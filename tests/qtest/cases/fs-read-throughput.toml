@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K141: bounded large-read regression for the vfsd proxy. Four 3 MiB reads from the initfs
+# through file: must finish within the 4 s step bound. Measured after the 64 KiB proxy chunk:
+# one read ~0.64 s, four reads ~2.5 s; the 4 s bound is normal time plus margin. The exact
+# call-count regression is the raven-vfsd chunk unit test (47 calls at 64 KiB vs 738 at 4 KiB).
+
+name = "fs-read-throughput"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 150
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '3019776 /lib/libc\.so\.1'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "wc -c /lib/libc.so.1; wc -c /lib/libc.so.1; wc -c /lib/libc.so.1; wc -c /lib/libc.so.1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 4
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 15

@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S167 C18 conformance: a pager-backed object's frames return to the frame baseline and the
+# pager key count returns to zero when (1) the owning process exits with the pager file still
+# open and (2) the file is truncated while the controller still holds it open.
+
+name = "pager-lifetime"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s36-lifecycle/build.sh pager"]
+initfs = "build/fixtures/s36-lifecycle/pager-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s36-mapcheck=1"
+# The release base starts blockd/fsd-ufs; give them the 1 MiB UFS2 disk the ufs-durability
+# fixture leaves behind so the boot plan reaches vfsd. The pager rows do not use this disk.
+qemu_extra = [
+    "-drive", "if=none,id=pager,format=raw,file=build/fixtures/ufs-durability/disk.img",
+    "-device", "virtio-blk-pci,drive=pager,disable-legacy=on",
+]
+expect_exit = "success"
+
+# Owner exit: pager key and frames must be gone at the exit-89 sample.
+[[expect]]
+regex = '^.*s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^.*s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=0$'
+
+[[expect]]
+regex = '^.*s36: mapcheck ok$'
+
+[[expect]]
+regex = '^.*s36: pager exit done$'
+
+# Shrink truncate: the controller still holds the file across the sample, so only the vfsd
+# truncate retire can free the pager key and frames.
+[[expect]]
+regex = '^.*s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^.*s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=0$'
+
+[[expect]]
+regex = '^.*s36: mapcheck ok$'
+
+[[expect]]
+regex = '^.*s36: pager truncate done$'
+
+[[forbid]]
+regex = '(?i)panic|s36: failed|s36: mapcheck leak'

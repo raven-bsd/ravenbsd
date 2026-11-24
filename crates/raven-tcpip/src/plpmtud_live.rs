@@ -53,14 +53,12 @@ pub(crate) fn probe_due(
         return None;
     }
     let top = ceiling(connection);
-    if !connection.plp_decided {
+    if !connection.plp_decided && u32::from(connection.mss) < top {
         connection.plp_decided = true;
-        if u32::from(connection.mss) < top {
-            let mut search = Plpmtud::new(u32::from(connection.mss), top, PROBE_BUDGET);
-            search.start();
-            connection.plp = Some(search);
-            connection.plp_next_ms = now_ms;
-        }
+        let mut search = Plpmtud::new(u32::from(connection.mss), top, PROBE_BUDGET);
+        search.start();
+        connection.plp = Some(search);
+        connection.plp_next_ms = now_ms;
     }
     if connection.plp_probe.is_some() {
         return None;
@@ -80,11 +78,7 @@ pub(crate) fn probe_due(
         PlpmtudState::Searching if now_ms >= connection.plp_next_ms => {}
         _ => return None,
     }
-    if room < top {
-        connection.plp_next_ms = now_ms.saturating_add(RETRY_MS);
-        return None;
-    }
-    let Some(size) = search.next_probe() else {
+    let Some(probe_size) = search.next_probe_size() else {
         if search.state == PlpmtudState::Error {
             connection.plp_next_ms = i64::MAX;
         } else {
@@ -93,6 +87,12 @@ pub(crate) fn probe_due(
         }
         return None;
     };
+    if room < probe_size {
+        connection.plp_next_ms = now_ms.saturating_add(RETRY_MS);
+        return None;
+    }
+    let size = search.next_probe()?;
+    debug_assert_eq!(size, probe_size);
     connection.plp_probe = Some((connection.snd_nxt.wrapping_add(size), size));
     connection.plp_next_ms = now_ms;
     Some((size, reprobe))

@@ -1,0 +1,50 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 20, 2026
+.Dt PTYD 8
+.Os RavenBSD
+.Sh NAME
+.Nm ptyd
+.Nd RavenBSD pseudo-terminal pair server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq pty:
+scheme and serves paired master and slave endpoints.
+Opening
+.Dq pty:master
+or
+.Dq pty:slave
+allocates a pair; the numbered forms
+.Dq pty:master/<id>
+and
+.Dq pty:slave/<id>
+select an existing pair.
+.Pp
+The server implements the standard terminal requests
+.Dv SET_MODE ,
+.Dv GET_MODE
+and
+.Dv FLUSH ,
+plus the pair-local foreground and hangup requests used by
+.Xr forkpty 3
+and the session leader.
+Closing the last slave endpoint hangs up the pair so the master reads
+end-of-file; the kernel
+.Dv PROC_CTTY_SET
+path makes the slave the child's controlling terminal.
+.Pp
+The server is started by
+.Xr svcd 8
+and is used by
+.Xr openpty 3 ,
+.Xr forkpty 3
+and the login session path.
+.Sh SEE ALSO
+.Xr svcd 8
+.Sh HISTORY
+The
+.Nm
+server first appeared in RavenBSD 0.1.0.

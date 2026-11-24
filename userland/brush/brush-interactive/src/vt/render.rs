@@ -67,6 +67,7 @@ impl Renderer {
     /// * `text` - The line being edited.
     /// * `cursor` - The cursor's byte offset in `text`.
     /// * `columns` - The terminal's width.
+    #[allow(dead_code, reason = "tests draw both styles through the enum")]
     pub fn draw(
         &mut self,
         out: &mut impl Write,
@@ -75,9 +76,22 @@ impl Renderer {
         cursor: usize,
         columns: usize,
     ) -> std::io::Result<()> {
+        self.draw_with_hint(out, prompt, text, cursor, columns, None)
+    }
+
+    /// Draws the line with an optional dimmed history suffix after the cursor.
+    pub fn draw_with_hint(
+        &mut self,
+        out: &mut impl Write,
+        prompt: &str,
+        text: &str,
+        cursor: usize,
+        columns: usize,
+        hint: Option<&str>,
+    ) -> std::io::Result<()> {
         let (text, cursor) = shown_text(text, cursor);
         match self {
-            Self::Vt(r) => r.draw(out, prompt, &text, cursor, columns),
+            Self::Vt(r) => r.draw(out, prompt, &text, cursor, columns, hint),
             Self::Backspace(r) => r.draw(out, prompt, &text, cursor),
         }
     }
@@ -155,6 +169,7 @@ impl VtRenderer {
         text: &str,
         cursor: usize,
         columns: usize,
+        hint: Option<&str>,
     ) -> std::io::Result<()> {
         let columns = columns.max(1);
         let mut seq = String::new();
@@ -171,9 +186,20 @@ impl VtRenderer {
                 .map_or(text, |(_, styled)| styled.as_str()),
         );
 
+        let shown_hint = hint.map(|hint| shown_text(hint, hint.len()).0).unwrap_or_default();
+        if !shown_hint.is_empty() {
+            let hint = nu_ansi_term::Style::new().dimmed().paint(shown_hint.as_ref());
+            let _ = write!(seq, "{hint}");
+        }
+
         let shown_prompt = visible_text(prompt);
-        let (end_row, end_column) =
-            position_after(shown_prompt.chars().chain(text.chars()), columns);
+        let (end_row, end_column) = position_after(
+            shown_prompt
+                .chars()
+                .chain(text.chars())
+                .chain(shown_hint.chars()),
+            columns,
+        );
         if end_column == 0 && end_row > 0 {
             // The line ends at the right margin, where terminals leave the cursor until
             // something else is written; put it at the start of the next row, where
@@ -212,7 +238,7 @@ impl VtRenderer {
         text: &str,
         columns: usize,
     ) -> std::io::Result<()> {
-        self.draw(out, prompt, text, text.len(), columns)?;
+        self.draw(out, prompt, text, text.len(), columns, None)?;
 
         // If the line ended at the right margin, the cursor is already on a new row.
         let shown_prompt = visible_text(prompt);
@@ -573,7 +599,7 @@ mod tests {
 
             let mut out = vec![];
             VtRenderer::start_on_own_row(&mut out, COLUMNS)?;
-            VtRenderer::default().draw(&mut out, "$ ", "ab", 2, COLUMNS)?;
+            VtRenderer::default().draw(&mut out, "$ ", "ab", 2, COLUMNS, None)?;
             play(&mut terminal, &out);
 
             let (rows, _) = shown(&terminal);
@@ -603,7 +629,7 @@ mod tests {
             ("a", 0, 0, 2),
         ] {
             let mut out = vec![];
-            renderer.draw(&mut out, prompt, text, cursor, COLUMNS)?;
+            renderer.draw(&mut out, prompt, text, cursor, COLUMNS, None)?;
             play(&mut terminal, &out);
 
             let (rows, position) = shown(&terminal);
@@ -681,7 +707,7 @@ mod tests {
                     let boundaries = text.char_indices().map(|(i, _)| i).chain([text.len()]);
                     for cursor in boundaries {
                         let mut out = vec![];
-                        renderer.draw(&mut out, prompt, text, cursor, columns)?;
+                        renderer.draw(&mut out, prompt, text, cursor, columns, None)?;
                         play(&mut terminal, &out);
 
                         let (rows, position) = shown(&terminal);
@@ -917,7 +943,7 @@ mod tests {
     fn treats_a_zero_width_terminal_as_one_column_wide() -> std::io::Result<()> {
         let mut renderer = VtRenderer::default();
         let mut out = vec![];
-        renderer.draw(&mut out, "", "ab", 1, 0)?;
+        renderer.draw(&mut out, "", "ab", 1, 0, None)?;
         let mut terminal = terminal(1);
         play(&mut terminal, &out);
         assert_eq!(

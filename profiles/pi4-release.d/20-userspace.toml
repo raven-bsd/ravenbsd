@@ -120,6 +120,14 @@ path = "/bin/getty"
 package = "login"
 path = "/bin/login"
 
+[[initfs.programs]]
+package = "pi4-xhci"
+path = "/sbin/pi4-xhci"
+
+[[initfs.programs]]
+package = "usb-hid"
+path = "/sbin/usb-hid"
+
 [[initfs.files]]
 src = "etc/services.d/logd.toml"
 path = "/etc/services.d/logd.toml"
@@ -153,7 +161,7 @@ src = "etc/services.d/vfsd.toml"
 path = "/etc/services.d/vfsd.toml"
 
 [[initfs.files]]
-src = "etc/services.d/consd.toml"
+src = "profiles/pi4-release.d/consd.manifest"
 path = "/etc/services.d/consd.toml"
 
 [[initfs.files]]
@@ -193,6 +201,14 @@ src = "profiles/pi4-release.d/getty.manifest"
 path = "/etc/services.d/getty.toml"
 
 [[initfs.files]]
+src = "profiles/pi4-release.d/usb-hid.manifest"
+path = "/etc/services.d/usb-hid.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/usb-xhci.manifest"
+path = "/etc/services.d/usb-xhci.toml"
+
+[[initfs.files]]
 src = "etc/mounts"
 path = "/etc/mounts"
 
@@ -219,6 +235,20 @@ mode = 0o600
 src = "etc/profile"
 path = "/etc/profile"
 mode = 0o644
+
+[[initfs.files]]
+src = "etc/brush/brushrc"
+path = "/etc/brush/brushrc"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/brush/bobtheshell.sh"
+path = "/etc/brush/bobtheshell.sh"
+mode = 0o644
+
+[[initfs.programs]]
+package = "ed"
+path = "/bin/ed"
 
 [[initfs.files]]
 src = "etc/motd"

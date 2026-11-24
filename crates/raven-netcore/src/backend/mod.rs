@@ -63,6 +63,15 @@ pub trait StackBackend {
         Vec::new()
     }
 
+    /// Live readiness of one socket without consuming data or errors.
+    ///
+    /// A backend that cannot answer returns [`Errno::EOPNOTSUPP`]; the caller must not invent a
+    /// stored readiness verdict in that case.
+    fn readiness(&self, s: SocketId) -> Result<crate::Readiness, Errno> {
+        let _ = s;
+        Err(Errno::EOPNOTSUPP)
+    }
+
     /// Packet/byte counters observed at the device boundary.
     fn interface_counters(&self) -> Option<crate::InterfaceCounters> {
         None
@@ -95,6 +104,20 @@ pub trait StackBackend {
 
     /// Listen on `port`.
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno>;
+
+    /// Listen on `port` with the caller's `SO_REUSEADDR` policy.
+    ///
+    /// The default ignores the policy so a backend that has no rebind control keeps the strict
+    /// behaviour; the native backend applies it as `FreeBSD in_pcbbind_setup` does.
+    fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
+        let _ = reuse_addr;
+        self.tcp_listen(port, backlog)
+    }
 
     /// Accept one completed connection.
     fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno>;
@@ -163,6 +186,12 @@ pub trait StackBackend {
     /// Read a protocol socket option.
     fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno> {
         let _ = (s, option);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Read and clear the pending socket error (`SO_ERROR`: once, then 0).
+    fn take_socket_error(&mut self, s: SocketId) -> Result<i32, Errno> {
+        let _ = s;
         Err(Errno::EOPNOTSUPP)
     }
 }

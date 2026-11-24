@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "modern-net-image"
+version = "0.1.0"
+description = "K202 host tool: add the target raven binary to the release initfs"
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "modern-net-image"
+path = "src/main.rs"
+
+[dependencies]
+raven-initfs = { path = "../../../../../crates/raven-initfs", features = ["std"] }

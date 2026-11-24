@@ -2,119 +2,127 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # K25a: the uutils coreutils slice built for the Raven std target. The staging tree
-# is produced by `cargo xtask build uutils --arch x86_64`; this first image carries
-# the base-tools subset (the rest stay staged until the initfs budget follow-up).
+# is produced by `cargo xtask build uutils --arch <arch>`; `{arch}` resolves to the
+# image target (K153), so the aarch64 release never stages x86_64 binaries. This
+# first image carries the base-tools subset (the rest stay staged until the initfs
+# budget follow-up).
 
 [[initfs.files]]
-src = "build/x86_64/uutils/ls"
+src = "build/{arch}/uutils/ls"
 path = "/bin/ls"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/cat"
+src = "build/{arch}/uutils/cat"
 path = "/bin/cat"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/cp"
+src = "build/{arch}/uutils/cp"
 path = "/bin/cp"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/mv"
+src = "build/{arch}/uutils/mv"
 path = "/bin/mv"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/rm"
+src = "build/{arch}/uutils/rm"
 path = "/bin/rm"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/mkdir"
+src = "build/{arch}/uutils/mkdir"
 path = "/bin/mkdir"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/rmdir"
+src = "build/{arch}/uutils/rmdir"
 path = "/bin/rmdir"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/touch"
+src = "build/{arch}/uutils/touch"
 path = "/bin/touch"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/stat"
+src = "build/{arch}/uutils/stat"
 path = "/bin/stat"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/df"
+src = "build/{arch}/uutils/df"
 path = "/bin/df"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/echo"
+src = "build/{arch}/uutils/echo"
 path = "/bin/echo"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/head"
+src = "build/{arch}/uutils/head"
 path = "/bin/head"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/tail"
+src = "build/{arch}/uutils/tail"
 path = "/bin/tail"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/sort"
+src = "build/{arch}/uutils/sort"
 path = "/bin/sort"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/du"
+src = "build/{arch}/uutils/du"
 path = "/bin/du"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/id"
+src = "build/{arch}/uutils/id"
 path = "/bin/id"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/wc"
+src = "build/{arch}/uutils/wc"
 path = "/bin/wc"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/true"
+src = "build/{arch}/uutils/true"
 path = "/bin/true"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/x86_64/uutils/false"
+src = "build/{arch}/uutils/false"
 path = "/bin/false"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/{arch}/uutils/tty"
+path = "/bin/tty"
 mode = 0o755
 generated = true

@@ -107,9 +107,29 @@ fn cancel_is_idempotent_and_safe() {
     assert!(cyc.cancel(id));
     assert!(!cyc.cancel(id)); // already cancelled
     assert!(!cyc.cancel(999)); // unknown
-    // The cancelled cyclic is reclaimed on fire and never fires.
+    // The cancelled cyclic is unlinked immediately and never fires.
     assert_eq!(fire_into(&mut cyc, 10), Vec::<CyclicId>::new());
     assert!(cyc.is_empty());
+}
+
+#[test]
+fn cancel_reclaims_the_last_entry_immediately() {
+    let mut cyc = Cyclics::new(RecordingBackend::new(0));
+    let mut ids = Vec::new();
+    // A cancelled timer that is the last entry disarms the backend. If it is retained, no
+    // interrupt ever reaches its original deadline, so the heap grows without bound.
+    for step in 0..1000u64 {
+        let id = cyc.add(spec(1_000_000_000 + step));
+        assert!(cyc.cancel(id));
+        ids.push(id);
+    }
+    assert_eq!(cyc.len(), 0, "cancelled cyclics retained");
+    assert!(cyc.is_empty());
+    assert_eq!(cyc.next_deadline(), None);
+    // The backend must not stay armed for a cancelled deadline.
+    assert_eq!(cyc.backend().programmed.last(), Some(&None));
+    // Cancellation stays idempotent after the entry is gone.
+    assert!(!cyc.cancel(ids[0]));
 }
 
 #[test]
@@ -191,6 +211,93 @@ fn slack_and_level_are_carried() {
     assert_eq!(spec.slack_ns, 50_000);
     assert_eq!(fire_into(&mut cyc, 10), vec![id]);
     assert_eq!(cyc.spec(id), None); // fired and gone
+}
+
+#[test]
+fn level_aware_callback_receives_the_firing_spec() {
+    let mut cyc = Cyclics::new(RecordingBackend::new(0));
+    let high = cyc.add(CyclicSpec {
+        when: 20,
+        interval: 0,
+        level: Level::High,
+        slack_ns: 7,
+    });
+    let normal = cyc.add(CyclicSpec {
+        when: 10,
+        interval: 0,
+        level: Level::Normal,
+        slack_ns: 3,
+    });
+    let low = cyc.add(CyclicSpec {
+        when: 15,
+        interval: 0,
+        level: Level::Low,
+        slack_ns: 11,
+    });
+    let mut fired = Vec::new();
+    cyc.on_interrupt_with(20, |id, spec| {
+        fired.push((id, spec.level, spec.when, spec.slack_ns));
+    });
+    assert_eq!(
+        fired,
+        vec![
+            (normal, Level::Normal, 10, 3),
+            (low, Level::Low, 15, 11),
+            (high, Level::High, 20, 7),
+        ]
+    );
+    assert!(cyc.is_empty());
+}
+
+#[test]
+fn delayed_ipi_drains_periodic_and_reports_each_deadline() {
+    let mut cyc = Cyclics::new(RecordingBackend::new(0));
+    let id = cyc.add(CyclicSpec {
+        when: 5,
+        interval: 5,
+        level: Level::High,
+        slack_ns: 0,
+    });
+    let mut fired = Vec::new();
+    // One delayed interrupt at 20 must drain every missed period in order, not only the first.
+    cyc.on_interrupt_with(20, |fired_id, spec| {
+        fired.push((fired_id, spec.when, spec.level));
+    });
+    assert_eq!(
+        fired,
+        vec![
+            (id, 5, Level::High),
+            (id, 10, Level::High),
+            (id, 15, Level::High),
+            (id, 20, Level::High),
+        ]
+    );
+    assert_eq!(cyc.next_deadline(), Some(25));
+}
+
+#[test]
+fn per_cpu_cyclics_are_independent() {
+    let mut cpu0 = Cyclics::new(RecordingBackend::new(0));
+    let mut cpu1 = Cyclics::new(RecordingBackend::new(0));
+    cpu0.add(spec(10));
+    cpu1.add(spec(20));
+    assert_eq!(cpu0.backend().programmed, vec![Some(10)]);
+    assert_eq!(cpu1.backend().programmed, vec![Some(20)]);
+    assert_eq!(fire_into(&mut cpu0, 10).len(), 1);
+    assert_eq!(cpu0.backend().programmed, vec![Some(10), None]);
+    // Firing cpu0 must not disturb cpu1's programmed deadline.
+    assert_eq!(cpu1.backend().programmed, vec![Some(20)]);
+    assert_eq!(cpu1.next_deadline(), Some(20));
+}
+
+#[test]
+fn remote_cancel_before_the_ipi_does_not_fire() {
+    let mut cyc = Cyclics::new(RecordingBackend::new(0));
+    let id = cyc.add(spec(10));
+    assert!(cyc.cancel(id));
+    assert_eq!(cyc.backend().programmed, vec![Some(10), None]);
+    assert_eq!(fire_into(&mut cyc, 10), Vec::<CyclicId>::new());
+    assert!(cyc.is_empty());
 }
 
 fn xorshift(state: &mut u64) -> u64 {

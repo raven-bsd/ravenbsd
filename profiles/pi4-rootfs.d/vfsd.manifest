@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Root file service. `ufs:` must be registered before vfsd snapshots the scheme
+# names, so the root mount and the merged `/root/etc/services.d` plan can use it.
+name = "vfsd"
+exec = "/sbin/vfsd"
+needs = ["logd", "initfsd", "ramfsd", "fsd-ufs"]
+provides = ["scheme:file"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+max_restarts = 3

@@ -16,6 +16,8 @@ use crate::sched;
 static IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
 /// PPI number of the timer, zero until [`set_timer`].
 static TIMER_IRQ: AtomicU32 = AtomicU32::new(0);
+/// SPI number of the PL011 receive line, zero until the console routes it.
+static UART_IRQ: AtomicU32 = AtomicU32::new(0);
 /// Spurious GIC acknowledgements (no interrupt to service).
 static SPURIOUS: AtomicU64 = AtomicU64::new(0);
 /// Interrupts with no owner; counted instead of logged in interrupt context.
@@ -30,6 +32,17 @@ pub fn set_timer(irq: u32) {
 #[must_use]
 pub fn timer_irq() -> u32 {
     TIMER_IRQ.load(Ordering::Acquire)
+}
+
+/// Record the PL011 receive interrupt line.
+pub fn set_uart_irq(irq: u32) {
+    UART_IRQ.store(irq, Ordering::Release);
+}
+
+/// The PL011 receive interrupt line, or zero.
+#[must_use]
+pub fn uart_irq() -> u32 {
+    UART_IRQ.load(Ordering::Acquire)
 }
 
 /// Number of interrupts dispatched since boot.
@@ -91,7 +104,10 @@ pub fn dispatch(from_user: bool) {
             timer::handle();
         } else {
             timer::rearm();
+            crate::time::on_ap_tick();
         }
+    } else if id != 0 && id == uart_irq() {
+        crate::arch::aarch64::console::handle_irq();
     } else if gic::is_spi(id) {
         if !crate::driver::irq::handle_spi(id) {
             // An unclaimed line must not storm; masking it also makes the next `IRQ_CREATE`

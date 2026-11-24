@@ -1,0 +1,41 @@
+acceptance: donors=219 register=218 target=218 accepted=218 gaps=0 missing=1 duplicate=0 unknown=0
+k315: missing=1 duplicate=0 unknown=0 empty_rust=0 empty_test=0 empty_mutation=0 not_pass=0
+target note: ticket text says 218 but the pinned donor/manifest has 219; the extra row is reported, not dropped
+218-row view: 217/218 if the one-row discrepancy excludes rack_dtor (PASS)
+owner	pass	total
+K269	2	2
+K328	35	35
+K329	43	43
+K330	15	15
+K331	15	15
+K332	15	15
+K333	11	11
+K334	76	76
+K335	2	2
+K336	4	4
+
+replay:
+class	traces	events	mismatches	first mismatch
+loss	10000	105000	7948	loss seed 1: expected lost 4000-5000 pipe 2000, got lost 4000-5000 pipe 1000
+	sample: loss seed 2: expected lost 2000-6000 pipe 5000, got lost - pipe 5000
+	sample: loss seed 3: expected lost 2000-6000 pipe 5000, got lost - pipe 5000
+	sample: loss seed 4: expected lost 3000-6000 pipe 4000, got lost - pipe 4000
+	sample: loss seed 6: expected lost 4000-5000 pipe 2000, got lost 4000-5000 pipe 1000
+	gap: product SackScoreboard exposes lost ranges and pipe only; retransmit and recovery counters are not part of its public result
+recovery	10000	121925	1025	recovery seed 11: expected lost - pipe 1000, got lost - pipe 0
+	sample: recovery seed 24: expected lost 8000-9000 pipe 2000, got lost - pipe 2000
+	sample: recovery seed 43: expected lost 8000-9000 pipe 1000, got lost - pipe 1000
+	sample: recovery seed 47: expected lost 8000-9000 pipe 1000, got lost - pipe 1000
+	sample: recovery seed 53: expected lost - pipe 1000, got lost - pipe 0
+	gap: product SackScoreboard exposes lost ranges and pipe only; retransmit selections and recovery entries/exits are not part of its public result
+tlp	5	10000	1747	tlp seed 0x32000001 event 192 dsack: expected reo_wnd 25, got reo_wnd 50
+	sample: tlp seed 0x32000001 event 528 dsack: expected reo_wnd 25, got reo_wnd 75
+	sample: tlp seed 0x32000001 event 677 dsack: expected reo_wnd 25, got reo_wnd 100
+	sample: tlp seed 0x32000001 event 729 dsack: expected reo_wnd 25, got reo_wnd 100
+	sample: tlp seed 0x32000001 event 856 dsack: expected reo_wnd 25, got reo_wnd 100
+	gap: the product Tlp has no probe counter, no RTO cap and no spurious-undo/reneging result; those K320 fields are compared only where Tlp/Rack expose them
+bbr	10	10000	10000	bbr seed 0x3260000a event 51863: expected pacing_rate 222650 B/s cwnd 77028, got absent: raven-tcpip has no BBR/timely/pacing engine
+	gap: K326 oracle values are complete; the product side is absent, so every modelled event is counted as a mismatch
+vtable	5	10000	1	vtable tfb_flags: expected 6, got 3
+	gap: the 10k-event K327 trace is replayed for determinism; only the callback probe matrix is compared against RackStack
+exit 1

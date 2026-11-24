@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K434 rev209 control for aarch64-ssh-client: the same release image binaries and the same
+# console dialogue on x86_64. `/bin/true` and `/bin/ssh -V` must print their markers; a red x86
+# row means the input pattern or shell, not aarch64, is at fault.
+
+name = "x86_64-ssh-client"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-nic", "none"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^SPAWN-TRUE:0$'
+
+[[expect]]
+regex = '^OpenSSH_[0-9]'
+
+[[expect]]
+regex = '^SSHTOOL:0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fatal runtime error|process: user fault'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/true; echo SPAWN-TRUE:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^SPAWN-TRUE:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ssh -V 2>&1; echo SSHTOOL:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^SSHTOOL:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

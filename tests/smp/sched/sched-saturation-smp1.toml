@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K527 single-CPU baseline: the same 128-thread saturation and 10k schedules.
+
+name = "sched-saturation-smp1"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=sched-saturation"
+qemu_extra = ["-smp", "1"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^sched-saturation: spawned=80 cap=1024$'
+
+[[expect]]
+regex = '^sched-saturation: done=80 lost=0 switches=[0-9]+$'
+
+[[expect]]
+regex = '^CONTRACT K527 PASS switches=[0-9]+$'
+
+[[forbid]]
+regex = '(?i)sched-saturation: fail|CONTRACT K527 FAIL|lost=[1-9]|panic|EXCEPTION'

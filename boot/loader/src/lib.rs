@@ -13,6 +13,7 @@ extern crate alloc;
 pub mod arch;
 pub mod bootinfo;
 pub mod config;
+pub mod console_mirror;
 #[cfg(target_os = "uefi")]
 pub mod fs;
 #[cfg(target_os = "uefi")]

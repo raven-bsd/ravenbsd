@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# file|packets|linktype|sha256|decoder|note
+arp.pcap|2|ethernet|3dc01b07e3a95722baa15e56703a53455c5a459b7b781d1cb09d33f05a5a0044|tcpdump -nn -tt|ARP request/reply
+ipv4-tcp-handshake.pcap|8|ethernet|15465803371a264dffed11f36754fd5c8741de3f2183f8c28baf329f0d33fa73|tcpdump -nn -tt|SYN options, payload, FIN
+ipv4-udp-dns.pcap|2|ethernet|a456558d615010a509b852cfdf6a86850fca647a119b637744d42ddab01f4ab2|tcpdump -nn -tt|DNS query and answer
+ipv4-icmp-echo.pcap|2|ethernet|458eae668d63eed61ec8ef932f48d69bc18c791e96d5f3bd7e4da78466f79cfd|tcpdump -nn -tt|ICMP echo request/reply
+ipv6-tcp-http.pcap|5|ethernet|64c086d78663e0d69992211244f6e3d2730381777f4767f97e269185bb068979|tcpdump -nn -tt|IPv6 TCP handshake/FIN
+ipv6-udp-icmp.pcap|4|ethernet|a99d543bb1620bc463bdd831e101b53d80b0ecee746b6411bfeef859d19ddcb4|tcpdump -nn -tt|IPv6 UDP DNS and ICMPv6 echo
+ipv4-fragmented-udp.pcap|3|ethernet|96cd79c2a690d5ea410f2b657e8d610fc409a64381db5c4653bde46d66a6f0fb|tcpdump -nn -tt -v|UDP split 1480/1480/48

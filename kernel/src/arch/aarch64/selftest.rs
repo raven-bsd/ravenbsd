@@ -15,6 +15,7 @@ pub fn run(cmdline: &CmdLine) {
         Some("timer") => crate::time::selftest(),
         Some("sched") => crate::sched::selftest::run(),
         Some("smp") => crate::sched::smp::selftest::run(),
+        Some("cyclic-smp") => crate::time::cyclic_smp_selftest(),
         _ => {}
     }
 }

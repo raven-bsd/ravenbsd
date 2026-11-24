@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# SC1: opt-in vendored-source configuration for the offline release build.
+# Normal builds use crates.io; use this only with a populated vendor snapshot:
+#   cargo --offline --config .cargo/vendor.toml ...
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"

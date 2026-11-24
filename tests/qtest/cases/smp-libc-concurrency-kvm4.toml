@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S85d: malloc/stdio concurrency stress under the qtest harness's fixed `-smp 4`. The C fixture
+# creates 8 threads, each doing 2000 malloc/free + flockfile/fputs/funlockfile rounds, then reads
+# every line back. A hang is a bounded 60 s failure, not a skip.
+
+# S112: malloc/stdio concurrency under KVM -smp 4.
+name = "smp-libc-concurrency-kvm4"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/libc/target/build-smp.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp-libc-concurrency: start$'
+
+[[expect]]
+regex = '^smp-libc-concurrency: malloc ok$'
+
+[[expect]]
+regex = '^smp-libc-concurrency: stdio ok lines=16000$'
+
+[[expect]]
+regex = '^smp-libc-concurrency: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-libc-concurrency: FAIL'

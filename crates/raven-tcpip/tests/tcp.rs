@@ -133,6 +133,61 @@ fn tcp_frame(
     frame
 }
 
+/// One IPv4/TCP frame with a payload, for the SYN_RECEIVED fallthrough tests.
+#[allow(clippy::too_many_arguments)] // The parameters mirror the wire header fields.
+fn tcp_frame_payload(
+    source: [u8; 4],
+    destination: [u8; 4],
+    source_port: u16,
+    destination_port: u16,
+    seq: u32,
+    ack: u32,
+    flags: TcpFlags,
+    payload: &[u8],
+) -> Vec<u8> {
+    let header = TcpHeader {
+        src_port: source_port,
+        dst_port: destination_port,
+        sequence: seq,
+        acknowledgement: ack,
+        flags,
+        window: 65_535,
+        urgent_pointer: 0,
+    };
+    let context = ChecksumContext::ipv4(WireIpv4Addr::new(source), WireIpv4Addr::new(destination));
+    let mut segment = vec![0u8; 20 + payload.len()];
+    {
+        let mut builder =
+            TcpBuilder::new(&mut segment, context, &header, &[], payload.len()).expect("tcp");
+        builder.payload_mut().copy_from_slice(payload);
+        builder.finish();
+    }
+    let ip_header = Ipv4Header {
+        id: 2,
+        ttl: 64,
+        protocol: 6,
+        src: WireIpv4Addr::new(source),
+        dst: WireIpv4Addr::new(destination),
+        ..Ipv4Header::default()
+    };
+    let mut packet = vec![0u8; 20 + segment.len()];
+    let mut builder = Ipv4Builder::new(&mut packet, &ip_header, segment.len()).expect("ipv4");
+    builder.payload_mut().copy_from_slice(&segment);
+    builder.finish();
+    let mut frame = vec![0u8; 14 + packet.len()];
+    let mut builder = EthernetBuilder::new(
+        &mut frame,
+        MacAddr::new(AMAC),
+        MacAddr::new(BMAC),
+        EtherType::Ipv4,
+        packet.len(),
+    )
+    .expect("ethernet");
+    builder.payload_mut().copy_from_slice(&packet);
+    builder.finish();
+    frame
+}
+
 fn trace_tcp<D: raven_tcpip::Device>(stack: &Stack<D>) -> Vec<(TcpFlags, u32, u32)> {
     stack
         .test_trace()
@@ -659,9 +714,10 @@ fn syn_received_state_is_visible_for_a_half_open_connection() {
     let listener = stack.tcp_listen(80, 2).expect("listen");
     let frame = tcp_frame(B, A, 1234, 80, 100, 0, TcpFlags::SYN);
     stack.test_inject_frame(&frame, Instant::ZERO);
-    let half_open = stack.test_listener_half_open(listener);
-    assert_eq!(half_open.len(), 1);
-    assert_eq!(stack.tcp_state(half_open[0]), Ok(TcpState::SynReceived));
+    stack.poll(Instant::ZERO);
+    assert_eq!(stack.test_syncache_len(), 1);
+    assert!(stack.test_listener_half_open(listener).is_empty());
+    assert!(stack.test_syncache_entry(1234).is_some());
 }
 
 #[test]
@@ -728,6 +784,28 @@ fn time_wait_ignores_rst() {
 }
 
 #[test]
+fn time_wait_rejects_a_syn_that_does_not_advance_rcv_nxt() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    let accepted = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("conn");
+    a.shutdown_write(socket).expect("a close");
+    drive(&mut a, &mut b, &[200, 250, 300, 350]);
+    b.shutdown_write(accepted).expect("b close");
+    drive(&mut a, &mut b, &[350, 400, 450, 500]);
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::TimeWait));
+    let rcv_nxt = a.test_tcp_rcv_nxt(socket).expect("rcv_nxt");
+    // FreeBSD tcp_twcheck recycles only when SEG.SEQ > RCV.NXT; a SYN at RCV.NXT
+    // is a retransmission of the old connection and must not reopen it.
+    let frame = tcp_frame(B, A, 80, 40_000, rcv_nxt, 0, TcpFlags::SYN);
+    a.test_inject_frame(&frame, Instant::from_millis(501));
+    a.poll(Instant::from_millis(501));
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::TimeWait));
+}
+
+#[test]
 fn syn_sent_unacceptable_ack_gets_a_reset() {
     let (link, mut a, _b) = pair();
     let socket = a
@@ -741,5 +819,230 @@ fn syn_sent_unacceptable_ack_gets_a_reset() {
         trace_link_tcp(&link, start)
             .iter()
             .any(|(flags, _, _)| flags.rst())
+    );
+}
+
+/// FreeBSD `tcp_do_segment` SYN_RECEIVED falls through to ESTABLISHED, so data
+/// carried on the third handshake segment must reach the accepted socket.
+#[test]
+fn syn_received_final_ack_processes_payload() {
+    let mut b = stack4();
+    let listener = b.tcp_listen(80, 4).expect("listen");
+    let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
+    b.test_inject_frame(&syn, Instant::ZERO);
+    b.poll(Instant::ZERO);
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
+
+    let ack = tcp_frame_payload(
+        B,
+        A,
+        40_000,
+        80,
+        irs.wrapping_add(1),
+        iss.wrapping_add(1),
+        TcpFlags::ACK,
+        b"hello",
+    );
+    b.test_inject_frame(&ack, Instant::from_millis(10));
+    b.poll(Instant::from_millis(10));
+    assert_eq!(b.test_syncache_len(), 0);
+    let accepted = b
+        .tcp_accept(listener)
+        .expect("accept")
+        .expect("established connection");
+    let mut buffer = [0u8; 8];
+    assert_eq!(
+        b.recv(accepted, &mut buffer).expect("final-ACK data"),
+        b"hello".len()
+    );
+    assert_eq!(&buffer[..b"hello".len()], b"hello");
+}
+
+/// A SYN with another sequence in SYN_RECEIVED is not a valid duplicate and
+/// must not tear down the half-open connection (FreeBSD only RSTs `seq < irs`).
+#[test]
+fn duplicate_syn_with_other_sequence_does_not_close_syn_received() {
+    let mut b = stack4();
+    let listener = b.tcp_listen(80, 4).expect("listen");
+    let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
+    b.test_inject_frame(&syn, Instant::ZERO);
+    b.poll(Instant::ZERO);
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
+
+    let forged = tcp_frame(B, A, 40_000, 80, 1_000, 0, TcpFlags::SYN);
+    b.test_inject_frame(&forged, Instant::from_millis(10));
+    assert_eq!(
+        b.test_syncache_len(),
+        1,
+        "a duplicate SYN must not remove the syncache entry"
+    );
+
+    let ack = tcp_frame(
+        B,
+        A,
+        40_000,
+        80,
+        irs.wrapping_add(1),
+        iss.wrapping_add(1),
+        TcpFlags::ACK,
+    );
+    b.test_inject_frame(&ack, Instant::from_millis(20));
+    b.poll(Instant::from_millis(20));
+    assert_eq!(b.test_syncache_len(), 0);
+    assert!(b.tcp_accept(listener).expect("accept").is_some());
+}
+
+/// FreeBSD's LAND guard (`SEQ_LT(seq, irs)` in SYN_RECEIVED) emits the
+/// `tcp_dropwithreset` shape: RST|ACK with ACK = SEG.SEQ + SEG.LEN.
+#[test]
+fn syn_below_irs_in_syn_received_gets_reset_ack() {
+    let mut b = stack4();
+    let _listener = b.tcp_listen(80, 4).expect("listen");
+    let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
+    b.test_inject_frame(&syn, Instant::ZERO);
+    b.poll(Instant::ZERO);
+    b.test_clear_trace();
+
+    let land = tcp_frame(B, A, 40_000, 80, 99, 0, TcpFlags::SYN);
+    b.test_inject_frame(&land, Instant::from_millis(10));
+    b.poll(Instant::from_millis(10));
+    assert_eq!(b.test_syncache_len(), 1);
+    let reply = trace_tcp(&b)
+        .into_iter()
+        .find(|(flags, _, _)| flags.rst())
+        .expect("LAND SYN gets a reset");
+    assert!(reply.0.rst() && reply.0.ack(), "RST|ACK, not a bare RST");
+    assert_eq!(reply.1, 0);
+    assert_eq!(reply.2, 100, "ACK covers the offending SYN");
+}
+
+/// FreeBSD records `ECONNREFUSED` when a RST closes a SYN_RECEIVED socket.
+#[test]
+fn rst_in_syn_received_records_econnrefused() {
+    let mut b = stack4();
+    let _listener = b.tcp_listen(80, 4).expect("listen");
+    let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
+    b.test_inject_frame(&syn, Instant::ZERO);
+    b.poll(Instant::ZERO);
+    let (_, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
+    let rst = tcp_frame(B, A, 40_000, 80, irs.wrapping_add(1), 0, TcpFlags::RST);
+    b.test_inject_frame(&rst, Instant::from_millis(10));
+    b.poll(Instant::from_millis(10));
+    assert_eq!(b.test_syncache_len(), 0, "a valid RST aborts the entry");
+}
+
+/// RFC 5961 RST validation uses `last_ack_sent` as well as `RCV.NXT`.  A small
+/// in-order segment leaves the ACK delayed, so `last_ack_sent` stays behind.
+#[test]
+fn rst_at_last_ack_sent_closes_a_connection_with_a_held_ack() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    let last_ack_sent = a.test_tcp_rcv_nxt(socket).expect("rcv_nxt");
+    let (_, _, snd_nxt) = a.test_tcp_window(socket).expect("window");
+    let data = tcp_frame_payload(
+        B,
+        A,
+        80,
+        40_000,
+        last_ack_sent,
+        snd_nxt,
+        TcpFlags::ACK,
+        b"x",
+    );
+    a.test_inject_frame(&data, Instant::from_millis(160));
+    a.poll(Instant::from_millis(160));
+    assert_eq!(
+        a.test_tcp_rcv_nxt(socket),
+        Some(last_ack_sent.wrapping_add(1)),
+        "the data advanced RCV.NXT"
+    );
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::Established));
+
+    let rst = tcp_frame(B, A, 80, 40_000, last_ack_sent, 1, TcpFlags::RST);
+    a.test_inject_frame(&rst, Instant::from_millis(161));
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::Closed));
+    assert_eq!(a.tcp_error(socket), Ok(Some(Errno::ECONNRESET)));
+}
+
+/// SYN_RECEIVED rejects an ACK that does not acknowledge the SYN|ACK.
+#[test]
+fn syn_received_bad_ack_gets_a_reset() {
+    let mut b = stack4();
+    let _listener = b.tcp_listen(80, 4).expect("listen");
+    let syn = tcp_frame(B, A, 40_000, 80, 100, 0, TcpFlags::SYN);
+    b.test_inject_frame(&syn, Instant::ZERO);
+    b.poll(Instant::ZERO);
+    let (iss, irs, _, _) = b.test_syncache_entry(40_000).expect("entry");
+    b.test_clear_trace();
+
+    let bad = tcp_frame(B, A, 40_000, 80, irs.wrapping_add(1), iss, TcpFlags::ACK);
+    b.test_inject_frame(&bad, Instant::from_millis(10));
+    b.poll(Instant::from_millis(10));
+    assert_eq!(b.test_syncache_len(), 1, "a bad ACK keeps the entry");
+    assert!(
+        trace_tcp(&b).iter().any(|(flags, _, _)| flags.rst()),
+        "an ACK that ignores the SYN gets a RST"
+    );
+}
+
+/// The pre-dispatch RST rule applies to FIN-WAIT-1 as well as ESTABLISHED.
+#[test]
+fn rst_in_fin_wait_1_closes_with_econnreset() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    a.shutdown_write(socket).expect("shutdown");
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::FinWait1));
+    let rcv_nxt = a.test_tcp_rcv_nxt(socket).expect("rcv_nxt");
+    let rst = tcp_frame(B, A, 80, 40_000, rcv_nxt, 1, TcpFlags::RST);
+    a.test_inject_frame(&rst, Instant::from_millis(160));
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::Closed));
+    assert_eq!(a.tcp_error(socket), Ok(Some(Errno::ECONNRESET)));
+}
+
+/// The pre-dispatch RST rule applies in CLOSE-WAIT after a peer FIN.
+#[test]
+fn rst_in_close_wait_closes_with_econnreset() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    let accepted = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("connection");
+    a.shutdown_write(socket).expect("a close");
+    drive(&mut a, &mut b, &[200, 250, 300]);
+    assert_eq!(b.tcp_state(accepted), Ok(TcpState::CloseWait));
+    let rcv_nxt = b.test_tcp_rcv_nxt(accepted).expect("rcv_nxt");
+    let rst = tcp_frame(A, B, 40_000, 80, rcv_nxt, 1, TcpFlags::RST);
+    b.test_inject_frame(&rst, Instant::from_millis(310));
+    assert_eq!(b.tcp_state(accepted), Ok(TcpState::Closed));
+    assert_eq!(b.tcp_error(accepted), Ok(Some(Errno::ECONNRESET)));
+}
+
+/// An ACK above `SND.MAX` is invalid in every synchronized state; FreeBSD
+/// acks/drops it without accepting its window.  FIN-WAIT-2 used to accept it.
+#[test]
+fn out_of_range_ack_in_fin_wait_2_does_not_update_the_window() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    a.shutdown_write(socket).expect("shutdown");
+    drive(&mut a, &mut b, &[200, 250, 300]);
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::FinWait2));
+    let (window, _, snd_nxt) = a.test_tcp_window(socket).expect("window");
+    let rcv_nxt = a.test_tcp_rcv_nxt(socket).expect("rcv_nxt");
+    let frame = tcp_frame(
+        B,
+        A,
+        80,
+        40_000,
+        rcv_nxt,
+        snd_nxt.wrapping_add(1_000),
+        TcpFlags::ACK,
+    );
+    a.test_inject_frame(&frame, Instant::from_millis(310));
+    assert_eq!(a.tcp_state(socket), Ok(TcpState::FinWait2));
+    assert_eq!(
+        a.test_tcp_window(socket).expect("window").0,
+        window,
+        "an ACK above SND.MAX must not update snd_wnd"
     );
 }

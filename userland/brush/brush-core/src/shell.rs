@@ -420,6 +420,23 @@ impl<SE: extensions::ShellExtensions> Shell<SE> {
     pub(crate) const fn command_number(&self) -> usize {
         self.command_number
     }
+
+    /// Changes the shell's working directory and the process working directory together.
+    ///
+    /// `set_working_dir` updates only the shell state (PWD/OLDPWD and `working_dir`); RavenBSD
+    /// child processes inherit the process cwd, so an interactive `cd` must move both. The shell
+    /// state is updated only after the process `chdir` succeeds, so a failed `cd` keeps the
+    /// previous directory.
+    pub fn change_dir(&mut self, target_dir: impl AsRef<Path>) -> Result<(), error::Error> {
+        let target = self.absolute_path(target_dir.as_ref());
+        std::env::set_current_dir(&target)?;
+        let previous = self.working_dir().to_owned();
+        if let Err(error) = self.set_working_dir(&target) {
+            let _ = std::env::set_current_dir(previous);
+            return Err(error);
+        }
+        Ok(())
+    }
 }
 
 /// Snapshot of the state the last command left behind: `$?`, `PIPESTATUS`, and `$_`.

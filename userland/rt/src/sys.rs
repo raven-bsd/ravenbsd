@@ -940,6 +940,50 @@ pub fn thread_create(
     })
 }
 
+/// The extended `THREAD_CREATE` payload (`raven_abi::syscall::ThreadCreateEx`).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct ThreadCreateEx {
+    /// User TLS base; zero leaves it unset.
+    tp: usize,
+    /// Caller address for the new tid; zero skips the write.
+    tid_out: usize,
+    /// New thread's clear-on-exit word; the kernel writes zero when `THREAD_EXIT` runs.
+    clear_tid_addr: usize,
+}
+
+/// Create a thread whose exit publishes `clear_tid_addr = 0` **from kernel mode**.
+///
+/// The kernel clears and wakes the word in `THREAD_EXIT` before switching away, so a joiner that
+/// observes zero knows the exiting thread has already entered the kernel and will never use its
+/// user stack again. That is the ordering `join` needs before it unmaps the stack.
+pub fn thread_create_ex(
+    process: Handle,
+    entry: usize,
+    stack_top: usize,
+    arg: usize,
+    clear_tid_addr: usize,
+) -> Result<Handle, Errno> {
+    let extended = ThreadCreateEx {
+        tp: 0,
+        tid_out: 0,
+        clear_tid_addr,
+    };
+    // SAFETY: the payload is live and correctly aligned for the duration of the call; the kernel
+    // validates the entry, stack and clear-word VMAs. The remaining arguments are scalars.
+    handle_from_ret(unsafe {
+        syscall6(
+            Syscall::THREAD_CREATE as usize,
+            process.0 as usize,
+            entry,
+            stack_top,
+            arg,
+            raven_abi::syscall::THREAD_CREATE_EX,
+            &extended as *const ThreadCreateEx as usize,
+        )
+    })
+}
+
 /// Terminate the calling thread (and process if it is the last thread).
 pub fn thread_exit(code: i32) -> ! {
     // SAFETY: THREAD_EXIT takes only the scalar exit code and never returns.

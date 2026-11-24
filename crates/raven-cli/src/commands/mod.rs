@@ -50,7 +50,7 @@ pub static COMMANDS: &[&dyn Command] = &[
     &crate::cmd::svc::SVC_COMMAND,
     &crate::cmd::config::CONFIG_COMMAND,
     &theme::THEME_COMMAND,
-    &reserved::NET,
+    &crate::cmd::net::NET_COMMAND,
     &reserved::LOG,
     &reserved::PKG,
     &reserved::USER,

@@ -11,7 +11,6 @@ use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 #[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::{Handle, Rights, map, memobj, prot};
-#[cfg(target_arch = "x86_64")]
 use raven_usercopy::UserSlice;
 use raven_vma::PAGE_SIZE;
 
@@ -20,7 +19,6 @@ use crate::memory::uspace::{InheritIdentity, MapInherit};
 use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
-#[cfg(target_arch = "x86_64")]
 use crate::usercopy::copy_from_user;
 
 /// Largest memory object accepted by `MEMOBJ_CREATE` (1 GiB).
@@ -41,6 +39,22 @@ enum MappedObject {
     Dma(Arc<DmaBuffer>),
 }
 
+/// Debug hook: a TLB shootdown must never run while this CPU holds an address-space mutex.
+struct AddressSpaceLockProbe;
+
+impl AddressSpaceLockProbe {
+    fn held() -> Self {
+        crate::sched::smp::percpu::note_unmap_lock_held(true);
+        Self
+    }
+}
+
+impl Drop for AddressSpaceLockProbe {
+    fn drop(&mut self) {
+        crate::sched::smp::percpu::note_unmap_lock_held(false);
+    }
+}
+
 /// `memobj_create(len, flags) -> Handle`.
 pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = frame.rdi;
@@ -55,14 +69,7 @@ pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let paged = flags & memobj::PAGER != 0;
     let object = if paged {
-        #[cfg(target_arch = "x86_64")]
-        {
-            MemObject::new_paged(len / PAGE_SIZE, &caller)?
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            return Err(Errno::ENOSYS);
-        }
+        MemObject::new_paged(len / PAGE_SIZE, &caller)?
     } else {
         MemObject::new(len / PAGE_SIZE)?
     };
@@ -82,7 +89,6 @@ pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
 }
 
 /// `pager_supply(object, offset, data, data_len) -> 0` (contract C18).
-#[cfg(target_arch = "x86_64")]
 pub fn pager_supply(frame: &SyscallFrame) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
@@ -112,12 +118,6 @@ pub fn pager_supply(frame: &SyscallFrame) -> Result<usize, Errno> {
     copy_from_user(&mut buffer, source)?;
     object.supply_page(offset / PAGE_SIZE, &buffer)?;
     Ok(0)
-}
-
-/// Pager-backed objects need the x86-64 scheme IPC transport.
-#[cfg(not(target_arch = "x86_64"))]
-pub fn pager_supply(_frame: &SyscallFrame) -> Result<usize, Errno> {
-    Err(Errno::ENOSYS)
 }
 
 /// `map(proc, memobj, offset, addr, len, flags) -> addr`.
@@ -186,14 +186,16 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
 
     let mut guard = target.address_space.lock();
+    let probe = AddressSpaceLockProbe::held();
     let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
+    let mut deferred = None;
     let vaddr = if replace {
         // CR-24: REPLACE is the atomic form of FIXED for a PROT_NONE reservation. It refuses a
         // range carrying any real mapping (EEXIST) instead of silently discarding it.
         if !address_space.is_reservation(addr, len) {
             return Err(Errno::EEXIST);
         }
-        address_space.unmap(addr, len)?;
+        deferred = Some(address_space.unmap(addr, len)?);
         addr
     } else if fixed {
         if !address_space.vmas().is_free(addr, len) {
@@ -201,9 +203,14 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
         addr
     } else {
+        let hint = if addr == 0 {
+            address_space.mmap_base()
+        } else {
+            addr
+        };
         address_space
             .vmas()
-            .find_free(len, addr, PAGE_SIZE)
+            .find_free(len, hint, PAGE_SIZE)
             .ok_or(Errno::ENOMEM)?
     };
 
@@ -242,9 +249,19 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
                 );
             }
         }
+        drop(guard);
+        drop(probe);
+        if let Some(deferred) = deferred {
+            deferred.finish();
+        }
         return Err(error);
     }
     address_space.set_inherit(vaddr, len, inherit, identity);
+    drop(guard);
+    drop(probe);
+    if let Some(deferred) = deferred {
+        deferred.finish();
+    }
     Ok(vaddr as usize)
 }
 
@@ -255,17 +272,20 @@ pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     let addr = frame.rsi;
     let len = frame.rdx;
     validate_range(addr, len)?;
-    let shared_range = {
+    let (dirty, shared_range, deferred) = {
         let mut guard = target.address_space.lock();
+        let _probe = AddressSpaceLockProbe::held();
         let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
         let shared_range = address_space.shared_futex_range(addr, len);
         // Collect before the mapping disappears; the object Arcs keep the pages alive for the
         // PageOut requests below.
         let dirty = address_space.collect_pager_dirty(addr, len);
-        address_space.unmap(addr, len)?;
-        (dirty, shared_range)
+        let deferred = address_space.unmap(addr, len)?;
+        (dirty, shared_range, deferred)
     };
-    let (dirty, shared_range) = shared_range;
+    // The address-space lock is released above. Wait for the remote TLB acknowledgement and
+    // recycle frames only now, so an aarch64 peer blocked on this mutex can take the TLB SGI.
+    deferred.finish();
     crate::syscall::futex::remove_private_range(target.id, addr, addr.saturating_add(len));
     if let Some((object, start, end)) = shared_range {
         crate::syscall::futex::remove_shared_range(target.id, object, start, end);
@@ -322,9 +342,15 @@ pub fn unmap_current(addr: u64, len: u64) {
     if validate_range(addr, len).is_err() {
         return;
     }
-    let mut guard = caller.address_space.lock();
-    if let Some(address_space) = guard.as_mut() {
-        let _ = address_space.unmap(addr, len);
+    let deferred = {
+        let mut guard = caller.address_space.lock();
+        let _probe = AddressSpaceLockProbe::held();
+        guard
+            .as_mut()
+            .and_then(|address_space| address_space.unmap(addr, len).ok())
+    };
+    if let Some(deferred) = deferred {
+        deferred.finish();
     }
 }
 
@@ -341,9 +367,13 @@ pub fn protect(frame: &SyscallFrame) -> Result<usize, Errno> {
     {
         return Err(Errno::EINVAL);
     }
-    let mut guard = target.address_space.lock();
-    let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
-    address_space.protect(addr, len, protection)?;
+    let deferred = {
+        let mut guard = target.address_space.lock();
+        let _probe = AddressSpaceLockProbe::held();
+        let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
+        address_space.protect(addr, len, protection)?
+    };
+    deferred.finish();
     Ok(0)
 }
 

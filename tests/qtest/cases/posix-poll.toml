@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K548: poll(2) on the fd kinds the guest ssh client uses. The C fixture polls a
+# socketpair end, a pipe write/read end and a write-only pty slave; a write-only
+# source must return its readiness, never EACCES. Rev 330 also polls the pty
+# master after the SSH session child exits (HUP within a bounded ppoll) and
+# exercises the ppoll signal mask. Rev 331 repeats the close shape on the
+# `/dev/ptmx` pty: SchemeFile master. Rev 207 execs this binary with the master
+# as an inherited fd and requires the `pty_master` role to survive the `FdMap`, so
+# the read EOF still reports HUP. Rev 208 adds the privsep ppoll row: the
+# waiting process is forked after the handler is registered (as OpenSSH's
+# monitor/session split does), so the per-thread kernel signal entry must be
+# registered again or a child exit never wakes the wait.
+# It runs as /bin/libc-test under the libc-test profile so the pty server is available.
+
+name = "posix-poll"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/fixtures/posix-poll/build.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^posix-poll: pty-exec-close hup=1$'
+
+[[expect]]
+regex = '^posix-poll: pty-exec-parent child=[0-9]+$'
+
+[[expect]]
+regex = '^posix-poll: socket ok$'
+
+[[expect]]
+regex = '^posix-poll: pipe ok$'
+
+[[expect]]
+regex = '^posix-poll: pty ok$'
+
+[[expect]]
+regex = '^posix-poll: pty-ssh-close hup=1 elapsed-ms=[0-9]+$'
+
+[[expect]]
+regex = '^posix-poll: pty-scheme-close hup=1 elapsed-ms=[0-9]+$'
+
+[[expect]]
+regex = '^posix-poll: ppoll-mask fork ok$'
+
+[[expect]]
+regex = '^posix-poll: ppoll-mask idle\+child ok$'
+
+[[expect]]
+regex = '^posix-poll: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|posix-poll: fail'

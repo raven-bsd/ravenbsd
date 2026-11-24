@@ -3,7 +3,10 @@
 
 name = "vfsd"
 exec = "/sbin/vfsd"
-needs = ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd"]
+# The shell/release mount table mounts /dev/pts on scheme:pty. Declare the provider so the start
+# plan puts ptyd in the earlier wave; otherwise vfsd blocks its own readiness on the 5 s
+# wait_scheme retry budget before it can register file:.
+needs = ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "scheme:pty"]
 provides = ["scheme:file"]
 readiness = "scheme"
 ready_timeout_ms = 60_000

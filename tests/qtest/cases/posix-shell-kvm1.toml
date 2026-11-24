@@ -1,0 +1,423 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4a/P4p/P45: POSIX shell conformance on the target. rsh owns the console; brush runs the four
+# --posix groups plus the P45 builtin group, then rsh runs the pipeline, redirection, list and
+# here-document group. The fixture script under tests/fixtures/posix-shell/ is the host reference.
+
+# S112: the same case under KVM -smp 1. The appended -smp 1 overrides the harness's fixed -smp 4.
+name = "posix-shell-kvm1"
+arch = "x86_64"
+profile = "modern-shell-test"
+timeout_secs = 1800
+pre = ["cargo xtask build brush --arch x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "1"]
+expect_exit = "success"
+
+[[expect]]
+regex = 'svcd: all services up$'
+unordered = true
+
+[[expect]]
+regex = 'rsh: ready'
+unordered = true
+
+[[expect]]
+regex = '^simple:1:2$'
+
+[[expect]]
+regex = '^status:1$'
+
+[[expect]]
+regex = '^and:ok$'
+
+[[expect]]
+regex = '^or:ok$'
+
+[[expect]]
+regex = '^group:ok$'
+
+[[expect]]
+regex = '^subshell:ok$'
+
+[[expect]]
+regex = '^func:arg$'
+
+[[expect]]
+regex = '^func-status:3$'
+
+[[expect]]
+regex = '^if:ok$'
+
+[[expect]]
+regex = '^case:ok$'
+
+[[expect]]
+regex = '^for:1$'
+
+[[expect]]
+regex = '^for:2$'
+
+[[expect]]
+regex = '^while:1$'
+
+[[expect]]
+regex = '^while:2$'
+
+[[expect]]
+regex = '^until:2$'
+
+[[expect]]
+regex = '^break-loop:1$'
+
+[[expect]]
+regex = '^break:done$'
+
+[[expect]]
+regex = '^continue:1$'
+
+[[expect]]
+regex = '^continue:3$'
+
+[[expect]]
+regex = '^cd:0$'
+
+[[expect]]
+regex = '^cmd:ok$'
+
+[[expect]]
+regex = '^command:0$'
+
+[[expect]]
+regex = '^export:yes$'
+
+[[expect]]
+regex = '^hash:0$'
+
+[[expect]]
+regex = '^shift:1:b$'
+
+[[expect]]
+regex = '^test:0$'
+
+[[expect]]
+regex = '^bracket:0$'
+
+[[expect]]
+regex = '^type:0$'
+
+[[expect]]
+regex = '^alias:0$'
+
+[[expect]]
+regex = '^unalias:0$'
+
+[[expect]]
+regex = '^return:7$'
+
+[[expect]]
+regex = '^dot:ok$'
+
+[[expect]]
+regex = '^exit:7$'
+
+[[expect]]
+regex = '^p1:abc:bc:ab:3$'
+
+[[expect]]
+regex = '^p2:default$'
+
+[[expect]]
+regex = '^arith:5$'
+
+[[expect]]
+regex = '^sub:inner$'
+
+[[expect]]
+regex = '^split:3:a:b:c$'
+
+[[expect]]
+regex = '^/tmp/p4g-a /tmp/p4g-b$'
+
+[[expect]]
+regex = '^read:# SPDX-License-Identifier: BSD-3-Clause$'
+
+[[expect]]
+regex = '^exec-read:# SPDX-License-Identifier: BSD-3-Clause$'
+
+[[expect]]
+regex = '^after-close:1$'
+
+[[expect]]
+regex = '^errexit:1$'
+
+[[expect]]
+regex = '^nounset:1$'
+
+[[expect]]
+regex = '^xtrace:0$'
+
+[[expect]]
+regex = '^eval:ok$'
+
+[[expect]]
+regex = '^ro:1$'
+
+[[expect]]
+regex = '^umask:0022$'
+
+[[expect]]
+regex = '^getopt:a:$'
+
+[[expect]]
+regex = '^getopt:b:val$'
+
+[[expect]]
+regex = '^optind:4$'
+
+[[expect]]
+regex = '^pid:[0-9]+$'
+
+[[expect]]
+regex = '^trap:exit$'
+
+[[expect]]
+regex = '^rshpiped$'
+
+[[expect]]
+regex = '^rshredir$'
+
+[[expect]]
+regex = '^rshappended$'
+
+[[expect]]
+regex = '^rsh: cat: /nonexistent: .*$'
+
+[[expect]]
+regex = '^rsh: cat: /missing: .*$'
+
+[[expect]]
+regex = '^rsh-here$'
+
+[[expect]]
+regex = '^rshstatus:0$'
+
+[[expect]]
+regex = '^rshstatus:1$'
+
+[[expect]]
+regex = '^rshone$'
+
+[[expect]]
+regex = '^rshtwo$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/brush --posix -c 'x=1; y=2; echo simple:$x:$y; false; echo status:$?; true && echo and:ok; false || echo or:ok; { echo group:ok; }; ( echo subshell:ok ); f() { echo func:$1; return 3; }; f arg; echo func-status:$?; if true; then echo if:ok; fi; case abc in a*) echo case:ok;; esac; for i in 1 2; do echo for:$i; done; n=0; while [ \"$n\" -lt 2 ]; do n=$((n+1)); echo while:$n; done; until [ \"$n\" -ge 2 ]; do n=$((n+1)); done; echo until:$n'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^until:2$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 'echo dot:ok' > /tmp/p4b-dot\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'for i in 1 2 3; do echo break-loop:$i; break; done; echo break:done; for i in 1 2 3; do if [ \"$i\" = 2 ]; then continue; fi; echo continue:$i; done; cd /tmp; echo cd:$?; cd /; command echo cmd:ok; echo command:$?; export P4B=yes; echo export:$P4B; hash; echo hash:$?; set -- a b; shift; echo shift:$#:$1; test -n x; echo test:$?; [ -n x ]; echo bracket:$?; type echo; echo type:$?; alias p4b=\"echo alias:ok\"; alias p4b; echo alias:$?; unalias p4b; echo unalias:$?; f() { return 7; }; f; echo return:$?; . /tmp/p4b-dot'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^dot:ok$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'exit 7'; echo exit:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^exit:7$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'v=abc; echo p1:${v:-x}:${v#a}:${v%c}:${#v}; unset u; echo p2:${u:-default}; echo arith:$((2+3)); echo sub:$(echo inner); IFS=:; v=a:b:c; set -- $v; echo split:$#:$1:$2:$3; unset IFS; echo a > /tmp/p4g-a; echo b > /tmp/p4g-b; echo /tmp/p4g-*'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/tmp/p4g-a /tmp/p4g-b$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'read line < /etc/mounts; echo read:$line; exec 3</etc/mounts; read line <&3; echo exec-read:$line; exec 3<&-; echo close >&- 2>&-; echo after-close:$?'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^after-close:1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'set -e; set +e; ( set -e; false; echo unreachable ); echo errexit:$?; ( set -u; echo \"$missing\" ); echo nounset:$?; ( set -x; echo traced ); echo xtrace:$?; trap \"echo trap:exit\" EXIT; eval \"echo eval:ok\"; readonly ro=1; echo ro:$ro; umask 022; echo umask:$(umask); set -- -a -b val x; while getopts ab: o; do echo getopt:$o:$OPTARG; done; echo optind:$OPTIND; echo pid:$$'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^trap:exit$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshpiped | cat\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshpiped$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshredir > /tmp/p4p-rsh-r; cat < /tmp/p4p-rsh-r\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshredir$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshappended >> /tmp/p4p-rsh-r; cat < /tmp/p4p-rsh-r\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshappended$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /nonexistent 2> /tmp/p4p-rsh-e; cat < /tmp/p4p-rsh-e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh: cat: /nonexistent: .*$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /missing > /tmp/p4p-rsh-o 2>&1; cat < /tmp/p4p-rsh-o\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh: cat: /missing: .*$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat <<EOF\nrsh-here\nEOF\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh-here$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "false | true; echo rshstatus:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshstatus:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "true | false; echo rshstatus:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshstatus:1$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo rshone; echo rshtwo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rshone$'
+timeout_secs = 30
+
+[[step]]
+wait = '^rshtwo$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

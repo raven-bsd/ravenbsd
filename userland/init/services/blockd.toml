@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Release disk-tools blockd: disabled at boot so an image booted without a scratch disk is
+# unchanged. The disk-tools qtest starts it after login once `devd` has launched virtio-blk and
+# published `disk:`. Its `scheme:disk` need is satisfied at runtime (the graph defers a scheme
+# with no enabled provider) and `svcd` grants the `disk` prefix to the child.
+name = "blockd"
+exec = "/sbin/blockd"
+needs = ["scheme:disk"]
+provides = ["scheme:block"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = false
+
+[env]
+BLOCKD_DISK = "disk:0"

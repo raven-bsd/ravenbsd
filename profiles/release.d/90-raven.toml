@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K209: stage the target-built `raven` administration client in the release/UFS image. The
+# artifact is produced by `tests/fixtures/modern-admin/build.sh` (a target build, not the host
+# binary) and installed at /usr/sbin/raven; the release profile extends shell, so this fragment covers
+# the release and UFS images. The raven-admin-test fixture keeps its own staging entry.
+[[initfs.files]]
+src = "build/fixtures/modern-admin/{arch}/raven"
+path = "/usr/sbin/raven"
+mode = 0o755
+generated = true

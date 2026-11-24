@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: stateful-tcp
+# features: stateful,tcp,allow,deny,expiry,reverse
+# reference: OpenBSD sys/net/pf.c:pf_test,pf_match_rule,pf_create_state; FreeBSD sys/netpfil/pf/pf.c; NetBSD sys/net/npf/npf_connkey.c
+# expect-counters in_pass=5 in_block=4 out_pass=3 out_block=1 states_created=4 states_expired=3 state_hits=4
+#
+# now direction interface proto source sport destination dport length flags expected disposition
+0   in  eth0 tcp 10.0.0.5   40001 192.0.2.10    80   60 S  pass  created
+1   out eth0 tcp 192.0.2.10 80    10.0.0.5      40001 60 SA pass  existing
+2   in  eth0 tcp 10.0.0.5   40001 192.0.2.10    80   40 A  pass  existing
+3   in  eth0 tcp 10.0.0.6   40002 192.0.2.10    22   60 S  block -
+4   in  eth0 udp 10.0.0.6   5353  192.0.2.10    53   40 -  block -
+5   in  eth0 icmp 10.0.0.6  0     192.0.2.10    0    84 -  block -
+6   out eth0 tcp 10.0.0.6   40003 198.51.100.20 443  60 S  pass  created
+7   in  eth0 tcp 198.51.100.20 443 10.0.0.6     40003 60 SA pass  existing
+8   in  eth0 tcp 10.0.0.7   40004 192.0.2.10    80   60 S  pass  created
+9   in  eth0 tcp 192.0.2.10 80    10.0.0.7      40004 60 SA block -
+10  out eth0 tcp 192.0.2.10 80    10.0.0.7      40004 60 SA pass  existing
+300 in  eth0 tcp 10.0.0.8   40005 192.0.2.10    80   60 S  pass  created
+421 out eth0 tcp 192.0.2.10 80    10.0.0.8      40005 60 SA block -

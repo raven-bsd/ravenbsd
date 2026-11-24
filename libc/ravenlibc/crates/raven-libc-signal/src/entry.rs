@@ -192,6 +192,7 @@ fn process<K: SigKernel>(
                     alt_flags,
                     disposition.flags,
                     interrupted_sp,
+                    raw::current_stack_pointer(),
                 );
                 // Step 10: call through the asm helper (16-byte aligned at the call).
                 let arg1 = sig as usize;
@@ -233,6 +234,7 @@ fn handler_stack(
     alt_flags: i32,
     flags: u32,
     interrupted_sp: usize,
+    entry_sp: usize,
 ) -> usize {
     let enabled = alt_flags & crate::altstack::SS_DISABLE == 0 && alt_size != 0;
     let inside =
@@ -240,13 +242,16 @@ fn handler_stack(
     if flags & SA_ONSTACK != 0 && enabled && !inside {
         return alt_base.wrapping_add(alt_size) & !15usize;
     }
+    // The handler must run below the live entry frame, not at the interrupted stack pointer:
+    // the kernel starts `__raven_sigentry` at `interrupted_sp - 128`, and reusing that address
+    // for the handler overwrites the entry's own return frame.
     #[cfg(target_arch = "x86_64")]
     {
-        interrupted_sp.saturating_sub(128)
+        entry_sp.saturating_sub(128)
     }
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
     {
-        interrupted_sp.saturating_sub(16)
+        entry_sp.saturating_sub(16)
     }
 }
 

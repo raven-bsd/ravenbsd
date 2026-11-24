@@ -3,11 +3,10 @@
 
 //! RavenBSD console server (`tty:` scheme).
 //!
-//! One reader thread pulls raw console bytes with `DEBUG_READ`, feeds them through the line
-//! discipline in `raven-tty-core` and writes the echo back with `DEBUG_WRITE`. The scheme server
-//! serves `tty:console`: `READ` returns whole lines in canonical mode (waiting for one when the
-//! line is not complete yet), `WRITE` goes straight to the console, `FSTAT` reports a character
-//! device and `CALL` carries the mode operations from `raven-proto-tty`.
+//! `tty:console` is served from a [`Multiplexer`]: UART is the default input/output, a keyboard
+//! source (`kbd:console`) is added when present, and output is fanned out to UART plus an optional
+//! framebuffer text sink (`fb:console`). The line discipline and the scheme contract are
+//! unchanged; getty/login still open `tty:console`.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -18,26 +17,32 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::collections::{BTreeMap, VecDeque};
+    use alloc::boxed::Box;
+    use alloc::collections::BTreeMap;
     use core::sync::atomic::{AtomicU32, Ordering};
 
     use raven_abi::errno::Errno;
-    use raven_proto_fs::{S_IFCHR, Stat};
+    use raven_consd::{ConsoleInput, ConsoleOutput, InputError, Multiplexer, OutputError};
+    use raven_proto_fs::{O_RDONLY, O_WRONLY, S_IFCHR, Stat};
     use raven_proto_tty::{
         CALL_LEN, OP_GET_WRITE, OP_SET_WRITE, Request, Response, WriteRequest, decode_request,
         decode_write_request, encode_response, encode_write_response,
     };
     use raven_rt::entry;
+    use raven_rt::fs;
     use raven_rt::sync::Mutex;
     use raven_scheme::{CallReply, Ctx, Handler, HandlerError, HandlerResult, Opened, Server};
-    use raven_tty_core::{Discipline, Event, Output};
 
     entry!(main);
 
     /// Console path accepted by `OPEN`.
     const CONSOLE_PATH: &str = "console";
-    /// Bytes read from the UART per `DEBUG_READ`.
+    /// Bytes read from a backend per call.
     const READ_CHUNK: usize = 256;
+    /// Consecutive UART backend I/O errors tolerated before the console is closed.
+    const IO_RETRY_LIMIT: u32 = 50;
+    /// Backoff between UART backend I/O retries.
+    const IO_RETRY_DELAY_NS: u64 = 10_000_000;
     /// Reader thread stack.
     const READER_STACK: usize = 32 * 1024;
 
@@ -47,60 +52,7 @@ mod program {
     /// Wakes a blocked `READ` whenever the console state changes.
     static SEQ: AtomicU32 = AtomicU32::new(0);
 
-    /// Shared console state: the discipline plus what readers have not consumed yet.
-    struct Console {
-        discipline: Discipline,
-        ready: VecDeque<u8>,
-        interrupt: bool,
-        eof: bool,
-        write_allowed: bool,
-    }
-
-    impl Console {
-        const fn new() -> Self {
-            Self {
-                discipline: Discipline::new(),
-                ready: VecDeque::new(),
-                interrupt: false,
-                eof: false,
-                write_allowed: true,
-            }
-        }
-
-        /// Apply one `feed` result: buffer its lines and latch its events.
-        fn accept(&mut self, output: &Output) {
-            for line in &output.lines {
-                self.ready.extend(line.iter().copied());
-            }
-            for event in &output.events {
-                match event {
-                    Event::Interrupt => self.interrupt = true,
-                    Event::EndOfFile => self.eof = true,
-                }
-            }
-        }
-
-        /// Move up to `buffer.len()` ready bytes into `buffer`.
-        fn take(&mut self, buffer: &mut [u8]) -> usize {
-            let count = buffer.len().min(self.ready.len());
-            for slot in buffer.iter_mut().take(count) {
-                if let Some(byte) = self.ready.pop_front() {
-                    *slot = byte;
-                }
-            }
-            count
-        }
-
-        /// Drop everything buffered, returning the number of bytes discarded.
-        fn flush(&mut self) -> u32 {
-            let pending = self.discipline.flush() + self.ready.len();
-            self.ready.clear();
-            self.eof = false;
-            u32::try_from(pending).unwrap_or(u32::MAX)
-        }
-    }
-
-    static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
+    static CONSOLE: Mutex<Multiplexer> = Mutex::new(Multiplexer::new());
 
     /// Publish a state change: bump the sequence word and wake blocked readers.
     fn publish() {
@@ -108,33 +60,125 @@ mod program {
         let _ = raven_rt::futex_wake(&SEQ, u32::MAX);
     }
 
-    /// Reader thread: pull console bytes and feed the discipline forever.
-    fn reader(_argument: usize) {
+    /// UART debug input.
+    struct UartInput;
+
+    impl ConsoleInput for UartInput {
+        fn read(&mut self, out: &mut [u8]) -> Result<usize, InputError> {
+            match raven_rt::debug_read(out, 0) {
+                Ok(count) => Ok(count),
+                Err(Errno::EINTR) => Err(InputError::WouldBlock),
+                Err(_) => Err(InputError::Io),
+            }
+        }
+    }
+
+    /// UART debug output.
+    struct UartOutput;
+
+    impl ConsoleOutput for UartOutput {
+        fn write(&mut self, bytes: &[u8]) -> Result<usize, OutputError> {
+            match raven_rt::debug_write(bytes) {
+                Ok(0) => Err(OutputError::Full),
+                Ok(count) => Ok(count),
+                Err(_) => Err(OutputError::Closed),
+            }
+        }
+    }
+
+    /// A byte sink backed by a scheme (`fb:console`), owned by HDMI1/UI1.
+    struct SchemeOutput {
+        file: fs::File,
+    }
+
+    impl ConsoleOutput for SchemeOutput {
+        fn write(&mut self, bytes: &[u8]) -> Result<usize, OutputError> {
+            match self.file.write(bytes) {
+                Ok(0) => Err(OutputError::Full),
+                Ok(count) => Ok(count),
+                Err(_) => Err(OutputError::Closed),
+            }
+        }
+    }
+
+    /// A byte source backed by a scheme (`kbd:console`), owned by USB1.
+    struct SchemeInput {
+        file: fs::File,
+    }
+
+    impl ConsoleInput for SchemeInput {
+        fn read(&mut self, out: &mut [u8]) -> Result<usize, InputError> {
+            match self.file.read(out) {
+                Ok(0) => Err(InputError::EndOfFile),
+                Ok(count) => Ok(count),
+                Err(Errno::EINTR) => Err(InputError::WouldBlock),
+                Err(_) => Err(InputError::Io),
+            }
+        }
+    }
+
+    /// UART reader thread: pull bytes and feed the multiplexer forever.
+    fn uart_reader(_argument: usize) {
+        let mut input = UartInput;
+        let mut buffer = [0u8; READ_CHUNK];
+        let mut io_retries = 0u32;
+        loop {
+            match input.read(&mut buffer) {
+                Ok(0) => {
+                    io_retries = 0;
+                }
+                Ok(count) => {
+                    io_retries = 0;
+                    let count = count.min(buffer.len());
+                    let changed = CONSOLE.lock().feed(&buffer[..count]);
+                    if changed {
+                        publish();
+                    }
+                }
+                Err(InputError::WouldBlock) => {
+                    io_retries = 0;
+                }
+                // A real EOF or closed backend ends the console.
+                Err(InputError::EndOfFile | InputError::Closed) => {
+                    CONSOLE.lock().mark_eof();
+                    publish();
+                    break;
+                }
+                // A transient backend error must not look like a live console forever: retry
+                // briefly, then report the persistent failure and close the console.
+                Err(InputError::Io) => {
+                    io_retries = io_retries.saturating_add(1);
+                    if io_retries > IO_RETRY_LIMIT {
+                        raven_rt::eprintln!(
+                            "consd: uart input: {io_retries} consecutive I/O errors; closing console"
+                        );
+                        CONSOLE.lock().mark_eof();
+                        publish();
+                        break;
+                    }
+                    let _ = raven_rt::nanosleep(IO_RETRY_DELAY_NS);
+                }
+            }
+        }
+    }
+
+    /// Keyboard reader thread: opens `kbd:console` and disappears if USB1 is absent.
+    fn keyboard_reader(_argument: usize) {
+        let Ok(mut input) = fs::open("kbd:console", O_RDONLY).map(|file| SchemeInput { file })
+        else {
+            return;
+        };
         let mut buffer = [0u8; READ_CHUNK];
         loop {
-            match raven_rt::debug_read(&mut buffer, 0) {
-                Ok(0) => continue,
+            match input.read(&mut buffer) {
                 Ok(count) => {
-                    let mut output = Output::default();
-                    {
-                        let mut console = CONSOLE.lock();
-                        console.discipline.feed(&buffer[..count], &mut output);
-                        console.accept(&output);
-                    }
-                    if !output.echo.is_empty() {
-                        let _ = raven_rt::debug_write(&output.echo);
-                    }
-                    if !output.lines.is_empty() || !output.events.is_empty() {
+                    let changed = CONSOLE.lock().feed(&buffer[..count]);
+                    if changed {
                         publish();
                     }
                 }
-                Err(error) => {
-                    // The console is gone (or the syscall failed): report EOF to readers.
-                    if error != Errno::EINTR {
-                        CONSOLE.lock().eof = true;
-                        publish();
-                    }
-                }
+                Err(InputError::WouldBlock) => continue,
+                Err(InputError::EndOfFile | InputError::Closed | InputError::Io) => break,
             }
         }
     }
@@ -193,31 +237,34 @@ mod program {
             if buffer.is_empty() {
                 return Ok(0);
             }
-            loop {
-                let sequence = SEQ.load(Ordering::Acquire);
-                {
-                    let mut console = CONSOLE.lock();
-                    if console.interrupt {
-                        console.interrupt = false;
-                        return Err(Errno::EINTR.into());
-                    }
-                    if !console.ready.is_empty() {
-                        return Ok(console.take(buffer));
-                    }
-                    if console.eof {
-                        return Ok(0);
-                    }
+            // Never sleep inside the single-threaded scheme server: a blocked `read` keeps the
+            // server from dispatching queued `write` requests (the console submit queue fills and
+            // the session output stalls). A caller that wants blocking semantics retries on
+            // `EAGAIN`; the input thread publishes every state change.
+            {
+                let mut console = CONSOLE.lock();
+                if console.take_interrupt() {
+                    return Err(Errno::EINTR.into());
                 }
-                let _ = raven_rt::futex_wait(&SEQ, sequence, None);
+                if console.has_ready() {
+                    return Ok(console.take(buffer));
+                }
+                if console.eof() {
+                    return Ok(0);
+                }
             }
+            Err(Errno::EAGAIN.into())
         }
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
             if !self.file(file)?.writable {
                 return Err(Errno::EACCES.into());
             }
-            let written = raven_rt::debug_write(buffer).map_err(HandlerError::from)?;
-            Ok(written)
+            match CONSOLE.lock().write_all(buffer) {
+                Ok(count) => Ok(count),
+                Err(OutputError::Full) => Err(Errno::EAGAIN.into()),
+                Err(OutputError::Closed | OutputError::Io) => Err(Errno::EIO.into()),
+            }
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
@@ -241,7 +288,7 @@ mod program {
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
             self.file(file)?;
-            let allowed = CONSOLE.lock().write_allowed;
+            let allowed = CONSOLE.lock().write_allowed();
             let mode = if allowed { 0o620 } else { 0o600 };
             Ok(Stat {
                 ino: file,
@@ -262,9 +309,9 @@ mod program {
                     let allowed = match decode_write_request(request)
                         .map_err(|_| HandlerError::from(Errno::EINVAL))?
                     {
-                        WriteRequest::Get => CONSOLE.lock().write_allowed,
+                        WriteRequest::Get => CONSOLE.lock().write_allowed(),
                         WriteRequest::Set { allowed } => {
-                            CONSOLE.lock().write_allowed = allowed;
+                            CONSOLE.lock().set_write_allowed(allowed);
                             allowed
                         }
                     };
@@ -276,16 +323,12 @@ mod program {
             }
             let request = decode_request(request).map_err(|_| HandlerError::from(Errno::ENOSYS))?;
             let reply = match request {
-                Request::GetMode => Response::Mode(CONSOLE.lock().discipline.settings()),
+                Request::GetMode => Response::Mode(CONSOLE.lock().settings()),
                 Request::SetMode { settings } => {
                     let applied = {
                         let mut console = CONSOLE.lock();
-                        let discarded = console.discipline.set_settings(settings);
-                        if discarded > 0 {
-                            console.ready.clear();
-                            console.eof = false;
-                        }
-                        console.discipline.settings()
+                        let _ = console.set_settings(settings);
+                        console.settings()
                     };
                     publish();
                     Response::Mode(applied)
@@ -325,7 +368,7 @@ mod program {
             buffer: &[u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
-            if !CONSOLE.lock().write_allowed && ctx.credentials.euid != 0 {
+            if !CONSOLE.lock().write_allowed() && ctx.credentials.euid != 0 {
                 return Err(Errno::EACCES.into());
             }
             self.write(file, offset, buffer)
@@ -340,13 +383,20 @@ mod program {
                 return 1;
             }
         };
-        match raven_rt::thread::spawn(reader, 0, READER_STACK) {
-            Ok(_reader) => {}
-            Err(error) => {
-                raven_rt::eprintln!("consd: reader thread: {}", error.description());
-                return 1;
-            }
+        {
+            let mut console = CONSOLE.lock();
+            console.add_output(Box::new(UartOutput));
         }
+        // HDMI1/UI1 may publish a text framebuffer sink; absence keeps UART-only behaviour.
+        if let Ok(file) = fs::open("fb:console", O_WRONLY) {
+            CONSOLE.lock().add_output(Box::new(SchemeOutput { file }));
+        }
+        if let Err(error) = raven_rt::thread::spawn(uart_reader, 0, READER_STACK) {
+            raven_rt::eprintln!("consd: uart reader thread: {}", error.description());
+            return 1;
+        }
+        // USB1 may publish kbd:console; the thread exits immediately when it is absent.
+        let _ = raven_rt::thread::spawn(keyboard_reader, 0, READER_STACK);
         let mut handler = ConsoleHandler::new();
         loop {
             let Some(packet) = server.poll(None) else {

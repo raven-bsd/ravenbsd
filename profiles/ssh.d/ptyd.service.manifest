@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The K196 pty: scheme used by sshd for interactive `ssh -tt` sessions. The
+# release profile has no other pty consumer, so the service is staged with SSH.
+
+name = "ptyd"
+exec = "/sbin/ptyd"
+needs = ["logd"]
+provides = ["scheme:pty"]
+readiness = "scheme"
+ready_timeout_ms = 30_000
+restart = "never"
+max_restarts = 0
+required = false

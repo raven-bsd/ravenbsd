@@ -272,6 +272,75 @@ fn woken_once_and_never_again() {
 }
 
 #[test]
+fn direct_handoff_stress_never_loses_a_waiter() {
+    // A donor-style direct handoff loop: each round hands the object to every waiter in turn.
+    // A lost wake, a stale owner, or an unrestored boost shows up immediately.
+    let mut t = Turnstiles::new();
+    for thread in 0..8u32 {
+        t.register(thread, prio(4 + (thread % 4) as u8)).unwrap();
+    }
+    for round in 0..200u32 {
+        let object = round;
+        t.acquire(object, 0).unwrap();
+        for waiter in 1..8u32 {
+            t.block(object, waiter).unwrap();
+        }
+        let mut woken = Vec::new();
+        while let Some(thread) = t.wake_one(object) {
+            woken.push(thread);
+        }
+        assert_eq!(woken.len(), 7, "round {round}: waiter lost");
+        for waiter in 1..8u32 {
+            assert!(
+                woken.contains(&waiter),
+                "round {round}: waiter {waiter} not woken"
+            );
+        }
+        assert_eq!(t.owner(object), None, "round {round}: stale owner");
+        assert_eq!(t.waiter_count(object), 0);
+        for thread in 0..8u32 {
+            assert_eq!(
+                t.effective_priority(thread),
+                t.base_priority(thread),
+                "round {round}: thread {thread} boost not restored"
+            );
+        }
+    }
+}
+
+#[test]
+fn canceled_handoff_round_restores_owner_and_never_wakes_the_canceled_thread() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    for thread in 1..6 {
+        t.register(thread, prio(4)).unwrap();
+    }
+    for round in 0..200u32 {
+        let object = 1000 + round;
+        t.acquire(object, 0).unwrap();
+        for waiter in 1..6 {
+            t.block(object, waiter).unwrap();
+        }
+        // The middle waiter is canceled before the handoff; the others must still make progress.
+        let canceled = 3;
+        let outcome = t.cancel(object, canceled);
+        assert!(outcome.removed);
+        let mut woken = Vec::new();
+        while let Some(thread) = t.wake_one(object) {
+            assert_ne!(thread, canceled);
+            woken.push(thread);
+        }
+        assert_eq!(
+            woken.len(),
+            4,
+            "round {round}: canceled round lost a waiter"
+        );
+        assert_eq!(t.owner(object), None);
+        assert_eq!(t.effective_priority(0), Some(prio(10)));
+    }
+}
+
+#[test]
 fn seeded_bug_effective_mismatch_is_detected() {
     let mut t = Turnstiles::new();
     t.register(0, prio(0)).unwrap();
@@ -379,6 +448,47 @@ fn lockstat_cancel_and_wake_one_counts() {
 
 #[cfg(feature = "lockstat")]
 #[test]
+fn lockstat_survives_turnstile_reclamation() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    t.register(1, prio(2)).unwrap();
+    t.acquire(2, 0).unwrap();
+    t.block(2, 1).unwrap();
+    assert_eq!(t.wake_one(2), Some(1)); // handoff to the waiter
+    assert_eq!(t.wake_one(2), None); // last owner releases: idle turnstile reclaimed
+    assert_eq!(t.objects().count(), 0, "empty turnstile must be reclaimed");
+    // The counters belong to the lock object, not the transient turnstile: FreeBSD
+    // `lock_profile_object` is keyed by `lock_object` and NetBSD `lockdebug` is allocated at
+    // lock init and freed at lock destroy. Reclaiming the empty turnstile must not zero them.
+    let s = t.stats(2);
+    assert_eq!(s.immediate_acquisitions, 1);
+    assert_eq!(s.wait_entries, 1);
+    assert_eq!(s.wakes, 1);
+    let stats_objects: vec::Vec<ObjectId> = t.stats_objects().collect();
+    assert_eq!(stats_objects, vec![2]);
+}
+
+#[cfg(feature = "lockstat")]
+#[test]
+fn lockstat_cache_is_bounded() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    for object in 0..MAX_STATS_OBJECTS as ObjectId {
+        t.acquire(object, 0).unwrap();
+        assert_eq!(t.wake_one(object), None);
+    }
+    assert_eq!(t.stats_objects().count(), MAX_STATS_OBJECTS);
+    // A full cache rejects only the new object; the existing records stay valid.
+    let extra = MAX_STATS_OBJECTS as ObjectId;
+    t.acquire(extra, 0).unwrap();
+    assert_eq!(t.wake_one(extra), None);
+    assert_eq!(t.stats(extra), LockStats::default());
+    assert_eq!(t.stats_objects().count(), MAX_STATS_OBJECTS);
+    assert_eq!(t.stats(0).immediate_acquisitions, 1);
+}
+
+#[cfg(feature = "lockstat")]
+#[test]
 fn lockstat_max_inheritance_depth_is_transitive() {
     let mut t = Turnstiles::new();
     t.register(0, prio(10)).unwrap(); // C
@@ -443,4 +553,18 @@ fn fairness_equal_priorities_hand_off_in_arrival_order() {
     assert_eq!(t.wake_one(0), None);
     assert_eq!(t.waiter_count(0), 0);
     assert_eq!(t.owner(0), None);
+}
+
+#[test]
+fn empty_turnstiles_are_reclaimed() {
+    let mut t = Turnstiles::new();
+    t.register(1, prio(10)).unwrap();
+    t.register(2, prio(20)).unwrap();
+    for object in 0..1000u32 {
+        t.acquire(object, 1).unwrap();
+        t.block(object, 2).unwrap();
+        assert_eq!(t.wake_one(object), Some(2));
+        assert_eq!(t.wake_one(object), None);
+    }
+    assert_eq!(t.objects().count(), 0, "empty turnstiles retained");
 }

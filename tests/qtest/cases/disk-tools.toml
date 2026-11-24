@@ -1,0 +1,170 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S110: the release image boots with a real virtio-blk scratch disk. After login the shell starts
+# the late blockd server, lists the disk and its GPT partition, starts fsd-ufs after `newfs`
+# formats the device, mounts UFS at /mnt, writes and reads a file, and unmounts. The disk is a
+# real 16 MiB GPT image built by `raven-k54-mkimage`; no fake device, format or transcript.
+#
+# The disk is attached before login. blockd/fsd-ufs are `enable = false` in the release profile,
+# so `release-login` still boots an image without a disk.
+
+name = "disk-tools"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["sh tests/fixtures/disk-tools/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-drive", "if=none,id=scratch,format=raw,file=build/fixtures/disk-tools/scratch.img",
+    "-device", "virtio-blk-pci,drive=scratch,disable-legacy=on",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^block0 [0-9]+ 32835 disk$'
+
+[[expect]]
+regex = '^block0p1 [0-9]+ 32768 part ufs-root$'
+
+[[expect]]
+regex = '^Scheme: GPT$'
+
+[[expect]]
+regex = '^\s*34\s+32768\s+1\s+ufs-root$'
+
+[[expect]]
+regex = '^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$'
+
+[[expect]]
+regex = 'read:s110-disk-ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/sbin/disk-tool-svcctl start blockd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^blockd running [0-9]+$'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/lsblk\n"
+delay_ms = 100
+
+[[step]]
+wait = '^block0p1 [0-9]+ 32768 part ufs-root$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/gpart show\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*34\s+32768\s+1\s+ufs-root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/newfs -s 16m block:0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^newfs: block:0 UFS2 block=4096 frag=512 size=16777216 label=$'
+timeout_secs = 120
+
+[[step]]
+send = "/sbin/disk-tool-svcctl start fsd-ufs\n"
+delay_ms = 100
+
+[[step]]
+wait = 'fsd-ufs: started'
+timeout_secs = 120
+
+[[step]]
+send = "/sbin/disk-tool-mount ufs: /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo s110-disk-ok > /mnt/hello.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ls -l /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = 'hello\.txt'
+timeout_secs = 30
+
+[[step]]
+send = "read line < /mnt/hello.txt; echo read:$line\n"
+delay_ms = 100
+
+[[step]]
+wait = 'read:s110-disk-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/disk-tool-umount /mnt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|newfs: .*(error|failed)|mount: .*(error|failed)|umount: .*(error|failed)|permission denied'

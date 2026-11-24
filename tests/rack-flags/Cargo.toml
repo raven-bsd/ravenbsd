@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "rack-flags"
+version = "0.1.0"
+description = "Host-only RACK canonical flag/constant and sendmap transition matrix."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-tcpip = { path = "../../crates/raven-tcpip" }
+
+[lints]
+workspace = true

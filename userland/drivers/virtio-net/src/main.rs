@@ -46,7 +46,7 @@ mod program {
 
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
-    use raven_driver::{AccessError, ConfigRegion, DmaRegion, Irq, MmioRegion};
+    use raven_driver::{AccessError, Capability, DmaRegion, Irq, MmioRegion};
     use raven_proto_fs::{OpenFlags, S_IFREG, Stat};
     use raven_proto_net::ring::{
         BUFFER_SIZE, Ring, RingConsumer, RingHeader, RingLayout as B39Layout, RingProducer,
@@ -57,9 +57,10 @@ mod program {
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
     use virtio_net::common::{
         DEVICE_FEATURE, DEVICE_FEATURE_SELECT, DEVICE_STATUS, DRIVER_FEATURE,
-        DRIVER_FEATURE_SELECT, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
+        DRIVER_FEATURE_SELECT, MSIX_CONFIG, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
         QUEUE_MSIX_VECTOR, QUEUE_NOTIFY_OFF, QUEUE_SELECT, QUEUE_SIZE, QUEUE_USED,
     };
+    use virtio_net::mmio;
     use virtio_net::{
         CAP_COMMON_CFG, CAP_DEVICE_CFG, CAP_ISR_CFG, CAP_NOTIFY_CFG, ControlInfo, DESC_F_WRITE,
         Descriptor, F_VERSION_1, Features, MAX_FRAME_LEN, MacAddress, NET_F_MAC, NET_F_MTU,
@@ -77,6 +78,10 @@ mod program {
     const CONFIG_HANDLE: Handle = Handle::new(4, 0);
     const DMA_HANDLE: Handle = Handle::new(5, 0);
     const IRQ_HANDLE: Handle = Handle::new(6, 0);
+    const MSIX_BAR_HANDLE: Handle = Handle::new(7, 0);
+    /// `devd dtb launch` grants one MMIO window, then DMA, then the IRQ (no PCI config page).
+    const MMIO_DMA_HANDLE: Handle = Handle::new(4, 0);
+    const MMIO_IRQ_HANDLE: Handle = Handle::new(5, 0);
 
     const VIRTIO_VENDOR: u16 = 0x1AF4;
     const VIRTIO_NET_DEVICE: u16 = 0x1041;
@@ -89,8 +94,18 @@ mod program {
     const TX_RING_BASE: usize = 0x0100;
     /// 12-byte zero virtio-net header for TX chains, below the B39 region.
     const TX_HEADER_OFFSET: usize = 0x0800;
-    /// Bounded pump wait: the frame rings are checked at least every 10 ms.
-    const IRQ_PUMP_NS: u64 = 10_000_000;
+    /// Bounded pump wait: the frame rings are checked at least every 1 ms.
+    const IRQ_PUMP_NS: u64 = 1_000_000;
+
+    /// MSI-X queue message and table location supplied by `devd`.
+    struct MsixInfo {
+        address_lo: u32,
+        address_hi: u32,
+        data: u32,
+        bar: usize,
+        bar_size: usize,
+        table: usize,
+    }
 
     static NIC: Mutex<Option<Nic>> = Mutex::new(None);
     static INFO: Mutex<Option<ControlInfo>> = Mutex::new(None);
@@ -101,6 +116,10 @@ mod program {
     static RX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_FRAMES: AtomicU64 = AtomicU64::new(0);
     static TX_DROPS: AtomicU64 = AtomicU64::new(0);
+    static TX_STALL: AtomicBool = AtomicBool::new(false);
+    static IRQ_TX_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_PROGRESS_LOGGED: AtomicBool = AtomicBool::new(false);
+    static IRQ_TOTAL: AtomicU64 = AtomicU64::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
@@ -119,6 +138,14 @@ mod program {
         let mut irq_line = 0u32;
         let mut test = false;
         let mut serve = false;
+        let mut mmio = false;
+        let mut msix = false;
+        let mut msix_addr_lo = None;
+        let mut msix_addr_hi = None;
+        let mut msix_data = None;
+        let mut msix_bar = None;
+        let mut msix_bar_size = None;
+        let mut msix_table = None;
         for argument in args.iter().skip(1) {
             if let Some(value) = argument.strip_prefix("bar=") {
                 bar_index = value
@@ -136,34 +163,114 @@ mod program {
                 irq_line = value
                     .parse()
                     .map_err(|_| format!("bad irq argument `{argument}`"))?;
+            } else if argument == "msix=1" || argument == "msix" {
+                msix = true;
+            } else if argument == "tx-stall" {
+                // Test-only mutation: drop TX completions so the qtest must catch the wedge.
+                TX_STALL.store(true, Ordering::Release);
+            } else if let Some(value) = argument.strip_prefix("msix_addr_lo=") {
+                msix_addr_lo = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_addr_lo argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_addr_hi=") {
+                msix_addr_hi = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_addr_hi argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_data=") {
+                msix_data = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_data argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar=") {
+                msix_bar = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar_size=") {
+                msix_bar_size = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar_size argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_table=") {
+                msix_table = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_table argument `{argument}`"))?,
+                );
             } else if argument == "test" {
                 test = true;
             } else if argument == "serve" {
                 serve = true;
+            } else if argument == "transport=mmio" {
+                mmio = true;
             }
         }
+        let msix = if msix {
+            Some(MsixInfo {
+                address_lo: msix_addr_lo
+                    .ok_or_else(|| "msix requested without msix_addr_lo".to_string())?,
+                address_hi: msix_addr_hi
+                    .ok_or_else(|| "msix requested without msix_addr_hi".to_string())?,
+                data: msix_data.ok_or_else(|| "msix requested without msix_data".to_string())?,
+                bar: msix_bar.ok_or_else(|| "msix requested without msix_bar".to_string())?,
+                bar_size: msix_bar_size
+                    .ok_or_else(|| "msix requested without msix_bar_size".to_string())?,
+                table: msix_table.ok_or_else(|| "msix requested without msix_table".to_string())?,
+            })
+        } else {
+            None
+        };
         if bar_size == 0 || dma_size < RING_REGION_OFFSET + RING_REGION_LEN {
             return Err("devd did not pass a usable BAR and DMA buffer".to_string());
         }
 
-        let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_size)
+        // The virtio-mmio window is 0x200 bytes, but the kernel maps page-granular objects; map
+        // the whole page the devd platform grant created (0x1000) and keep the register offsets.
+        let bar_map_size = if mmio {
+            bar_size.saturating_add(0xfff) & !0xfff
+        } else {
+            bar_size
+        };
+        let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_map_size)
             .map_err(|error| format!("bar map: {}", error.description()))?;
         let bar = MmioRegion::new(bar_window);
-        let config_window = raven_rt::map_mmio(CONFIG_HANDLE, raven_driver::PAGE)
-            .map_err(|error| format!("config map: {}", error.description()))?;
-        let config = ConfigRegion::new(config_window);
-        let dma_info = raven_rt::dma_info(DMA_HANDLE)
+        let (config, dma_handle, irq_handle, msix_bar) = if mmio {
+            // `devd dtb launch` grants one MMIO window, then DMA, then the IRQ.
+            (None, MMIO_DMA_HANDLE, MMIO_IRQ_HANDLE, None)
+        } else {
+            let config_window = raven_rt::map_mmio_mut(CONFIG_HANDLE, raven_driver::PAGE)
+                .map_err(|error| format!("config map: {}", error.description()))?;
+            let config = MmioRegion::new(config_window);
+            let msix_bar = match &msix {
+                Some(info) => {
+                    let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
+                        .map_err(|error| format!("msix bar map: {}", error.description()))?;
+                    Some(MmioRegion::new(window))
+                }
+                None => None,
+            };
+            (Some(config), DMA_HANDLE, IRQ_HANDLE, msix_bar)
+        };
+        let dma_info = raven_rt::dma_info(dma_handle)
             .map_err(|error| format!("dma info: {}", error.description()))?;
-        let window = raven_rt::map_mmio_mut(DMA_HANDLE, dma_size)
+        let window = raven_rt::map_mmio_mut(dma_handle, dma_size)
             .map_err(|error| format!("dma map: {}", error.description()))?;
         // The split-queue metadata lives in the first 4 KiB; the B39 region and pool follow.
         let (meta, rest) = window.split_at_mut(RING_REGION_OFFSET);
         let (region, _tail) = rest.split_at_mut(RING_REGION_LEN);
         let dma = DmaRegion::new(meta, dma_info.bus_addr);
-        let irq = Irq::new(IRQ_HANDLE);
+        let irq = Irq::new(irq_handle);
 
         let mut nic = Nic::open(
-            bar, config, dma, region, irq, bar_index, bar_size, dma_size, irq_line,
+            bar, config, dma, region, irq, bar_index, bar_size, dma_size, irq_line, msix, msix_bar,
+            mmio,
         )?;
         if !test && !serve {
             // B13b compatibility: the old one-shot qtest profile passes no mode token.
@@ -179,10 +286,15 @@ mod program {
             let mut guard = NIC.lock();
             *guard = Some(nic);
         }
+        // K9 KVM2: the pump wake is bounded by the running thread's scheduler slice (measured
+        // 10-14 ms late on a 1 ms wait), not by the requested timeout. Run the driver at the
+        // highest nice so the woken pump preempts the current thread and drains TX before the
+        // contract's half-close window.
+        let _ = raven_rt::priority::setpriority(raven_rt::priority::PRIO_PROCESS, 0, -20);
         thread::spawn(pump_thread, 0, 128 * 1024)
             .map_err(|error| format!("pump thread: {}", error.description()))?;
 
-        let mut handler = NicHandler::new(test);
+        let mut handler = NicHandler::new(test, dma_handle);
         let mut server = match Server::register(NIC_SCHEME) {
             Ok(server) => server,
             Err(error) => {
@@ -247,6 +359,7 @@ mod program {
 
     /// The four virtio-pci capabilities on the BAR the driver was given.
     struct Caps {
+        mmio: bool,
         common: Region,
         notify: Region,
         isr: Region,
@@ -289,6 +402,9 @@ mod program {
         rx_prod: u32,
         rx_cons_seen: u32,
         tx_busy: bool,
+        tx_waits: u32,
+        last_fired: usize,
+        last_isr: u8,
         broken: bool,
     }
 
@@ -296,7 +412,7 @@ mod program {
         #[allow(clippy::too_many_arguments)] // five handles plus the BAR/DMA geometry
         fn open(
             mut bar: MmioRegion,
-            config: ConfigRegion,
+            config: Option<MmioRegion>,
             mut dma: DmaRegion,
             region: &'static mut [u8],
             irq: Irq,
@@ -304,29 +420,96 @@ mod program {
             bar_size: usize,
             dma_len: usize,
             irq_line: u32,
+            msix: Option<MsixInfo>,
+            msix_bar: Option<MmioRegion>,
+            is_mmio: bool,
         ) -> Result<Self, String> {
-            let (vendor, device) = config.ids().map_err(describe)?;
-            if vendor != VIRTIO_VENDOR || device != VIRTIO_NET_DEVICE {
-                return Err(format!(
-                    "unexpected function {vendor:#06x}:{device:#06x}, expected 1af4:1041"
-                ));
-            }
-            raven_rt::println!("virtio-net: id={vendor:04x}:{device:04x}");
-            let caps = read_capabilities(&config, bar_index, bar_size)?;
-            raven_rt::println!(
-                "virtio-net: common={:#x} notify={:#x} isr={:#x} device={:#x}",
-                caps.common.offset,
-                caps.notify.offset,
-                caps.isr.offset,
-                caps.device.offset
-            );
-            raven_rt::println!(
-                "virtio-net: dma len={dma_len} bus={:#x} irq={irq_line}",
-                dma.bus_address()
-            );
-            let features = reset_and_negotiate(&mut bar, &caps)?;
-            let mac = read_mac(&bar, &caps, &features)?;
-            let (link, mtu) = read_status(&bar, &caps, &features)?;
+            let (caps, features, mac, link, mtu, msix_vector) = if is_mmio {
+                if msix.is_some() {
+                    return Err("MSI-X is not part of virtio-mmio".to_string());
+                }
+                let magic = bar.read_u32(mmio::MAGIC_VALUE).map_err(describe)?;
+                let version = bar.read_u32(mmio::VERSION_REG).map_err(describe)?;
+                let device = bar.read_u32(mmio::DEVICE_ID).map_err(describe)?;
+                if magic != mmio::MAGIC || version != mmio::VERSION || device != mmio::DEVICE_ID_NET
+                {
+                    return Err(format!(
+                        "unexpected virtio-mmio magic={magic:#010x} version={version} device={device}"
+                    ));
+                }
+                raven_rt::println!("virtio-net: transport=mmio id={device} irq={irq_line}");
+                let caps = Caps {
+                    mmio: true,
+                    common: Region {
+                        offset: 0,
+                        length: mmio::WINDOW_LEN,
+                    },
+                    notify: Region {
+                        offset: mmio::QUEUE_NOTIFY,
+                        length: 4,
+                    },
+                    isr: Region {
+                        offset: mmio::INTERRUPT_STATUS,
+                        length: 8,
+                    },
+                    device: Region {
+                        offset: mmio::CONFIG,
+                        length: 0x10,
+                    },
+                    notify_multiplier: 1,
+                };
+                raven_rt::println!(
+                    "virtio-net: dma len={dma_len} bus={:#x} irq={irq_line}",
+                    dma.bus_address()
+                );
+                let features = reset_and_negotiate(&mut bar, &caps)?;
+                let mac = read_mac(&bar, &caps, &features)?;
+                let (link, mtu) = read_status(&bar, &caps, &features)?;
+                (caps, features, mac, link, mtu, 0xFFFF)
+            } else {
+                let mut config =
+                    config.ok_or_else(|| "missing PCI configuration page".to_string())?;
+                let vendor = config.read_u16(0x00).map_err(describe)?;
+                let device = config.read_u16(0x02).map_err(describe)?;
+                if vendor != VIRTIO_VENDOR || device != VIRTIO_NET_DEVICE {
+                    return Err(format!(
+                        "unexpected function {vendor:#06x}:{device:#06x}, expected 1af4:1041"
+                    ));
+                }
+                raven_rt::println!("virtio-net: id={vendor:04x}:{device:04x}");
+                let caps = read_capabilities(&config, bar_index, bar_size)?;
+                raven_rt::println!(
+                    "virtio-net: common={:#x} notify={:#x} isr={:#x} device={:#x}",
+                    caps.common.offset,
+                    caps.notify.offset,
+                    caps.isr.offset,
+                    caps.device.offset
+                );
+                raven_rt::println!(
+                    "virtio-net: dma len={dma_len} bus={:#x} irq={irq_line}",
+                    dma.bus_address()
+                );
+                let features = reset_and_negotiate(&mut bar, &caps)?;
+                let msix_vector = match (msix, msix_bar) {
+                    (Some(info), Some(mut table)) => {
+                        let cap = find_msix(&config)?.ok_or_else(|| {
+                            "MSI-X was requested but the function has no MSI-X capability"
+                                .to_string()
+                        })?;
+                        configure_msix(&mut table, &mut config, &cap, &info)?;
+                        bar.write_u16(common(&caps, MSIX_CONFIG), 0)
+                            .map_err(describe)?;
+                        1
+                    }
+                    (Some(_), None) => {
+                        return Err("MSI-X table BAR was not transferred".to_string());
+                    }
+                    (None, _) => 0xFFFF,
+                };
+                let mac = read_mac(&bar, &caps, &features)?;
+                let (link, mtu) = read_status(&bar, &caps, &features)?;
+                (caps, features, mac, link, mtu, msix_vector)
+            };
             raven_rt::println!(
                 "virtio-net: mac={mac} mtu={mtu} link={}",
                 if link { "up" } else { "down" }
@@ -339,11 +522,19 @@ mod program {
             b39.write_header(region, 0, 0)
                 .map_err(|error| format!("ring header: {error}"))?;
 
-            let queues = bar.read_u16(common(&caps, NUM_QUEUES)).map_err(describe)?;
+            let queues = if is_mmio {
+                2
+            } else {
+                bar.read_u16(common(&caps, NUM_QUEUES)).map_err(describe)?
+            };
             if queues < 2 {
                 return Err(format!("device offers {queues} queues, need 2"));
             }
-            let maximum = queue_maximum(&mut bar, &caps, 0)?;
+            let maximum = if is_mmio {
+                queue_maximum_mmio(&mut bar, 0)?
+            } else {
+                queue_maximum(&mut bar, &caps, 0)?
+            };
             let qsize = queue_size(maximum)
                 .ok_or_else(|| format!("device queue size {maximum} is too small"))?;
             let rx_layout = SplitLayout::new(RX_RING_BASE, qsize);
@@ -352,8 +543,17 @@ mod program {
                 return Err("DMA buffer is too small for the split queues".to_string());
             }
             let bus = dma.bus_address();
-            let rx_notify = program_queue(&mut bar, &caps, 0, &rx_layout, bus)?;
-            let tx_notify = program_queue(&mut bar, &caps, 1, &tx_layout, bus)?;
+            let (rx_notify, tx_notify) = if is_mmio {
+                (
+                    program_queue_mmio(&mut bar, 0, &rx_layout, bus)?,
+                    program_queue_mmio(&mut bar, 1, &tx_layout, bus)?,
+                )
+            } else {
+                (
+                    program_queue(&mut bar, &caps, 0, &rx_layout, bus, msix_vector)?,
+                    program_queue(&mut bar, &caps, 1, &tx_layout, bus, msix_vector)?,
+                )
+            };
             raven_rt::println!("virtio-net: queue0 rx size={qsize}");
             raven_rt::println!("virtio-net: queue1 tx size={qsize}");
             raven_rt::println!(
@@ -426,6 +626,9 @@ mod program {
                 rx_prod: 0,
                 rx_cons_seen: 0,
                 tx_busy: false,
+                tx_waits: 0,
+                last_fired: 0,
+                last_isr: 0,
                 broken: false,
             };
             // The queues are programmed; the device is live from here.
@@ -455,12 +658,7 @@ mod program {
         fn reset(&mut self) -> Result<(), String> {
             write_status(&mut self.bar, &self.caps, 0)?;
             let mut spins = 0;
-            while self
-                .bar
-                .read_u8(common(&self.caps, DEVICE_STATUS))
-                .map_err(describe)?
-                != 0
-            {
+            while read_device_status(&self.bar, &self.caps)? != 0 {
                 spins += 1;
                 if spins > 1000 {
                     return Err("device did not reset".to_string());
@@ -471,6 +669,12 @@ mod program {
         }
 
         fn notify_queue(&mut self, notify_offset: usize, queue: u16) -> Result<(), String> {
+            if self.caps.mmio {
+                return self
+                    .bar
+                    .write_u32(mmio::QUEUE_NOTIFY, u32::from(queue))
+                    .map_err(describe);
+            }
             let address = self.caps.notify.offset + notify_offset;
             let end = address
                 .checked_add(2)
@@ -534,9 +738,32 @@ mod program {
                 return Err("device is broken".to_string());
             }
             let fired = self.irq.wait(IRQ_PUMP_NS).unwrap_or(0);
+            self.last_fired = fired;
             if fired > 0 {
-                let _isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
+                let isr = self.bar.read_u8(self.caps.isr.offset).map_err(describe)?;
+                self.last_isr = isr;
+                if self.caps.mmio {
+                    self.bar
+                        .write_u32(mmio::INTERRUPT_ACK, u32::from(isr))
+                        .map_err(describe)?;
+                }
                 let _ = self.irq.ack();
+                let tx = TX_FRAMES.load(Ordering::Acquire);
+                if tx > 0 && !IRQ_TX_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq tx fired={fired} isr={isr:#x} tx={tx} rx={}",
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
+                let total = IRQ_TOTAL.fetch_add(fired as u64, Ordering::AcqRel)
+                    + u64::try_from(fired).unwrap_or(0);
+                if total >= 24 && !IRQ_PROGRESS_LOGGED.swap(true, Ordering::AcqRel) {
+                    raven_rt::println!(
+                        "virtio-net: irq progress fired={total} tx={} rx={}",
+                        TX_FRAMES.load(Ordering::Acquire),
+                        RX_FRAMES.load(Ordering::Acquire)
+                    );
+                }
             }
             self.update_link()?;
             if !STARTED.load(Ordering::Acquire) {
@@ -638,6 +865,20 @@ mod program {
                     .dma
                     .read_u16(self.tx.layout.used_idx())
                     .map_err(describe)?;
+                if TX_STALL.load(Ordering::Acquire) {
+                    // Test-only mutation: leave the used entry unread and the frame in flight.
+                    self.tx_waits = self.tx_waits.wrapping_add(1);
+                    if self.tx_waits.is_multiple_of(100) {
+                        raven_rt::println!(
+                            "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
+                            self.tx.used,
+                            self.tx.avail,
+                            self.last_fired,
+                            self.last_isr
+                        );
+                    }
+                    return Ok(());
+                }
                 if used != self.tx.used {
                     if used.wrapping_sub(self.tx.used) != 1 {
                         return self.fail("TX used index drift".to_string());
@@ -661,7 +902,19 @@ mod program {
                         let _ = consumer.pop();
                     }
                     self.tx_busy = false;
+                    self.tx_waits = 0;
                     TX_FRAMES.fetch_add(1, Ordering::AcqRel);
+                } else {
+                    self.tx_waits = self.tx_waits.wrapping_add(1);
+                    if self.tx_waits.is_multiple_of(100) {
+                        raven_rt::println!(
+                            "virtio-net: tx-wait used={used} expected={} avail={} fired={} isr={:#x}",
+                            self.tx.used,
+                            self.tx.avail,
+                            self.last_fired,
+                            self.last_isr
+                        );
+                    }
                 }
                 return Ok(());
             }
@@ -716,6 +969,7 @@ mod program {
     /// The control scheme handler.
     struct NicHandler {
         test: bool,
+        dma_handle: Handle,
         pending: Option<(u64, String)>,
         opens: BTreeMap<u64, OpenKind>,
         next_id: u64,
@@ -730,9 +984,10 @@ mod program {
     }
 
     impl NicHandler {
-        fn new(test: bool) -> Self {
+        fn new(test: bool, dma_handle: Handle) -> Self {
             Self {
                 test,
+                dma_handle,
                 pending: None,
                 opens: BTreeMap::new(),
                 next_id: 1,
@@ -801,7 +1056,7 @@ mod program {
                 if !flags.readable() {
                     return Err(Errno::EACCES.into());
                 }
-                return Ok(Opened::Attach(DMA_HANDLE));
+                return Ok(Opened::Attach(self.dma_handle));
             }
             let kind = match path {
                 NIC_INFO | NIC_MAC | NIC_MTU | NIC_LINK => {
@@ -1019,7 +1274,7 @@ mod program {
     }
 
     fn read_capabilities(
-        config: &ConfigRegion,
+        config: &MmioRegion,
         bar_index: usize,
         bar_size: usize,
     ) -> Result<Caps, String> {
@@ -1031,7 +1286,7 @@ mod program {
         // QEMU prepends each capability, so the chain runs from the highest offset down.
         let mut seen = [0u8; raven_driver::MAX_CAPABILITIES];
         let mut seen_len = 0usize;
-        let mut current = config.first_capability().map_err(describe)?;
+        let mut current = first_capability(config)?;
         while let Some(capability) = current {
             let offset = usize::from(capability.offset);
             if seen
@@ -1106,6 +1361,7 @@ mod program {
             current = next_capability(config, capability.next)?;
         }
         Ok(Caps {
+            mmio: false,
             common: common.ok_or_else(|| "no common configuration capability".to_string())?,
             notify: notify.ok_or_else(|| "no notify capability".to_string())?,
             isr: isr.ok_or_else(|| "no ISR capability".to_string())?,
@@ -1114,29 +1370,183 @@ mod program {
         })
     }
 
-    fn next_capability(
-        config: &ConfigRegion,
-        next: u8,
-    ) -> Result<Option<raven_driver::Capability>, String> {
+    fn next_capability(config: &MmioRegion, next: u8) -> Result<Option<Capability>, String> {
         if next == 0 {
             return Ok(None);
         }
-        config.capability(next).map_err(describe)
+        capability(config, next)
+    }
+
+    fn first_capability(config: &MmioRegion) -> Result<Option<Capability>, String> {
+        let status = config.read_u16(0x06).map_err(describe)?;
+        if status & (1 << 4) == 0 {
+            return Ok(None);
+        }
+        let pointer = config.read_u8(0x34).map_err(describe)? & 0xFC;
+        if pointer == 0 {
+            return Ok(None);
+        }
+        capability(config, pointer)
+    }
+
+    fn capability(config: &MmioRegion, offset: u8) -> Result<Option<Capability>, String> {
+        let offset = usize::from(offset);
+        if !offset.is_multiple_of(4) || offset < 0x40 || offset + 1 >= raven_driver::PAGE {
+            return Ok(None);
+        }
+        let id = config.read_u8(offset).map_err(describe)?;
+        if id == 0 {
+            return Ok(None);
+        }
+        let next = config.read_u8(offset + 1).map_err(describe)? & 0xFC;
+        Ok(Some(Capability {
+            id,
+            offset: offset as u8,
+            next,
+        }))
+    }
+
+    /// One function's MSI-X capability.
+    struct MsixCap {
+        offset: u8,
+        table_bar: usize,
+        table_offset: usize,
+        table_size: u16,
+    }
+
+    fn find_msix(config: &MmioRegion) -> Result<Option<MsixCap>, String> {
+        let mut current = first_capability(config)?;
+        let mut seen = [0u8; raven_driver::MAX_CAPABILITIES];
+        let mut seen_len = 0usize;
+        while let Some(capability) = current {
+            let offset = usize::from(capability.offset);
+            if seen
+                .get(..seen_len)
+                .unwrap_or(&[])
+                .contains(&capability.offset)
+            {
+                break;
+            }
+            let Some(slot) = seen.get_mut(seen_len) else {
+                break;
+            };
+            *slot = capability.offset;
+            seen_len = seen_len.saturating_add(1);
+            if capability.id == 0x11 {
+                let control = config.read_u16(offset + 2).map_err(describe)?;
+                let table = config.read_u32(offset + 4).map_err(describe)?;
+                return Ok(Some(MsixCap {
+                    offset: capability.offset,
+                    table_bar: usize::try_from(table & 7).unwrap_or(usize::MAX),
+                    table_offset: usize::try_from(table & !7).unwrap_or(usize::MAX),
+                    table_size: (control & 0x7FF).saturating_add(1),
+                }));
+            }
+            current = next_capability(config, capability.next)?;
+        }
+        Ok(None)
+    }
+
+    /// Program the MSI-X table for the RX/TX queue vector and enable MSI-X.
+    ///
+    /// Entry 0 is the configuration vector and is masked; entry 1 is shared by both queues.
+    fn configure_msix(
+        table: &mut MmioRegion,
+        config: &mut MmioRegion,
+        cap: &MsixCap,
+        info: &MsixInfo,
+    ) -> Result<(), String> {
+        if cap.table_bar != info.bar || cap.table_offset != info.table {
+            return Err(format!(
+                "MSI-X table is bar{} offset {:#x}, devd passed bar{} offset {:#x}",
+                cap.table_bar, cap.table_offset, info.bar, info.table
+            ));
+        }
+        if cap.table_size < 2 {
+            return Err(format!(
+                "MSI-X table has {} entries; need 2",
+                cap.table_size
+            ));
+        }
+        let end = info
+            .table
+            .checked_add(32)
+            .ok_or_else(|| "MSI-X table offset overflows".to_string())?;
+        if end > info.bar_size {
+            return Err("MSI-X table is outside the BAR".to_string());
+        }
+        table.write_u32(info.table, 0).map_err(describe)?;
+        table.write_u32(info.table + 4, 0).map_err(describe)?;
+        table.write_u32(info.table + 8, 0).map_err(describe)?;
+        table.write_u32(info.table + 12, 1).map_err(describe)?;
+        table
+            .write_u32(info.table + 16, info.address_lo)
+            .map_err(describe)?;
+        table
+            .write_u32(info.table + 20, info.address_hi)
+            .map_err(describe)?;
+        table
+            .write_u32(info.table + 24, info.data)
+            .map_err(describe)?;
+        table.write_u32(info.table + 28, 0).map_err(describe)?;
+        let offset = usize::from(cap.offset);
+        let control = config.read_u16(offset + 2).map_err(describe)?;
+        config
+            .write_u16(offset + 2, (control | 0x8000) & !0x4000)
+            .map_err(describe)?;
+        let command = config.read_u16(0x04).map_err(describe)?;
+        config.write_u16(0x04, command | 0x0400).map_err(describe)?;
+        raven_rt::println!(
+            "virtio-net: msix table={:#x} bar={} vector=1",
+            info.table,
+            info.bar
+        );
+        Ok(())
     }
 
     fn common(caps: &Caps, register: usize) -> usize {
-        caps.common.offset + register
+        if !caps.mmio {
+            return caps.common.offset + register;
+        }
+        let offset = match register {
+            DEVICE_FEATURE_SELECT => mmio::DEVICE_FEATURES_SEL,
+            DEVICE_FEATURE => mmio::DEVICE_FEATURES,
+            DRIVER_FEATURE_SELECT => mmio::DRIVER_FEATURES_SEL,
+            DRIVER_FEATURE => mmio::DRIVER_FEATURES,
+            DEVICE_STATUS => mmio::STATUS,
+            QUEUE_SELECT => mmio::QUEUE_SEL,
+            QUEUE_SIZE => mmio::QUEUE_NUM,
+            QUEUE_ENABLE => mmio::QUEUE_READY,
+            _ => register,
+        };
+        caps.common.offset + offset
     }
 
     fn write_status(bar: &mut MmioRegion, caps: &Caps, status: u8) -> Result<(), String> {
-        bar.write_u8(common(caps, DEVICE_STATUS), status)
-            .map_err(describe)
+        if caps.mmio {
+            bar.write_u32(common(caps, DEVICE_STATUS), u32::from(status))
+                .map_err(describe)
+        } else {
+            bar.write_u8(common(caps, DEVICE_STATUS), status)
+                .map_err(describe)
+        }
+    }
+
+    fn read_device_status(bar: &MmioRegion, caps: &Caps) -> Result<u8, String> {
+        if caps.mmio {
+            let value = bar
+                .read_u32(common(caps, DEVICE_STATUS))
+                .map_err(describe)?;
+            Ok((value & 0xff) as u8)
+        } else {
+            bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)
+        }
     }
 
     fn reset_and_negotiate(bar: &mut MmioRegion, caps: &Caps) -> Result<Features, String> {
         write_status(bar, caps, 0)?;
         let mut spins = 0;
-        while bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)? != 0 {
+        while read_device_status(bar, caps)? != 0 {
             spins += 1;
             if spins > 1000 {
                 return Err("device did not reset".to_string());
@@ -1157,6 +1567,13 @@ mod program {
         device.high = bar
             .read_u32(common(caps, DEVICE_FEATURE))
             .map_err(describe)?;
+        if caps.mmio {
+            raven_rt::println!(
+                "virtio-net: mmio device features low={:#010x} high={:#010x}",
+                device.low,
+                device.high
+            );
+        }
         if !device.has(32) {
             return Err("device does not offer VIRTIO_F_VERSION_1".to_string());
         }
@@ -1186,8 +1603,19 @@ mod program {
             caps,
             STATUS_ACKNOWLEDGE | STATUS_DRIVER | STATUS_FEATURES_OK,
         )?;
-        if bar.read_u8(common(caps, DEVICE_STATUS)).map_err(describe)? & STATUS_FEATURES_OK == 0 {
-            return Err("device rejected the feature set".to_string());
+        let status = read_device_status(bar, caps)?;
+        if caps.mmio {
+            raven_rt::println!(
+                "virtio-net: mmio driver features low={:#010x} high={:#010x} status={status:#04x}",
+                driver.low,
+                driver.high
+            );
+        }
+        if status & STATUS_FEATURES_OK == 0 {
+            return Err(format!(
+                "device rejected the feature set (status={status:#04x} device={:#010x}:{:#010x} driver={:#010x}:{:#010x})",
+                device.low, device.high, driver.low, driver.high
+            ));
         }
         Ok(driver)
     }
@@ -1233,18 +1661,57 @@ mod program {
         bar.read_u16(common(caps, QUEUE_SIZE)).map_err(describe)
     }
 
+    /// `QueueNumMax` after selecting `queue` in the virtio-mmio transport.
+    fn queue_maximum_mmio(bar: &mut MmioRegion, queue: u16) -> Result<u16, String> {
+        bar.write_u32(mmio::QUEUE_SEL, u32::from(queue))
+            .map_err(describe)?;
+        let maximum = bar.read_u32(mmio::QUEUE_NUM_MAX).map_err(describe)?;
+        Ok(u16::try_from(maximum).unwrap_or(u16::MAX))
+    }
+
+    /// Program one split queue through the virtio-mmio register window.
+    fn program_queue_mmio(
+        bar: &mut MmioRegion,
+        queue: u16,
+        layout: &SplitLayout,
+        bus: u64,
+    ) -> Result<usize, String> {
+        bar.write_u32(mmio::QUEUE_SEL, u32::from(queue))
+            .map_err(describe)?;
+        bar.write_u32(mmio::QUEUE_NUM, u32::from(layout.size))
+            .map_err(describe)?;
+        let (desc_lo, desc_hi) = mmio::address_parts(bus + layout.desc as u64);
+        let (avail_lo, avail_hi) = mmio::address_parts(bus + layout.avail as u64);
+        let (used_lo, used_hi) = mmio::address_parts(bus + layout.used as u64);
+        let (desc_lo_reg, desc_hi_reg) = mmio::address_offsets(mmio::QUEUE_DESC_LOW);
+        let (avail_lo_reg, avail_hi_reg) = mmio::address_offsets(mmio::QUEUE_DRIVER_LOW);
+        let (used_lo_reg, used_hi_reg) = mmio::address_offsets(mmio::QUEUE_DEVICE_LOW);
+        bar.write_u32(desc_lo_reg, desc_lo).map_err(describe)?;
+        bar.write_u32(desc_hi_reg, desc_hi).map_err(describe)?;
+        bar.write_u32(avail_lo_reg, avail_lo).map_err(describe)?;
+        bar.write_u32(avail_hi_reg, avail_hi).map_err(describe)?;
+        bar.write_u32(used_lo_reg, used_lo).map_err(describe)?;
+        bar.write_u32(used_hi_reg, used_hi).map_err(describe)?;
+        bar.write_u32(mmio::QUEUE_READY, 1).map_err(describe)?;
+        if bar.read_u32(mmio::QUEUE_READY).map_err(describe)? != 1 {
+            return Err(format!("queue {queue} did not become ready"));
+        }
+        Ok(0)
+    }
+
     fn program_queue(
         bar: &mut MmioRegion,
         caps: &Caps,
         queue: u16,
         layout: &SplitLayout,
         bus: u64,
+        msix_vector: u16,
     ) -> Result<usize, String> {
         bar.write_u16(common(caps, QUEUE_SELECT), queue)
             .map_err(describe)?;
         bar.write_u16(common(caps, QUEUE_SIZE), layout.size)
             .map_err(describe)?;
-        bar.write_u16(common(caps, QUEUE_MSIX_VECTOR), 0xFFFF)
+        bar.write_u16(common(caps, QUEUE_MSIX_VECTOR), msix_vector)
             .map_err(describe)?;
         bar.write_u64(common(caps, QUEUE_DESC), bus + layout.desc as u64)
             .map_err(describe)?;

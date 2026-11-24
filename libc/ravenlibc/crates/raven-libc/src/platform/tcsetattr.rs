@@ -10,6 +10,8 @@ use raven_libc_abi::structs::Termios;
 ///
 /// The platform seam exposes `TCSETS` (the `TCSANOW` action); the drain/flush variants share
 /// the same attribute copy here because the tty scheme applies the settings synchronously.
+/// `TCSADRAIN` is safe by construction: the pty applies the record without touching the master
+/// output queue, so bytes queued before the call are still readable afterwards (K444).
 ///
 /// # Safety
 /// `termios_p` is NULL or points to a readable `struct termios`.

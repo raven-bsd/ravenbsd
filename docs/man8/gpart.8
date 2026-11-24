@@ -1,0 +1,28 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt GPART 8
+.Os RavenBSD
+.Sh NAME
+.Nm gpart
+.Nd show GPT partitions
+.Sh SYNOPSIS
+.Nm
+.Cm show
+.Op Ar block:0
+.Sh DESCRIPTION
+The
+.Nm
+utility reads the geometry and GPT partition records from the
+.Dq block:
+scheme and prints the start sector, size, index and name for every partition.
+Partitioning write support is a follow-up.
+This version lists the real records and never invents a table.
+A device that cannot be opened or a malformed reply is an error.
+.Sh EXIT STATUS
+Returns 0 on success.
+Returns 1 on a device or protocol error.
+Returns 2 on usage errors.
+.Sh SEE ALSO
+.Xr lsblk 1 ,
+.Xr newfs 8

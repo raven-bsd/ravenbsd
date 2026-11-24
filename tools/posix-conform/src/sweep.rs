@@ -90,8 +90,8 @@ pub(crate) fn compiler(arch: &str) -> Result<(String, PathBuf)> {
 /// Returns an error when the profile or extension list cannot be read, the compiler cannot be
 /// executed, or a probe file cannot be written.
 pub fn run(root: &Path, arch: &str, extensions_path: &Path, strict: bool) -> Result<u8> {
-    let profile =
-        load_profile(&root.join("docs/posix/profile.toml")).context("cannot load profile")?;
+    let profile = load_profile(&crate::mgmt::posix_dir(root)?.join("profile.toml"))
+        .context("cannot load profile")?;
     let extensions = load_extensions(extensions_path)?;
     let (cc, arch_include) = compiler(arch)?;
     let include_root = root.join("libc/ravenlibc/include");

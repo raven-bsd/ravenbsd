@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S99 UFS demo, first boot: attach the host-formatted UFS2 GPT disk, list it,
+# mount the UFS partition read-write at /mnt, create/read a file and unmount.
+# The second boot is the ufs-disk-persist case.
+
+name = "ufs-disk"
+arch = "x86_64"
+profile = "ufs-demo"
+timeout_secs = 420
+pre = ["sh scripts/ufs-demo.sh --prepare"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/fixtures/ufs-demo/disk.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^lsblk$'
+unordered = true
+
+[[expect]]
+regex = '^newfs$'
+unordered = true
+
+[[expect]]
+regex = '^gpart$'
+unordered = true
+
+[[expect]]
+regex = 'NAME SIZE SECTORS TYPE'
+
+[[expect]]
+regex = 'block0 [0-9]+ [0-9]+ disk'
+
+[[expect]]
+regex = 'block0p1 16777216 32768 part ufs-root'
+
+[[expect]]
+regex = 'Geom name: block0'
+
+[[expect]]
+regex = 'Scheme: GPT'
+
+[[expect]]
+regex = '34\s+32768\s+1\s+ufs-root'
+
+[[expect]]
+regex = 's99-persist$'
+
+[[expect]]
+regex = '^irq-loop-ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^lsblk$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls /sbin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^gpart$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "lsblk\n"
+delay_ms = 100
+
+[[step]]
+wait = 'block0p1 16777216 32768 part ufs-root'
+timeout_secs = 30
+
+[[step]]
+send = "gpart show block:0\n"
+delay_ms = 100
+
+[[step]]
+wait = '34\s+32768\s+1\s+ufs-root'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mount ufs: /mnt && echo mount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mount-ok$'
+timeout_secs = 120
+
+[[step]]
+send = "echo s99-persist > /mnt/s99-demo.txt; echo write-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^write-ok$'
+timeout_secs = 120
+
+[[step]]
+send = "cat /mnt/s99-demo.txt; echo read-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^read-ok$'
+timeout_secs = 120
+
+# K522 regression row: bounded disk I/O loop over the MSI-X completion path.
+# Eight write+read cycles, N=8; the vector must stay owned for the whole loop.
+# Any `irq:` report (unclaimed vector / unexpected interrupt) fails the case.
+[[step]]
+send = "i=0; while [ $i -lt 8 ]; do cat /etc/motd > /mnt/i; cat /mnt/i > /dev/null; i=$((i+1)); done; echo irq-loop-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^irq-loop-ok$'
+timeout_secs = 120
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "umount /mnt && echo umount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^umount-ok$'
+timeout_secs = 120
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|mount: .*error|mount: .*invalid|fsd-ufs: .*failed|blockd: .*failed'
+
+# K522: the MSI-X vector must stay owned; the kernel reports any free vector
+# that still fires as `irq: unclaimed vector` (or `irq: unexpected interrupt`).
+[[forbid]]
+regex = '^irq:'

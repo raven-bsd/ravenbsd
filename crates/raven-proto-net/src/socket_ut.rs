@@ -339,3 +339,23 @@ fn icmp_reply_golden_bytes_and_roundtrip() {
     let bytes = encode_request(request);
     assert_eq!(SocketRequest::decode(&bytes), Ok(request));
 }
+
+#[test]
+fn poll_request_round_trip_and_readiness_bits() {
+    let request = SocketRequest::Call(Call::Poll);
+    assert_eq!(
+        encode_request(request),
+        [0x01, 0x00, 0x04, 0x00, 0x0b, 0x00]
+    );
+    assert_eq!(SocketRequest::decode(&encode_request(request)), Ok(request));
+
+    let bits = READY_READABLE | READY_WRITABLE | READY_HUP | READY_ERROR;
+    assert_eq!(
+        Response::decode(&encode_response(Response::Value(bits))),
+        Ok(Response::Value(bits))
+    );
+    assert_eq!(
+        [READY_READABLE, READY_WRITABLE, READY_HUP, READY_ERROR],
+        [1, 2, 4, 8]
+    );
+}

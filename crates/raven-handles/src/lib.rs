@@ -47,8 +47,10 @@ pub fn live_lineage_nodes() -> u64 {
 /// One node in a handle's rights-derivation tree.
 ///
 /// `rights` is the mask granted when the handle was created (already reduced by the parent and
-/// the caller's mask); `revoked` accumulates the bits revoked by this node's handle or by any
-/// ancestor whose revocation reached it.  `effective() = rights & !revoked`.
+/// the caller's mask); `revoked` is the bit mask revoked on this node. `revoked()` walks the
+/// strong parent chain, so a completed ancestor revoke is visible even when this node was
+/// registered in the kernel's weak registry after the revoke snapshot.
+/// `effective() = rights & !revoked()`.
 pub struct LineageNode {
     rights: Rights,
     revoked: AtomicU32,
@@ -80,14 +82,32 @@ impl LineageNode {
         self.rights
     }
 
-    /// Rights revoked by this node or an ancestor.
+    /// Rights revoked by this node or any ancestor, read through the strong parent chain.
+    ///
+    /// The chain is the linearization point: a revoke that completed before this call is seen
+    /// even if this node was registered after the revoker's registry snapshot.
     pub fn revoked(&self) -> Rights {
-        Rights(self.revoked.load(Ordering::Acquire))
+        let mut revoked = Rights::NONE;
+        let mut current = Some(self);
+        while let Some(node) = current {
+            revoked = revoked.union(Rights(node.revoked.load(Ordering::Acquire)));
+            current = node.parent.as_deref();
+        }
+        revoked
     }
 
-    /// Rights still usable: granted minus revoked.
+    /// Rights this node was granted at creation and that this node or an ancestor revoked.
+    ///
+    /// This is the C17 error-split mask: a right that was never granted to this handle is not
+    /// here, so the lookup reports `EACCES`, while a granted right revoked anywhere in the chain
+    /// reports `EPERM`.
+    pub fn revoked_effective(&self) -> Rights {
+        self.rights.intersect(self.revoked())
+    }
+
+    /// Rights still usable: granted minus the revocation chain.
     pub fn effective(&self) -> Rights {
-        Rights(self.rights.0 & !self.revoked.load(Ordering::Acquire))
+        Rights(self.rights.0 & !self.revoked().0)
     }
 
     /// Revoke `mask` on this node.  OR-ing is idempotent.
@@ -201,8 +221,14 @@ impl<T: Clone> HandleTable<T> {
 
     /// Insert an object whose rights derive from `parent`.
     ///
-    /// The stored rights are `parent.effective() & rights`; a child created after a revoke can
-    /// never regain a revoked bit. The returned handle's lineage node is available through
+    /// The child node keeps the **granted** mask: `parent.granted() & rights`, where callers
+    /// pass the current effective mask or a queued handle's send-time mask. The slot stores the
+    /// **currently effective** mask, `parent.effective() & granted`.
+    ///
+    /// This distinction is C17 for a queued `SCM_RIGHTS` handle: a right the sender held at send
+    /// time stays granted on the installed child, so an ancestor revoke that completed before
+    /// the install reports `EPERM`; a right the parent never had is absent from the granted mask
+    /// and reports `EACCES`. The returned handle's node is available through
     /// [`Self::lineage_node`] for the kernel's cross-process revocation registry.
     pub fn insert_derived(
         &mut self,
@@ -210,8 +236,9 @@ impl<T: Clone> HandleTable<T> {
         rights: Rights,
         parent: &Arc<LineageNode>,
     ) -> Result<Handle, Errno> {
-        let effective = parent.effective().intersect(rights);
-        let node = LineageNode::child(effective, parent);
+        let granted = parent.granted().intersect(rights);
+        let effective = parent.effective().intersect(granted);
+        let node = LineageNode::child(granted, parent);
         let index = self.allocate_index()?;
         Ok(self.fill(index, value, effective, node))
     }
@@ -266,7 +293,10 @@ impl<T: Clone> HandleTable<T> {
         }
         let value = slot.value.as_ref().ok_or(Errno::EBADF)?;
         let (revoked, effective) = match slot.lineage.as_ref() {
-            Some(node) => (node.revoked(), node.effective()),
+            // The error split uses the rights this handle actually held, masked by the whole
+            // revocation chain: an ancestor revoke is EPERM, a bit this handle never had is
+            // EACCES even when an ancestor revoked the same bit.
+            Some(node) => (node.revoked_effective(), node.effective()),
             None => (Rights::NONE, slot.rights),
         };
         if !effective.contains(needed) {
@@ -360,13 +390,14 @@ impl<T: Clone> HandleTable<T> {
                 return Err(Errno::EBADF);
             }
             let value = slot.value.as_ref().ok_or(Errno::EBADF)?;
-            if !slot.rights.contains(Rights::DUP) {
-                return Err(Errno::EACCES);
-            }
+            // The node's effective mask is authoritative. `slot.rights` is the effective mask
+            // recorded at insert time and can be stale for a queued child whose granted bit was
+            // revoked before the install; the node still knows it was granted (EPERM), so do not
+            // short-circuit on the slot mask.
             let parent = slot.lineage.clone().ok_or(Errno::EBADF)?;
             let effective = parent.effective();
             if !effective.contains(Rights::DUP) {
-                return Err(if (parent.revoked().0 & Rights::DUP.0) != 0 {
+                return Err(if (parent.revoked_effective().0 & Rights::DUP.0) != 0 {
                     Errno::EPERM
                 } else {
                     Errno::EACCES

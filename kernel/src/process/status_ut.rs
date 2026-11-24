@@ -29,6 +29,28 @@ fn wait_events_encode_once() {
 }
 
 #[test]
+fn signal_death_uses_the_low_status_byte() {
+    assert_eq!(signal_status(SIGTERM, false), SIGTERM as i32);
+    assert_eq!(signal_status(3, true), 3 | 0x80);
+    assert_eq!(
+        WaitEvent::Exited(-(SIGTERM as i32)).status(),
+        SIGTERM as i32
+    );
+    assert_eq!(WaitEvent::Exited(-((3 | 0x80) as i32)).status(), 3 | 0x80);
+}
+
+#[test]
+fn default_actions_match_the_signal_table() {
+    assert_eq!(default_action(SIGTERM), Some(DefaultAction::Terminate));
+    assert_eq!(default_action(SIGCHLD), Some(DefaultAction::Ignore));
+    assert_eq!(default_action(SIGKILL), Some(DefaultAction::Terminate));
+    assert_eq!(default_action(SIGSTOP), Some(DefaultAction::Stop));
+    assert_eq!(default_action(SIGCONT), Some(DefaultAction::Continue));
+    assert_eq!(default_action(0), None);
+    assert_eq!(default_action(65), None);
+}
+
+#[test]
 fn signal_numbers_are_bounded() {
     assert!(signal_valid(SIGHUP));
     assert!(signal_valid(SIGKILL));

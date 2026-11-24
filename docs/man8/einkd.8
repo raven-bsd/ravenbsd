@@ -1,0 +1,56 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt EINKD 8
+.Os RavenBSD
+.Sh NAME
+.Nm einkd
+.Nd RavenBSD E-Ink fetch/render/refresh service
+.Sh SYNOPSIS
+.Nm /sbin/einkd
+.Op --dry-run
+.Op --once
+.Sh DESCRIPTION
+.Nm
+runs the fetch, render and full-refresh service core for the Pi 4 7.5-inch
+UC8179 E-Ink panel.
+The service is disabled by default in the release image
+.Pq Va enable = false
+and is ordered after
+.Dq getty
+and
+.Dq netd ,
+so it never runs on the boot or login path.
+.Pp
+The current binary supports the host-tested dry-run path:
+.Bl -tag -width "--dry-run" -compact
+.It Fl -dry-run
+Use the static content source and a dry-run panel that only counts and logs
+the rendered frame.
+No SPI, GPIO, panel or network access is performed.
+.It Fl -once
+Perform one bounded fetch/render/refresh and exit 0.
+.El
+.Pp
+A run without
+.Fl -dry-run
+exits with
+.Dq hardware adapter not built
+until E4 supplies the SPI/GPIO adapter.
+The service manifest keeps
+.Nm
+disabled by default; the
+.Dq einkd-supervision
+qtest starts it after login and checks one dry-run refresh.
+.Sh FILES
+.Bl -tag -width "/etc/services.d/einkd.toml" -compact
+.It Pa /sbin/einkd
+The service binary.
+.It Pa /etc/services.d/einkd.toml
+The disabled service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr getty 1 ,
+.Xr netd 8

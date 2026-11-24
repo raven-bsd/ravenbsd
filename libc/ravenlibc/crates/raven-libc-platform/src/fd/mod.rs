@@ -17,8 +17,8 @@ pub mod ofd;
 pub mod table;
 
 pub use fdsan::{ErrorLevel, FdsanState, OwnerType, tag, tag_type, tag_value};
-pub use inherit::{FDMAP_MAGIC, FDMAP_VERSION, FdMap, FdMapEntry};
-pub use ofd::{Ofd, OfdArena, OfdKind, OfdRef};
+pub use inherit::{FDMAP_MAGIC, FDMAP_VERSION, FdMap, FdMapEntry, InheritedSocket};
+pub use ofd::{Ofd, OfdArena, OfdKind, OfdRef, SocketEndpoint, SocketMeta};
 pub use table::{FD_CLOEXEC, FdEntry, FdTable};
 
 /// The default soft `RLIMIT_NOFILE`.

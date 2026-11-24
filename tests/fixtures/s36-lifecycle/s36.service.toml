@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S36 frame-ownership probe: one one-shot lifecycle service after vfsd's file scheme is live.
+name = "s36-lifecycle"
+exec = "/bin/s36-lifecycle"
+args = []
+needs = ["scheme:file"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

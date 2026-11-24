@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P5c: raw RECORD_LOCK advisory byte-range locks over the file: scheme.
+# P5c2 adds the libc fcntl F_GETLK/F_SETLK/F_SETLKW path over the same kernel table.
+
+# S112: the same case under KVM -smp 4.
+name = "posix-fs-record-lock-kvm4"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/posix/fs/record-lock/build.sh"]
+initfs = "build/fixtures/record-lock/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^record-lock: services ok$'
+
+[[expect]]
+regex = '^record-lock: getlk-free ok$'
+
+[[expect]]
+regex = '^record-lock: conflict ok$'
+
+[[expect]]
+regex = '^record-lock: getlk-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: block ok$'
+
+[[expect]]
+regex = '^record-lock: close ok$'
+
+[[expect]]
+regex = '^record-lock: exit ok$'
+
+[[expect]]
+regex = '^record-lock: libc-getlk-free ok$'
+
+[[expect]]
+regex = '^record-lock: libc-getlk-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: libc-setlk-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: libc-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: libc-setlkw ok$'
+
+[[expect]]
+regex = '^record-lock: libc-close ok$'
+
+[[expect]]
+regex = '^record-lock: libc-exit ok$'
+
+[[expect]]
+regex = '^record-lock: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|record-lock: fail'

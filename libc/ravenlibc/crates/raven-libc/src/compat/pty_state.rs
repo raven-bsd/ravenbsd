@@ -26,6 +26,11 @@ use core::ffi::{c_char, c_int};
 
 use raven_libc_abi::generated::structs::Termios;
 use raven_libc_compat::{ForkResult, PtyOps, Winsize};
+use raven_libc_platform::xlat::open_flags;
+use raven_libc_platform::{OfdKind, RealSys, SysBackend, scheme::open_scheme_path};
+
+/// Raw `proc_ctty_set(handle) -> 0` (native `TIOCSCTTY`, kernel `syscall/tty.rs`).
+pub(crate) const PROC_CTTY_SET: usize = 0x1e0;
 
 pub(crate) struct RealPty;
 
@@ -73,6 +78,18 @@ impl PtyOps for RealPty {
     }
 
     fn open(&mut self, path: &[u8], flags: i32) -> Result<i32, raven_libc_abi::errno::Errno> {
+        if path.starts_with(b"pty:") {
+            let spec =
+                open_flags(flags as u32).map_err(|error| raven_libc_abi::errno::Errno(error.0))?;
+            let handle = open_scheme_path(&RealSys, path, spec.wire)
+                .map_err(|error| raven_libc_abi::errno::Errno(error.0))?;
+            return crate::ffi::platform::global()
+                .install(handle, OfdKind::Tty, spec.status, None, spec.cloexec)
+                .map_err(|error| {
+                    let _ = RealSys.close(handle);
+                    raven_libc_abi::errno::Errno(error.0)
+                });
+        }
         let mut name = [0 as c_char; 4096];
         if path.len() >= name.len() {
             return Err(raven_libc_abi::errno::Errno(super::ENAMETOOLONG as u16));
@@ -132,12 +149,17 @@ impl PtyOps for RealPty {
     }
 
     fn set_ctty(&mut self, fd: i32) -> Result<(), raven_libc_abi::errno::Errno> {
-        // SAFETY: `fd` is open.
-        if unsafe { super::ioctl(fd, super::TIOCSCTTY, 0 as c_int) } != 0 {
-            Err(raven_libc_abi::errno::Errno(super::EINVAL as u16))
-        } else {
-            Ok(())
-        }
+        // TIOCSCTTY is a kernel terminal operation, not a scheme CALL: pass the descriptor's
+        // scheme-file handle to PROC_CTTY_SET after setsid made the caller a session leader.
+        let handle = crate::ffi::platform::global()
+            .get(fd)
+            .map_err(|error| raven_libc_abi::errno::Errno(error.0))?
+            .handle();
+        // SAFETY: PROC_CTTY_SET takes one live scheme-file handle owned by the caller.
+        let raw = unsafe { raven_libc_sys::arch::syscall1(PROC_CTTY_SET, handle.0 as usize) };
+        raven_libc_sys::errno::ret(raw)
+            .map(|_| ())
+            .map_err(|error| raven_libc_abi::errno::Errno(error.0))
     }
 
     fn dup2(&mut self, from: i32, to: i32) -> Result<i32, raven_libc_abi::errno::Errno> {

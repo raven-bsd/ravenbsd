@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "cc-model-audit"
+version = "0.1.0"
+description = "Host-only audit of the K341 CUBIC/NewReno/RACK traces and the K269 rows."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+cc-model = { path = "../cc-model" }
+
+[lints]
+workspace = true

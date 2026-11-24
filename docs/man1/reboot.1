@@ -1,0 +1,24 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 20, 2026
+.Dt REBOOT 1
+.Os RavenBSD
+.Sh NAME
+.Nm reboot
+.Nd stop services and reboot the system
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+The
+.Nm
+utility stops the running services through
+.Xr svcd 8 ,
+flushes file systems, and requests a normal kernel reset.
+It requires effective uid 0.
+.Sh EXIT STATUS
+.Ex -std
+A permission or kernel failure exits 1.
+.Sh SEE ALSO
+.Xr poweroff 1 ,
+.Xr shutdown 1 ,
+.Xr svcd 8

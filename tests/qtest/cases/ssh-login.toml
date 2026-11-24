@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K195 host-to-guest SSH login gate. The pre-step runs the real host OpenSSH
+# client over the K194 tap/bridge (tests/ssh/ssh-login.sh): command session,
+# `ssh -tt` PTY session, wrong-password refusal and host-key capture. The case
+# then boots the same release image as a console-login smoke, so a broken SSHD
+# staging cannot pass silently.
+#
+# Build the case image first (the acceptance run uses --no-build):
+#   cargo xtask image --arch x86_64 --profile release --output build/qtest/ssh-login.img
+#
+# A pre-step failure is the gate: the host login must work before the smoke runs.
+
+name = "ssh-login"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/ssh/ssh-login.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: sshd up$'
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^raven# $'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|bad ELF'
+
+[[forbid]]
+regex = '(?i)SegmentOutsideUserRange'

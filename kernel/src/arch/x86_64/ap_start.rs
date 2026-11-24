@@ -7,11 +7,14 @@
 //! INIT-SIPI-SIPI sequence with startup vector [`TRAMPOLINE_VECTOR`]. It is position-dependent:
 //! every absolute address in it is the fixed physical address of the copy. The 16-bit code loads
 //! a temporary GDT, enters 32-bit protected mode, enables PAE and long mode with a private page
-//! table that identity-maps the first 2 MiB, then enters 64-bit mode. The 64-bit tail installs
-//! the per-CPU GS base and the final kernel GDT and jumps to [`ap_entry`].
+//! table that identity-maps the first 2 MiB, then enters 64-bit mode with the kernel code
+//! selector. The 64-bit tail installs the per-CPU GS base and enters a low stub. The stub
+//! switches to the kernel root before using the AP stack or the high-half Rust entry, then jumps
+//! to [`ap_entry`], which loads the per-CPU GDT/TSS.
 //!
-//! The private page table copies the kernel PML4 entries, so the high-half kernel mappings are
-//! available immediately. [`ap_entry`] switches to the kernel root before touching the heap.
+//! The private page table copies the kernel PML4 entries for the low trampoline. The kernel root
+//! temporarily maps the trampoline's low page so the instruction after the CR3 switch remains
+//! fetchable; [`unmap_trampoline_page`] drops that mapping after the APs are online.
 //!
 //! Only kernel threads run on application processors in S10: ring-3 entry needs a per-CPU TSS,
 //! which the follow-up SMP work owns. The boot processor keeps the existing TSS path.
@@ -118,17 +121,6 @@ static BSP_IDT_LIMIT: AtomicU16 = AtomicU16::new(0);
 static BSP_IDT_BASE: AtomicU64 = AtomicU64::new(0);
 static NULL_PAGE_FRAME: AtomicU64 = AtomicU64::new(0);
 
-/// Final 64-bit GDT used by application processors. 0x08 is the kernel code selector, 0x10 the
-/// kernel data selector, matching the boot processor's GDT. No TSS descriptor is loaded because
-/// APs only run kernel threads.
-static FINAL_GDT: [u64; 5] = [
-    0,
-    0x00af_9a00_0000_ffff,
-    0x00cf_9200_0000_ffff,
-    0x00cf_f200_0000_ffff,
-    0x00af_fa00_0000_ffff,
-];
-
 /// One CPU's GS block.
 pub fn block(cpu: usize) -> &'static PerCpuBlock {
     BLOCKS
@@ -222,6 +214,37 @@ pub unsafe fn probe_read(address: u64) -> u8 {
     unsafe { core::ptr::read_volatile(address as *const u8) }
 }
 
+/// Save `RFLAGS`, disable maskable interrupts and return the saved flags.
+///
+/// Used by the SMP active-request guards: they mask interrupts only for the publish/clear
+/// critical sections and restore the caller's original IF when the guard is dropped.
+pub fn save_and_disable_local_interrupts() -> u64 {
+    let flags: u64;
+    // SAFETY: `pushfq`/`pop` and `cli` are ring-0 operations; no memory is accessed.
+    unsafe {
+        asm!(
+            "pushfq",
+            "pop {}",
+            "cli",
+            out(reg) flags,
+            options(nomem, nostack),
+        );
+    }
+    flags
+}
+
+/// Restore the interrupt state captured by [`save_and_disable_local_interrupts`].
+pub fn restore_local_interrupts(flags: u64) {
+    // SAFETY: `sti`/`cli` are ring-0; the flags came from `pushfq`.
+    unsafe {
+        if flags & (1 << 9) != 0 {
+            asm!("sti", options(nomem, nostack, preserves_flags));
+        } else {
+            asm!("cli", options(nomem, nostack));
+        }
+    }
+}
+
 /// Enable maskable interrupts on this CPU (used while waiting for a remote TLB acknowledgement).
 pub fn enable_local_interrupts() {
     // SAFETY: the caller is in kernel context and all IDT gates are installed.
@@ -292,6 +315,7 @@ pub fn early_init() -> Result<(), ()> {
     // virtual page 0 in the kernel root makes the `gs:[0]` self-pointer read return zero instead
     // of faulting if a timer interrupt lands in that window.
     map_null_page();
+    map_trampoline_page()?;
     block(0)
         .apic_id
         .store(u64::from(apic::id()), Ordering::Release);
@@ -345,6 +369,37 @@ fn map_apic() -> Result<(), MapError> {
     let pointer = mmio::map_mmio(address, 0x1000)?;
     APIC_MMIO.store(pointer as u64, Ordering::Release);
     Ok(())
+}
+
+/// Map the low trampoline page in the kernel root so the AP can finish the CR3 switch and fetch
+/// the high-half Rust entry. The AP's private root already identity-maps this page; the kernel
+/// root needs it only for the one instruction that runs after `mov cr3`.
+fn map_trampoline_page() -> Result<(), ()> {
+    let Some(virt) = raven_rmm::VirtAddr::new(TRAMPOLINE_PHYS) else {
+        return Err(());
+    };
+    let mapped = paging::with_kernel_mapper(|mapper| {
+        mapper.map(
+            virt,
+            raven_rmm::PhysAddr(TRAMPOLINE_PHYS),
+            raven_rmm::PageFlags::kernel_rx(),
+            raven_rmm::PageSize::Size4K,
+        )
+    });
+    if matches!(mapped, Ok(Ok(()))) {
+        Ok(())
+    } else {
+        kprintln!("smp: cannot map the low trampoline page in the kernel root");
+        Err(())
+    }
+}
+
+/// Drop the temporary low trampoline mapping once every AP has switched to the kernel root.
+pub fn unmap_trampoline_page() {
+    let Some(virt) = raven_rmm::VirtAddr::new(TRAMPOLINE_PHYS) else {
+        return;
+    };
+    let _ = paging::with_kernel_mapper(|mapper| mapper.unmap(virt));
 }
 
 fn map_null_page() {
@@ -468,12 +523,8 @@ pub fn prepare_ap(
     write_u64(destination, 0x198, percpu_address(cpu));
     write_u64(destination, 0x1A0, u64::try_from(cpu).unwrap_or(0));
     write_u64(destination, 0x1A8, u64::from(apic_id));
-    write_u16(
-        destination,
-        0x1F0,
-        (FINAL_GDT.len() as u16).saturating_mul(8).saturating_sub(1),
-    );
-    write_u64(destination, 0x1F2, FINAL_GDT.as_ptr() as u64);
+    let kernel_root = paging::kernel_root().ok_or(())?;
+    write_u64(destination, 0x1B0, kernel_root.0);
     serialize();
     Ok(())
 }
@@ -486,13 +537,6 @@ fn trampoline_length() -> usize {
     let start = trampoline_start() as usize;
     let end = core::ptr::addr_of!(ap_trampoline_end) as usize;
     end.saturating_sub(start)
-}
-
-fn write_u16(base: *mut u8, offset: usize, value: u16) {
-    // SAFETY: `offset` is inside the reserved trampoline page and `base` is writable.
-    unsafe {
-        base.add(offset).cast::<u16>().write_unaligned(value);
-    }
 }
 
 fn write_u64(base: *mut u8, offset: usize, value: u64) {
@@ -520,7 +564,7 @@ fn serialize() {
     }
 }
 
-/// Send INIT, wait, send SIPI twice to `apic_id`.
+/// Send INIT, wait, then one SIPI to `apic_id`; the caller retries the sequence on timeout.
 pub fn start_ap(apic_id: u32) {
     const INIT_ASSERT: u32 = (0b101 << 8) | (1 << 14) | (1 << 15);
     const INIT_DEASSERT: u32 = (0b101 << 8) | (1 << 15);
@@ -528,8 +572,6 @@ pub fn start_ap(apic_id: u32) {
     send_icr(apic_id, INIT_ASSERT);
     time::delay_ns(10_000_000);
     send_icr(apic_id, INIT_DEASSERT);
-    time::delay_ns(200_000);
-    send_icr(apic_id, SIPI);
     time::delay_ns(200_000);
     send_icr(apic_id, SIPI);
 }
@@ -652,8 +694,9 @@ fn lapic_init_ap() {
 
 /// Rust entry point of an application processor.
 ///
-/// Reached from the 64-bit trampoline tail with the AP kernel stack, final GDT and GS base
-/// already installed and interrupts disabled.
+/// Reached from the low trampoline stub after it switched to the kernel root and installed the
+/// AP kernel stack and GS base, with interrupts disabled. This function loads the per-CPU GDT
+/// and TSS before entering the scheduler.
 #[unsafe(no_mangle)]
 pub extern "C" fn ap_entry(cpu: u64) -> ! {
     let cpu = usize::try_from(cpu)
@@ -694,7 +737,7 @@ fn write_cr3(value: u64) {
     }
 }
 
-fn rdmsr(msr: u32) -> u64 {
+pub(crate) fn rdmsr(msr: u32) -> u64 {
     let low: u32;
     let high: u32;
     // SAFETY: ring-0 MSR read of an architectural address.
@@ -710,7 +753,7 @@ fn rdmsr(msr: u32) -> u64 {
     (u64::from(high) << 32) | u64::from(low)
 }
 
-fn wrmsr(msr: u32, value: u64) {
+pub(crate) fn wrmsr(msr: u32, value: u64) {
     // SAFETY: ring-0 MSR write of an architectural address.
     unsafe {
         asm!(
@@ -749,14 +792,14 @@ ap_trampoline_start:
     mov cr0, eax
     .byte 0x66, 0xea
     .long 0x8200
-    .word 0x08
+    .word 0x18
 
     .org 0x100
-    /* Temporary GDT: 0x08 = 32-bit code, 0x10 = data, 0x18 = 64-bit code, 0x20 = data. */
+    /* Temporary GDT: 0x08 = 64-bit code, 0x10 = data, 0x18 = 32-bit code, 0x20 = data. */
     .quad 0
-    .quad 0x00cf9a000000ffff
-    .quad 0x00cf92000000ffff
     .quad 0x00af9a000000ffff
+    .quad 0x00cf92000000ffff
+    .quad 0x00cf9a000000ffff
     .quad 0x00cf92000000ffff
 
     .org 0x180
@@ -768,13 +811,12 @@ ap_trampoline_start:
     .quad 0                     /* CPU index */
     .quad 0                     /* APIC id */
 
+    .org 0x1b0
+    .quad 0                     /* kernel root physical */
+
     .org 0x1e0
     .word 0x0027                /* temporary GDT limit (5 entries) */
     .long 0x8100                /* temporary GDT physical base */
-
-    .org 0x1f0
-    .word 0x0027                /* final GDT limit (patched) */
-    .quad 0                     /* final GDT base (patched) */
 
     .org 0x200
     .code32
@@ -803,12 +845,12 @@ ap_trampoline_start:
     mov cr0, eax
     .byte 0xea
     .long 0x8300
-    .word 0x18
+    .word 0x08
 
     .org 0x300
     .code64
-    mov rsp, qword ptr [0x8188]
-    sub rsp, 8
+    mov r12, qword ptr [0x81b0]
+    mov rsp, 0x7000
     mov rax, qword ptr [0x8198]
     mov ecx, 0xc0000101
     mov rdx, rax
@@ -817,11 +859,17 @@ ap_trampoline_start:
     mov ecx, 0xc0000102
     wrmsr
     mov rdi, qword ptr [0x81a0]
-    lgdt [0x81f0]
     mov rax, qword ptr [0x8190]
     push 0x08
-    push rax
+    push 0x8f00
     retfq
+
+    .org 0xf00
+    .code64
+ap_entry_stub:
+    mov rsp, qword ptr [0x8188]
+    mov cr3, r12
+    jmp rax
 
     .org 0x1000
     .global ap_trampoline_end

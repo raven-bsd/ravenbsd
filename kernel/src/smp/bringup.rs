@@ -29,12 +29,14 @@ pub fn platform_init() {
         kprintln!("smp: per-CPU setup failed; running on the boot processor");
         set_online(1);
         kprintln!("smp: 1 cpus online");
+        ap_start::unmap_trampoline_page();
         return;
     }
     if !ipi::install() {
         kprintln!("smp: cannot install IPI gates; running on the boot processor");
         set_online(1);
         kprintln!("smp: 1 cpus online");
+        ap_start::unmap_trampoline_page();
         return;
     }
     let info = acpi::info();
@@ -46,6 +48,7 @@ pub fn platform_init() {
             kprintln!("smp: no AP page table; running on the boot processor");
             set_online(1);
             kprintln!("smp: 1 cpus online");
+            ap_start::unmap_trampoline_page();
             return;
         }
     };
@@ -101,6 +104,7 @@ pub fn platform_init() {
             ap_start::start_ap_timers();
             set_online(cpu);
             kprintln!("smp: {cpu} cpus online");
+            ap_start::unmap_trampoline_page();
             return;
         }
         cpu = cpu.saturating_add(1);
@@ -111,6 +115,7 @@ pub fn platform_init() {
     ap_start::start_ap_timers();
     set_online(cpu);
     kprintln!("smp: {cpu} cpus online");
+    ap_start::unmap_trampoline_page();
 }
 
 /// Ask `cpu` to reschedule (used by cross-CPU wakeups).

@@ -1,0 +1,134 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K386: the HDMI text-console contract on the serial stream that the Pi 4 kernel mirrors to the
+# firmware display buffer. The fixture runs the production init/getty/login path plus a target
+# raven-fb probe; the host check renders the 1024x768x32 artifact. This is not a physical-monitor
+# claim: the Pi 4 panel/keyboard evidence remains UI1's board run.
+#
+# The target probe prints the styled boot screen through DEBUG_WRITE, the same byte stream the
+# Pi 4 serial mirror also sends to fb::write_text: title, 80-column rules, timed rows and Welcome.
+# The host check renders the same text at 1024x768x32. The real getty owns `login:`; a physical
+# monitor and USB keyboard remain UI1 board evidence, never this qtest.
+
+name = "hdmi-console"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 420
+pre = ["sh tests/fixtures/hdmi-console/build.sh"]
+initfs = "build/fixtures/hdmi-console/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \((x86_64|aarch64)\)'
+
+# Target probe: configured firmware mode, blitter, scroll and mailbox fallback.
+[[expect]]
+regex = '^hdmi-console: mode 1024x768x32 ok$'
+unordered = true
+
+[[expect]]
+regex = '^hdmi-console: blit ok$'
+unordered = true
+
+[[expect]]
+regex = '^hdmi-console: scroll ok$'
+unordered = true
+
+[[expect]]
+regex = '^hdmi-console: mailbox fallback ok$'
+unordered = true
+
+[[expect]]
+regex = '^hdmi-console: done$'
+unordered = true
+
+# Target probe: the styled screen is printed to the serial mirror and rendered by the host PPM.
+# The marker keeps these lines distinct from the init's concise boot report on the base tree.
+[[expect]]
+regex = '^hdmi-console: styled screen$'
+unordered = true
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+unordered = true
+
+[[expect]]
+regex = '^-{80}$'
+unordered = true
+
+[[expect]]
+regex = '^000\.00  svcd +ok$'
+unordered = true
+
+[[expect]]
+regex = '^000\.00  consd +ok$'
+unordered = true
+
+[[expect]]
+regex = '^000\.00  getty +ok$'
+unordered = true
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 (x86_64|aarch64)$'
+unordered = true
+
+[[expect]]
+regex = '(?i)^.*login: ?root$'
+unordered = true
+
+[[expect]]
+regex = '(?i)^password: ?$'
+unordered = true
+
+[[expect]]
+regex = '^raven# '
+unordered = true
+
+[[expect]]
+regex = '^hdmi-console-ok$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|hdmi-console: FAIL|login: unable'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "echo hdmi-console-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hdmi-console-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

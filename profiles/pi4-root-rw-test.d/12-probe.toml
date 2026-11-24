@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot probe: write, unmount, remount and read back the UFS root, then exit.
+
+[[initfs.files]]
+src = "build/fixtures/pi4-root/rw-probe"
+path = "/sbin/fsd-ufs-rw-probe"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/rw-probe.manifest"
+path = "/etc/services.d/fsd-ufs-rw-probe.toml"

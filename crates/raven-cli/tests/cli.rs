@@ -46,7 +46,7 @@ const GENERAL_HELP: &str = concat!(
     "  svc           list, inspect and control services\n",
     "  config        validate and show the effective TOML configuration\n",
     "  theme         preview, set, apply or export the Raven terminal theme\n",
-    "  net           reserved: network control\n",
+    "  net           show network interfaces and IPv4 routes\n",
     "  log           reserved: log access\n",
     "  pkg           reserved: package access\n",
     "  user          reserved: user identities\n",
@@ -63,7 +63,7 @@ const GENERAL_HELP: &str = concat!(
     "  -V, --version      print the version\n",
 );
 
-const RESERVED: &[&str] = &["net", "log", "pkg", "user", "image"];
+const RESERVED: &[&str] = &["log", "pkg", "user", "image"];
 
 const ALL_COMMANDS: &[&str] = &[
     "version",
@@ -171,7 +171,7 @@ fn reserved_commands_are_recognized_and_not_faked() {
 
 #[test]
 fn reserved_commands_have_a_human_error() {
-    let (exit, stdout, stderr) = run(&["net"]);
+    let (exit, stdout, stderr) = run(&["log"]);
     assert_eq!(exit, Exit::Failure);
     assert!(stdout.is_empty());
     assert!(stderr.contains("not available"));
@@ -179,7 +179,7 @@ fn reserved_commands_have_a_human_error() {
 
 #[test]
 fn reserved_commands_reject_unknown_flags() {
-    let (exit, stdout, stderr) = run(&["--json", "net", "--wat"]);
+    let (exit, stdout, stderr) = run(&["--json", "log", "--wat"]);
     assert_eq!(exit, Exit::Usage);
     assert!(stdout.is_empty());
     assert_eq!(json(&stderr)["code"], "EUSAGE");
@@ -217,10 +217,18 @@ fn help_flag_after_a_command_works() {
 
 #[test]
 fn help_marks_reserved_commands() {
-    let (exit, stdout, _) = run(&["help", "net"]);
+    let (exit, stdout, _) = run(&["help", "log"]);
     assert_eq!(exit, Exit::Success);
     assert!(stdout.contains("reserved"));
     assert!(stdout.contains("EUNAVAILABLE"));
+}
+
+#[test]
+fn help_for_net_shows_the_read_only_usage() {
+    let (exit, stdout, _) = run(&["help", "net"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.contains("Usage: raven net <if|route|status> [--json]"));
+    assert!(!stdout.contains("reserved"));
 }
 
 #[test]

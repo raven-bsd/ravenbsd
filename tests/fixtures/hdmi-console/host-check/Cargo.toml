@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-hdmi-console-host-check"
+version = "0.1.0"
+description = "K386 host check: config mode, raven-fb blitter/scroll and source fallback invariants."
+edition = "2024"
+license = "BSD-3-Clause"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "hdmi-console-host-check"
+path = "src/main.rs"
+
+[dependencies]
+raven-fb = { path = "../../../../crates/raven-fb" }

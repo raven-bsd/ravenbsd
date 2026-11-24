@@ -2,11 +2,19 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Stateless and stateful match engine with per-rule and global counters.
+//!
+//! Donor: `pf_test()` (`sys/netpfil/pf/pf.c:11646`) for the state-before-rules order,
+//! `pf_test_rule()` (`pf.c:6339`) for the translation phase before state creation,
+//! `pf_create_state()` (`pf.c:6631`) for the fail-closed `max_states` check, and
+//! `pf_counters_inc()` (`pf.c:11489`) for the `PFRES_*` reason counters.
 
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use crate::abi::{self, PFRES_MAX, PfStatus};
 use crate::ast::{Action, IfaceSpec, Packet, Ruleset, StatePolicy};
+use crate::log::{LogEntry, PacketLog};
+use crate::nat::Translation;
 use crate::state::{StateDisposition, StateTable, TcpState, Timeouts};
 
 pub use crate::parser::MAX_RULES;
@@ -34,7 +42,7 @@ pub struct RuleStatSnapshot {
 }
 
 /// Global counters.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Counters {
     in_pass: AtomicU64,
     in_block: AtomicU64,
@@ -43,6 +51,45 @@ struct Counters {
     states_created: AtomicU64,
     states_expired: AtomicU64,
     state_hits: AtomicU64,
+    reasons: Vec<AtomicU64>,
+}
+
+impl Counters {
+    fn new() -> Self {
+        Self {
+            in_pass: AtomicU64::new(0),
+            in_block: AtomicU64::new(0),
+            out_pass: AtomicU64::new(0),
+            out_block: AtomicU64::new(0),
+            states_created: AtomicU64::new(0),
+            states_expired: AtomicU64::new(0),
+            state_hits: AtomicU64::new(0),
+            reasons: (0..PFRES_MAX).map(|_| AtomicU64::new(0)).collect(),
+        }
+    }
+
+    fn bump(&self, reason: usize) {
+        if let Some(counter) = self.reasons.get(reason) {
+            counter.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn snapshot(&self) -> CounterSnapshot {
+        CounterSnapshot {
+            in_pass: self.in_pass.load(Ordering::Relaxed),
+            in_block: self.in_block.load(Ordering::Relaxed),
+            out_pass: self.out_pass.load(Ordering::Relaxed),
+            out_block: self.out_block.load(Ordering::Relaxed),
+            states_created: self.states_created.load(Ordering::Relaxed),
+            states_expired: self.states_expired.load(Ordering::Relaxed),
+            state_hits: self.state_hits.load(Ordering::Relaxed),
+            reasons: core::array::from_fn(|index| {
+                self.reasons
+                    .get(index)
+                    .map_or(0, |counter| counter.load(Ordering::Relaxed))
+            }),
+        }
+    }
 }
 
 /// A plain snapshot of the global counters.
@@ -58,23 +105,19 @@ pub struct CounterSnapshot {
     pub out_block: u64,
     /// Connections created.
     pub states_created: u64,
-    /// Connections expired or evicted.
+    /// Connections expired.
     pub states_expired: u64,
     /// Packets allowed by an existing state.
     pub state_hits: u64,
+    /// `PFRES_*` reason counters.
+    pub reasons: [u64; PFRES_MAX],
 }
 
-impl Counters {
-    fn snapshot(&self) -> CounterSnapshot {
-        CounterSnapshot {
-            in_pass: self.in_pass.load(Ordering::Relaxed),
-            in_block: self.in_block.load(Ordering::Relaxed),
-            out_pass: self.out_pass.load(Ordering::Relaxed),
-            out_block: self.out_block.load(Ordering::Relaxed),
-            states_created: self.states_created.load(Ordering::Relaxed),
-            states_expired: self.states_expired.load(Ordering::Relaxed),
-            state_hits: self.state_hits.load(Ordering::Relaxed),
-        }
+impl CounterSnapshot {
+    /// One reason counter.
+    #[must_use]
+    pub fn reason(&self, reason: usize) -> u64 {
+        self.reasons.get(reason).copied().unwrap_or(0)
     }
 }
 
@@ -98,6 +141,10 @@ pub struct Decision {
     pub state: Option<StateDisposition>,
     /// TCP state after the packet, when the packet belongs to a state.
     pub tcp: Option<TcpState>,
+    /// Address/port rewrite the caller must apply, when the packet is translated.
+    pub translation: Option<Translation>,
+    /// `PFRES_*` reason for a drop, when the drop has one.
+    pub reason: Option<usize>,
 }
 
 /// The packet filter engine.
@@ -110,6 +157,7 @@ pub struct Engine {
     states: StateTable,
     rules: Vec<RuleStats>,
     counters: Counters,
+    log: PacketLog,
 }
 
 impl Engine {
@@ -135,7 +183,8 @@ impl Engine {
             ruleset,
             states: StateTable::with_limit(limit, timeouts),
             rules,
-            counters: Counters::default(),
+            counters: Counters::new(),
+            log: PacketLog::new(),
         }
     }
 
@@ -169,12 +218,41 @@ impl Engine {
         })
     }
 
+    /// The retained log records.
+    #[must_use]
+    pub fn logs(&self) -> &[LogEntry] {
+        self.log.entries()
+    }
+
+    /// Take the retained log records.
+    pub fn drain_logs(&mut self) -> Vec<LogEntry> {
+        self.log.drain()
+    }
+
+    /// A `pf_status`-shaped snapshot for the pfctl client.
+    #[must_use]
+    pub fn status(&self) -> PfStatus {
+        let counters = self.counters.snapshot();
+        PfStatus {
+            running: true,
+            since: 0,
+            states: u32::try_from(self.states.len()).unwrap_or(u32::MAX),
+            max_states: u32::try_from(self.states.limit()).unwrap_or(u32::MAX),
+            counters: counters.reasons,
+            linserts: self.counters.states_created.load(Ordering::Relaxed),
+            ldeletes: self.counters.states_expired.load(Ordering::Relaxed),
+            fcounters_pass: counters.in_pass.saturating_add(counters.out_pass),
+            fcounters_block: counters.in_block.saturating_add(counters.out_block),
+        }
+    }
+
     /// Evaluate one packet.
     ///
     /// An existing connection state is checked before the rules; a stateful pass keeps the
     /// return traffic flowing even if a later block rule would otherwise match. Without a state,
     /// the last matching rule wins unless a matching rule is `quick`; when no rule matches, the
-    /// ruleset's `default_action` applies.
+    /// ruleset's `default_action` applies. A matched NAT/RDR rule rewrites the packet; a failed
+    /// translation or a full state table drops the packet (fail-closed).
     pub fn evaluate(&mut self, packet: &Packet<'_>, now: u64) -> Decision {
         let expired = self.states.expire(now);
         if expired > 0 {
@@ -191,7 +269,44 @@ impl Engine {
                 rule: Some(hit.rule),
                 state: Some(StateDisposition::Existing),
                 tcp: Some(hit.tcp),
+                translation: hit.translation,
+                reason: None,
             };
+        }
+
+        // Translation phase first: donor pf_test_rule() calls pf_get_translation() and then
+        // pf_translate_compat() before pf_match_rule(), so the filter sees the translated
+        // packet view.
+        let translation = match self.ruleset.nat.find(packet, &self.ruleset.tables) {
+            Some(index) => {
+                let result = self.ruleset.nat.translate(index, packet, |address, port| {
+                    self.states.in_use(address, port)
+                });
+                match result {
+                    Ok(translation) => translation,
+                    Err(_) => {
+                        self.counters.bump(abi::PFRES_MAPFAILED);
+                        self.log_forced(packet, None, abi::PFRES_MAPFAILED, now);
+                        self.counters_for(packet, Verdict::Block);
+                        return Decision {
+                            verdict: Verdict::Block,
+                            rule: None,
+                            state: None,
+                            tcp: None,
+                            translation: None,
+                            reason: Some(abi::PFRES_MAPFAILED),
+                        };
+                    }
+                }
+            }
+            None => None,
+        };
+        let mut filter_packet = *packet;
+        if let Some(translation) = translation {
+            filter_packet.source = translation.source;
+            filter_packet.source_port = translation.source_port;
+            filter_packet.destination = translation.destination;
+            filter_packet.destination_port = translation.destination_port;
         }
 
         let mut matched: Option<usize> = None;
@@ -199,7 +314,7 @@ impl Engine {
             if let Some(stats) = self.rules.get(index) {
                 stats.evaluations.fetch_add(1, Ordering::Relaxed);
             }
-            if rule.matches(packet) {
+            if rule.matches(&filter_packet, &self.ruleset.tables) {
                 if let Some(stats) = self.rules.get(index) {
                     stats.matches.fetch_add(1, Ordering::Relaxed);
                 }
@@ -229,13 +344,30 @@ impl Engine {
                         .rules
                         .get(index)
                         .is_some_and(|rule| rule.state == StatePolicy::Keep)
+                    && !packet.fragment
                 {
                     let interface = match self.ruleset.rules.get(index).map(|rule| &rule.interface)
                     {
                         Some(IfaceSpec::Name(name)) => Some(name.as_str()),
                         _ => None,
                     };
-                    let created = self.states.establish(index, packet, interface, now);
+                    let created =
+                        self.states
+                            .establish_with(index, packet, interface, translation, now);
+                    if created == StateDisposition::Rejected {
+                        self.counters.bump(abi::PFRES_MAXSTATES);
+                        self.log_forced(packet, rule, abi::PFRES_MAXSTATES, now);
+                        self.counters_for(packet, Verdict::Block);
+                        self.hit_rule(index, packet);
+                        return Decision {
+                            verdict: Verdict::Block,
+                            rule,
+                            state: Some(StateDisposition::Rejected),
+                            tcp: None,
+                            translation: None,
+                            reason: Some(abi::PFRES_MAXSTATES),
+                        };
+                    }
                     if created == StateDisposition::Created {
                         self.counters.states_created.fetch_add(1, Ordering::Relaxed);
                     }
@@ -244,27 +376,60 @@ impl Engine {
                 self.counters_for(packet, Verdict::Pass);
                 if let Some(index) = rule {
                     self.hit_rule(index, packet);
+                    if self.ruleset.rules.get(index).is_some_and(|rule| rule.log) {
+                        self.log.push(LogEntry::from_packet(
+                            &filter_packet,
+                            Action::Pass,
+                            rule,
+                            None,
+                            now,
+                        ));
+                    }
                 }
                 Decision {
                     verdict: Verdict::Pass,
                     rule,
                     state: disposition,
                     tcp: None,
+                    translation,
+                    reason: None,
                 }
             }
             Action::Block => {
+                self.counters.bump(abi::PFRES_MATCH);
                 self.counters_for(packet, Verdict::Block);
                 if let Some(index) = rule {
                     self.hit_rule(index, packet);
+                    if self.ruleset.rules.get(index).is_some_and(|rule| rule.log) {
+                        self.log.push(LogEntry::from_packet(
+                            &filter_packet,
+                            Action::Block,
+                            rule,
+                            Some(abi::PFRES_MATCH),
+                            now,
+                        ));
+                    }
                 }
                 Decision {
                     verdict: Verdict::Block,
                     rule,
                     state: None,
                     tcp: None,
+                    translation: None,
+                    reason: Some(abi::PFRES_MATCH),
                 }
             }
         }
+    }
+
+    fn log_forced(&mut self, packet: &Packet<'_>, rule: Option<usize>, reason: usize, now: u64) {
+        self.log.push(LogEntry::from_packet(
+            packet,
+            Action::Block,
+            rule,
+            Some(reason),
+            now,
+        ));
     }
 
     fn counters_for(&self, packet: &Packet<'_>, verdict: Verdict) {

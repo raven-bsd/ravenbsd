@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K285: the release rc policy (one-shot resident services, session ends when getty exits).
+# The sources are the shared release files; see profiles/release.d/10-rc.toml.
+
+[[initfs.files]]
+src = "profiles/release.d/rc.conf"
+path = "/etc/rc.conf"
+
+[[initfs.files]]
+src = "profiles/release.d/svcd.conf"
+path = "/etc/svcd.conf"
+mode = 0o644

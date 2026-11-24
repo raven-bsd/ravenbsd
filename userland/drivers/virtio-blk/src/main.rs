@@ -38,9 +38,11 @@ mod program {
     use alloc::string::{String, ToString};
     use alloc::vec;
 
+    use core::sync::atomic::{AtomicBool, Ordering};
+
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
-    use raven_driver::{AccessError, ConfigRegion, DmaRegion, Irq, MmioRegion};
+    use raven_driver::{AccessError, Capability, DmaRegion, MmioRegion};
     use raven_proto_block::{
         BlockInfo, INFO_LEN, Op as WireOp, REPLY_HEADER_LEN, Request as WireRequest, SECTOR_SIZE,
         encode_reply, write_reply_header,
@@ -50,7 +52,7 @@ mod program {
     use raven_scheme::{Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
     use virtio_blk::common::{
         DEVICE_FEATURE, DEVICE_FEATURE_SELECT, DEVICE_STATUS, DRIVER_FEATURE,
-        DRIVER_FEATURE_SELECT, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
+        DRIVER_FEATURE_SELECT, MSIX_CONFIG, NUM_QUEUES, QUEUE_AVAIL, QUEUE_DESC, QUEUE_ENABLE,
         QUEUE_MSIX_VECTOR, QUEUE_NOTIFY_OFF, QUEUE_SELECT, QUEUE_SIZE, QUEUE_USED,
     };
     use virtio_blk::{
@@ -69,6 +71,7 @@ mod program {
     const CONFIG_HANDLE: Handle = Handle::new(4, 0);
     const DMA_HANDLE: Handle = Handle::new(5, 0);
     const IRQ_HANDLE: Handle = Handle::new(6, 0);
+    const MSIX_BAR_HANDLE: Handle = Handle::new(7, 0);
 
     /// The driver table matches `1af4:1042` (modern virtio-blk).
     const VIRTIO_VENDOR: u16 = 0x1AF4;
@@ -80,8 +83,20 @@ mod program {
     const STATUS_OFFSET: usize = 0x0110;
     const DATA_OFFSET: usize = 0x0200;
     const CHUNK_BYTES: usize = (CHUNK_SECTORS as usize) * (SECTOR_SIZE as usize);
-    /// Legacy INTx wait per completion (one second).
-    const IRQ_WAIT_NS: u64 = 1_000_000_000;
+    /// Completion poll bound: 2000 × 1 ms = 2 s, matching the previous completion budget.
+    const POLL_LIMIT: u32 = 2000;
+    /// One-time completion-poll trace (K427 measurement).
+    static POLL_TRACED: AtomicBool = AtomicBool::new(false);
+
+    /// MSI-X queue message and table location supplied by `devd`.
+    struct MsixInfo {
+        address_lo: u32,
+        address_hi: u32,
+        data: u32,
+        bar: usize,
+        bar_size: usize,
+        table: usize,
+    }
 
     /// qtest fixture layout: a small GPT lives in the first MiB; the pattern covers the data area
     /// after it, the marker sits in an unused prefix sector, and partition 1 is the probe's region.
@@ -110,6 +125,13 @@ mod program {
         let mut dma_size = 0usize;
         let mut irq_line = 0u32;
         let mut test = false;
+        let mut msix = false;
+        let mut msix_addr_lo = None;
+        let mut msix_addr_hi = None;
+        let mut msix_data = None;
+        let mut msix_bar = None;
+        let mut msix_bar_size = None;
+        let mut msix_table = None;
         for argument in args.iter().skip(1) {
             if let Some(value) = argument.strip_prefix("bar=") {
                 bar_index = value
@@ -127,10 +149,63 @@ mod program {
                 irq_line = value
                     .parse()
                     .map_err(|_| format!("bad irq argument `{argument}`"))?;
+            } else if argument == "msix=1" || argument == "msix" {
+                msix = true;
+            } else if let Some(value) = argument.strip_prefix("msix_addr_lo=") {
+                msix_addr_lo = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_addr_lo argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_addr_hi=") {
+                msix_addr_hi = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_addr_hi argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_data=") {
+                msix_data = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_data argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar=") {
+                msix_bar = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_bar_size=") {
+                msix_bar_size = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_bar_size argument `{argument}`"))?,
+                );
+            } else if let Some(value) = argument.strip_prefix("msix_table=") {
+                msix_table = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("bad msix_table argument `{argument}`"))?,
+                );
             } else if argument == "test" {
                 test = true;
             }
         }
+        let msix = if msix {
+            Some(MsixInfo {
+                address_lo: msix_addr_lo
+                    .ok_or_else(|| "msix requested without msix_addr_lo".to_string())?,
+                address_hi: msix_addr_hi
+                    .ok_or_else(|| "msix requested without msix_addr_hi".to_string())?,
+                data: msix_data.ok_or_else(|| "msix requested without msix_data".to_string())?,
+                bar: msix_bar.ok_or_else(|| "msix requested without msix_bar".to_string())?,
+                bar_size: msix_bar_size
+                    .ok_or_else(|| "msix requested without msix_bar_size".to_string())?,
+                table: msix_table.ok_or_else(|| "msix requested without msix_table".to_string())?,
+            })
+        } else {
+            None
+        };
         if bar_size == 0 || dma_size < DATA_OFFSET + CHUNK_BYTES {
             return Err("devd did not pass a usable BAR and DMA buffer".to_string());
         }
@@ -138,9 +213,9 @@ mod program {
         let bar_window = raven_rt::map_mmio_mut(BAR_HANDLE, bar_size)
             .map_err(|error| format!("bar map: {}", error.description()))?;
         let bar = MmioRegion::new(bar_window);
-        let config_window = raven_rt::map_mmio(CONFIG_HANDLE, raven_driver::PAGE)
+        let config_window = raven_rt::map_mmio_mut(CONFIG_HANDLE, raven_driver::PAGE)
             .map_err(|error| format!("config map: {}", error.description()))?;
-        let config = ConfigRegion::new(config_window);
+        let config = MmioRegion::new(config_window);
         let dma_info = raven_rt::dma_info(DMA_HANDLE)
             .map_err(|error| format!("dma info: {}", error.description()))?;
         let dma_window = raven_rt::map_mmio_mut(DMA_HANDLE, dma_size)
@@ -150,10 +225,37 @@ mod program {
         // 64 KiB payload moves with a compiled copy instead of 8,000 volatile accesses.
         let (meta, data) = dma_window.split_at_mut(DATA_OFFSET);
         let dma = DmaRegion::new(meta, dma_info.bus_addr);
-        let irq = Irq::new(IRQ_HANDLE);
+        // K427: devd transfers one shared legacy INTx line to both virtio devices. The network's
+        // MSI-X setup fails, so its exclusive `irq_create` for line 11 would return EBUSY and devd
+        // would exit before serving `disk:0`. The block queue is poll-driven: release the line
+        // here, before devd launches the network, and bound the completion poll below.
+        //
+        // K466/K522: that release is only valid for the shared legacy line. With `msix=1` the
+        // handle is this device's own MSI-X vector; closing it frees the vector while the
+        // programmed table entry still raises it on every completion, which floods the kernel
+        // with `unclaimed vector` and can hand the vector to another device.
+        //
+        // Vector lifecycle rule: devd creates and claims the vector, the device raises one
+        // message per completion, this queue acknowledges by draining the used ring while it
+        // polls, and the handle is closed only when the MSI-X table itself is released. No
+        // acknowledgement may follow the close; the MSI-X vector therefore stays owned for the
+        // driver's lifetime and the kernel EOIs any in-flight completion. Close only the legacy
+        // line.
+        if msix.is_none() {
+            let _ = raven_rt::handle_close(IRQ_HANDLE);
+        }
+        let msix_bar = match &msix {
+            Some(info) => {
+                let window = raven_rt::map_mmio_mut(MSIX_BAR_HANDLE, info.bar_size)
+                    .map_err(|error| format!("msix bar map: {}", error.description()))?;
+                Some(MmioRegion::new(window))
+            }
+            None => None,
+        };
 
-        let mut device =
-            VirtioBlk::open(bar, config, dma, data, irq, bar_index, bar_size, irq_line)?;
+        let mut device = VirtioBlk::open(
+            bar, config, dma, data, bar_index, bar_size, irq_line, msix, msix_bar,
+        )?;
         raven_rt::println!(
             "virtio-blk: capacity={} sector_size={} ro={}",
             device.capacity,
@@ -260,7 +362,7 @@ mod program {
     }
 
     fn read_capabilities(
-        config: &ConfigRegion,
+        config: &MmioRegion,
         bar_index: usize,
         bar_size: usize,
     ) -> Result<Caps, String> {
@@ -273,7 +375,7 @@ mod program {
         // with a bounded visited list instead of assuming increasing offsets.
         let mut seen = [0u8; raven_driver::MAX_CAPABILITIES];
         let mut seen_len = 0usize;
-        let mut current = config.first_capability().map_err(describe)?;
+        let mut current = first_capability(config)?;
         while let Some(capability) = current {
             let offset = usize::from(capability.offset);
             if seen
@@ -357,14 +459,139 @@ mod program {
         })
     }
 
-    fn next_capability(
-        config: &ConfigRegion,
-        next: u8,
-    ) -> Result<Option<raven_driver::Capability>, String> {
+    fn next_capability(config: &MmioRegion, next: u8) -> Result<Option<Capability>, String> {
         if next == 0 {
             return Ok(None);
         }
-        config.capability(next).map_err(describe)
+        capability(config, next)
+    }
+
+    fn first_capability(config: &MmioRegion) -> Result<Option<Capability>, String> {
+        let status = config.read_u16(0x06).map_err(describe)?;
+        if status & (1 << 4) == 0 {
+            return Ok(None);
+        }
+        let pointer = config.read_u8(0x34).map_err(describe)? & 0xFC;
+        if pointer == 0 {
+            return Ok(None);
+        }
+        capability(config, pointer)
+    }
+
+    fn capability(config: &MmioRegion, offset: u8) -> Result<Option<Capability>, String> {
+        let offset = usize::from(offset);
+        if !offset.is_multiple_of(4) || offset < 0x40 || offset + 1 >= raven_driver::PAGE {
+            return Ok(None);
+        }
+        let id = config.read_u8(offset).map_err(describe)?;
+        if id == 0 {
+            return Ok(None);
+        }
+        let next = config.read_u8(offset + 1).map_err(describe)? & 0xFC;
+        Ok(Some(Capability {
+            id,
+            offset: offset as u8,
+            next,
+        }))
+    }
+
+    /// One function's MSI-X capability.
+    struct MsixCap {
+        offset: u8,
+        table_bar: usize,
+        table_offset: usize,
+        table_size: u16,
+    }
+
+    fn find_msix(config: &MmioRegion) -> Result<Option<MsixCap>, String> {
+        let mut current = first_capability(config)?;
+        let mut seen = [0u8; raven_driver::MAX_CAPABILITIES];
+        let mut seen_len = 0usize;
+        while let Some(capability) = current {
+            let offset = usize::from(capability.offset);
+            if seen
+                .get(..seen_len)
+                .unwrap_or(&[])
+                .contains(&capability.offset)
+            {
+                break;
+            }
+            let Some(slot) = seen.get_mut(seen_len) else {
+                break;
+            };
+            *slot = capability.offset;
+            seen_len = seen_len.saturating_add(1);
+            if capability.id == 0x11 {
+                let control = config.read_u16(offset + 2).map_err(describe)?;
+                let table = config.read_u32(offset + 4).map_err(describe)?;
+                return Ok(Some(MsixCap {
+                    offset: capability.offset,
+                    table_bar: usize::try_from(table & 7).unwrap_or(usize::MAX),
+                    table_offset: usize::try_from(table & !7).unwrap_or(usize::MAX),
+                    table_size: (control & 0x7FF).saturating_add(1),
+                }));
+            }
+            current = next_capability(config, capability.next)?;
+        }
+        Ok(None)
+    }
+
+    /// Program the MSI-X table for the queue vector and enable MSI-X.
+    ///
+    /// Entry 0 is the configuration vector and is masked; entry 1 is the shared queue vector the
+    /// request queue references. `devd` allocated the kernel vector and passed its message.
+    fn configure_msix(
+        table: &mut MmioRegion,
+        config: &mut MmioRegion,
+        cap: &MsixCap,
+        info: &MsixInfo,
+    ) -> Result<(), String> {
+        if cap.table_bar != info.bar || cap.table_offset != info.table {
+            return Err(format!(
+                "MSI-X table is bar{} offset {:#x}, devd passed bar{} offset {:#x}",
+                cap.table_bar, cap.table_offset, info.bar, info.table
+            ));
+        }
+        if cap.table_size < 2 {
+            return Err(format!(
+                "MSI-X table has {} entries; need 2",
+                cap.table_size
+            ));
+        }
+        let end = info
+            .table
+            .checked_add(32)
+            .ok_or_else(|| "MSI-X table offset overflows".to_string())?;
+        if end > info.bar_size {
+            return Err("MSI-X table is outside the BAR".to_string());
+        }
+        table.write_u32(info.table, 0).map_err(describe)?;
+        table.write_u32(info.table + 4, 0).map_err(describe)?;
+        table.write_u32(info.table + 8, 0).map_err(describe)?;
+        table.write_u32(info.table + 12, 1).map_err(describe)?;
+        table
+            .write_u32(info.table + 16, info.address_lo)
+            .map_err(describe)?;
+        table
+            .write_u32(info.table + 20, info.address_hi)
+            .map_err(describe)?;
+        table
+            .write_u32(info.table + 24, info.data)
+            .map_err(describe)?;
+        table.write_u32(info.table + 28, 0).map_err(describe)?;
+        let offset = usize::from(cap.offset);
+        let control = config.read_u16(offset + 2).map_err(describe)?;
+        config
+            .write_u16(offset + 2, (control | 0x8000) & !0x4000)
+            .map_err(describe)?;
+        let command = config.read_u16(0x04).map_err(describe)?;
+        config.write_u16(0x04, command | 0x0400).map_err(describe)?;
+        raven_rt::println!(
+            "virtio-blk: msix table={:#x} bar={} vector=1",
+            info.table,
+            info.bar
+        );
+        Ok(())
     }
 
     fn common(caps: &Caps, register: usize) -> usize {
@@ -377,7 +604,6 @@ mod program {
         dma: DmaRegion,
         /// The data window of the DMA buffer (offset [`DATA_OFFSET`] onwards).
         data: &'static mut [u8],
-        irq: Irq,
         caps: Caps,
         layout: RingLayout,
         qsize: u16,
@@ -394,15 +620,17 @@ mod program {
         #[allow(clippy::too_many_arguments)] // the five transferred handles plus the BAR geometry
         fn open(
             mut bar: MmioRegion,
-            config: ConfigRegion,
+            mut config: MmioRegion,
             mut dma: DmaRegion,
             data: &'static mut [u8],
-            irq: Irq,
             bar_index: usize,
             bar_size: usize,
             _irq_line: u32,
+            msix: Option<MsixInfo>,
+            msix_bar: Option<MmioRegion>,
         ) -> Result<Self, String> {
-            let (vendor, device) = config.ids().map_err(describe)?;
+            let vendor = config.read_u16(0x00).map_err(describe)?;
+            let device = config.read_u16(0x02).map_err(describe)?;
             if vendor != VIRTIO_VENDOR || device != VIRTIO_BLK_DEVICE {
                 return Err(format!(
                     "unexpected function {vendor:#06x}:{device:#06x}, expected 1af4:1042"
@@ -418,6 +646,21 @@ mod program {
                 caps.device.offset
             );
             let features = reset_and_negotiate(&mut bar, &caps)?;
+            let msix_vector = match (msix, msix_bar) {
+                (Some(info), Some(mut table)) => {
+                    let cap = find_msix(&config)?.ok_or_else(|| {
+                        "MSI-X was requested but the function has no MSI-X capability".to_string()
+                    })?;
+                    configure_msix(&mut table, &mut config, &cap, &info)?;
+                    bar.write_u16(common(&caps, MSIX_CONFIG), 0)
+                        .map_err(describe)?;
+                    1
+                }
+                (Some(_), None) => {
+                    return Err("MSI-X table BAR was not transferred".to_string());
+                }
+                (None, _) => 0xFFFF,
+            };
             // The capacity field is 8 bytes at the start of the device configuration; read it as
             // two 32-bit words because the capability only guarantees 4-byte alignment.
             let low = bar.read_u32(caps.device.offset).map_err(describe)?;
@@ -443,7 +686,7 @@ mod program {
             }
             bar.write_u16(common(&caps, QUEUE_SIZE), qsize)
                 .map_err(describe)?;
-            bar.write_u16(common(&caps, QUEUE_MSIX_VECTOR), 0xFFFF)
+            bar.write_u16(common(&caps, QUEUE_MSIX_VECTOR), msix_vector)
                 .map_err(describe)?;
             bar.write_u64(
                 common(&caps, QUEUE_DESC),
@@ -488,7 +731,6 @@ mod program {
                 bar,
                 dma,
                 data,
-                irq,
                 caps,
                 layout,
                 qsize,
@@ -618,36 +860,27 @@ mod program {
             self.dma.publish();
             self.notify(0)?;
 
-            let mut rounds = 0usize;
+            let mut polls = 0u32;
             loop {
-                rounds += 1;
-                if rounds > 3 {
-                    return self.fail();
-                }
-                let fired = match self.irq.wait(IRQ_WAIT_NS) {
-                    Ok(fired) => fired,
-                    Err(_) => return self.fail(),
-                };
-                if fired == 0 {
-                    return self.fail();
-                }
-                let _isr = self
-                    .bar
-                    .read_u8(self.caps.isr.offset)
-                    .map_err(device_errno)?;
-                let _ = self.irq.ack();
                 self.dma.acquire();
                 let used = self
                     .dma
                     .read_u16(self.layout.used_idx())
                     .map_err(device_errno)?;
-                if used == self.used_seq {
-                    continue;
+                if used != self.used_seq {
+                    if used.wrapping_sub(self.used_seq) != 1 {
+                        return self.fail();
+                    }
+                    break;
                 }
-                if used.wrapping_sub(self.used_seq) != 1 {
+                polls = polls.saturating_add(1);
+                if polls > POLL_LIMIT {
                     return self.fail();
                 }
-                break;
+                let _ = raven_rt::nanosleep(1_000_000);
+            }
+            if !POLL_TRACED.swap(true, Ordering::AcqRel) {
+                raven_rt::println!("virtio-blk: completion polled={polls}");
             }
 
             self.dma.acquire();

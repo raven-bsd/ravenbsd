@@ -22,6 +22,8 @@ pub struct FileEntry<'a> {
     pub path: &'a str,
     /// Permission bits from the initfs header.
     pub mode: u32,
+    /// Modification time in seconds since the Unix epoch.
+    pub mtime: u64,
     /// File contents in the archive.
     pub data: &'a [u8],
 }
@@ -38,6 +40,7 @@ pub enum NodeRef {
 struct DirNode {
     name: String,
     ino: u64,
+    mtime: u64,
     entries: BTreeMap<String, NodeRef>,
 }
 
@@ -45,6 +48,7 @@ struct FileNode<'a> {
     name: String,
     ino: u64,
     mode: u32,
+    mtime: u64,
     data: &'a [u8],
 }
 
@@ -66,10 +70,14 @@ impl<'a> Model<'a> {
             .map_err(|_| Errno::ENOMEM)?
             .checked_add(1)
             .ok_or(Errno::ENOMEM)?;
+        // Directories are synthesized from file paths; they inherit the image epoch carried by
+        // the entries (the first one is representative), so `/` and `/bin` are not 1970.
+        let dir_mtime = entries.first().map_or(0, |entry| entry.mtime);
         let mut dirs = Vec::new();
         dirs.push(DirNode {
             name: "/".to_string(),
             ino: root_ino,
+            mtime: dir_mtime,
             entries: BTreeMap::new(),
         });
         let mut files = Vec::new();
@@ -93,6 +101,7 @@ impl<'a> Model<'a> {
                         dirs.push(DirNode {
                             name: (*name).to_string(),
                             ino,
+                            mtime: dir_mtime,
                             entries: BTreeMap::new(),
                         });
                         dirs[current]
@@ -111,6 +120,7 @@ impl<'a> Model<'a> {
                 name: (*name).to_string(),
                 ino,
                 mode: entry.mode & 0o7777,
+                mtime: entry.mtime,
                 data: entry.data,
             });
             dirs[current]
@@ -211,21 +221,29 @@ impl<'a> Model<'a> {
             NodeRef::File(index) => {
                 let file = self.files.get(index).ok_or(Errno::EBADF)?;
                 let size = file.data.len() as u64;
+                let mtime = i64::try_from(file.mtime).unwrap_or(0);
                 Ok(Stat {
                     ino: file.ino,
                     size,
                     blocks: size.div_ceil(512),
                     mode: S_IFREG | (file.mode & 0o7777),
                     nlink: 1,
+                    mtime,
+                    ctime: mtime,
+                    atime: mtime,
                     ..Stat::default()
                 })
             }
             NodeRef::Dir(index) => {
                 let dir = self.dirs.get(index).ok_or(Errno::EBADF)?;
+                let mtime = i64::try_from(dir.mtime).unwrap_or(0);
                 Ok(Stat {
                     ino: dir.ino,
                     mode: S_IFDIR | 0o755,
                     nlink: 2,
+                    mtime,
+                    ctime: mtime,
+                    atime: mtime,
                     ..Stat::default()
                 })
             }
@@ -282,6 +300,7 @@ mod tests {
         FileEntry {
             path,
             mode: 0o644,
+            mtime: 1_700_000_000,
             data,
         }
     }
@@ -406,6 +425,7 @@ mod tests {
         let entry = FileEntry {
             path: &path,
             mode: 0o644,
+            mtime: 1_700_000_000,
             data: b"1",
         };
         assert_eq!(Model::new(&[entry]).err(), Some(Errno::ENAMETOOLONG));
@@ -559,6 +579,7 @@ mod tests {
             entries.push(FileEntry {
                 path: name,
                 mode: 0o644,
+                mtime: 1_700_000_000,
                 data: b"x",
             });
         }
@@ -590,6 +611,7 @@ mod tests {
         let entry = FileEntry {
             path: &path,
             mode: 0o644,
+            mtime: 1_700_000_000,
             data: b"x",
         };
         let model = Model::new(&[entry]).unwrap();
@@ -647,6 +669,7 @@ mod tests {
         let entry = FileEntry {
             path: "/x",
             mode: 0o600,
+            mtime: 1_700_000_000,
             data: b"x",
         };
         let model = Model::new(&[entry]).unwrap();

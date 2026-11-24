@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K491 rlimit privilege fixture: one-shot service after vfsd/initfsd are ready.
+
+name = "proc-rlimit"
+exec = "/bin/proc-rlimit"
+needs = ["scheme:file", "consd", "logd"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

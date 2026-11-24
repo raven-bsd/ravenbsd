@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K495 rev174 test-only mount table: the release shell mounts plus the K536 `/dev/pts pty:` entry
+# that the current master reverted. The pty-path overlay stages this as /etc/mounts; the mutation
+# overlay omits the /dev/pts line.
+
+/ initfs:
+/tmp tmpfs:
+/dev/null null:
+/dev/zero zero:
+/dev/random rand:
+/dev/urandom rand:
+/dev/pts pty:

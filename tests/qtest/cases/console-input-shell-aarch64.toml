@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K541: the K503 UART console-input rows on aarch64 (PL011). Same fixture and rows as
+# `console-input-shell.toml`, same byte checks:
+#   1. one typed byte reaches the line discipline and is echoed;
+#   2. a full command line executes;
+#   3. a 64-byte burst (echo + 58-byte payload + newline) loses and duplicates nothing;
+#   4. the output lines are byte-exact.
+# The measured boot prints `console: PL011 rx irq 33 (level)`; the shell-test profile keeps the
+# `console=ttyS0` contract name, which the aarch64 kernel maps to the PL011. Dialogues match
+# complete serial lines, so input bytes are newline-terminated.
+
+name = "console-input-shell-aarch64"
+arch = "aarch64"
+profile = "shell-test"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^UART-OK$'
+
+[[expect]]
+regex = '^BURST-0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmn$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fatal runtime error'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+# 1. a single byte reaches the line discipline: the echoed command line and the shell's
+#    not-found reply both carry the byte. (The dialogue matches complete serial lines, so the
+#    byte is terminated with a newline; the echo line is `raven# ~`.)
+[[step]]
+send = "~\n"
+delay_ms = 100
+
+[[step]]
+wait = '~'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+# 2. a full command line executes; the output line is byte-exact.
+[[step]]
+send = "echo UART-OK\n"
+delay_ms = 100
+
+[[step]]
+wait = '^UART-OK$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+# 3. a 64-byte burst: "echo " (5) + 58-byte payload + "\n" (1). Every byte must survive
+#    whole and once: the exact output line below is the integrity check.
+[[step]]
+send = "echo BURST-0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmn\n"
+delay_ms = 100
+
+[[step]]
+wait = '^BURST-0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmn$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

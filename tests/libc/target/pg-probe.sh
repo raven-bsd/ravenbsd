@@ -135,7 +135,9 @@ probe() {
             fi
             ;;
         45)
-            if grep -qs 'PROC_FORK' "$root/crates/raven-abi/src/syscall.rs"; then
+            # PROC_FORK is a kernel primitive (S50b); the ABI crate has no variant yet.
+            if grep -qs 'PROC_FORK' "$root/crates/raven-abi/src/syscall.rs" ||
+                grep -qs 'pub const PROC_FORK' "$root/kernel/src/syscall/process_ctl.rs"; then
                 present
             else
                 absent

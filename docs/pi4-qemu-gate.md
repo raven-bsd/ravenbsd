@@ -1,88 +1,106 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Pi 4 QEMU release-image gate
+# Pi 4 aarch64 QEMU boot gate (K096b)
 
-Recorded host/QEMU sweep of the Pi 4 release surface at commit `d8f32734`
-(`dave/A8c`, from `origin/master`).
+Date: 2026-11-21
+Tree: `b04e71ad87d0273ab9d86367b912a30c300c69ac`
 
-This is **not** a board claim. The Pi 4 serial/GENET gate is still blocked on the missing USB-TTL
-adapter; everything below runs on the host with QEMU's `virt` machine or checks the built image.
-Board rows are marked `UNAVAILABLE`, never "pass".
+Scope: host-side aarch64 release-image boot evidence. **No board, HDMI monitor or USB-keyboard
+claim**; those remain UI1 hardware gates.
 
-## 1. Image build and host check
+## Image
 
-The release image must exist before `--check`; a clean clone has only the sources.
-
-```
-RAVEN_RPI_FIRMWARE=/home/bo/work/ravenos-workspace/ravenbsd-resources/rpi-firmware/boot \
-    cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release
+```sh
+timeout 1200 cargo xtask image --arch aarch64 --profile release \
+  --output build/qtest/k096b-aarch64.img
 ```
 
-Result: exit 0, `build/aarch64/ravenbsd-pi4.img`, 335 544 320 bytes,
-sha256 `ac543abcaa1a13fb96447bc00c4576f6b2bbaf0a790b6c9999a77ca43baa2196`.
+- Exit 0, measured **423 s**.
+- Size **335,544,320 bytes** (320 MiB).
+- SHA-256 `c6c2527ff8b4a20b43f392776d5e480bd8115afa710a2bf063afdca69383b2a2`.
+- The build log is `tests/evidence/pi4/<sha>/k096b-image-build.log`.
 
-```
-sh scripts/pi4-release.sh --check
-```
+## Boot result
 
-Result: exit 0, `pi4-release: image check PASS (board gates remain UNVERIFIED)`.
-
-* `pi4-manifest: PASSED` — firmware set (`bootcode.bin`, `start4.elf`, `fixup4.dat`,
-  `bcm2711-rpi-4-b.dtb`, `LICENCE.broadcom`, `overlays/disable-bt.dtbo`) and the flat
-  `kernel8.img` (142 745 744 bytes) with the banner marker.
-* 19 initfs paths verified: `/sbin/{vfsd,netd,platd,genet,pcid,devd}`,
-  `/bin/{rsh,login,getty,brush,ls,ping}`, `/etc/{passwd,group,shadow,profile,motd,drivers.toml,pi4.dtb}`.
-* `/etc/pi4.dtb` FDT header/totalsize/CRC-32 match the P8 fixture
-  (`totalsize=371 crc32=4047538b`).
-* The manifest linter's devd/netd/platd/genet/svcd/drivers-table rules passed (the script fails the
-  check when any of them is wrong).
-
-## 2. QEMU cases
-
-Command set:
-
-```
-cargo xtask qtest --case <case> --arch aarch64
+```sh
+cp build/qtest/k096b-aarch64.img build/qtest/k096b-aarch64-login.img
+timeout 600 cargo xtask qtest \
+  --case tests/evidence/pi4/k096b/aarch64-login.toml \
+  --arch aarch64 --no-build
 ```
 
-| Case | Exit | Result | Coverage / limit |
-|---|---|---|---|
-| `pi4-root` | 0 | pass | J5: EMMC2 **host-backed fake card** → blockd → fsd-ufs → vfsd, mount/read. QEMU has no BCM2711 EMMC2 model, so MMIO/IRQ/SDMA are not covered. |
-| `pi4-devd` | 0 | pass | P8: devd decodes the fixture DTB and hands MMIO/DMA/IRQ handles to a fake platform driver. Device-memory access is not exercised. |
-| `pi4-usb` | 0 | pass | D2: xHCI driver in **fake-keyboard** mode; D1 ring seam and enumeration without PCI/MMIO. VL805 board path not covered. |
-| `pi4-emmc2` | 0 | pass | J4: real EMMC2 driver in **host-backed test mode** against a memory disk (disk scheme, block framing, pattern/checksum). Board MMIO/DMA not covered. |
-| `pi4-platd` | — | **UNAVAILABLE** on aarch64 | The fixture is x86_64-only by design (`pi4-platd fixture is x86_64-only (requested aarch64)`, pre step exit 2). On its native arch: `cargo xtask qtest --case pi4-platd --arch x86_64` → exit 0, pass, so the P12 platd launch/`plat:` scheme path is covered as a host test. |
+- **`k096b-aarch64-login: pass`**, 24.1 s, all expectations matched, no forbidden lines.
+- Serial (`tests/evidence/pi4/<sha>/k096b-serial.log`) contains:
 
-No case timed out.
+```text
+loader: RavenBSD loader 0.1 (aarch64)
+RavenBSD kernel 0.1 (aarch64) b04e71ad 2026-11-21
+R A V E N   B S D
+Welcome to RavenBSD 0.1 aarch64
+login: root
+Password:
+raven#
+init exited (0)
+```
 
-## 3. Board-only rows (UNAVAILABLE)
+The styled screen, login/password, root prompt and clean `init exited (0)` are the host-side
+contract. The QEMU boot report also shows `10 up, 3 failed` (pcid/netd/devd) because this is not
+the Pi 4 board; the login path still completes and is the only claim here.
 
-| Gate | Why UNAVAILABLE |
+## Test-case finding (for the qtest owner)
+
+- `tests/qtest/cases/release-login.toml` is **x86_64-only** (`arch = "x86_64"`, x86_64 loader/kernel
+  literals, `console=ttyS0`), so `--arch aarch64` cannot use it as the ticket text suggests.
+- `tests/qtest/cases/login-aarch64.toml` is the real aarch64 case, but its expectation
+  `^RavenBSD 0\.1 \(aarch64\) \(tty:console\)$` no longer appears on current master; the case
+  times out after a successful login/prompt/exit. That failure is preserved as
+  `k096b-login-aarch64-stale.log/json`.
+- K096b therefore adds the evidence case `tests/evidence/pi4/k096b/aarch64-login.toml` with the
+  current markers (styled screen, welcome, login/password, `raven#`, clean exit). It does not
+  weaken or delete the existing cases; their stale expectation is a separate test-owner fix.
+
+## K411 five-boot stability sample
+
+Tree `c685aa6ce9e20eed536309111e2a63463c56d45a`, image sha256
+`1539663743cda9341a232a474206db9376de82619200b9a61f47834241f26d2f` (320 MiB, build 244.89 s).
+Five consecutive `login-aarch64` boots, `--no-build`, KVM host QEMU:
+
+| Run | Exit | Wall s | Host load1 | Panic/TLB | Kernel |
+|---:|---:|---:|---:|---:|---|
+| 1 | 0 | 65 | 27.07 | 0 | `c685aa6ce` |
+| 2 | 0 | 30 | 44.27 | 0 | `c685aa6ce` |
+| 3 | 0 | 44 | 35.85 | 0 | `c685aa6ce` |
+| 4 | 0 | 44 | 35.46 | 0 | `c685aa6ce` |
+| 5 | 0 | 26 | 31.43 | 0 | `c685aa6ce` |
+
+p50 44 s, p90 65 s. Every boot reached the styled screen, `login:`/`Password:`/`raven# ` and
+`init exited (0)`; no panic, exception or TLB line. Host QEMU only - no board/HDMI claim.
+Artifacts: `tests/evidence/pi4/c685aa6ce9e20eed536309111e2a63463c56d45a/`.
+
+## Hardware gates
+
+| Gate | Status |
 |---|---|
-| Serial console capture (`scripts/pi4-release.sh --device /dev/ttyUSB0` or `--log`) | No USB-TTL adapter on this host; `--check` never opens a serial port. |
-| Board release markers (kernel banner, `login root/raven`, `raven#`, `ls /bin`, `ping <gateway>`, clean exit) | Require the captured board log above. |
-| GENET v5 networking on the board | Needs the Pi 4 and the adapter; QEMU `virt` has no BCM2711 GENET model. |
-| Real EMMC2 MMIO/IRQ/SDMA path | QEMU has no BCM2711 EMMC2 model; only the host-backed card path runs. |
-| VL805 xHCI on the board | The QEMU case runs the driver in fake-keyboard mode with no PCI/MMIO. |
-| Live firmware DTB | The image stages the P8 fixture DTB, not the firmware-provided tree. |
+| aarch64 release boot to login in QEMU | **PASS**, host-only |
+| Pi 4 SD/UFS serial boot | **HARDWARE** (K383 owner checklist) |
+| HDMI monitor + USB keyboard login | **HARDWARE** (UI1) |
+| E-Ink panel photo/refresh | **HARDWARE** (E5) |
 
-## 4. Environment note (clone state, not a product defect)
+## Commands and caps
 
-`scripts/pi4-release.sh --check` does not build; it fails with
-`pi4-release: image not found: build/aarch64/ravenbsd-pi4.img` until the image exists.
+| Command | Cap | Exit | Result |
+|---|---:|---:|---|
+| `cargo xtask image --arch aarch64 --profile release --output build/qtest/k096b-aarch64.img` | 1200 s | 0 | 423 s, image built |
+| `cargo xtask qtest --case tests/evidence/pi4/k096b/aarch64-login.toml --arch aarch64 --no-build` | 600 s | 0 | pass, 24.1 s |
+| `cargo xtask qtest --case login-aarch64 --arch aarch64 --no-build` | 600 s | 1 | stale banner expectation; boot itself succeeds |
+| `make check-fast` | 900 s | 0 | `check-fast: PASSED` |
 
-On this clone the first image build also failed because the staged sysroot
-`build/aarch64/libc.a` (dated 2026-11-15) predated master's libc exports, so `brush` could not link
-(`undefined symbol: pipe2`, `confstr`, `tcgetpgrp`, `tcsetattr`, `killpg`, `gethostname`,
-`errno_location`, ...). `xtask initfs::ensure_libc` only checks that `libc.a`/`crt*.o` *exist*, not
-that they are current. Deleting those four generated files forced `libc-pack` to rebuild them, after
-which the image built and every check passed. Nothing in the image, profiles, kernel or tests was
-edited.
+## Evidence files
 
-## 5. Outcome
+Under `tests/evidence/pi4/b04e71ad87d0273ab9d86367b912a30c300c69ac/`: image build log, image
+SHA-256/size, passing serial and JSON, stale-case serial/JSON, and `SHA256SUMS`.
 
-Host-side release image, manifest, initfs and `/etc/pi4.dtb` checks pass; the four aarch64 Pi 4
-QEMU cases pass on their host-backed paths; `pi4-platd` is x86_64-only and is recorded as
-UNAVAILABLE here (it passes on x86_64). Every board-only row stays UNAVAILABLE. Board
-serial/GENET remains **UNVERIFIED** until a real captured log exists.
+The earlier `d8f32734` Pi 4 host/QEMU sweep (pi4-root/devd/usb/emmc2/platd and the board-only
+UNAVAILABLE table) is preserved at `b04e71ad:docs/pi4-qemu-gate.md` in git history; this page is the
+current K096b aarch64 boot record.

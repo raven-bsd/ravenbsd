@@ -31,8 +31,47 @@ mod program {
         time.tv_sec.max(0)
     }
 
-    fn main(_args: raven_rt::Args) -> i32 {
-        let mut server = match Server::register("ramfs") {
+    /// Parsed service arguments.
+    struct Config {
+        scheme: &'static str,
+        root_mode: u16,
+    }
+
+    /// Parse `--scheme <name>` and `--root-mode <octal>`; the defaults are `ramfs` and 0755.
+    fn parse_config(args: &raven_rt::Args) -> Result<Config, ()> {
+        let mut scheme = "ramfs";
+        let mut root_mode = 0o755u16;
+        let mut arguments = args.iter().skip(1);
+        while let Some(argument) = arguments.next() {
+            match argument {
+                "--scheme" => {
+                    scheme = arguments.next().ok_or(())?;
+                    if scheme.is_empty() {
+                        return Err(());
+                    }
+                }
+                "--root-mode" => {
+                    let value = arguments.next().ok_or(())?;
+                    root_mode = u16::from_str_radix(value, 8).map_err(|_| ())?;
+                    if root_mode & !0o7777 != 0 {
+                        return Err(());
+                    }
+                }
+                _ => return Err(()),
+            }
+        }
+        Ok(Config { scheme, root_mode })
+    }
+
+    fn main(args: raven_rt::Args) -> i32 {
+        let config = match parse_config(&args) {
+            Ok(config) => config,
+            Err(()) => {
+                raven_rt::eprintln!("ramfsd: usage: ramfsd [--scheme NAME] [--root-mode OCTAL]");
+                return 2;
+            }
+        };
+        let mut server = match Server::register(config.scheme) {
             Ok(server) => server,
             Err(error) => {
                 raven_rt::eprintln!("ramfsd: {}", error.description());
@@ -40,7 +79,8 @@ mod program {
             }
         };
         log_started("ramfsd");
-        let mut handler = RamfsHandler::new(now_seconds);
+        let trace = args.env_get("RAMFSD_TRACE").is_some();
+        let mut handler = RamfsHandler::with_trace_root_mode(now_seconds, trace, config.root_mode);
         loop {
             let Some(packet) = server.poll(None) else {
                 continue;

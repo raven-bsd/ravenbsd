@@ -17,10 +17,13 @@ use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::prot;
 use raven_pager::PageState;
+#[cfg(target_arch = "x86_64")]
+use raven_rmm::Mapper;
 use raven_rmm::page::{NO_EXECUTE, PRESENT};
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::{Backing, PAGE_SIZE, Vma, VmaError, Vmas};
 
+use crate::memory::aslr;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::frame;
 use crate::memory::paging;
@@ -159,6 +162,55 @@ pub struct UserAddressSpace {
     /// Bumped on every mapping change. A capture records it at create and only copies back when
     /// the client's mapping has not been replaced meanwhile.
     mapping_generation: u64,
+    /// Randomized first anonymous mmap hint for this process image.
+    mmap_base: u64,
+    /// Randomized initial stack VMA base for this process image.
+    stack_base: u64,
+}
+
+/// Deferred TLB shootdown and frame recycling after an `unmap`.
+///
+/// `UserAddressSpace::unmap` runs under the caller's address-space mutex. It must not wait for a
+/// remote TLB acknowledgement there: a peer blocked on that mutex would never reach its SGI
+/// handler. The caller drops the mutex and then calls [`UnmapDeferred::finish`].
+pub struct UnmapDeferred {
+    start: u64,
+    len: u64,
+    frames: Vec<u64>,
+}
+
+impl UnmapDeferred {
+    /// Flush every remote TLB, then recycle the frames that were owned by the mapping.
+    ///
+    /// Returns false when a remote CPU timed out; in that case the frames are deliberately
+    /// leaked rather than recycled under a potentially stale translation.
+    pub fn finish(self) -> bool {
+        let flushed = crate::sched::smp::shootdown::flush_range(self.start, self.len);
+        if flushed {
+            for physical in self.frames {
+                let physical = frame::PhysAddr(physical);
+                if frame::is_shared(physical) {
+                    frame::release_shared(physical);
+                } else {
+                    let _ = frame::free_frame(physical);
+                }
+            }
+        }
+        flushed
+    }
+}
+
+/// Deferred TLB shootdown after a `protect` under the address-space mutex.
+pub struct ProtectDeferred {
+    start: u64,
+    len: u64,
+}
+
+impl ProtectDeferred {
+    /// Flush the range after the caller releases the address-space mutex.
+    pub fn finish(self) {
+        let _ = crate::sched::smp::shootdown::flush_range(self.start, self.len);
+    }
 }
 
 /// A normal fault error can be returned from code that still speaks `Errno`.
@@ -189,7 +241,21 @@ impl UserAddressSpace {
             dma: Vec::new(),
             inherit: Vec::new(),
             mapping_generation: 0,
+            mmap_base: aslr::mmap_base(),
+            stack_base: aslr::stack_base(),
         }
+    }
+
+    /// Randomized anonymous-mmap hint for this process image.
+    #[must_use]
+    pub const fn mmap_base(&self) -> u64 {
+        self.mmap_base
+    }
+
+    /// Randomized initial stack VMA base for this process image.
+    #[must_use]
+    pub const fn stack_base(&self) -> u64 {
+        self.stack_base
     }
 
     /// Monotonic mapping generation, bumped by every map/unmap/protect.
@@ -507,6 +573,9 @@ impl UserAddressSpace {
         if self.vmas.len() != 1 || !self.objects.is_empty() {
             return Err(Errno::EINVAL);
         }
+        // fork inherits the parent layout exactly; only exec draws a new one.
+        self.mmap_base = source.mmap_base;
+        self.stack_base = source.stack_base;
         let vmas: Vec<Vma> = source.vmas.iter().copied().collect();
         let objects = source.objects.clone();
         let inherit = source.inherit.clone();
@@ -836,7 +905,7 @@ impl UserAddressSpace {
     }
 
     /// Remove a fully mapped range, splitting VMAs and releasing object references.
-    pub fn unmap(&mut self, start: u64, len: u64) -> Result<(), Errno> {
+    pub fn unmap(&mut self, start: u64, len: u64) -> Result<UnmapDeferred, Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
             return Err(Errno::EINVAL);
         }
@@ -904,25 +973,23 @@ impl UserAddressSpace {
         self.remove_inherit_range(start, len);
         self.remove_mmio_range(start, len);
         self.remove_dma_range(start, len);
-        // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
-        // could otherwise reach a frame that was already handed to another address space.
-        let flushed = crate::sched::smp::shootdown::flush_range(start, len);
-        if flushed {
-            for physical in to_free {
-                let physical = frame::PhysAddr(physical);
-                if frame::is_shared(physical) {
-                    frame::release_shared(physical);
-                } else {
-                    let _ = frame::free_frame(physical);
-                }
-            }
-        }
         self.bump_generation();
-        Ok(())
+        // The caller drops the address-space mutex before `finish`; waiting for a remote TLB
+        // acknowledgement under that mutex can starve an aarch64 peer that is blocked on it.
+        Ok(UnmapDeferred {
+            start,
+            len,
+            frames: to_free,
+        })
     }
 
     /// Change protections over a fully mapped range.
-    pub fn protect(&mut self, start: u64, len: u64, new_prot: u8) -> Result<(), Errno> {
+    pub fn protect(
+        &mut self,
+        start: u64,
+        len: u64,
+        new_prot: u8,
+    ) -> Result<ProtectDeferred, Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
             return Err(Errno::EINVAL);
         }
@@ -954,6 +1021,15 @@ impl UserAddressSpace {
                     return Err(Errno::EINVAL);
                 };
                 let vma = self.vmas.find(virt.data()).ok_or(Errno::ENOMEM)?;
+                // Initfs pages are an immutable source image. A mapping may start writable
+                // (private COW), but PROTECT must never turn a read-only initfs mapping into a
+                // writable-in-place one: that would bypass the COW copy and expose the archive.
+                if vma.prot() & (prot::WRITE as u8) == 0
+                    && new_prot & (prot::WRITE as u8) != 0
+                    && matches!(vma.backing(), Backing::Initfs { .. })
+                {
+                    return Err(Errno::EACCES);
+                }
                 let Some((physical, _, _)) = mapper.translate(virt) else {
                     let pager_page = self
                         .objects
@@ -976,9 +1052,8 @@ impl UserAddressSpace {
             }
         }
         self.vmas.protect(start, len, new_prot).map_err(vma_errno)?;
-        let _ = crate::sched::smp::shootdown::flush_range(start, len);
         self.bump_generation();
-        Ok(())
+        Ok(ProtectDeferred { start, len })
     }
 
     /// Handle a user page fault at `cr2`.
@@ -1173,6 +1248,35 @@ impl UserAddressSpace {
             }
         }
         dirty
+    }
+
+    /// Count the present user pages in this address space (K449 test-only metric).
+    ///
+    /// Walks every VMA and counts translated 4 KiB leaves, including initfs and memory-object
+    /// pages. The kernel-owned capture window is skipped. This is diagnostic and changes no
+    /// mapping.
+    pub fn mapped_pages(&mut self) -> u64 {
+        let vmas: Vec<Vma> = self.vmas.iter().copied().collect();
+        let mut pages = 0u64;
+        if let Ok(mut mapper) = self.aspace.mapper() {
+            for vma in vmas {
+                if overlaps_capture_window(vma.start(), vma.len()) {
+                    continue;
+                }
+                let count = pages_in(vma.len()).unwrap_or(0);
+                let mut page = 0u64;
+                while page < count {
+                    let address = vma.start().saturating_add(page.saturating_mul(PAGE_SIZE));
+                    if let Some(virt) = VirtAddr::new(address)
+                        && mapper.translate(virt).is_some()
+                    {
+                        pages = pages.saturating_add(1);
+                    }
+                    page = page.saturating_add(1);
+                }
+            }
+        }
+        pages
     }
 
     /// Free every data frame owned by this address space and clear the VMA tree.
@@ -1457,6 +1561,42 @@ fn leaf_flags(prot: u8, writable: bool) -> PageFlags {
 /// ring-3 access fault. The frame stays present so `UNMAP` and `PROTECT` can find and re-use it.
 fn none_leaf_flags() -> PageFlags {
     PageFlags::from_bits(PRESENT | NO_EXECUTE)
+}
+
+/// True when every present leaf in `[address, address + length)` is user-accessible.
+///
+/// x86-64 `rep movsb` at CPL0 ignores the U/S bit on reads, so `PROT_NONE`'s present
+/// supervisor-only leaf is readable by `copy_from_user` unless the kernel checks it in software.
+/// A not-present page is allowed through: the copy's fault fixup/VM fault path is responsible for
+/// resolving it or returning EFAULT. A present supervisor leaf is rejected with EFAULT here.
+///
+/// The walk is one page-table traversal per 4 KiB page in the range; `copy_to_user` does not need
+/// it because a user write to the supervisor leaf faults in hardware.
+#[cfg(target_arch = "x86_64")]
+pub fn user_range_user_accessible(root: u64, address: u64, length: u64) -> bool {
+    let Some(end) = address.checked_add(length) else {
+        return false;
+    };
+    let mut allocator = paging::KernelFrameAllocator;
+    let memory = paging::KernelPhysMemory;
+    let mut tlb = paging::KernelTlb;
+    let Ok(mut mapper) = Mapper::new(PhysAddr(root), &mut allocator, &memory, &mut tlb) else {
+        return false;
+    };
+    let mut page = address & !(PAGE_SIZE - 1);
+    while page < end {
+        let Some(virt) = VirtAddr::new(page) else {
+            return false;
+        };
+        if let Some((_, flags, _)) = mapper.translate(virt)
+            && flags.is_present()
+            && !flags.is_user()
+        {
+            return false;
+        }
+        page = page.saturating_add(PAGE_SIZE);
+    }
+    true
 }
 
 /// Map one 4 KiB user leaf, seeding the intermediate tables as user-owned for `PROT_NONE`.

@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K434 rev 106: bounded S36 thread-create/exit churn. The marker child exits before and
+# after the 10,000 cycles; the kernel prints the stack/heap counters on each marker exit.
+# The red state is the 960-byte kernel allocation panic before the closing counters.
+
+name = "ssh-churn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/s36-churn/build.sh"]
+initfs = "build/fixtures/s36-churn/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s36-stackcheck=1 k449-metrics=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
+
+[[expect]]
+regex = '^K449-GRAPH graph_threads=\d+ weak_threads=\d+ class3072_in_use=\d+ class3072_slabs=\d+ class3072_fail=\d+ .*$'
+
+[[expect]]
+regex = '^s36: cycles done=10000$'
+
+[[expect]]
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
+
+[[expect]]
+regex = '^s36: churn done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|s36: failed'

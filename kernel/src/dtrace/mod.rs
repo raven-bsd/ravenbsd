@@ -88,7 +88,7 @@ fn wake_consumer() {
     if let Some(event) = event
         && event.signal()
     {
-        crate::event::notify_all();
+        crate::event::notify_event(&event);
     }
 }
 

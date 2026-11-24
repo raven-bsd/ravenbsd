@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-signal-frame-abi"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Standalone host test: S160 owns this directory and the root workspace membership is not in its
+# Owns list. Run with `cargo nextest run --manifest-path tests/abi/signal-frame/Cargo.toml`.
+[workspace]

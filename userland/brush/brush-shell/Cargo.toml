@@ -26,6 +26,11 @@ name = "brush"
 path = "src/main.rs"
 bench = false
 
+[[bin]]
+name = "exec-canary"
+path = "src/bin/exec-canary.rs"
+bench = false
+
 [[test]]
 name = "brush-compat-tests"
 path = "tests/compat_tests.rs"

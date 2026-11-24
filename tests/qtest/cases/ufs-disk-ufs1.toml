@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S99 UFS1 demo: the same mount/write/read/unmount path on a host-formatted
+# UFS1 GPT disk. This is the UFS1 half of the UFS1/UFS2 handling check.
+
+name = "ufs-disk-ufs1"
+arch = "x86_64"
+profile = "ufs-demo"
+timeout_secs = 420
+pre = ["sh scripts/ufs-demo.sh --prepare-ufs1"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/fixtures/ufs-demo/disk-ufs1.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = 'block0p1 16777216 32768 part ufs-root'
+
+[[expect]]
+regex = 's99-persist$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "lsblk\n"
+delay_ms = 100
+
+[[step]]
+wait = 'block0p1 16777216 32768 part ufs-root'
+timeout_secs = 30
+
+[[step]]
+send = "mount ufs: /mnt && echo mount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mount-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "echo s99-persist > /mnt/s99-demo.txt; echo write-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^write-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "cat /mnt/s99-demo.txt; echo read-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^read-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "umount /mnt && echo umount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^umount-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|mount: .*error|mount: .*invalid|fsd-ufs: .*failed|blockd: .*failed'

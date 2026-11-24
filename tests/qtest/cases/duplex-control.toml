@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K210: duplex endpoint control messages. The fixture checks SCM_RIGHTS handle passing both
+# directions, bytes and datagram boundaries, peer credentials, and malformed/oversized control.
+
+name = "duplex-control"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/duplex-control/build.sh"]
+initfs = "build/fixtures/duplex-control/duplex-control.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^duplex-control: stream=1 datagram=1$'
+
+[[expect]]
+regex = '^duplex-control: creds=1 negative=1$'
+
+[[expect]]
+regex = '^duplex-control: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|duplex-control: FAIL'

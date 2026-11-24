@@ -6,6 +6,10 @@
 [alias]
 xtask = "run --package xtask --"
 
+# SC1: normal builds resolve from crates.io. The vendored release graph is opt-in: pass
+# `--config .cargo/vendor.toml` (and, for nested xtask cargo builds, the matching
+# CARGO_SOURCE_* environment) to `cargo --offline`. See docs/supply-chain.md.
+
 # K19a: getrandom 0.4 selects its custom backend through this cfg. The
 # `raven-getrandom` crate provides the matching `__getrandom_v03_custom`
 # symbol; the kernel entropy primitive (G-7) currently reports UNSUPPORTED.

@@ -11,6 +11,7 @@ use core::cell::RefCell;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::socket::{SOCK_DGRAM, SOCK_STREAM};
+use raven_libc_platform::fd::InheritedSocket;
 use raven_proto_net::path::{self, Transport};
 use raven_proto_net::{
     Call, Endpoint, IF_LINK_UP, IF_LOOPBACK, IF_UP, IfName, IfaceInfo, IfaceRequest, IfaceResponse,
@@ -18,7 +19,8 @@ use raven_proto_net::{
 };
 
 use crate::{
-    CallReply, Caps, FdInfo, NetBackend, NetEnv, ReadDone, Sock, SocketFds, UnixBackend, WaitItem,
+    CallReply, Caps, FdInfo, NetBackend, NetEnv, ReadDone, Sock, SocketFds, SocketMeta,
+    UnixBackend, WaitItem,
 };
 
 /// The fake operation selected by [`FakeNetd::fail_next`].
@@ -119,6 +121,8 @@ struct FakeState {
     next_sock: u32,
     next_fd: i32,
     fds: BTreeMap<i32, FdInfo>,
+    /// Socket identity published for the next `execve`, keyed by OFD.
+    metas: BTreeMap<u32, SocketMeta>,
     log: Vec<WireLog>,
     clock_ms: u64,
     entropy: u64,
@@ -134,6 +138,11 @@ struct FakeState {
     fail: Option<(FakeOp, Errno)>,
     max_read: Option<usize>,
     route_fail: bool,
+    /// The next TCP `CONNECT` completes with a pending `ECONNREFUSED` (`SO_ERROR` row).
+    refuse_connect: bool,
+    mptcp_requests: Vec<Vec<u8>>,
+    mptcp_reply: Vec<u8>,
+    inherited: Vec<InheritedSocket>,
 }
 
 /// A fake netd plus fd table and environment.
@@ -195,6 +204,12 @@ impl FakeNetd {
         value
     }
 
+    /// Socket identity recorded for `ofd` by [`SocketFds::set_meta`].
+    #[must_use]
+    pub fn socket_meta(&self, ofd: u32) -> Option<SocketMeta> {
+        self.state.borrow().metas.get(&ofd).copied()
+    }
+
     /// Replace the interface list.
     pub fn set_ifaces(&self, list: Vec<IfaceInfo>) {
         self.state.borrow_mut().ifaces = list;
@@ -203,6 +218,20 @@ impl FakeNetd {
     /// Add one interface record.
     pub fn add_iface(&self, info: IfaceInfo) {
         self.state.borrow_mut().ifaces.push(info);
+    }
+
+    /// Add an inherited socket record and its fd-table entry (exec restoration test).
+    pub fn push_inherited(&self, inherited: InheritedSocket) {
+        let mut state = self.state.borrow_mut();
+        state.fds.insert(
+            inherited.fd,
+            FdInfo {
+                ofd: inherited.ofd,
+                sock: (inherited.handle.0 != 0).then_some(Sock(inherited.handle.0)),
+                nonblock: inherited.status & raven_libc_abi::fcntl::O_NONBLOCK as u32 != 0,
+            },
+        );
+        state.inherited.push(inherited);
     }
 
     /// Add a DNS answer table row.
@@ -246,6 +275,14 @@ impl FakeNetd {
     /// Make every UDP `CONNECT` fail with `ENETUNREACH` (PG-41 route script).
     pub fn fail_routes(&self) {
         self.state.borrow_mut().route_fail = true;
+    }
+
+    /// Make the next TCP `CONNECT` complete with a pending `ECONNREFUSED`.
+    ///
+    /// A real non-blocking connect reports `EINPROGRESS` and the error through `SO_ERROR`; the
+    /// fake keeps that shape instead of failing the call synchronously.
+    pub fn refuse_next_connect(&self) {
+        self.state.borrow_mut().refuse_connect = true;
     }
 
     /// Limit one `READ` to `count` bytes to exercise `MSG_WAITALL`.
@@ -306,6 +343,17 @@ impl FakeNetd {
     /// Clear the request log.
     pub fn clear_log(&self) {
         self.state.borrow_mut().log.clear();
+    }
+
+    /// Every encoded `SOL_MPTCP` request received by the fake.
+    #[must_use]
+    pub fn mptcp_requests(&self) -> Vec<Vec<u8>> {
+        self.state.borrow().mptcp_requests.clone()
+    }
+
+    /// Set the canned reply for the next `SOL_MPTCP` control request.
+    pub fn set_mptcp_reply(&self, reply: &[u8]) {
+        self.state.borrow_mut().mptcp_reply = reply.to_vec();
     }
 
     /// The number of live backend sockets.
@@ -392,6 +440,14 @@ impl NetBackend for FakeNetd {
                 Kind::Udp
             };
             return self.open_endpoint(kind, None);
+        }
+        if text == "net:mptcp" {
+            return self.open_endpoint(Kind::Tcp, None);
+        }
+        if let Some(endpoint) = text.strip_prefix("net:mptcp/") {
+            let path = alloc::format!("net:tcp/{endpoint}");
+            let parsed = path::parse(&path).map_err(|_| Errno::EINVAL)?;
+            return self.open_endpoint(Kind::Tcp, parsed.endpoint);
         }
         let parsed = path::parse(text).map_err(|_| Errno::EINVAL)?;
         match parsed.transport {
@@ -665,8 +721,14 @@ impl NetBackend for FakeNetd {
                 if state.route_fail {
                     return Err(Errno::ENETUNREACH);
                 }
+                let refuse = core::mem::take(&mut state.refuse_connect);
                 let sock = state.socks.get_mut(&s.0).ok_or(Errno::EBADF)?;
                 sock.peer = Some(endpoint);
+                if refuse {
+                    sock.connected = false;
+                    sock.so_error = i32::from(Errno::ECONNREFUSED.0);
+                    return Ok(CallReply::Ok);
+                }
                 sock.connected = true;
                 Ok(CallReply::Ok)
             }
@@ -706,16 +768,45 @@ impl NetBackend for FakeNetd {
                 Ok(CallReply::Ok)
             }
             Call::GetSockOpt { opt } => {
-                let sock = state.socks.get(&s.0).ok_or(Errno::EBADF)?;
+                let sock = state.socks.get_mut(&s.0).ok_or(Errno::EBADF)?;
                 if opt == SockOpt::Error {
-                    return Ok(CallReply::Value(sock.so_error));
+                    // `SO_ERROR` is read once and cleared on the server.
+                    let value = sock.so_error;
+                    sock.so_error = 0;
+                    return Ok(CallReply::Value(value));
                 }
                 Ok(CallReply::Value(
                     sock.opts.get(&opt.code()).copied().unwrap_or(0),
                 ))
             }
             Call::Event => Ok(CallReply::Ok),
+            // K244 adds the additive live readiness query. The host fake has no native stack;
+            // K245 wires the real backend and the libc poll consumer. A defined unsupported
+            // answer keeps the fake honest instead of inventing readiness.
+            Call::Poll => Err(Errno::EOPNOTSUPP),
         }
+    }
+
+    fn mptcp_control(&self, _s: Sock, request: &[u8], reply: &mut [u8]) -> Result<usize, Errno> {
+        let mut state = self.state.borrow_mut();
+        state.mptcp_requests.push(request.to_vec());
+        let canned = state.mptcp_reply.clone();
+        if canned.is_empty() {
+            // A successful setter by default; a getter test sets a structured reply.
+            let ok = [0u8, 0u8];
+            let count = ok.len().min(reply.len());
+            reply
+                .get_mut(..count)
+                .ok_or(Errno::ENOBUFS)?
+                .copy_from_slice(ok.get(..count).ok_or(Errno::ENOBUFS)?);
+            return Ok(count);
+        }
+        let count = canned.len().min(reply.len());
+        reply
+            .get_mut(..count)
+            .ok_or(Errno::ENOBUFS)?
+            .copy_from_slice(canned.get(..count).unwrap_or(&[]));
+        Ok(count)
     }
 
     fn close(&self, s: Sock) {
@@ -848,6 +939,14 @@ impl SocketFds for FakeNetd {
     fn release(&self, ofd: u32) {
         let mut state = self.state.borrow_mut();
         state.fds.retain(|_, info| info.ofd != ofd);
+    }
+
+    fn set_meta(&self, ofd: u32, meta: SocketMeta) {
+        self.state.borrow_mut().metas.insert(ofd, meta);
+    }
+
+    fn inherited(&self) -> Vec<InheritedSocket> {
+        self.state.borrow().inherited.clone()
     }
 }
 

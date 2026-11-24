@@ -24,7 +24,7 @@ __raven_sigentry:
     .hidden __rl_sigreturn_stub
     .type __rl_sigreturn_stub,%function
 __rl_sigreturn_stub:
-    mov x8, #0x82
+    mov x8, #{sigreturn}
     svc #0
     brk #0
 
@@ -34,5 +34,6 @@ __rl_sigreturn_stub:
     .align 3
 __rl_entry_fn:
     .quad 0
-"#
+"#,
+    sigreturn = const raven_abi::signal::SIGRETURN
 );

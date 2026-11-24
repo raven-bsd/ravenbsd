@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 SD image: the release userland on a UFS2 root partition.
+#
+# The FAT boot partition carries the firmware, config.txt, cmdline.txt, flattened
+# kernel8.img and the DTB. The root filesystem is the same release userland and
+# service set, staged from the release fragments below and formatted as UFS2.
+name = "pi4-rootfs"
+extends = "base"
+
+[initfs]
+release = true
+dynamic = true
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

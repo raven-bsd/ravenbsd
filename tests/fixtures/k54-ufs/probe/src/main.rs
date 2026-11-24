@@ -140,7 +140,10 @@ mod program {
         match CallResponse::decode(statfs.op(), &response[..length])
             .map_err(|_| "decode STATFS".to_string())?
         {
-            CallResponse::StatFs { status: 0, statfs } if statfs.block_size == 4096 => {}
+            // K181: the wire `block_size` is the UFS fragment size (fs_fsize), and `blocks` is
+            // counted in those fragments. The golden vector is ufs2-b4096, whose fragment size
+            // is 512 bytes.
+            CallResponse::StatFs { status: 0, statfs } if statfs.block_size == 512 => {}
             other => return Err(format!("STATFS returned {other:?}")),
         }
 

@@ -11,6 +11,7 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-auth = { path = "../raven-auth" }
 raven-svc-manifest = { path = "../raven-svc-manifest" }
 serde_json = "1"
 toml = "1.2"

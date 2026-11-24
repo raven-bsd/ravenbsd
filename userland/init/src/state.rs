@@ -18,6 +18,56 @@ use raven_svc_manifest::{
     GraphError, Manifest, Overrides, Plan, Readiness, Restart, apply_overrides, start_order,
 };
 
+/// Readiness timing captured for the standard per-service timing line.
+///
+/// The supervision transitions do not read this record; the boot log reports it. It keeps the
+/// deadline after [`Runtime::ready_deadline_ms`] is cleared, so the log still reports what the
+/// service raced.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReadyTiming {
+    /// Generation these timestamps belong to.
+    pub generation: u64,
+    /// Monotonic time `start` or `begin_restart` selected this generation.
+    pub start_ms: Option<u64>,
+    /// Monotonic time the worker created the child.
+    pub spawned_ms: Option<u64>,
+    /// Monotonic time of the first scheme-readiness poll.
+    pub first_poll_ms: Option<u64>,
+    /// Absolute readiness deadline for this generation.
+    pub deadline_ms: Option<u64>,
+    /// Wall-clock time credited to observed stalls where the worker did not run.
+    pub stalled_ms: u64,
+    /// Monotonic time readiness succeeded, the service exited, or the deadline fired.
+    pub finished_ms: Option<u64>,
+}
+
+/// Format the standard per-unit timing line for the release boot log.
+///
+/// The four required stamps are always present: `start`, `spawn`, `first-ready` and `ready`.
+/// `first-ready` is the first readiness poll; `ready` is the finish stamp (success, exit or
+/// timeout). Missing optional stamps print as `none`. `status` keeps the reason for the finish.
+#[must_use]
+pub fn format_ready_timing(name: &str, timing: &ReadyTiming, status: &str) -> String {
+    alloc::format!(
+        "svcd: {name} timing: generation={} start={} spawn={} first-ready={} ready={} deadline={} stalled={} status={status}",
+        timing.generation,
+        timing_ms(timing.start_ms),
+        timing_ms(timing.spawned_ms),
+        timing_ms(timing.first_poll_ms),
+        timing_ms(timing.finished_ms),
+        timing_ms(timing.deadline_ms),
+        timing.stalled_ms,
+    )
+}
+
+/// Format one optional monotonic millisecond stamp.
+fn timing_ms(value: Option<u64>) -> String {
+    match value {
+        Some(ms) => alloc::format!("{ms}"),
+        None => "none".to_string(),
+    }
+}
+
 /// Per-service runtime state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Runtime {
@@ -45,6 +95,8 @@ pub struct Runtime {
     pub stop_requested: bool,
     /// Start the service again after the current stop reaches terminal state.
     pub restart_after_stop: bool,
+    /// Readiness timestamps for the per-service diagnostic line; diagnostics only.
+    pub ready_timing: ReadyTiming,
 }
 
 impl Default for Runtime {
@@ -62,6 +114,7 @@ impl Default for Runtime {
             last_exit: None,
             stop_requested: false,
             restart_after_stop: false,
+            ready_timing: ReadyTiming::default(),
         }
     }
 }
@@ -75,6 +128,9 @@ pub enum Notice {
     Failed(usize, String),
     /// `svcd: <name> crash loop, giving up`
     CrashLoop(usize),
+    /// `svcd: <name> unavailable: <reason>`; a service that could not become ready, not a
+    /// running service that crashed.
+    Unavailable(usize, String),
 }
 
 /// A service the caller should start on a new worker thread.
@@ -130,7 +186,8 @@ impl Supervisor {
     /// A cycle, a missing dependency or an ambiguous provider is returned unchanged so the caller
     /// can print it as the fatal `svcd: <reason>` line.
     pub fn new(services: Vec<Manifest>) -> Result<Self, GraphError> {
-        let plan = start_order(&services)?;
+        let effective = with_deferred_scheme_needs(&services);
+        let plan = start_order(&effective)?;
         let runtime = services.iter().map(|_| Runtime::default()).collect();
         Ok(Self {
             services,
@@ -168,7 +225,8 @@ impl Supervisor {
             apply_overrides(&mut services, overrides)
                 .map_err(|error| MergeError::UnknownService(error.service))?;
         }
-        let plan = start_order(&services).map_err(MergeError::Graph)?;
+        let plan =
+            start_order(&with_deferred_scheme_needs(&services)).map_err(MergeError::Graph)?;
         self.runtime.resize(services.len(), Runtime::default());
         self.services = services;
         self.plan = plan;
@@ -212,6 +270,36 @@ impl Supervisor {
         self.boot_complete = true;
     }
 
+    /// Mark `root` and every enabled service or scheme provider it transitively needs.
+    ///
+    /// The getty closure is the boot-critical set: services outside it may be started but must
+    /// not hold the login past the boot budget. Scheme needs follow every enabled provider; a
+    /// disabled or absent provider contributes nothing.
+    pub fn dependency_closure(&self, root: usize) -> Vec<bool> {
+        let mut mark = alloc::vec![false; self.services.len()];
+        self.mark_dependencies(root, &mut mark);
+        mark
+    }
+
+    fn mark_dependencies(&self, index: usize, mark: &mut [bool]) {
+        if index >= self.services.len() || mark.get(index).copied().unwrap_or(true) {
+            return;
+        }
+        mark[index] = true;
+        for need in &self.services[index].needs {
+            if let Some(name) = need.strip_prefix("scheme:") {
+                let want = alloc::format!("scheme:{name}");
+                for (provider, service) in self.services.iter().enumerate() {
+                    if service.enable && service.provides.iter().any(|provide| provide == &want) {
+                        self.mark_dependencies(provider, mark);
+                    }
+                }
+            } else if let Some(dependent) = self.find(need) {
+                self.mark_dependencies(dependent, mark);
+            }
+        }
+    }
+
     /// True after [`Supervisor::set_boot_complete`].
     pub const fn boot_complete(&self) -> bool {
         self.boot_complete
@@ -219,7 +307,6 @@ impl Supervisor {
 
     /// Start `index` and return its generation, or `None` for an invalid index.
     pub fn start(&mut self, index: usize, now: u64) -> Option<u64> {
-        let service = self.services.get(index)?;
         let runtime = self.runtime.get_mut(index)?;
         let preserve_ready = runtime.state == State::Restarting;
         runtime.state = State::Starting;
@@ -227,13 +314,21 @@ impl Supervisor {
         runtime.restart_after_stop = false;
         runtime.handle = None;
         runtime.started = true;
-        runtime.ready_deadline_ms = match service.readiness {
-            Readiness::None => None,
-            _ => Some(now.saturating_add(u64::from(service.ready_timeout_ms))),
-        };
+        // The readiness window is armed by `spawned`: the child does not exist yet, and on TCG
+        // the worker's own thread and ELF copy can consume seconds before the first instruction.
+        runtime.ready_deadline_ms = None;
         runtime.restart_at_ms = None;
         runtime.last_exit = None;
         runtime.generation = runtime.generation.wrapping_add(1);
+        runtime.ready_timing = ReadyTiming {
+            generation: runtime.generation,
+            start_ms: Some(now),
+            spawned_ms: None,
+            first_poll_ms: None,
+            deadline_ms: None,
+            stalled_ms: 0,
+            finished_ms: None,
+        };
         if !preserve_ready {
             runtime.ever_ready = false;
         }
@@ -246,7 +341,7 @@ impl Supervisor {
         index: usize,
         generation: u64,
         handle: Handle,
-        _now: u64,
+        now: u64,
     ) -> Vec<Notice> {
         let Some(runtime) = self.runtime.get_mut(index) else {
             return Vec::new();
@@ -255,16 +350,38 @@ impl Supervisor {
             return Vec::new();
         }
         runtime.handle = Some(handle);
+        runtime.ready_timing.spawned_ms = Some(now);
         if self.services[index].readiness == Readiness::None {
             runtime.state = State::Running;
             runtime.ever_ready = true;
+            runtime.ready_timing.finished_ms = Some(now);
             return alloc::vec![Notice::Up(index)];
         }
+        // The readiness budget starts when the child exists, not when the plan selected it.
+        let timeout_ms = self.services[index].ready_timeout_ms;
+        runtime.ready_deadline_ms = Some(now.saturating_add(u64::from(timeout_ms)));
+        runtime.ready_timing.deadline_ms = runtime.ready_deadline_ms;
         Vec::new()
     }
 
+    /// Record the first scheme-readiness poll for the diagnostic line.
+    ///
+    /// Subsequent polls keep the first timestamp; a stale generation or a service that already
+    /// left `Starting` is ignored.
+    pub fn polled(&mut self, index: usize, generation: u64, now: u64) {
+        let Some(runtime) = self.runtime.get_mut(index) else {
+            return;
+        };
+        if runtime.generation != generation || runtime.state != State::Starting {
+            return;
+        }
+        if runtime.ready_timing.first_poll_ms.is_none() {
+            runtime.ready_timing.first_poll_ms = Some(now);
+        }
+    }
+
     /// Record that readiness succeeded.
-    pub fn ready(&mut self, index: usize, generation: u64) -> Vec<Notice> {
+    pub fn ready(&mut self, index: usize, generation: u64, now: u64) -> Vec<Notice> {
         let Some(runtime) = self.runtime.get_mut(index) else {
             return Vec::new();
         };
@@ -274,6 +391,7 @@ impl Supervisor {
         runtime.state = State::Running;
         runtime.ever_ready = true;
         runtime.ready_deadline_ms = None;
+        runtime.ready_timing.finished_ms = Some(now);
         alloc::vec![Notice::Up(index)]
     }
 
@@ -285,9 +403,35 @@ impl Supervisor {
         if runtime.generation != generation || runtime.state != State::Starting {
             return Vec::new();
         }
-        runtime.state = State::Failed;
+        runtime.state = State::GaveUp;
         runtime.ready_deadline_ms = None;
-        alloc::vec![Notice::Failed(index, reason)]
+        alloc::vec![Notice::Unavailable(index, reason)]
+    }
+
+    /// Credit an unobserved stall to the readiness window.
+    ///
+    /// The caller passes the wall-clock span in which its own poll loop did not run (for example
+    /// a TCG guest descheduled by the host). That span is not evidence that the child failed to
+    /// become ready, so it is added to both the live deadline and the diagnostic timestamp.
+    /// Returns `true` when the deadline moved.
+    pub fn extend_readiness(&mut self, index: usize, generation: u64, stalled_ms: u64) -> bool {
+        if stalled_ms == 0 {
+            return false;
+        }
+        let Some(runtime) = self.runtime.get_mut(index) else {
+            return false;
+        };
+        if runtime.generation != generation || runtime.state != State::Starting {
+            return false;
+        }
+        let Some(deadline) = runtime.ready_deadline_ms else {
+            return false;
+        };
+        runtime.ready_deadline_ms = Some(deadline.saturating_add(stalled_ms));
+        runtime.ready_timing.deadline_ms = runtime.ready_deadline_ms;
+        runtime.ready_timing.stalled_ms =
+            runtime.ready_timing.stalled_ms.saturating_add(stalled_ms);
+        true
     }
 
     /// Check the readiness deadline. Returns a failure notice and cancels the wait when due.
@@ -304,9 +448,10 @@ impl Supervisor {
         if now < deadline {
             return Vec::new();
         }
-        runtime.state = State::Failed;
+        runtime.state = State::GaveUp;
         runtime.ready_deadline_ms = None;
-        alloc::vec![Notice::Failed(index, "readiness timeout".to_string())]
+        runtime.ready_timing.finished_ms = Some(now);
+        alloc::vec![Notice::Unavailable(index, "readiness timeout".to_string())]
     }
 
     /// Record a child exit and apply the restart policy.
@@ -349,6 +494,7 @@ impl Supervisor {
             runtime.state = State::Stopped;
             runtime.ever_ready = true;
             runtime.ready_deadline_ms = None;
+            runtime.ready_timing.finished_ms = Some(now);
             return ExitOutcome {
                 restart: None,
                 start: None,
@@ -363,12 +509,13 @@ impl Supervisor {
         };
         if !restart {
             if runtime.state == State::Starting && service.readiness != Readiness::None {
-                runtime.state = State::Failed;
+                runtime.state = State::GaveUp;
                 runtime.ready_deadline_ms = None;
+                runtime.ready_timing.finished_ms = Some(now);
                 return ExitOutcome {
                     restart: None,
                     start: None,
-                    notices: alloc::vec![Notice::Failed(
+                    notices: alloc::vec![Notice::Unavailable(
                         index,
                         "exited before it became ready".to_string()
                     )],
@@ -388,10 +535,16 @@ impl Supervisor {
         if runtime.restarts >= service.max_restarts {
             runtime.state = State::GaveUp;
             runtime.ready_deadline_ms = None;
+            runtime.ready_timing.finished_ms = Some(now);
+            let notice = if runtime.ever_ready {
+                Notice::CrashLoop(index)
+            } else {
+                Notice::Unavailable(index, "could not become ready".to_string())
+            };
             return ExitOutcome {
                 restart: None,
                 start: None,
-                notices: alloc::vec![Notice::CrashLoop(index)],
+                notices: alloc::vec![notice],
             };
         }
         runtime.restarts = runtime.restarts.saturating_add(1);
@@ -483,9 +636,6 @@ impl Supervisor {
     ///
     /// Returns `false` when the generation is stale or a `STOP` cancelled the restart.
     pub fn begin_restart(&mut self, index: usize, generation: u64, now: u64) -> bool {
-        let Some(service) = self.services.get(index) else {
-            return false;
-        };
         let Some(runtime) = self.runtime.get_mut(index) else {
             return false;
         };
@@ -494,9 +644,16 @@ impl Supervisor {
         }
         runtime.state = State::Starting;
         runtime.handle = None;
-        runtime.ready_deadline_ms = match service.readiness {
-            Readiness::None => None,
-            _ => Some(now.saturating_add(u64::from(service.ready_timeout_ms))),
+        // Armed by `spawned`, exactly like the first start.
+        runtime.ready_deadline_ms = None;
+        runtime.ready_timing = ReadyTiming {
+            generation,
+            start_ms: Some(now),
+            spawned_ms: None,
+            first_poll_ms: None,
+            deadline_ms: None,
+            stalled_ms: 0,
+            finished_ms: None,
         };
         runtime.restart_at_ms = None;
         true
@@ -577,6 +734,76 @@ impl Supervisor {
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.services.iter().map(|service| service.name.as_str())
     }
+
+    /// Scheme prefixes that a runtime provider may register after boot.
+    ///
+    /// A scheme declared by any manifest (`provides`, or a `needs` such as `scheme:disk`) but not
+    /// provided by an enabled service is late: the driver or server that will publish it starts
+    /// later. `svcd` grants these prefixes to each child before its first thread so the child can
+    /// open the scheme once the provider registers, without weakening the exact-name snapshot.
+    pub fn dynamic_scheme_prefixes(&self) -> Vec<String> {
+        let enabled: Vec<&str> = self
+            .services
+            .iter()
+            .filter(|service| service.enable)
+            .flat_map(|service| service.provides.iter().map(String::as_str))
+            .filter_map(|provide| provide.strip_prefix("scheme:"))
+            .collect();
+        let mut prefixes: Vec<String> = Vec::new();
+        for service in &self.services {
+            for scheme in service.provides.iter().chain(service.needs.iter()) {
+                let Some(name) = scheme.strip_prefix("scheme:") else {
+                    continue;
+                };
+                if !valid_scheme_name(name)
+                    || enabled.contains(&name)
+                    || prefixes.iter().any(|prefix| prefix == name)
+                {
+                    continue;
+                }
+                prefixes.push(name.to_string());
+            }
+        }
+        prefixes
+    }
+}
+
+/// Drop a `scheme:` dependency that no enabled service provides.
+///
+/// Such a dependency is satisfied at runtime (a driver publishes `disk:` after `devd` scans PCI,
+/// or an operator starts `blockd`/`fsd-ufs` through `svcctl`), so it must not fail the static
+/// graph. An enabled provider keeps the edge and therefore the existing ordering, missing
+/// non-scheme dependencies still fail, and an ambiguous provider still fails.
+fn with_deferred_scheme_needs(services: &[Manifest]) -> Vec<Manifest> {
+    let provided: Vec<&str> = services
+        .iter()
+        .filter(|service| service.enable)
+        .flat_map(|service| service.provides.iter().map(String::as_str))
+        .filter(|provide| provide.starts_with("scheme:"))
+        .collect();
+    let mut effective = services.to_vec();
+    for service in &mut effective {
+        if !service.enable {
+            continue;
+        }
+        service
+            .needs
+            .retain(|need| !need.starts_with("scheme:") || provided.contains(&need.as_str()));
+    }
+    effective
+}
+
+/// True when `name` is a scheme name the kernel namespace syscall accepts.
+fn valid_scheme_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 64
+        && bytes.iter().all(|byte| {
+            matches!(
+                *byte,
+                b'a'..=b'z' | b'0'..=b'9' | b':' | b'_' | b'-'
+            )
+        })
 }
 
 #[cfg(test)]

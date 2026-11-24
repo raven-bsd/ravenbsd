@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! Archive checks A1-A8 of C60 section 7. They run when `build/x86_64/libc.a` exists; set
-//! `RL_LIBC_REQUIRED=1` to make a missing archive a failure.
+//! Archive checks A1-A13 of C60 section 7.
+//!
+//! The test builds the archive it inspects from the current tree with `cargo xtask libc-pack`
+//! into `target/archive-exports`; it never reads the untracked `build/x86_64/libc.a`. A build
+//! failure is a test failure, not a skip. The first test process to acquire the lock builds; the
+//! other archive tests wait for the same fresh archive.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, SystemTime};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -15,22 +20,105 @@ fn root() -> PathBuf {
         .to_path_buf()
 }
 
+fn run_id() -> String {
+    std::env::var("NEXTEST_RUN_ID").unwrap_or_else(|_| format!("cargo-{}", std::process::id()))
+}
+
+fn archive_dir() -> PathBuf {
+    root()
+        .join("target")
+        .join(format!("archive-exports-{}", run_id()))
+}
+
+/// The fresh archive built from the current tree.
 fn archive() -> PathBuf {
-    root().join("build/x86_64/libc.a")
+    ensure_archive();
+    archive_dir().join("libc.a")
 }
 
-fn required() -> bool {
-    std::env::var("RL_LIBC_REQUIRED").as_deref() == Ok("1")
+fn members() -> PathBuf {
+    let _ = archive();
+    archive_dir().join("pack/members")
 }
 
-macro_rules! skip_or_fail {
-    ($reason:expr) => {{
-        if required() {
-            panic!("SKIP: {} (RL_LIBC_REQUIRED=1)", $reason);
-        }
-        eprintln!("SKIP: {}", $reason);
+fn ensure_archive() {
+    let dir = archive_dir();
+    let archive = dir.join("libc.a");
+    if archive.is_file() && dir.join("ready").is_file() {
         return;
-    }};
+    }
+    let target = root().join("target");
+    std::fs::create_dir_all(&target).expect("target dir");
+    let lock = target.join(format!("archive-exports-{}.lock", run_id()));
+    loop {
+        match std::fs::create_dir(&lock) {
+            Ok(()) => {
+                // A waiter can acquire the lock just after the previous builder released it;
+                // re-check the ready marker before removing the archive and rebuilding.
+                if archive.is_file() && dir.join("ready").is_file() {
+                    let _ = std::fs::remove_dir_all(&lock);
+                    return;
+                }
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                if archive.is_file() && dir.join("ready").is_file() {
+                    return;
+                }
+                if let Ok(text) = std::fs::read_to_string(dir.join("error")) {
+                    panic!("archive_exports: {text}");
+                }
+                if let Ok(metadata) = std::fs::metadata(&lock)
+                    && let Ok(modified) = metadata.modified()
+                    && SystemTime::now()
+                        .duration_since(modified)
+                        .unwrap_or_default()
+                        > Duration::from_secs(300)
+                {
+                    let _ = std::fs::remove_dir_all(&lock);
+                    continue;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => panic!("archive_exports: lock: {error}"),
+        }
+    }
+    let result = build_archive(&dir, &archive);
+    match &result {
+        Ok(()) => {
+            std::fs::write(dir.join("ready"), b"ok").expect("ready marker");
+        }
+        Err(error) => {
+            let _ = std::fs::write(dir.join("error"), error);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&lock);
+    if let Err(error) = result {
+        panic!("archive_exports: {error}");
+    }
+}
+
+fn build_archive(dir: &Path, archive: &Path) -> Result<(), String> {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).map_err(|error| format!("create {}: {error}", dir.display()))?;
+    let output = Command::new("cargo")
+        .args(["xtask", "libc-pack", "--arch", "x86_64", "--out"])
+        .arg(dir)
+        .current_dir(root())
+        .output()
+        .map_err(|error| format!("libc-pack: {error}"))?;
+    let _ = std::fs::write(dir.join("pack.log"), &output.stderr);
+    if !output.status.success() {
+        return Err(format!(
+            "libc-pack failed ({}): {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    if !archive.is_file() {
+        return Err(format!("libc-pack produced no {}", archive.display()));
+    }
+    Ok(())
 }
 
 fn nm() -> String {
@@ -106,9 +194,6 @@ fn undefined() -> std::collections::BTreeSet<String> {
 
 #[test]
 fn a1_k1_to_k6_pass() {
-    if !archive().is_file() {
-        skip_or_fail!("no build/x86_64/libc.a");
-    }
     let list = root().join("libc/ravenlibc/abi/Symbols.list");
     let map = root().join("libc/ravenlibc/crates/raven-libc/Symbol.map");
     let versions = root().join("libc/ravenlibc/abi/Versions.def");
@@ -134,16 +219,15 @@ fn a1_k1_to_k6_pass() {
         .expect("mkmap check");
     assert!(
         output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stdout)
+        "mkmap failed ({})\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 
 #[test]
 fn a2_no_init_array_in_a_shell_member() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let readelf = if Command::new("llvm-readelf")
         .arg("--version")
         .output()
@@ -153,10 +237,8 @@ fn a2_no_init_array_in_a_shell_member() {
     } else {
         "readelf"
     };
-    let members = root().join("build/x86_64/pack/members");
-    let Ok(entries) = std::fs::read_dir(&members) else {
-        return;
-    };
+    let members = members();
+    let entries = std::fs::read_dir(&members).expect("pack/members");
     for entry in entries.flatten() {
         let path = entry.path();
         let name = path.file_name().unwrap_or_default().to_string_lossy();
@@ -179,9 +261,6 @@ fn a2_no_init_array_in_a_shell_member() {
 
 #[test]
 fn a3_one_public_text_symbol_per_member() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let mut text_per_member = std::collections::BTreeMap::new();
     for (member, kind, name) in defined() {
         if !(member.contains("raven_libc.") || member.contains("libraven_libc.")) {
@@ -201,9 +280,6 @@ fn a3_one_public_text_symbol_per_member() {
 
 #[test]
 fn a4_symbols_list_has_no_duplicates() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let text = std::fs::read_to_string(root().join("libc/ravenlibc/abi/Symbols.list"))
         .expect("Symbols.list");
     let names = text
@@ -262,15 +338,12 @@ fn a6_panic_rs_never_names_the_payload_type() {
 
 #[test]
 fn a7_hot_members_have_no_call() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let hot = [
         "strlen", "strnlen", "memchr", "memcmp", "bcmp", "strcmp", "strncmp", "strchr",
     ];
     let symbols = defined();
     let objdump = "llvm-objdump";
-    let members = root().join("build/x86_64/pack/members");
+    let members = members();
     for name in hot {
         let Some((member, _, _)) = symbols.iter().find(|(_, _, symbol)| symbol == name) else {
             continue;
@@ -296,9 +369,6 @@ fn a7_hot_members_have_no_call() {
 
 #[test]
 fn a8_c64_family_symbols_are_defined() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let names = defined()
         .into_iter()
         .map(|(_, _, name)| name)
@@ -350,13 +420,6 @@ fn lld() -> Option<PathBuf> {
 fn hostrun(name: &str) -> Option<String> {
     if !(cfg!(all(target_os = "linux", target_arch = "x86_64"))) {
         eprintln!("SKIP: host");
-        return None;
-    }
-    if !archive().is_file() {
-        if required() {
-            panic!("SKIP: no build/x86_64/libc.a (RL_LIBC_REQUIRED=1)");
-        }
-        eprintln!("SKIP: no build/x86_64/libc.a");
         return None;
     }
     let scratch = Path::new("/tmp/opencode");
@@ -439,9 +502,6 @@ fn a10_hostrun_h6_platform_glue() {
 
 #[test]
 fn a11_every_expected_family_name_is_defined() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let text = defined();
     let names = text
         .iter()
@@ -465,9 +525,6 @@ fn a11_every_expected_family_name_is_defined() {
 
 #[test]
 fn a12_c60c_data_symbols_are_defined() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let names = defined()
         .into_iter()
         .map(|(_, _, name)| name)
@@ -487,9 +544,6 @@ fn a12_c60c_data_symbols_are_defined() {
 
 #[test]
 fn a13_c61_start_link_symbols_are_defined() {
-    if !archive().is_file() {
-        skip_or_fail!("no archive");
-    }
     let mut kinds = std::collections::BTreeMap::new();
     for (_, kind, name) in defined() {
         kinds.entry(name).or_insert(kind);

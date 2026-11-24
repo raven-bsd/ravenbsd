@@ -1,0 +1,118 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K197: the scripted-key `raven config` TUI. Boots the K78b admin profile, drives the dry-run and
+# the real save through the serial line, and verifies only the dedicated drop-in is written.
+name = "raven-config-tui"
+arch = "x86_64"
+profile = "raven-admin-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/modern-admin/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+# The prompt wait below proves the shell is up; boot-service line ordering is not this TUI's
+# contract. A panic or exception is still fatal.
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "export NO_COLOR=1 RAVEN_TUI=1 RAVEN_CONFIG_ROOT=/tmp/raven-config-test\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config --dry-run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-tui\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: dry-run plan=.*network\.toml file=absent$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/net\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: module=Network$'
+timeout_secs = 30
+
+[[step]]
+send = "raven-tui\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: saved .*network\.toml$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config --dry-run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s+Hostname: raven-tui\s*$'
+timeout_secs = 30
+
+[[step]]
+send = "q\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

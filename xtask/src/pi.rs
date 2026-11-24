@@ -37,9 +37,26 @@ const FIRMWARE_FILES: [&str; 5] = [
     "LICENCE.broadcom",
     DTB_NAME,
 ];
-/// The boot configuration: the K35 contract lines plus the real-Pi UART setup from
-/// `docs/pi4.md` (free the PL011 from Bluetooth and pin its 48 MHz clock).
-const CONFIG_TXT: &str = "arm_64bit=1\nkernel=kernel8.img\nenable_uart=1\nuart_2ndstage=1\ndtoverlay=disable-bt\ninit_uart_clock=48000000\ncore_freq=250\n";
+/// The boot configuration: the K35 contract lines, the real-Pi UART setup from `docs/pi4.md`
+/// (free the PL011 from Bluetooth and pin its 48 MHz clock), and the HDMI1 deterministic
+/// firmware display buffer. A fixed 1024x768 60 Hz DMT mode plus forced hotplug gives the same
+/// scanout with or without a monitor sensed at power-on; `enable_uart` stays on, so the UART
+/// boot/login gate is unchanged and remains the recovery console.
+const CONFIG_TXT: &str = "arm_64bit=1\n\
+    kernel=kernel8.img\n\
+    enable_uart=1\n\
+    uart_2ndstage=1\n\
+    dtoverlay=disable-bt\n\
+    init_uart_clock=48000000\n\
+    core_freq=250\n\
+    framebuffer_width=1024\n\
+    framebuffer_height=768\n\
+    framebuffer_depth=32\n\
+    framebuffer_ignore_alpha=1\n\
+    hdmi_force_hotplug=1\n\
+    hdmi_group=2\n\
+    hdmi_mode=16\n\
+    disable_overscan=1\n";
 /// The Bluetooth-disable overlay referenced by `config.txt`.
 const BLUETOOTH_OVERLAY: &str = "overlays/disable-bt.dtbo";
 

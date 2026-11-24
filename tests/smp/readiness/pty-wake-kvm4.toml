@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K495 rev156: pty-master ppoll/SIGCHLD discriminator.
+# R1: child exits with an explicit slave close; the master must report HUP/readable without a
+#     SIGCHLD handler and ppoll must not return EINTR.
+# R2: same child with a caught SIGCHLD handler; the handler must run and ppoll must return
+#     EINTR or a ready master/self-pipe.
+# R3: child writes and exits without an explicit close; the master must still report HUP.
+# R4: child execs /bin/brush -c "echo wake" on the pty and exits; the master must deliver wake and
+#     HUP (the sshd session-child shape).
+# R5: same child exit with a quiet second poll source (a socketpair), like sshd's connection_in;
+#     the pty HUP must still wake ppoll.
+# R6: a child sets the pty slave as its controlling terminal (setsid + TIOCSCTTY) and opens
+#     /dev/tty; the open must succeed and fstat the same slave inode (the sshd `tty` row).
+
+name = "smp-readiness-pty-wake"
+arch = "x86_64"
+profile = "network-config-test"
+# The fixture runs R1-R6. R6 sets the pty slave as the child's controlling terminal (setsid +
+# TIOCSCTTY), opens /dev/tty and fstats the same slave inode. The measured summary is `PASS 6/6`;
+# the pre-R6 5/5 summary is not expected (mutation with 5/5 fails).
+# The measured boot+rows did not reach `PTY-WAKE start` at 60 s and did at 120 s; 120 s is the
+# measured row budget (boot + R1-R6 + margin). The guest currently stays up because
+# `exit_when_exits = readiness-pty` does not produce `init exited (0)` (measured >480 s); that is an
+# init/svcd exit issue, not a budget one.
+timeout_secs = 120
+pre = ["sh tests/smp/readiness/build-pty-wake.sh"]
+initfs = "build/smp/readiness/pty-wake/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-accel", "kvm", "-cpu", "host", "-smp", "4", "-nic", "user,model=virtio-net-pci"]
+expect_exit = "success"
+
+[[expect]]
+regex = 'PTY-WAKE start$'
+
+[[expect]]
+regex = 'PTY-WAKE R1 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R2 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R3 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R4 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R5 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R6 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE SUMMARY PASS 6/6$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|PTY-WAKE .* FAIL'

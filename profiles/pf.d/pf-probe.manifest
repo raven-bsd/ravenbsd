@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "pf-probe"
+exec = "/sbin/netd-probe"
+args = ["netd-probe", "pf"]
+needs = ["scheme:net"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

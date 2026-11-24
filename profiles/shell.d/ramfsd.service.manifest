@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K531: the shell/release boot needs the 1777 tmpfs instance before vfsd mounts /tmp. `vfsd`
+# already needs `ramfsd`, so this dependency puts `tmpfs` in the bootstrap selection before vfsd.
+# The `ramfs:` instance itself keeps the default 0755 root for /etc test mounts.
+
+name = "ramfsd"
+exec = "/sbin/ramfsd"
+needs = ["logd", "tmpfs"]
+provides = ["scheme:ramfs"]
+readiness = "scheme"
+restart = "on-failure"

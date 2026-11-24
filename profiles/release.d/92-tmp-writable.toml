@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K531 test-only fixture. The qtest logs in as root and runs /bin/tmp-writable, which forks and drops
+# to uid 1000 for the non-root rows. Built by tests/fixtures/tmp-writable/build.sh.
+
+[[initfs.files]]
+src = "build/fixtures/tmp-writable/{arch}/tmp-writable"
+path = "/bin/tmp-writable"
+mode = 0o755
+generated = true

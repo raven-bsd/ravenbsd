@@ -15,7 +15,11 @@
 //! its exact error.
 
 const MAGIC: &[u8] = b"RAVENFS1";
-const VERSION: u32 = 1;
+/// Current image format version (`raven-initfs::format::VERSION`).
+const VERSION: u32 = 2;
+/// Legacy images are structurally readable by this name-table scan; the strict parser validates
+/// them after the decision.
+const LEGACY_VERSION: u32 = 1;
 const PAGE_SIZE: usize = 4096;
 const HEADER_SIZE: usize = 64;
 const ENTRY_SIZE: usize = 48;
@@ -47,7 +51,7 @@ pub fn initfs_has_manifest(image: &[u8]) -> Option<bool> {
     let version = read_u32(image, HEADER_VERSION_OFFSET)?;
     let header_size = read_u32(image, HEADER_SIZE_OFFSET)?;
     let entry_size = read_u32(image, HEADER_ENTRY_SIZE_OFFSET)?;
-    if version != VERSION
+    if (version != VERSION && version != LEGACY_VERSION)
         || header_size as usize != HEADER_SIZE
         || entry_size as usize != ENTRY_SIZE
     {
@@ -115,6 +119,14 @@ mod tests {
     #[test]
     fn an_image_without_manifests_reports_false() {
         assert_eq!(initfs_has_manifest(&base_image()), Some(false));
+    }
+
+    #[test]
+    fn a_legacy_version_one_name_table_is_readable() {
+        let mut image = base_image();
+        image[super::HEADER_VERSION_OFFSET..super::HEADER_VERSION_OFFSET + 4]
+            .copy_from_slice(&super::LEGACY_VERSION.to_le_bytes());
+        assert_eq!(initfs_has_manifest(&image), Some(false));
     }
 
     #[test]

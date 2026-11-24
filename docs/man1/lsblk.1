@@ -1,0 +1,34 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt LSBLK 1
+.Os RavenBSD
+.Sh NAME
+.Nm lsblk
+.Nd list block devices and GPT partitions
+.Sh SYNOPSIS
+.Nm
+.Op Fl n
+.Op Ar device ...
+.Sh DESCRIPTION
+The
+.Nm
+utility queries the
+.Dq block:
+scheme for each device and prints its size and GPT partitions.
+With no operands it probes
+.Ql block:0
+through
+.Ql block:7
+and skips absent devices.
+An explicitly named device that cannot be opened is an error.
+The
+.Fl n
+option suppresses the header.
+.Sh EXIT STATUS
+Returns 0 when at least one device was listed.
+Returns 1 when no device was found or a named device failed.
+Returns 2 on usage errors.
+.Sh SEE ALSO
+.Xr gpart 1 ,
+.Xr newfs 1

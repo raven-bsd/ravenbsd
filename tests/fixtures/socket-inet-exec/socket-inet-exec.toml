@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K231 socket-inet-exec service: runs after netd publishes the net scheme, listens for one
+# hostfwd connection and hands it to an exec'd session process. The test-only svcd.conf exits
+# init with this service's status.
+
+name = "socket-inet-exec"
+exec = "/bin/socket-inet-exec"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

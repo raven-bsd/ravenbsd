@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "ipc-fuzz"
+arch = "x86_64"
+profile = "base"
+# Measured gate budget: 13.82 s max over three warm TCG runs (8.35 s, 7.24 s), plus margin.
+timeout_secs = 25
+pre = ["sh tests/smp/ipc-fuzz/build.sh"]
+initfs = "build/ipc-fuzz/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = []
+expect_exit = "success"
+
+# The fixture serves its own scheme from the main thread and fuzzes the reply parser from a client
+# thread. Deviations are findings and are allowed on the summary line; the survival markers are not.
+[[expect]]
+regex = '^ipc-fuzz: start seed=0x[0-9a-f]+ groups=[0-9]+ packet=536$'
+
+[[expect]]
+regex = '^ipc-fuzz: summary rows=[0-9]+ deviations=0 seed=0x[0-9a-f]+ table-hash=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^ipc-fuzz: alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|setup-failed|ipc-fuzz: failed'

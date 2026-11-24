@@ -35,9 +35,9 @@
 /// Overall, the module ensures each entry in the DIRED output has the correct
 /// byte position, considering additional lines or padding affecting positions.
 ///
-use crate::{Config, LsError};
+use crate::{Config, LsError, OutputBuffer};
 use std::fmt;
-use std::io::{BufWriter, Stdout, Write};
+use std::io::Write;
 use uucore::error::UResult;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -97,7 +97,7 @@ pub fn calculate_dired(
     (start, end)
 }
 
-pub fn indent(out: &mut BufWriter<Stdout>) -> UResult<()> {
+pub fn indent(out: &mut OutputBuffer) -> UResult<()> {
     write!(out, "  ")?;
     Ok(())
 }
@@ -113,7 +113,7 @@ pub fn calculate_subdired(dired: &mut DiredOutput, path_len: usize) {
 pub fn print_dired_output(
     config: &Config,
     dired: &DiredOutput,
-    out: &mut BufWriter<Stdout>,
+    out: &mut OutputBuffer,
 ) -> UResult<()> {
     if !dired.dired_positions.is_empty() {
         print_positions(out, "//DIRED//", &dired.dired_positions)?;
@@ -134,7 +134,7 @@ pub fn print_dired_output(
 
 /// Helper function to print positions with a given prefix.
 fn print_positions(
-    out: &mut BufWriter<Stdout>,
+    out: &mut OutputBuffer,
     prefix: &str,
     positions: &[BytePosition],
 ) -> UResult<()> {

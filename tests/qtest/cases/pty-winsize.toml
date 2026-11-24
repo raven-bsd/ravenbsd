@@ -1,0 +1,143 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K455: the pty window-size contract. The guest sets 43x120x0x0 on the slave, reads all four
+# fields back on the slave and master, sets 24x80x640x480 from the master and reads it on the
+# slave, sets zeros and reads zeros, and checks that a non-tty fd answers ENOTTY (never ENOSYS).
+
+name = "pty-winsize"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-winsize"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^pty-winsize: start uid=0$'
+
+[[expect]]
+regex = '^pty-winsize: slave-open fd=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pty-winsize: set1=0$'
+
+[[expect]]
+regex = '^pty-winsize: get slave=0$'
+
+[[expect]]
+regex = '^pty-winsize: slave row=43 ok$'
+
+[[expect]]
+regex = '^pty-winsize: slave col=120 ok$'
+
+[[expect]]
+regex = '^pty-winsize: slave xpixel=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: slave ypixel=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: get master=0$'
+
+[[expect]]
+regex = '^pty-winsize: master row=43 ok$'
+
+[[expect]]
+regex = '^pty-winsize: master col=120 ok$'
+
+[[expect]]
+regex = '^pty-winsize: master xpixel=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: master ypixel=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: ioctl-get=0$'
+
+[[expect]]
+regex = '^pty-winsize: ioctl-slave row=43 ok$'
+
+[[expect]]
+regex = '^pty-winsize: ioctl-slave col=120 ok$'
+
+[[expect]]
+regex = '^pty-winsize: ioctl-slave xpixel=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: ioctl-slave ypixel=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: set2-ioctl=0$'
+
+[[expect]]
+regex = '^pty-winsize: get second-slave=0$'
+
+[[expect]]
+regex = '^pty-winsize: second-slave row=24 ok$'
+
+[[expect]]
+regex = '^pty-winsize: second-slave col=80 ok$'
+
+[[expect]]
+regex = '^pty-winsize: second-slave xpixel=640 ok$'
+
+[[expect]]
+regex = '^pty-winsize: second-slave ypixel=480 ok$'
+
+[[expect]]
+regex = '^pty-winsize: set3=0$'
+
+[[expect]]
+regex = '^pty-winsize: get zeros-master=0$'
+
+[[expect]]
+regex = '^pty-winsize: zeros-master row=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: zeros-master col=0 ok$'
+
+[[expect]]
+regex = '^pty-winsize: non-tty-get=-1 errno=25$'
+
+[[expect]]
+regex = '^pty-winsize: non-tty-set=-1 errno=25$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch fg pgrp=[0-9]+$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch change-1 count=1 row=43 col=120$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch noop count=1$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch change-2 count=2 row=24 col=80$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch bg pgrp=[0-9]+$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch change-3 count=3 row=30 col=100$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch bg count=0$'
+
+[[expect]]
+regex = '^pty-winsize: sigwinch closed errno=9 signal=-11$'
+
+[[expect]]
+regex = '^pty-winsize: close child-exit read=1 byte=90$'
+
+[[expect]]
+regex = '^pty-winsize: close child-exit eof=1$'
+
+[[expect]]
+regex = '^pty-winsize: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-winsize: .*FAIL'

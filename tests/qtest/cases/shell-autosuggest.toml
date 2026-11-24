@@ -1,0 +1,149 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K205: dimmed history autosuggestions in the Vt editor. Seed local history, type a prefix,
+# accept the dimmed suffix with Right, execute it, then prove RAVEN_AUTOSUGGEST=0 leaves no
+# hint. keep_ansi preserves the dim sequence for the assertion.
+
+name = "shell-autosuggest"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 240
+keep_ansi = true
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '2muggest-marker'
+
+[[expect]]
+regex = '^autosuggest-marker$'
+
+[[expect]]
+regex = '^plain-h$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '2mint-value'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 500
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 60
+
+[[step]]
+send = "echo seed-one\n"
+delay_ms = 100
+
+[[step]]
+wait = '^seed-one$'
+timeout_secs = 30
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+[[step]]
+send = "echo autosuggest-marker\n"
+delay_ms = 100
+
+[[step]]
+wait = '^autosuggest-marker$'
+timeout_secs = 30
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+[[step]]
+send = "echo plain-hint-value\n"
+delay_ms = 100
+
+[[step]]
+wait = '^plain-hint-value$'
+timeout_secs = 30
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+# Type the prefix; the dimmed suffix comes from the newest matching history entry.
+[[step]]
+send = "echo autos"
+delay_ms = 800
+
+[[step]]
+send = "\u0005"
+delay_ms = 300
+
+[[step]]
+send = "\n"
+delay_ms = 500
+
+[[step]]
+wait = '^autosuggest-marker$'
+timeout_secs = 30
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+# Explicitly off: the same history prefix must not draw the dimmed suffix.
+[[step]]
+send = "export RAVEN_AUTOSUGGEST=0\n"
+delay_ms = 100
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+[[step]]
+send = "echo plain-h"
+delay_ms = 800
+
+[[step]]
+send = "\n"
+delay_ms = 300
+
+[[step]]
+wait = '^plain-h$'
+timeout_secs = 30
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

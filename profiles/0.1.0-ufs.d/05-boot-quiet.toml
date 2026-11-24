@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K191/K414: the UFS server image defaults to the concise styled boot report.
+
+[[initfs.files]]
+src = "profiles/0.1.0-ufs.d/boot-quiet"
+path = "/etc/raven/boot-quiet"
+mode = 0o644

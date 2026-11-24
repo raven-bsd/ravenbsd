@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K458: pty lifetime churn. Four workers x 250 open/use/close cycles, a handshake proving the four
+# slave paths are distinct while all are open, 32 simultaneous pairs, fd-number reuse, and the
+# kernel's s24 free-frame count after every worker exit. `ptyd` prints its own file/pair count on
+# startup and whenever the table becomes empty, so a leaked pair fails the second occurrence.
+
+name = "pty-churn"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-churn"]
+boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck=1 s24-alloccheck=1 s25-handlecheck=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^pty-churn: start uid=0 workers=4 cycles=250 concurrent=32$'
+
+[[expect]]
+regex = '^pty-churn: handshake index=0 path=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-churn: handshake index=1 path=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-churn: handshake index=2 path=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-churn: handshake index=3 path=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-churn: handshake distinct=4$'
+
+[[expect]]
+regex = '^pty-churn: worker=[0-3] cycles=250 first-master=[0-9]+ first-slave=[0-9]+ ok$'
+unordered = true
+
+[[expect]]
+regex = '^pty-churn: worker=[0-3] cycles=250 first-master=[0-9]+ first-slave=[0-9]+ ok$'
+unordered = true
+
+[[expect]]
+regex = '^pty-churn: worker=[0-3] cycles=250 first-master=[0-9]+ first-slave=[0-9]+ ok$'
+unordered = true
+
+[[expect]]
+regex = '^pty-churn: worker=[0-3] cycles=250 first-master=[0-9]+ first-slave=[0-9]+ ok$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^s24: frames free=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^s25: exit handles=0$'
+unordered = true
+
+[[expect]]
+regex = '^s25: exit handles=0$'
+unordered = true
+
+[[expect]]
+regex = '^s25: exit handles=0$'
+unordered = true
+
+[[expect]]
+regex = '^s25: exit handles=0$'
+unordered = true
+
+[[expect]]
+regex = '^pty-churn: workers=4 status=ok$'
+
+[[expect]]
+regex = '^pty-churn: concurrent=32 distinct=ok$'
+
+[[expect]]
+regex = '^pty-churn: fd-reuse master=[0-9]+ slave=[0-9]+ ok$'
+
+[[expect]]
+regex = '^pty-churn: pass cycles=1000 concurrent=32$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-churn: FAIL'

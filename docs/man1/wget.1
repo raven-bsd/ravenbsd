@@ -1,0 +1,75 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 20, 2026
+.Dt WGET 1
+.Os RavenBSD
+.Sh NAME
+.Nm wget
+.Nd simple HTTP and verified HTTPS download
+.Sh SYNOPSIS
+.Nm
+.Op Fl q
+.Op Fl O Ar file
+.Op Fl -max-time Ar seconds
+.Op Fl -cacert Ar file
+.Ar URL
+.Sh DESCRIPTION
+The
+.Nm
+utility performs one bounded HTTP GET and saves the response body to
+.Ar file
+when
+.Fl O
+is present, otherwise to the last path segment of
+.Ar URL .
+An empty path or a trailing slash becomes
+.Pa index.html .
+The names
+.Sq \&.
+and
+.Sq \&..
+are rejected.
+An existing file is overwritten.
+.Pp
+The base build is plain HTTP and does not link C or OpenSSL; an
+.Pa https://
+URL fails with a clear
+.Dv EUNAVAILABLE
+message.
+The optional TLS add-on build links
+.Xr raven-tls 3
+and the owner-approved OpenSSL add-on and verifies the certificate chain and
+the host name or IP address.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl O Ar file
+Write to
+.Ar file .
+The value
+.Sq -
+means standard output.
+.It Fl q
+Suppress the summary and diagnostics.
+.It Fl -max-time Ar seconds
+Set the total request deadline in seconds.
+The default is 10.
+.It Fl -cacert Ar file
+TLS add-on build only: trust exactly this PEM bundle instead of the default
+.Pa /addons/etc/ssl/certs/ca-bundle.pem .
+.El
+.Pp
+Redirects are followed with a bounded budget.
+There is no recursive spidering, resume, POST, cookie jar or shell execution.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr curl 1
+.Sh STANDARDS
+RavenBSD.
+This is a deliberately small subset, not a GNU wget replacement.
+.Sh HISTORY
+The
+.Nm
+utility first appeared in RavenBSD 0.1.0.

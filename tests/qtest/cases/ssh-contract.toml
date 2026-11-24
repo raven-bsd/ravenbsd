@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K443: SIGCHLD delivery and reaping while the parent is blocked in ppoll. The base profile has
+# no network or pty services; /init is the K11-K14 fixture. This is the registered `ssh-contract`
+# qtest case for the K443 session-close contract.
+
+name = "ssh-contract"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/ssh-contract/build-sigchld.sh"]
+initfs = "build/fixtures/ssh-contract-sigchld/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONTRACT K11 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K12 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K13 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K14 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K15 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K16 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K17 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K18 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K19 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K20 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 10/10$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)CONTRACT K[0-9]+ FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

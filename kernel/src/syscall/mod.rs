@@ -10,12 +10,13 @@
 //! register.
 
 pub mod basic;
-/// Console input is a COM1 device path; aarch64 reports `ENOSYS`.
-#[cfg(target_arch = "x86_64")]
+/// Console input is a COM1/PL011 device path.
 pub mod debug_read;
 pub mod driver;
 /// `DTRACE_*` provider control syscalls (S57).
 pub mod dtrace;
+/// K208 raw duplex endpoint pair/shutdown syscalls.
+pub mod duplex;
 pub mod event;
 pub mod exec;
 pub mod futex;
@@ -98,6 +99,12 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_FORK {
         return process_ctl::fork(frame);
     }
+    if number == raven_abi::syscall::PROC_REBOOT {
+        return process_ctl::reboot(frame);
+    }
+    if number == raven_abi::syscall::PROC_CHROOT {
+        return process_ctl::chroot(frame);
+    }
     if number == ipc::PREAD {
         return ipc::pread(frame);
     }
@@ -112,6 +119,21 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == exec::PROC_EXEC {
         return exec::exec(frame);
+    }
+    if number == duplex::DUPLEX_PAIR {
+        return duplex::pair(frame);
+    }
+    if number == duplex::DUPLEX_SHUTDOWN {
+        return duplex::shutdown(frame);
+    }
+    if number == duplex::DUPLEX_SENDMSG {
+        return duplex::sendmsg(frame);
+    }
+    if number == duplex::DUPLEX_RECVMSG {
+        return duplex::recvmsg(frame);
+    }
+    if number == duplex::DUPLEX_PEERCRED {
+        return duplex::peercred(frame);
     }
     if number == pipe::PIPE {
         return pipe::pipe(frame);
@@ -148,6 +170,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == tty::PROC_CTTY_SET_FG {
         return tty::set_pgrp(frame);
+    }
+    if number == tty::PROC_CTTY_HANDLE {
+        return tty::ctty_handle();
     }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);
@@ -194,6 +219,12 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_SIGRECV {
         return process_ctl::sigrecv(frame);
     }
+    if number == process_ctl::PROC_SIGRECV_EX {
+        return process_ctl::sigrecv_ex(frame);
+    }
+    if number == process_ctl::PROC_SIGQUEUE {
+        return process_ctl::sigqueue(frame);
+    }
     if number == process_ctl::PROC_TIMES {
         return process_ctl::times(frame);
     }
@@ -211,6 +242,15 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == raven_abi::syscall::THREAD_SET_TLS {
         return thread::set_tls(frame);
+    }
+    if number == raven_abi::syscall::SIGACTION {
+        return thread::sigaction(frame);
+    }
+    if number == raven_abi::syscall::SIGPROCMASK {
+        return thread::sigprocmask(frame);
+    }
+    if number == raven_abi::syscall::SIGALTSTACK {
+        return thread::sigaltstack(frame);
     }
     if number == raven_abi::syscall::THREAD_KICK {
         return thread::kick(frame);
@@ -235,6 +275,17 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == raven_abi::signal::SIGRESEND {
         return thread::sigresend(frame);
+    }
+    // C19: the kernel sigacts table (`sigaction`/`sigprocmask`/`sigaltstack`), raw constants
+    // assigned by the lead in `raven_abi::syscall`.
+    if number == raven_abi::syscall::SIGACTION {
+        return thread::sigaction(frame);
+    }
+    if number == raven_abi::syscall::SIGPROCMASK {
+        return thread::sigprocmask(frame);
+    }
+    if number == raven_abi::syscall::SIGALTSTACK {
+        return thread::sigaltstack(frame);
     }
     // S72: wall-clock and entropy syscalls, dispatched by reviewer-assigned raw numbers that are
     // not yet `raven-abi` variants (see `basic::{GETRANDOM, CLOCK_SET}` for the required diff).
@@ -264,7 +315,6 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::PROC_TERMINATE) => process_ctl::terminate(frame),
         Some(Syscall::PROC_NAMESPACE) => process_ctl::namespace(frame),
         Some(Syscall::FUTEX) => futex::dispatch(frame),
-        #[cfg(target_arch = "x86_64")]
         Some(Syscall::DEBUG_READ) => debug_read::handle(frame),
         Some(Syscall::THREAD_CREATE) => thread::create(frame),
         Some(Syscall::THREAD_EXIT) => thread::exit(frame),

@@ -204,7 +204,10 @@ pub struct Stack<D: Device> {
     pub(crate) ports: crate::table::PortAllocator,
     /// Live TIME-WAIT membership and recycling (C17).
     pub(crate) timewait: crate::table::TimeWaitTable<crate::table::TimeWaitSlot>,
-    pub(crate) next_isn: u32,
+    /// FreeBSD-aligned SYN cache for embryonic connections (K276).
+    pub(crate) syncache: crate::syncache::Syncache,
+    /// FreeBSD-aligned ISN and timestamp-offset state (K278).
+    pub(crate) isn: crate::isn::IsnState,
     pub(crate) option_override: Option<Vec<u8>>,
     #[allow(dead_code)] // Used when the tcp-md5 feature is enabled.
     pub(crate) md5_keys: BTreeMap<u16, Vec<u8>>,
@@ -259,9 +262,10 @@ impl<D: Device> Stack<D> {
         let mut rng = Generator::from_seed(&seed_from_entropy(seed, 0));
         let mut ephemeral_seed = [0u8; 2];
         rng.fill(&mut ephemeral_seed);
-        let mut isn_seed = [0u8; 4];
-        rng.fill(&mut isn_seed);
-        let next_isn = u32::from_le_bytes(isn_seed);
+        let mut isn_secret = [0u8; crate::isn::ISN_SECRET_LENGTH];
+        rng.fill(&mut isn_secret);
+        let mut ts_secret = [0u8; crate::isn::ISN_SECRET_LENGTH];
+        rng.fill(&mut ts_secret);
         let next_ephemeral = 49_152u16.saturating_add(u16::from_le_bytes(ephemeral_seed) % 16_384);
         let cookie_seed = seed_from_entropy(seed, 0xc0_0c);
         let mut secret_bytes = [0u8; 8];
@@ -320,7 +324,8 @@ impl<D: Device> Stack<D> {
             timewait: crate::table::TimeWaitTable::new(
                 usize::try_from(tunables.timewait_max).unwrap_or(65_536),
             ),
-            next_isn,
+            syncache: crate::syncache::Syncache::new(crate::syncache::SyncacheConfig::default()),
+            isn: crate::isn::IsnState::new(1_000, isn_secret, ts_secret),
             option_override: None,
             md5_keys: BTreeMap::new(),
             ao_keys: BTreeMap::new(),
@@ -529,17 +534,10 @@ impl<D: Device> Stack<D> {
         let mut events: Vec<Event> = Vec::new();
         for (raw_id, record) in &mut self.sockets.records {
             let id = SocketId(*raw_id);
-            let readable = record.forced_readable
-                || !record.rx.is_empty()
-                || match &record.kind {
-                    Kind::Udp { datagrams, .. } => !datagrams.is_empty(),
-                    _ => false,
-                };
-            let writable = !record.closed
-                && !record.tx_shutdown
-                && record.tx.len() < record.tx_cap
-                && !matches!(record.kind, Kind::Listener { .. });
-            let closed = record.closed || record.peer_closed;
+            let levels = crate::readiness::socket_levels(record);
+            let readable = levels.readable;
+            let writable = levels.writable;
+            let closed = levels.closed;
 
             if readable && !record.prev_readable {
                 events.push(Event::Readable(id));

@@ -115,6 +115,19 @@ pub struct StdTerminal {
 }
 
 impl Terminal for StdTerminal {
+    fn is_terminal(&self) -> bool {
+        // The RavenBSD console reports the tty on the output side; the input
+        // descriptor is a scheme-backed console even when `isatty(0)` is false.
+        #[cfg(target_os = "ravenbsd")]
+        {
+            return std::io::stdout().is_terminal() || std::io::stdin().is_terminal();
+        }
+        #[cfg(not(target_os = "ravenbsd"))]
+        {
+            std::io::stdin().is_terminal()
+        }
+    }
+
     fn enable_raw_mode(&mut self) -> std::io::Result<()> {
         // Only a Unix terminal can be set to send keys as bytes, unechoed: the
         // Windows console sends them only in a mode brush doesn't set, and WASI
@@ -128,7 +141,11 @@ impl Terminal for StdTerminal {
 
         // Restore any mode set before, so it isn't taken for the original one.
         self.mode = None;
-        let mode = brush_core::terminal::AutoModeGuard::new(std::io::stdin().into())
+        #[cfg(target_os = "ravenbsd")]
+        let terminal_file = std::io::stdout();
+        #[cfg(not(target_os = "ravenbsd"))]
+        let terminal_file = std::io::stdin();
+        let mode = brush_core::terminal::AutoModeGuard::new(terminal_file.into())
             .map_err(std::io::Error::other)?;
 
         // Raw mode, as readline sets it, with Enter and Ctrl-J told apart, and a
@@ -152,7 +169,14 @@ impl Terminal for StdTerminal {
     }
 
     fn columns(&self) -> Option<usize> {
-        brush_core::sys::terminal::get_columns(&std::io::stdin().into())
+        #[cfg(target_os = "ravenbsd")]
+        {
+            brush_core::sys::terminal::get_columns(&std::io::stdout().into())
+        }
+        #[cfg(not(target_os = "ravenbsd"))]
+        {
+            brush_core::sys::terminal::get_columns(&std::io::stdin().into())
+        }
     }
 
     fn wait_for_input(&mut self, timeout: Duration) -> std::io::Result<bool> {

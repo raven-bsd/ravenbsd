@@ -1,0 +1,31 @@
+
+   Compiling raven-b47-plat v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/fixtures/b47-plat)
+error[E0432]: unresolved import `raven_rt::spawn::spawn`
+   --> tests/fixtures/b47-plat/src/bin/init.rs:17:37
+    |
+ 17 | use raven_rt::spawn::{SpawnOptions, spawn};
+    |                                     ^^^^^ no `spawn` in `spawn`
+    |
+note: found an item that was configured out
+   --> userland/rt/src/spawn.rs:118:8
+    |
+117 | #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    |          -------------------------------------------- the item is gated here
+118 | pub fn spawn(
+    |        ^^^^^
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `raven-b47-plat` (bin "raven-b47-plat-init" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/rustcNw3KPY/symbols.o" "<4 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libtest-*,libgetopts-*,librustc_std_workspace_std-*,libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*}.rlib" "/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/{libraven_rt-8f40510fce0b68a7,libraven_scheme-2ad310252b7a3cd6,libraven_ipc-416ed9b2786dbcb3,libraven_trace_core-162cd17d9da18c7d,libraven_spawn-1c916660a4f7e6d4,libraven_elf-a652b691f3e129dc,libraven_proto_fs-db12d4de10e17fe6,libraven_abi-3e405d37d3c84b38}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/rustcNw3KPY/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/raven_b47_plat_client-d18fe8a07c42e11b" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: duplicate symbol: _start
+          >>> defined at /usr/lib/gcc/x86_64-linux-gnu/11/../../../x86_64-linux-gnu/Scrt1.o:(_start)
+          >>> defined at eqmcg81stqjo2l81hluhepgwy
+          >>>            raven_rt-8f40510fce0b68a7.eqmcg81stqjo2l81hluhepgwy.0alggff.rcgu.o:(.text+0x0) in archive /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-8f40510fce0b68a7.rlib
+          collect2: error: ld returned 1 exit status
+          
+
+error: could not compile `raven-b47-plat` (bin "raven-b47-plat-client" test) due to 1 previous error

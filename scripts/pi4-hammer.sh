@@ -25,10 +25,11 @@ cd "$ROOT" || {
     echo "pi4-hammer: cannot enter repository root from $0" >&2
     exit 2
 }
+. "$ROOT/scripts/lib/mgmt.sh"
 
 WORK=build/pi4-hammer
 RESULTS=$WORK/results.tsv
-HOST_OUT=docs/pi4-test-matrix.md
+HOST_OUT=
 BOARD_OUT=$WORK/board-matrix.md
 IMAGE=build/aarch64/ravenbsd-pi4.img
 
@@ -47,10 +48,11 @@ usage:
   sh scripts/pi4-hammer.sh --board [--device TTY] [--log PATH]
 
   --host       build the aarch64 kernel and pi4 image, run the Pi 4 qtests and host packages,
-               run make check-fast, and write docs/pi4-test-matrix.md
+               run make check-fast, and write the matrix under RAVEN_MGMT_ROOT
   --board      capture/check the Pi 4 board evidence; no device or log writes the UNVERIFIED
                procedure only
-  --out PATH   matrix output path (host default: docs/pi4-test-matrix.md,
+  --out PATH   matrix output path (host default:
+               RAVEN_MGMT_ROOT/tickets/evidence/pi4-test-matrix.md,
                board default: build/pi4-hammer/board-matrix.md)
   --device TTY serial adapter for --board capture (default: /dev/ttyUSB0 when --board runs)
   --log PATH   serial log for --board (captures to build/pi4-hammer/serial.log when --device is set)
@@ -98,6 +100,10 @@ if [ -z "$MODE" ]; then
     echo "pi4-hammer: one of --host or --board is required" >&2
     usage >&2
     exit 2
+fi
+
+if [ -z "$OUT" ] && [ "$MODE" = host ]; then
+    HOST_OUT=$(mgmt_path tickets/evidence/pi4-test-matrix.md) || exit 2
 fi
 
 mkdir -p "$WORK" || exit 2
@@ -362,7 +368,7 @@ sh scripts/pi4-hammer.sh --board --device /dev/ttyUSB0
 | GENET board markers | otto/O4 | `scripts/pi4-genet-evidence.sh build/pi4/<image-sha256>.log` | UNVERIFIED |
 | GENET/audio soak markers | otto/O6 | `scripts/pi4-soak.sh build/pi4/<image-sha256>.log` | UNVERIFIED |
 | Root mount | jerry/J5 | capture the log and look for `svcd: root mounted at /root` and `fsd-ufs: mounted block:` | UNVERIFIED (pi4-root case absent: J5 is blocked) |
-| PWM audio register read-backs | otto/B46 | follow `docs/pi4-audio.md` section 5 and record every register/counter | UNVERIFIED |
+| PWM audio register read-backs | otto/B46 | follow the Pi 4 audio note section 5 and record every register/counter | UNVERIFIED |
 
 A board row becomes PASS only when the captured log contains the helper's required markers. No
 line in this section is a hardware result until the owner attaches the log and audio recording.
@@ -489,7 +495,7 @@ write_board_matrix() {
             "${BOARD_LOG:-<log>}" "$SOAK_STATUS" "$SOAK_EVIDENCE"
         printf '| Root mount markers | jerry/J5 | inspect `%s` | **%s** | %s |\n' \
             "${BOARD_LOG:-<log>}" "$ROOT_STATUS" "$ROOT_EVIDENCE"
-        printf '| PWM audio register read-backs | otto/B46 | `docs/pi4-audio.md` section 5 | **%s** | %s |\n' \
+        printf '| PWM audio register read-backs | otto/B46 | `the Pi 4 audio note` section 5 | **%s** | %s |\n' \
             "$AUDIO_STATUS" "$AUDIO_EVIDENCE"
         printf '\n## Board procedure\n\n'
         printf '```sh\n'
@@ -514,7 +520,7 @@ board_mode() {
     ROOT_STATUS=UNVERIFIED
     ROOT_EVIDENCE="no captured log"
     AUDIO_STATUS=UNVERIFIED
-    AUDIO_EVIDENCE="no hardware marker script; follow docs/pi4-audio.md section 5"
+    AUDIO_EVIDENCE="no hardware marker script; follow the Pi 4 audio note section 5"
 
     if [ -n "$DEVICE" ] && [ -z "$BOARD_LOG" ]; then
         BOARD_LOG=$WORK/serial.log

@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 DHCP test network stack: reuse the release network programs and services.
+[[initfs.programs]]
+package = "raven-pcid"
+path = "/sbin/pcid"
+
+[[initfs.programs]]
+package = "raven-devd"
+path = "/sbin/devd"
+
+[[initfs.programs]]
+package = "virtio-net"
+path = "/sbin/virtio-net"
+
+[[initfs.programs]]
+package = "netd"
+path = "/sbin/netd"
+
+[[initfs.programs]]
+package = "resolvd"
+path = "/sbin/resolvd"
+
+[[initfs.programs]]
+package = "raven-ifconfig"
+path = "/sbin/ifconfig"
+
+[[initfs.programs]]
+package = "raven-ping"
+path = "/sbin/ping"
+
+[[initfs.programs]]
+package = "raven-route"
+path = "/sbin/route"
+
+[[initfs.programs]]
+package = "raven-netstat"
+path = "/sbin/netstat"
+
+[[initfs.files]]
+src = "etc/services.d/pcid.toml"
+path = "/etc/services.d/pcid.toml"
+
+[[initfs.files]]
+src = "profiles/server.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "userland/init/release-drivers.conf"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "rootfs/server/etc/services.d/netd.toml"
+path = "/etc/services.d/netd.toml"
+
+[[initfs.files]]
+src = "rootfs/server/etc/services.d/resolvd.toml"
+path = "/etc/services.d/resolvd.toml"
+
+[[initfs.files]]
+src = "etc/resolv.conf"
+path = "/etc/resolv.conf"
+mode = 0o644

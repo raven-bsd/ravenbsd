@@ -22,7 +22,7 @@ use std::{
     cell::OnceCell,
     ffi::{OsStr, OsString},
     fs::{self, DirEntry, FileType, Metadata, ReadDir},
-    io::{BufWriter, ErrorKind, Stdout, Write, stdout},
+    io::{ErrorKind, Write, stdout},
     ops::RangeInclusive,
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -58,6 +58,39 @@ use config::options::QUOTING_STYLE;
 use config::{Dereference, Files, Sort};
 use dired::DiredOutput;
 use display::{display_items, display_size, should_display, show_dir_name};
+
+/// Accumulated listing bytes. Writing through `std::io::Stdout` line-buffers every newline, so a
+/// RavenBSD console listing costs one scheme write per line; one buffered write keeps the console
+/// cost bounded.
+pub(crate) struct OutputBuffer(Vec<u8>);
+
+impl OutputBuffer {
+    fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl Write for OutputBuffer {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.0.extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn write_listing(bytes: &[u8]) -> std::io::Result<()> {
+    #[cfg(target_os = "ravenbsd")]
+    {
+        uucore::io::RawWriter(stdout()).write_all(bytes)
+    }
+    #[cfg(not(target_os = "ravenbsd"))]
+    {
+        stdout().write_all(bytes)
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 enum LsError {
@@ -915,7 +948,6 @@ impl<'a> PathData<'a> {
                 } else {
                     get_metadata_with_deref_opt(self.path(), self.must_dereference)
                 };
-
                 match md {
                     Err(err) => {
                         // FIXME: A bit tricky to propagate the result here
@@ -1006,7 +1038,7 @@ impl Colorable for PathData<'_> {
 // A struct to encapsulate state that is passed around from `list` functions.
 #[cfg_attr(not(unix), allow(dead_code))]
 struct ListState<'a> {
-    out: BufWriter<Stdout>,
+    out: OutputBuffer,
     style_manager: Option<StyleManager<'a>>,
     // TODO: More benchmarking with different use cases is required here.
     // From experiments, BTreeMap may be faster than HashMap, especially as the
@@ -1038,7 +1070,7 @@ impl<'a> TextOutput<'a> {
     pub fn new(config: &'a Config) -> Self {
         Self {
             state: ListState {
-                out: BufWriter::new(stdout()),
+                out: OutputBuffer::new(),
                 style_manager: config.color.as_ref().map(StyleManager::new),
                 #[cfg(unix)]
                 uid_cache: FxHashMap::default(),
@@ -1110,7 +1142,10 @@ impl LsOutput for TextOutput<'_> {
     }
 
     fn flush(&mut self) -> UResult<()> {
-        self.state.out.flush().map_err(LsError::WriteError)?;
+        if !self.state.out.0.is_empty() {
+            write_listing(&self.state.out.0).map_err(LsError::WriteError)?;
+            self.state.out.0.clear();
+        }
         Ok(())
     }
 

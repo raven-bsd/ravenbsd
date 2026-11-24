@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! `getty`: print the console banner and `login:` prompt, run `login`, then start the session
-//! shell named by `/etc/passwd`.
+//! `getty`: print the console banner, retry the `login:` prompt, then start the session shell.
 //!
 //! The kernel has no `exec`, so the session is a small process chain: `getty` owns the `initfs`
-//! grant from its service manifest and uses it to spawn `/bin/login` and then `/bin/rsh` (or the
-//! shell field from `/etc/passwd`). `login` verifies the password and exits 0; `getty` starts the
-//! shell only on that status. No process is setuid and no password is kept in this binary.
+//! grant from its service manifest and uses it to spawn `/bin/login` and then the shell named by
+//! login policy. `login` verifies the password and exits 0; a nonzero status re-prompts instead of
+//! ending the session. No process is setuid and no password is kept in this binary.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -18,13 +17,14 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::format;
     use alloc::string::String;
-    use alloc::vec;
-    use alloc::vec::Vec;
 
     use login::tty::Console;
-    use login::{Profile, is_root_user, normalize_username, parse_profile, parse_root_passwd};
+    use login::{
+        Autologin, PasswdEntry, Profile, parse_autologin, parse_passwd, parse_profile,
+        parse_root_passwd,
+    };
+    use raven_getty::{Account, Session, SessionError, run_session};
     use raven_initfs::Initfs;
     use raven_rt::entry;
     use raven_rt::fs;
@@ -32,61 +32,101 @@ mod program {
 
     entry!(main);
 
-    /// Printed before the login prompt.
-    const BANNER: &str = "RavenBSD 0.1 (x86_64) (tty:console)\n";
+    struct ConsoleSession {
+        console: Console,
+        initfs: Initfs<'static>,
+        accounts: alloc::vec::Vec<PasswdEntry>,
+    }
+
+    impl Session for ConsoleSession {
+        fn write(&mut self, bytes: &[u8]) -> Result<(), SessionError> {
+            self.console.write(bytes).map_err(|_| SessionError)
+        }
+
+        fn read_line(&mut self) -> Result<String, SessionError> {
+            self.console.read_line().map_err(|_| SessionError)
+        }
+
+        fn run_login(&mut self, username: &str) -> Result<i32, SessionError> {
+            let login_args = ["login", username];
+            let login_env = [alloc::format!("USER={username}")];
+            let login_env: alloc::vec::Vec<&str> = login_env.iter().map(String::as_str).collect();
+            let options = SpawnOptions {
+                args: &login_args,
+                env: &login_env,
+            };
+            spawn_wait(&self.initfs, "/bin/login", &options)
+        }
+
+        fn run_shell(
+            &mut self,
+            shell: &str,
+            args: &[&str],
+            env: &[&str],
+        ) -> Result<i32, SessionError> {
+            let options = SpawnOptions { args, env };
+            spawn_wait(&self.initfs, shell, &options)
+        }
+
+        fn account(&mut self, username: &str) -> Option<Account> {
+            self.accounts
+                .iter()
+                .find(|entry| entry.name == username)
+                .map(|entry| Account {
+                    home: entry.home.clone(),
+                    shell: entry.shell.clone(),
+                })
+        }
+    }
 
     fn main(_args: raven_rt::Args) -> i32 {
         let profile = read_profile();
+        let passwd = read_passwd();
+        let mut accounts = parse_passwd(&passwd);
+        for entry in &mut accounts {
+            if entry.name == login::ROOT_USER {
+                entry.shell = alloc::string::String::from(login::DEFAULT_SHELL);
+            }
+        }
+        let shell = root_shell(&passwd).unwrap_or_else(|| profile.shell.clone());
+        let autologin = read_autologin();
         let Ok(console) = Console::open() else {
             return 1;
         };
-        if console.write(BANNER.as_bytes()).is_err() || console.write(b"login: ").is_err() {
-            return 1;
-        }
-        let username = match console.read_line() {
-            Ok(line) => line,
-            Err(_) => return 1,
-        };
-        drop(console);
-        let Some(username) = normalize_username(&username) else {
-            return 1;
-        };
-        if !is_root_user(username) {
-            return 1;
-        }
         let Some(image) = raven_rt::map_initfs().ok() else {
             return 1;
         };
         let Ok(initfs) = Initfs::parse(image) else {
             return 1;
         };
-        let login_args = ["login", username];
-        let login_env = ["USER=root"];
-        let login_options = SpawnOptions {
-            args: &login_args,
-            env: &login_env,
+        let mut session = ConsoleSession {
+            console,
+            initfs,
+            accounts,
         };
-        let status = spawn_wait(&initfs, "/bin/login", &login_options);
-        if status != 0 {
-            return status;
-        }
-        let shell = read_shell().unwrap_or_else(|| profile.shell.clone());
-        let env_strings = profile_env(&profile, &shell);
-        let env: Vec<&str> = env_strings.iter().map(String::as_str).collect();
-        // The console scheme has no POSIX tty, so brush cannot detect an interactive stdin;
-        // the login shell is interactive by construction.
-        let shell_args: &[&str] = if shell.rsplit('/').next() == Some("brush") {
-            // argv[0] is the shell name; `-i` forces the interactive backend and `-l` loads
-            // /etc/profile on the console.
-            &["brush", "-i", "-l"]
-        } else {
-            &[]
-        };
-        let shell_options = SpawnOptions {
-            args: shell_args,
-            env: &env,
-        };
-        spawn_wait(&initfs, &shell, &shell_options)
+        run_session(&mut session, &profile, &shell, autologin.as_deref())
+    }
+
+    fn read_passwd() -> String {
+        fs::read_to_vec("file:/etc/passwd")
+            .ok()
+            .and_then(|bytes| {
+                core::str::from_utf8(&bytes)
+                    .ok()
+                    .map(alloc::string::String::from)
+            })
+            .unwrap_or_default()
+    }
+
+    fn root_shell(passwd: &str) -> Option<alloc::string::String> {
+        parse_root_passwd(passwd).map(|entry| entry.shell)
+    }
+
+    fn read_autologin() -> Option<alloc::string::String> {
+        let bytes = fs::read_to_vec("file:/etc/raven/autologin.toml").ok()?;
+        let text = core::str::from_utf8(&bytes).ok()?;
+        let Autologin { enabled, user } = parse_autologin(text);
+        (enabled && !user.is_empty()).then_some(user)
     }
 
     fn read_profile() -> Profile {
@@ -96,33 +136,16 @@ mod program {
             .unwrap_or_default()
     }
 
-    fn read_shell() -> Option<String> {
-        let passwd = fs::read_to_vec("file:/etc/passwd").ok()?;
-        let text = core::str::from_utf8(&passwd).ok()?;
-        parse_root_passwd(text).map(|entry| entry.shell)
-    }
-
-    fn profile_env(profile: &Profile, shell: &str) -> Vec<String> {
-        vec![
-            format!("PATH={}", profile.path),
-            format!("HOME={}", profile.home),
-            format!("TERM={}", profile.term),
-            format!("USER={}", profile.user),
-            format!("SHELL={shell}"),
-            String::from("PWD=/"),
-        ]
-    }
-
-    fn spawn_wait(initfs: &Initfs<'_>, path: &str, options: &SpawnOptions<'_>) -> i32 {
-        match raven_rt::spawn::spawn(initfs, path, options) {
-            Ok(process) => {
-                let mut code = 0i32;
-                let waited = RtSys.proc_wait(process, &mut code);
-                let _ = raven_rt::handle_close(process);
-                if waited.is_ok() { code } else { 1 }
-            }
-            Err(_) => 1,
-        }
+    fn spawn_wait(
+        initfs: &Initfs<'_>,
+        path: &str,
+        options: &SpawnOptions<'_>,
+    ) -> Result<i32, SessionError> {
+        let process = raven_rt::spawn::spawn(initfs, path, options).map_err(|_| SessionError)?;
+        let mut code = 0i32;
+        let waited = RtSys.proc_wait(process, &mut code);
+        let _ = raven_rt::handle_close(process);
+        waited.map(|()| code).map_err(|_| SessionError)
     }
 }
 

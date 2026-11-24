@@ -4,27 +4,51 @@
 name = "process-lifecycle"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 180
+timeout_secs = 300
 pre = ["sh tests/fixtures/s36-lifecycle/build.sh"]
 initfs = "build/fixtures/s36-lifecycle/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-mapcheck=1 s36-lockcheck=1"
 qemu_extra = []
 expect_exit = "success"
 
+# The getty `login: ` prompt is written without a trailing newline, so a prompt that lands
+# between two s36 lines prefixes the next one. Allow that console prefix on the early lines
+# (the same convention the cycles row below already uses); the exact s36 message is still
+# required at the end of the line.
+
 # Scenario 4: a created-but-never-started process is reaped by PROC_WAIT.
 [[expect]]
-regex = '^s36: unstarted reaped$'
+regex = '^.*s36: unstarted reaped$'
+
+# Scenario 7: the child status wins over the SIGCHLD kick; no spurious EINTR.
+[[expect]]
+regex = '^.*s36: wait race ok$'
+
+[[expect]]
+regex = '^.*s36: wait race handle ok$'
+
+# Scenario 8: a caught signal delivered while blocked still returns EINTR.
+[[expect]]
+regex = '^.*s36: wait eintr ok$'
 
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]
-regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
 
 [[expect]]
-regex = '^s36: cycles done=10000$'
+regex = '^.*s36: cycles done=10000$'
+
+# Bounded process/address-space/stack churn between the same counter markers.
+[[expect]]
+regex = '^s36: sessions done=32$'
+
+# Bounded VMA churn; the marker after it separates data/page-table frames from baseline.
+[[expect]]
+regex = '^s36: vma vma-large done=100$'
 
 # Scenario 2, closing marker exit: the counters again (the report compares the two lines).
 [[expect]]
-regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
 
 # Scenario 1: one thread exits (process alive), then EXIT kills every thread.
 [[expect]]
@@ -51,8 +75,64 @@ regex = '^s36: server ready$'
 [[expect]]
 regex = '^s36: scheme reregistered$'
 
+# Lock/time churn: futex wake and timeout paths, sampled frame allocated_bytes.
+[[expect]]
+regex = '^s36: lockcheck base allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: lock churn wake=5000 timeout=1000$'
+
+[[expect]]
+regex = '^s36: lockcheck delta=[0-9]+ allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: lockcheck ok$'
+
+# vfsd pager frame-return row: baseline at exit 88, map/unmap cycles, closing at exit 89.
+# The `mapcheck ok` line is required and the leak line is forbidden: this row is red until
+# the vfsd/rt allocator owner returns the mapped-chunk frames.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: vfsd map done=1000$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
+# C18 lifetime 1: the owning process exits with the pager file still open; the pager count must
+# be zero, not just under the frame tolerance.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=0$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
+[[expect]]
+regex = '^s36: pager exit done$'
+
+# C18 lifetime 2: shrinking truncate while the controller still holds the open file. Without the
+# vfsd truncate retire the pager key remains and this `pager=0` line is not printed.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=0$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
+[[expect]]
+regex = '^s36: pager truncate done$'
+
 [[expect]]
 regex = '^s36: lifecycle ok$'
 
 [[forbid]]
-regex = '(?i)panic|s36: failed'
+regex = '(?i)panic|s36: failed|s36: mapcheck leak|s36: lockcheck leak'

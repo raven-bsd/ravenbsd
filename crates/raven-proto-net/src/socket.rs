@@ -56,6 +56,20 @@ pub const OP_GETSOCKOPT: u16 = 9;
 /// client can register in an S26 event queue. The event is signalled on readable, writable,
 /// accepted or closed transitions.
 pub const OP_EVENT: u16 = 10;
+/// `CALL` operation: live, non-consuming readiness query.
+///
+/// The reply is [`Response::Value`] carrying the `READY_*` bits. The query reads no bytes, pops
+/// no UDP datagram, accepts no connection, clears no pending error and opens no socket.
+pub const OP_POLL: u16 = 11;
+
+/// Readiness bit: data may be read, or the peer finished sending (EOF is readable).
+pub const READY_READABLE: i32 = 1 << 0;
+/// Readiness bit: a write would be accepted, not rejected by shutdown or a full send buffer.
+pub const READY_WRITABLE: i32 = 1 << 1;
+/// Readiness bit: the connection is fully closed (a peer half-close is only readable).
+pub const READY_HUP: i32 = 1 << 2;
+/// Readiness bit: a pending socket error waits; the query does not consume it.
+pub const READY_ERROR: i32 = 1 << 3;
 
 /// Maximum length of an `OPEN` scheme path in bytes.
 pub const MAX_PATH: usize = 64;
@@ -229,6 +243,8 @@ pub enum Call {
     },
     /// Obtain the socket readiness event (S26 `UserEvent`, attached to the reply).
     Event,
+    /// Query the current readiness without consuming anything (K244).
+    Poll,
 }
 
 /// A request sent to `netd`.
@@ -447,6 +463,7 @@ impl Call {
                 writer.put_u16(opt.code())
             }
             Self::Event => writer.put_u16(OP_EVENT),
+            Self::Poll => writer.put_u16(OP_POLL),
         }
     }
 
@@ -488,6 +505,7 @@ impl Call {
                 Self::GetSockOpt { opt }
             }
             OP_EVENT => Self::Event,
+            OP_POLL => Self::Poll,
             _ => return Err(DecodeError::tag()),
         };
         Ok(call)

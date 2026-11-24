@@ -14,7 +14,9 @@ rust-version.workspace = true
 raven-usb-hid = { path = "../../../crates/raven-usb-hid" }
 
 [target.'cfg(target_os = "none")'.dependencies]
-raven-rt = { path = "../../rt" }
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [lints]
 workspace = true

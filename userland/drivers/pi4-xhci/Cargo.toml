@@ -25,6 +25,7 @@ usb-hid = { path = "../usb-hid" }
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-driver = { path = "../../../crates/raven-driver" }
 raven-rt = { path = "../../rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [lints]
 workspace = true

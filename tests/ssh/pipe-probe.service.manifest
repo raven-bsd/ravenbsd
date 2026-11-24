@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# One-shot probe service for the K195 pipe(2) primitive.
+
+name = "pipe-probe"
+exec = "/bin/pipe-probe"
+args = []
+readiness = "exit"
+restart = "never"
+max_restarts = 0

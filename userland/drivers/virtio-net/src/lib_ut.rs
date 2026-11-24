@@ -280,3 +280,45 @@ fn an_rx_descriptor_points_after_the_virtio_header() {
     assert!(rx_desc(&layout, 0, 0).is_none());
     assert!(rx_desc(&layout, 0, MAX_FRAME_LEN + 1).is_none());
 }
+
+#[test]
+fn mmio_transport_magic_and_version_are_spec_values() {
+    assert_eq!(mmio::MAGIC, 0x7472_6976);
+    assert_eq!(mmio::VERSION, 2);
+    assert_eq!(mmio::DEVICE_ID_NET, 1);
+    assert_eq!(mmio::WINDOW_LEN, 0x200);
+    assert_eq!(mmio::MAGIC_VALUE, 0x000);
+    assert_eq!(mmio::VERSION_REG, 0x004);
+    assert_eq!(mmio::DEVICE_ID, 0x008);
+    assert_eq!(mmio::VENDOR_ID, 0x00c);
+}
+
+#[test]
+fn mmio_queue_addresses_split_into_low_high_registers() {
+    assert_eq!(
+        mmio::address_parts(0x1234_5678_9abc_def0),
+        (0x9abc_def0, 0x1234_5678)
+    );
+    assert_eq!(mmio::address_offsets(mmio::QUEUE_DESC_LOW), (0x080, 0x084));
+    assert_eq!(
+        mmio::address_offsets(mmio::QUEUE_DRIVER_LOW),
+        (0x090, 0x094)
+    );
+    assert_eq!(
+        mmio::address_offsets(mmio::QUEUE_DEVICE_LOW),
+        (0x0a0, 0x0a4)
+    );
+}
+
+#[test]
+fn mmio_queue_registers_are_the_spec_offsets() {
+    assert_eq!(mmio::QUEUE_SEL, 0x030);
+    assert_eq!(mmio::QUEUE_NUM_MAX, 0x034);
+    assert_eq!(mmio::QUEUE_NUM, 0x038);
+    assert_eq!(mmio::QUEUE_READY, 0x044);
+    assert_eq!(mmio::QUEUE_NOTIFY, 0x050);
+    assert_eq!(mmio::INTERRUPT_STATUS, 0x060);
+    assert_eq!(mmio::INTERRUPT_ACK, 0x064);
+    assert_eq!(mmio::STATUS, 0x070);
+    assert_eq!(mmio::CONFIG, 0x100);
+}

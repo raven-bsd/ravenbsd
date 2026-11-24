@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S36 timeout-retention probe: terminate a process blocked in a timed futex wait.
+name = "s36-lifecycle"
+exec = "/bin/s36-lifecycle"
+args = ["/bin/s36-lifecycle", "timeout-check"]
+needs = []
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

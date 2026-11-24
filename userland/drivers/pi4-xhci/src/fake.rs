@@ -273,6 +273,7 @@ fn keyboard_check() -> Result<(), String> {
     let queued = service.poll().map_err(|error| format!("{error:?}"))?;
     let mut buffer = [0u8; 8];
     let read = service.read_console(&mut buffer);
+    crate::kbd::push(buffer.get(..read).unwrap_or(&[]));
     let key = core::str::from_utf8(buffer.get(..read).unwrap_or(&[])).unwrap_or("?");
     if queued != 1 || read != 1 || key != "a" {
         return Err("fake keyboard did not decode a key".into());

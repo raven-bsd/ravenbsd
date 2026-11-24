@@ -29,6 +29,7 @@ raven-elf = { path = "../crates/raven-elf" }
 raven-esr = { path = "../crates/raven-esr" }
 raven-handles = { path = "../crates/raven-handles" }
 raven-initfs = { path = "../crates/raven-initfs" }
+raven-ipiq = { path = "../crates/raven-ipiq" }
 raven-kmem = { path = "../crates/raven-kmem" }
 raven-pager = { path = "../crates/raven-pager" }
 raven-pci = { path = "../crates/raven-pci" }

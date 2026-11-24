@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# MPTCP2c1 guest API probe: one-shot, after netd publishes the net scheme.
+
+name = "mptcp-api"
+exec = "/bin/mptcp-api"
+needs = ["scheme:net", "consd"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

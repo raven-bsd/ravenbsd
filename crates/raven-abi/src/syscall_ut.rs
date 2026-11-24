@@ -58,3 +58,11 @@ fn thread_extensions_are_frozen() {
     assert_eq!(extended.tid_out, 0x2000);
     assert_eq!(extended.clear_tid_addr, 0x3000);
 }
+
+#[test]
+fn signal_syscalls_are_frozen() {
+    assert_eq!(THREAD_KICK, 0x81);
+    assert_eq!(PROC_SIGRECV_EX, 0x85);
+    assert_eq!(PROC_SIGQUEUE, 0x86);
+    assert_eq!(PROC_SIGRECV_DELIVERABLE, 2);
+}

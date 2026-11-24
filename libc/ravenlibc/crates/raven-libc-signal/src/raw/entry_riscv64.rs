@@ -23,7 +23,7 @@ __raven_sigentry:
     .hidden __rl_sigreturn_stub
     .type __rl_sigreturn_stub,%function
 __rl_sigreturn_stub:
-    li a7, 0x82
+    li a7, {sigreturn}
     ecall
     ebreak
 
@@ -33,5 +33,6 @@ __rl_sigreturn_stub:
     .align 3
 __rl_entry_fn:
     .quad 0
-"#
+"#,
+    sigreturn = const raven_abi::signal::SIGRETURN
 );

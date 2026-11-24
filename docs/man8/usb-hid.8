@@ -1,0 +1,38 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt USB-HID 8
+.Os RavenBSD
+.Sh NAME
+.Nm usb-hid
+.Nd USB HID boot-keyboard console queue
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+serves the
+.Dq kbd:
+scheme over the bounded console input queue.
+The xHCI driver pushes decoded boot-keyboard ASCII with
+.Dv WRITE
+and a reader drains it with
+.Dv READ .
+An empty queue returns
+.Er EAGAIN
+and a full queue returns
+.Er ENOSPC ;
+bytes are never silently overwritten.
+The queue holds 256 bytes.
+.Pp
+The service is optional.
+With no keyboard attached it stays up with an empty queue and does not gate
+UART getty or login.
+The US layout is selected first.
+Modifiers, Enter, Backspace and Ctrl-D map to the console bytes documented in
+.Pa docs/pi4-usb.md .
+A non-keyboard HID descriptor is rejected before it reaches the queue.
+.Sh FILES
+.Bl -tag -width /etc/services.d/usb-hid.toml -compact
+.It Pa /etc/services.d/usb-hid.toml
+Service manifest staged in the Pi 4 release profile.
+.El

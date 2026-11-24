@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: fragment-no-scrub
+# features: ipv4,fragmentation,allow,deny,fail-closed
+# reference: FreeBSD sys/netpfil/pf/pf.c:5997-6002 pf_match_rule PF_VPROTO_FRAGMENT
+#   rejects any rule that names a source or destination port.
+# support: raven-pf-known-divergence
+#
+# Donor: a fragment fails a rule with `port_op` set, so the only rule here
+# (`pass ... port 80`) cannot match and the default block applies. raven-pf
+# 0.1.0 (K273) instead skips the port attributes and admits the fragment; the
+# harness records this as KNOWN with the observed verdict and the failure is
+# reported to the pf lane. The fixture keeps the donor expectation.
+# expect-counters in_pass=0 in_block=3 out_pass=0 out_block=0 states_created=0 states_expired=0 state_hits=0
+# now direction interface proto source sport destination dport length flags expected disposition fragment translation
+0 in eth0 tcp 10.0.0.5 40000 192.0.2.10 80 1480 S  block - frag -
+1 in eth0 tcp 10.0.0.5 40000 192.0.2.10 80 1480 -  block - frag -
+2 in eth0 tcp 10.0.0.5 40000 192.0.2.10 80 48   -  block - frag -

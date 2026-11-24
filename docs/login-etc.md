@@ -28,7 +28,7 @@ not root.
 `etc/shadow` is exactly the REL1b build-time default record:
 
 ```
-root:$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:0:0:99999:7:0:0:0
+root:$6$rounds=5000$G3aRZtaEHFI9mxqP$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.:20000:0:99999:7:::
 ```
 
 No plaintext password is present. `tests/login/etc/check-etc.sh` checks the modes, the `root`

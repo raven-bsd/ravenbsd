@@ -20,10 +20,11 @@ use ufs_mkfs::{MkfsOptions, format_image};
 
 use crate::build::{self, Arch, Component};
 use crate::gpt::{GptLayout, Partition, SECTOR_SIZE};
+use crate::profiles::Profile;
 use crate::repo::Workspace;
 
 /// FreeBSD UFS type GUID `516E7CB6-6ECF-11D6-8FF8-00022D09712B`.
-const TYPE_FREEBSD_UFS: [u8; 16] = [
+pub(crate) const TYPE_FREEBSD_UFS: [u8; 16] = [
     0xb6, 0x7c, 0x6e, 0x51, 0xcf, 0x6e, 0xd6, 0x11, 0x8f, 0xf8, 0x00, 0x02, 0x2d, 0x09, 0x71, 0x2b,
 ];
 const FIRST_USABLE_LBA: u64 = 34;
@@ -165,11 +166,20 @@ pub fn stage_rootfs_spec(source_root: &Path, spec_path: &Path, staging: &Path) -
     stage_files(source_root, &spec.files, staging)
 }
 
-/// True when `rootfs/<profile>.toml` exists.
+/// Resolve a rootfs spec: `rootfs/<profile>.toml`, or the profile-adjacent
+/// `profiles/<profile>/rootfs.toml` used by the Pi 4 SD image.
+pub(crate) fn spec_path(root: &Path, profile: &str) -> Option<PathBuf> {
+    let conventional = root.join("rootfs").join(format!("{profile}.toml"));
+    if conventional.is_file() {
+        return Some(conventional);
+    }
+    let profile_adjacent = root.join("profiles").join(profile).join("rootfs.toml");
+    profile_adjacent.is_file().then_some(profile_adjacent)
+}
+
+/// True when a rootfs spec exists for `profile`.
 pub fn profile_exists(root: &Path, profile: &str) -> bool {
-    root.join("rootfs")
-        .join(format!("{profile}.toml"))
-        .is_file()
+    spec_path(root, profile).is_some()
 }
 
 /// Build the root image for `profile` when `rootfs/<profile>.toml` exists.
@@ -179,10 +189,9 @@ pub fn build_for_profile(
     profile: &str,
     release: bool,
 ) -> Result<Option<PathBuf>> {
-    let spec_path = root.join("rootfs").join(format!("{profile}.toml"));
-    if !spec_path.is_file() {
+    let Some(spec_path) = spec_path(root, profile) else {
         return Ok(None);
-    }
+    };
     let spec = load_spec(&spec_path)?;
     ensure!(
         spec.size >= 1024 * 1024 && spec.size.is_multiple_of(4096),
@@ -249,6 +258,155 @@ pub fn build_for_profile(
     let disk = root.join("build").join(arch.as_str()).join("blockd.img");
     build_root_disk(&ufs, &disk)?;
     Ok(Some(disk))
+}
+
+/// Build the raw UFS image for the Pi 4 SD root from the resolved profile's initfs
+/// userland plus the profile-adjacent rootfs spec.
+///
+/// The profile is the single source of truth for the programs, services and `/etc` files;
+/// the spec only fixes the UFS size and adds root-only files such as `/root/.keep`.
+pub(crate) fn build_sd_root(
+    root: &Path,
+    arch: Arch,
+    profile_name: &str,
+    release: bool,
+) -> Result<PathBuf> {
+    let Some(spec_path) = spec_path(root, profile_name) else {
+        bail!("no rootfs spec for profile `{profile_name}`");
+    };
+    let spec = load_spec(&spec_path)?;
+    ensure!(
+        spec.size >= 1024 * 1024 && spec.size.is_multiple_of(4096),
+        "{}: rootfs size must be a 4 KiB multiple of at least 1 MiB",
+        spec_path.display()
+    );
+    let profile = Profile::load(root, profile_name)?;
+    let workspace = Workspace::load(root)?;
+
+    let packages: Vec<String> = profile
+        .initfs
+        .programs
+        .iter()
+        .map(|program| program.package.clone())
+        .collect();
+    if !packages.is_empty() {
+        let code = build::run(&workspace, Component::User, arch, release, &packages, false)?;
+        if code != 0 {
+            bail!("rootfs user program build failed with exit code {code}");
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    for program in &profile.initfs.programs {
+        if !seen.insert(program.path.clone()) {
+            bail!(
+                "{}: duplicate rootfs path `{}`",
+                spec_path.display(),
+                program.path
+            );
+        }
+    }
+    for file in &profile.initfs.files {
+        if !seen.insert(file.path.clone()) {
+            bail!(
+                "{}: duplicate rootfs path `{}`",
+                spec_path.display(),
+                file.path
+            );
+        }
+    }
+    let mut spec_seen = BTreeSet::new();
+    for file in &spec.files {
+        if !spec_seen.insert(file.path.clone()) {
+            bail!(
+                "{}: duplicate rootfs path `{}`",
+                spec_path.display(),
+                file.path
+            );
+        }
+        // A spec file may overlay a profile file (for example the post-pivot
+        // /etc/mounts); it is staged after the profile below.
+    }
+
+    let staging = root
+        .join("build")
+        .join(arch.as_str())
+        .join("rootfs-staging");
+    reset_directory(&staging)?;
+    for program in &profile.initfs.programs {
+        let source = build::artifact_path(root, arch, Component::User, &program.package);
+        let destination = staging_path(&spec_path, &program.path, &staging)?;
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("cannot create {}", parent.display()))?;
+        }
+        fs::copy(&source, &destination).with_context(|| {
+            format!(
+                "cannot copy rootfs program {} -> {}",
+                source.display(),
+                destination.display()
+            )
+        })?;
+        set_mode(&destination, 0o755)?;
+    }
+    for file in &profile.initfs.files {
+        stage_root_file(
+            root,
+            arch,
+            &staging,
+            &spec_path,
+            &file.src,
+            &file.path,
+            file.mode,
+            file.generated,
+        )?;
+    }
+    for file in &spec.files {
+        stage_root_file(
+            root,
+            arch,
+            &staging,
+            &spec_path,
+            &file.src,
+            &file.path,
+            file.mode,
+            file.generated,
+        )?;
+    }
+
+    let ufs = root.join("build").join(arch.as_str()).join("rootfs.ufs");
+    build_ufs_root(&staging, spec.size, &ufs)?;
+    Ok(ufs)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stage_root_file(
+    source_root: &Path,
+    arch: Arch,
+    staging: &Path,
+    spec_path: &Path,
+    src: &str,
+    path: &str,
+    mode: u32,
+    generated: bool,
+) -> Result<()> {
+    let source = crate::initfs::source_path(source_root, arch, src);
+    if !source.is_file() && !generated {
+        bail!("rootfs source `{src}` does not exist");
+    }
+    let destination = staging_path(spec_path, path, staging)?;
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    fs::copy(&source, &destination).with_context(|| {
+        format!(
+            "cannot copy rootfs file {} -> {}",
+            src,
+            destination.display()
+        )
+    })?;
+    set_mode(&destination, mode)
 }
 
 fn load_spec(path: &Path) -> Result<RootSpec> {
@@ -332,3 +490,7 @@ fn write_at(disk: &mut [u8], offset: u64, bytes: &[u8]) -> Result<()> {
         .copy_from_slice(bytes);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "rootfs_ut.rs"]
+mod tests;

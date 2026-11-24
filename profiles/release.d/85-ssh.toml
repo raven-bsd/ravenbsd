@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K195: upstream OpenSSH 10.6p2 add-on service (DR-65). `addons/ssh/build.sh`
+# builds the unmodified binaries; this fragment only stages them read-only into
+# the release/UFS image and installs the service manifests. No SSH code lives in
+# the base tree.
+#
+# The build output must exist before the image build (sh addons/ssh/build.sh).
+# The split server binaries are staged at the paths the listener embeds from
+# K212: /usr/libexec/sshd-session and /usr/libexec/sshd-auth.
+#
+# `{arch}` is the image target, not the host: the add-on is built per arch, and
+# staging a foreign-arch ELF is refused by the initfs builder (the target loader
+# would reject it as `bad ELF: BadMachine`).
+
+[[initfs.files]]
+src = "build/ssh/{arch}/bin/sshd"
+path = "/sbin/sshd"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/{arch}/bin/ssh"
+path = "/bin/ssh"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/{arch}/bin/ssh-keygen"
+path = "/bin/ssh-keygen"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/{arch}/libexec/sshd-session"
+path = "/usr/libexec/sshd-session"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/ssh/{arch}/libexec/sshd-auth"
+path = "/usr/libexec/sshd-auth"
+mode = 0o755
+generated = true
+
+[[initfs.programs]]
+package = "raven-ptyd"
+path = "/sbin/ptyd"
+
+[[initfs.files]]
+src = "profiles/ssh.d/sshd_config"
+path = "/etc/ssh/sshd_config"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/sshd.service.manifest"
+path = "/etc/services.d/sshd.toml"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/ssh-hostkeys.service.manifest"
+path = "/etc/services.d/ssh-hostkeys.toml"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/ptyd.service.manifest"
+path = "/etc/services.d/ptyd.toml"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/etc-ssh.keep"
+path = "/etc/ssh/.keep"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/ssh.d/var-empty.keep"
+path = "/var/empty/.keep"
+mode = 0o644

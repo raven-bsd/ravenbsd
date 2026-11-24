@@ -6,12 +6,16 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 
+use crate::filter::{FilterDevice, FilterLog, FilterPolicy, new_log};
+use crate::network::StaticConfig;
 use raven_abi::errno::Errno;
 use raven_netcore::{
-    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, RouteEntry,
-    SocketId, SocketState, SocketTransport,
+    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, Readiness,
+    RouteEntry, SocketId, SocketState, SocketTransport,
 };
 use raven_proto_fs::{S_IFSOCK, Stat};
 use raven_proto_net::{
@@ -21,7 +25,10 @@ use raven_proto_net::{
     SOCKET_STATE_ESTABLISHED, SOCKET_STATE_FIN_WAIT_1, SOCKET_STATE_FIN_WAIT_2, SOCKET_STATE_ICMP,
     SOCKET_STATE_LAST_ACK, SOCKET_STATE_LISTEN, SOCKET_STATE_SYN_RECEIVED, SOCKET_STATE_SYN_SENT,
     SOCKET_STATE_TIME_WAIT, SOCKET_STATE_UDP, SOCKET_TCP, SOCKET_UDP, SocketEntry, Transport, path,
-    socket::{Call, Endpoint, Response, SockOpt, SocketRequest},
+    socket::{
+        Call, Endpoint, READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE, Response, SockOpt,
+        SocketRequest,
+    },
 };
 
 /// Mode reported by `FSTAT` for a socket file.
@@ -30,6 +37,8 @@ pub const SOCKET_FILE: u32 = S_IFSOCK | 0o666;
 const LOOPBACK_NAME: &str = "lo";
 const LOOPBACK_MTU: u16 = 65_535;
 const NIC_NAME: &str = "eth0";
+/// QEMU user-mode (slirp) DNS server; the fixed address is `10.0.2.15/24`, gateway `10.0.2.2`.
+const QEMU_USER_DNS: [u8; 4] = [10, 0, 2, 3];
 /// NIC frame rings are drained at least this often even when no stack timer is armed.
 const NIC_POLL_MS: u64 = 10;
 const MAX_OPEN_FILES: usize = 256;
@@ -60,6 +69,8 @@ pub enum NicAddressing {
     QemuUser,
     /// Platform NIC: no address is published until a validated DHCP lease arrives.
     DhcpFirst,
+    /// Explicit static address, prefix and gateway; no DHCP client is started.
+    Static,
 }
 
 /// Static NIC configuration supplied by the target glue after `nic:info`.
@@ -110,10 +121,36 @@ impl NicConfig {
         }
     }
 
+    /// The explicit static configuration: no DHCP, publish immediately.
+    #[must_use]
+    pub const fn static_config(
+        mac: [u8; 6],
+        mtu: u16,
+        addr: [u8; 4],
+        prefix: u8,
+        gateway: Option<[u8; 4]>,
+    ) -> Self {
+        Self {
+            mac,
+            mtu,
+            addr,
+            prefix,
+            gateway,
+            dhcp: false,
+            addressing: NicAddressing::Static,
+        }
+    }
+
     /// Whether this is the QEMU fixed-address mode.
     #[must_use]
     pub const fn is_qemu_user(self) -> bool {
         matches!(self.addressing, NicAddressing::QemuUser)
+    }
+
+    /// Whether the stack should configure an IPv4 address without waiting for DHCP.
+    #[must_use]
+    pub const fn is_configured(self) -> bool {
+        !matches!(self.addressing, NicAddressing::DhcpFirst)
     }
 }
 
@@ -133,6 +170,7 @@ trait SocketCore {
     fn add_route(&mut self, route: RouteEntry) -> Result<(), Errno>;
     fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno>;
     fn socket_table(&self) -> Vec<CoreSocket>;
+    fn readiness(&self, s: SocketId) -> Result<Readiness, Errno>;
     fn interface_counters(&self) -> Option<InterfaceCounters>;
     fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno>;
     fn icmp_echo(
@@ -146,7 +184,12 @@ trait SocketCore {
     fn icmp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno>;
     fn poll(&mut self, now_ms: i64) -> Vec<Event>;
     fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64>;
-    fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno>;
+    fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno>;
     fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno>;
     fn tcp_connect(
         &mut self,
@@ -173,6 +216,7 @@ trait SocketCore {
     fn peer_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)>;
     fn set_socket_option(&mut self, s: SocketId, option: u32, value: i32) -> Result<(), Errno>;
     fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno>;
+    fn take_socket_error(&mut self, s: SocketId) -> Result<i32, Errno>;
 }
 
 impl<D: Device> SocketCore for NetCore<D> {
@@ -198,6 +242,10 @@ impl<D: Device> SocketCore for NetCore<D> {
 
     fn socket_table(&self) -> Vec<CoreSocket> {
         NetCore::socket_table(self)
+    }
+
+    fn readiness(&self, s: SocketId) -> Result<Readiness, Errno> {
+        NetCore::readiness(self, s)
     }
 
     fn interface_counters(&self) -> Option<InterfaceCounters> {
@@ -231,8 +279,13 @@ impl<D: Device> SocketCore for NetCore<D> {
         NetCore::next_poll_delay_ms(self, now_ms)
     }
 
-    fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
-        NetCore::tcp_listen(self, port, backlog)
+    fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
+        NetCore::tcp_listen_reuse(self, port, backlog, reuse_addr)
     }
 
     fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno> {
@@ -299,6 +352,10 @@ impl<D: Device> SocketCore for NetCore<D> {
     fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno> {
         NetCore::get_socket_option(self, s, option)
     }
+
+    fn take_socket_error(&mut self, s: SocketId) -> Result<i32, Errno> {
+        NetCore::take_socket_error(self, s)
+    }
 }
 
 /// One accepted connection waiting for its client-side file open.
@@ -332,6 +389,9 @@ struct SocketFile {
     transport: Transport,
     interface: Interface,
     socket: Option<SocketId>,
+    /// Every core listener for this file. A wildcard (`0.0.0.0`) bind creates one entry per
+    /// available core; every other socket keeps this empty and uses `interface`/`socket`.
+    listeners: Vec<(Interface, SocketId)>,
     listener: bool,
     path_endpoint: Endpoint,
     local: Endpoint,
@@ -354,6 +414,7 @@ impl SocketFile {
             transport,
             interface,
             socket: None,
+            listeners: Vec::new(),
             listener: false,
             path_endpoint,
             local: if icmp {
@@ -382,6 +443,7 @@ impl SocketFile {
             transport: accepted.transport,
             interface: accepted.interface,
             socket: Some(accepted.socket),
+            listeners: Vec::new(),
             listener: false,
             path_endpoint: accepted.local,
             local: accepted.local,
@@ -405,6 +467,20 @@ impl SocketFile {
             self.path_endpoint.port
         }
     }
+
+    /// Every core listener this file owns: the wildcard set when present, otherwise the single
+    /// legacy `(interface, socket)` pair.
+    fn listener_entries(&self) -> Vec<(Interface, SocketId)> {
+        if !self.listeners.is_empty() {
+            self.listeners.clone()
+        } else if self.listener {
+            self.socket
+                .map(|id| vec![(self.interface, id)])
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 struct Control {
@@ -422,13 +498,18 @@ struct NicControl {
 
 /// The host-testable `net:` server.
 pub struct Netd<D: Device> {
-    core: NetCore<D>,
+    core: NetCore<FilterDevice<D>>,
+    filter_log: FilterLog,
     nic: Option<Box<dyn SocketCore>>,
     nic_config: Option<NicConfig>,
     nic_control: Option<NicControl>,
     nic_lease: Option<DhcpLease>,
+    nic_dns: Vec<[u8; 4]>,
     release_ping: Option<ReleasePing>,
     files: BTreeMap<u64, File>,
+    /// Open-file reference count per file id. `open`/`accept` starts at one, `dup`/fork adds
+    /// one, `close` drops one; the File/socket is released only at zero.
+    file_refs: BTreeMap<u64, u32>,
     next_file: u64,
     accepted: BTreeMap<u32, Accepted>,
     next_accept: u32,
@@ -440,16 +521,26 @@ impl<D: Device> Netd<D> {
     /// Create the server over `device` and configure IPv4 loopback.
     #[must_use]
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
-        let mut core = NetCore::new(device, mac, now_ms);
+        Self::with_filter(device, mac, now_ms, None)
+    }
+
+    /// Create the server with a packet-filter policy on the loopback interface.
+    #[must_use]
+    pub fn with_filter(device: D, mac: [u8; 6], now_ms: i64, policy: Option<FilterPolicy>) -> Self {
+        let filter_log = policy.as_ref().map_or_else(new_log, FilterPolicy::log);
+        let mut core = NetCore::new(FilterDevice::new(device, policy, "lo"), mac, now_ms);
         core.set_ipv4(Ipv4Addr::new(127, 0, 0, 1), 8, None);
         Self {
             core,
+            filter_log,
             nic: None,
             nic_config: None,
             nic_control: None,
             nic_lease: None,
+            nic_dns: Vec::new(),
             release_ping: None,
             files: BTreeMap::new(),
+            file_refs: BTreeMap::new(),
             next_file: 1,
             accepted: BTreeMap::new(),
             next_accept: 1,
@@ -464,8 +555,23 @@ impl<D: Device> Netd<D> {
 
     /// Attach the persistent NIC as a second socket core.
     pub fn attach_nic<N: Device + 'static>(&mut self, device: N, config: NicConfig, now_ms: i64) {
-        let mut core = NetCore::new(device, config.mac, now_ms);
-        if config.is_qemu_user() {
+        self.attach_nic_with_filter(device, config, now_ms, None);
+    }
+
+    /// Attach the NIC with a packet-filter policy on `eth0`.
+    pub fn attach_nic_with_filter<N: Device + 'static>(
+        &mut self,
+        device: N,
+        config: NicConfig,
+        now_ms: i64,
+        policy: Option<FilterPolicy>,
+    ) {
+        let mut core = NetCore::new(
+            FilterDevice::new(device, policy, "eth0"),
+            config.mac,
+            now_ms,
+        );
+        if config.is_configured() {
             core.set_ipv4(
                 Ipv4Addr::from_octets(config.addr),
                 config.prefix,
@@ -478,12 +584,59 @@ impl<D: Device> Netd<D> {
         self.nic = Some(Box::new(core));
         self.nic_config = Some(config);
         self.nic_lease = None;
-        self.nic_control = config.is_qemu_user().then_some(NicControl {
+        self.nic_dns.clear();
+        self.nic_control = config.is_configured().then_some(NicControl {
             addr: config.addr,
             prefix: config.prefix,
             gateway: config.gateway,
             up: true,
         });
+        if config.is_qemu_user() {
+            // QEMU user-mode has an immediate fixed address but is not `Static`; resolvd still
+            // asks for `net:`'s DHCP lease. Publish the synthetic lease with slirp's DNS so the
+            // resolver starts instead of reporting ENOENT for a configured interface.
+            let mut dns = Vec::new();
+            dns.push(QEMU_USER_DNS);
+            self.set_nic_dns(dns);
+        }
+    }
+
+    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static or
+    /// QEMU fixed-address mode.
+    pub fn set_nic_dns(&mut self, dns: Vec<[u8; 4]>) {
+        self.nic_dns = dns;
+        self.nic_lease = self.static_lease();
+    }
+
+    /// Apply the static parameters after a late configuration read.
+    ///
+    /// The boot path reads the drop-in before attaching the NIC. This method exists for a
+    /// configuration that arrives after a default attach: it replaces the published address
+    /// and publishes the DNS list without restarting the stack.
+    pub fn apply_static(&mut self, config: &StaticConfig) {
+        let Some(nic_config) = self.nic_config else {
+            return;
+        };
+        let updated = NicConfig::static_config(
+            nic_config.mac,
+            nic_config.mtu,
+            config.addr,
+            config.prefix,
+            config.gateway,
+        );
+        self.nic_config = Some(updated);
+        self.nic_control = Some(NicControl {
+            addr: config.addr,
+            prefix: config.prefix,
+            gateway: config.gateway,
+            up: true,
+        });
+        self.core_mut(Interface::Nic).set_ipv4(
+            Ipv4Addr::from_octets(config.addr),
+            config.prefix,
+            config.gateway.map(Ipv4Addr::from_octets),
+        );
+        self.set_nic_dns(config.dns.clone());
     }
 
     /// Whether a NIC core is attached.
@@ -509,13 +662,37 @@ impl<D: Device> Netd<D> {
         Some(config)
     }
 
-    /// The live NIC DHCP lease, if the stack has one or a platform lease was applied.
+    /// The live NIC DHCP lease, if the stack has one or a static/platform lease was applied.
     #[must_use]
     pub fn dhcp_lease(&self) -> Option<DhcpLease> {
         self.nic
             .as_ref()
             .and_then(|nic| nic.dhcp_lease())
             .or_else(|| self.nic_lease.clone())
+    }
+
+    fn static_lease(&self) -> Option<DhcpLease> {
+        let config = self.nic_config?;
+        if !matches!(
+            config.addressing,
+            NicAddressing::Static | NicAddressing::QemuUser
+        ) {
+            return None;
+        }
+        let control = self.nic_control.as_ref()?;
+        Some(DhcpLease {
+            address: Ipv4Addr::from_octets(control.addr),
+            prefix_len: control.prefix,
+            router: control.gateway.map(Ipv4Addr::from_octets),
+            dns: self
+                .nic_dns
+                .iter()
+                .map(|server| Ipv4Addr::from_octets(*server))
+                .collect(),
+            renew_at_ms: None,
+            rebind_at_ms: None,
+            expires_at_ms: None,
+        })
     }
 
     /// Apply one validated platform DHCP lease and publish `eth0`.
@@ -624,6 +801,11 @@ impl<D: Device> Netd<D> {
         }
     }
 
+    /// Take the pending packet-filter log lines from every interface.
+    pub fn take_filter_log(&mut self) -> Vec<String> {
+        core::mem::take(&mut *self.filter_log.borrow_mut())
+    }
+
     /// Number of open socket files (control files are excluded).
     #[must_use]
     pub fn socket_files(&self) -> usize {
@@ -664,7 +846,10 @@ impl<D: Device> Netd<D> {
             .iter()
             .filter_map(|(file, state)| match state {
                 File::Socket(state)
-                    if state.socket == Some(socket) && state.interface == interface =>
+                    if (state.socket == Some(socket) && state.interface == interface)
+                        || state.listeners.iter().any(|(core_interface, id)| {
+                            *core_interface == interface && *id == socket
+                        }) =>
                 {
                     Some(*file)
                 }
@@ -698,6 +883,7 @@ impl<D: Device> Netd<D> {
         let id = self.next_file;
         self.next_file = self.next_file.checked_add(1).ok_or(Errno::ENFILE)?;
         self.files.insert(id, file);
+        self.file_refs.insert(id, 1);
         Ok(id)
     }
 
@@ -745,7 +931,12 @@ impl<D: Device> Netd<D> {
         }
         let id = id.ok_or(Errno::ENOTCONN)?;
         match transport {
-            Transport::Tcp => self.core_mut(interface).send(id, buffer),
+            // POSIX write on a connection whose peer has fully closed is EPIPE, not the
+            // core's internal not-connected state; the SSH session close path depends on it.
+            Transport::Tcp => match self.core_mut(interface).send(id, buffer) {
+                Err(Errno::ENOTCONN) => Err(Errno::EPIPE),
+                other => other,
+            },
             Transport::Udp => {
                 let to = peer.ok_or(Errno::EADDRNOTAVAIL)?;
                 self.core_mut(interface).udp_send_to(
@@ -788,20 +979,36 @@ impl<D: Device> Netd<D> {
         }
     }
 
-    /// Close `file` and its socket.
-    pub fn close(&mut self, file: u64) -> Result<(), Errno> {
-        let file = self.files.remove(&file).ok_or(Errno::EBADF)?;
-        if let File::Socket(socket) = file
-            && let Some(id) = socket.socket
-        {
-            let _ = self.core_mut(socket.interface).close(id);
+    /// Drop one reference to `file`; return `true` when this was the last one.
+    ///
+    /// The File, its core socket and its readiness event stay alive while any descriptor,
+    /// including a fork-inherited one, still names the file.
+    pub fn close(&mut self, file: u64) -> Result<bool, Errno> {
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        if *refs > 1 {
+            *refs -= 1;
+            return Ok(false);
         }
-        Ok(())
+        self.file_refs.remove(&file);
+        let file = self.files.remove(&file).ok_or(Errno::EBADF)?;
+        if let File::Socket(socket) = file {
+            if socket.listeners.is_empty() {
+                if let Some(id) = socket.socket {
+                    let _ = self.core_mut(socket.interface).close(id);
+                }
+            } else {
+                for (interface, id) in socket.listeners {
+                    let _ = self.core_mut(interface).close(id);
+                }
+            }
+        }
+        Ok(true)
     }
 
-    /// Duplicate a file description; the kernel owns the handle duplication.
+    /// Account for a duplicate/fork-inherited reference to `file`.
     pub fn dup(&mut self, file: u64) -> Result<u64, Errno> {
-        self.files.get(&file).ok_or(Errno::EBADF)?;
+        let refs = self.file_refs.get_mut(&file).ok_or(Errno::EBADF)?;
+        *refs = refs.checked_add(1).ok_or(Errno::EMFILE)?;
         Ok(file)
     }
 
@@ -1097,6 +1304,7 @@ impl<D: Device> Netd<D> {
             Call::GetPeerName => self.endpoint_response(file, true),
             Call::SetSockOpt { opt, value } => self.set_option(file, opt, value),
             Call::GetSockOpt { opt } => self.get_option(file, opt),
+            Call::Poll => self.readiness(file),
             // The target glue creates the S26 event handle and attaches it; the pure core has no
             // kernel handle table.
             Call::Event => Err(Errno::EOPNOTSUPP),
@@ -1142,7 +1350,7 @@ impl<D: Device> Netd<D> {
     }
 
     fn listen(&mut self, file: u64, backlog: u16) -> Result<Response, Errno> {
-        let (interface, transport, port, has_socket) =
+        let (interface, transport, port, has_socket, wildcard, reuse_addr) =
             match self.files.get(&file).ok_or(Errno::EBADF)? {
                 File::Control => return Err(Errno::EINVAL),
                 File::Socket(socket) => (
@@ -1150,6 +1358,8 @@ impl<D: Device> Netd<D> {
                     socket.transport,
                     socket.port_for_listen(),
                     socket.socket.is_some(),
+                    socket.local.ip == [0, 0, 0, 0],
+                    socket.reuse_addr,
                 ),
             };
         if has_socket {
@@ -1158,14 +1368,48 @@ impl<D: Device> Netd<D> {
         if transport != Transport::Tcp {
             return Err(Errno::EOPNOTSUPP);
         }
-        let id = self
-            .core_mut(interface)
-            .tcp_listen(port, backlog as usize)?;
+        // A wildcard bind is one POSIX socket visible on every interface. Raven keeps one
+        // `Stack` per interface, so register the same port on every available core and aggregate
+        // accept/readiness over them. This is the per-interface divergence recorded in the
+        // report: NetBSD `solisten`/`soreceive` demultiplex one socket by local port.
+        let mut interfaces = Vec::with_capacity(2);
+        if wildcard {
+            interfaces.push(Interface::Loopback);
+            if self.nic.is_some() {
+                interfaces.push(Interface::Nic);
+            }
+        } else {
+            interfaces.push(interface);
+        }
+        let mut created: Vec<(Interface, SocketId)> = Vec::with_capacity(interfaces.len());
+        for core_interface in interfaces {
+            match self
+                .core_mut(core_interface)
+                .tcp_listen_reuse(port, backlog as usize, reuse_addr)
+            {
+                Ok(id) => created.push((core_interface, id)),
+                Err(error) => {
+                    for (created_interface, id) in created {
+                        let _ = self.core_mut(created_interface).close(id);
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        // Keep the file's original interface as the primary so per-file callers (doorbell
+        // identity and the getsockname fallback) stay stable.
+        let primary = created
+            .iter()
+            .position(|(core_interface, _)| *core_interface == interface)
+            .unwrap_or(0);
+        let (primary_interface, primary_id) = created[primary];
         let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
             File::Socket(socket) => socket,
             File::Control => return Err(Errno::EINVAL),
         };
-        socket.socket = Some(id);
+        socket.socket = Some(primary_id);
+        socket.interface = primary_interface;
+        socket.listeners = created;
         socket.listener = true;
         socket.local.port = port;
         socket.bound = true;
@@ -1174,20 +1418,26 @@ impl<D: Device> Netd<D> {
     }
 
     fn accept(&mut self, file: u64) -> Result<Response, Errno> {
-        let (interface, listener, local) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+        let (listeners, local) = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => {
                 if !socket.listener {
                     return Err(Errno::EINVAL);
                 }
-                (
-                    socket.interface,
-                    socket.socket.ok_or(Errno::EBADF)?,
-                    socket.local,
-                )
+                (socket.listener_entries(), socket.local)
             }
         };
-        let Some(socket) = self.core_mut(interface).tcp_accept(listener)? else {
+        if listeners.is_empty() {
+            return Err(Errno::EBADF);
+        }
+        let mut accepted = None;
+        for (interface, listener) in listeners {
+            if let Some(socket) = self.core_mut(interface).tcp_accept(listener)? {
+                accepted = Some((interface, socket));
+                break;
+            }
+        }
+        let Some((interface, socket)) = accepted else {
             return Err(Errno::EAGAIN);
         };
         if self.accepted.len() >= MAX_PENDING_ACCEPTS {
@@ -1352,19 +1602,80 @@ impl<D: Device> Netd<D> {
         Ok(Response::Ok)
     }
 
+    /// Live readiness of the socket behind an open file.
+    ///
+    /// A wildcard listener aggregates the level of every core listener; every other file runs the
+    /// core predicate on its one interface and socket id. A control file and a file without a
+    /// socket have a defined error instead of a made-up "ready" bit.
+    pub fn socket_readiness(&self, file: u64) -> Result<Readiness, Errno> {
+        let (interface, socket, listeners) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+            File::Control => return Err(Errno::EINVAL),
+            File::Socket(socket) => (socket.interface, socket.socket, socket.listeners.clone()),
+        };
+        if listeners.is_empty() {
+            let id = socket.ok_or(Errno::ENOTCONN)?;
+            return self.core_ref(interface).readiness(id);
+        }
+        // A wildcard listener is one POSIX socket over several cores: the level is the OR of
+        // every core's listener (pending connections on any interface). The core predicate is the
+        // sole level source for every socket: FreeBSD `SBS_CANTSENDMORE` keeps POLLOUT after
+        // SHUT_WR (K279).
+        let mut ready = Readiness::NONE;
+        for (core_interface, id) in listeners {
+            let level = self.core_ref(core_interface).readiness(id)?;
+            ready.readable |= level.readable;
+            ready.writable |= level.writable;
+            ready.hup |= level.hup;
+            ready.error |= level.error;
+        }
+        Ok(ready)
+    }
+
+    /// Answer the live readiness query for an open socket file.
+    fn readiness(&self, file: u64) -> Result<Response, Errno> {
+        let ready = self.socket_readiness(file)?;
+        let mut bits = 0i32;
+        if ready.readable {
+            bits |= READY_READABLE;
+        }
+        if ready.writable {
+            bits |= READY_WRITABLE;
+        }
+        if ready.hup {
+            bits |= READY_HUP;
+        }
+        if ready.error {
+            bits |= READY_ERROR;
+        }
+        Ok(Response::Value(bits))
+    }
+
     fn get_option(&mut self, file: u64, opt: SockOpt) -> Result<Response, Errno> {
+        let (interface, id) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+            File::Control => return Err(Errno::EINVAL),
+            File::Socket(socket) => (socket.interface, socket.socket),
+        };
+        // `SO_ERROR` is read-once and cleared (FreeBSD `sogetopt`). The core owns the pending
+        // error; netd must not answer from a zero default.
+        if opt == SockOpt::Error {
+            return match id {
+                Some(id) => self
+                    .core_mut(interface)
+                    .take_socket_error(id)
+                    .map(Response::Value),
+                None => Ok(Response::Value(0)),
+            };
+        }
+        if let Some(id) = id {
+            return self
+                .core_ref(interface)
+                .get_socket_option(id, u32::from(opt.code()))
+                .map(Response::Value);
+        }
         let socket = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => socket,
         };
-        if let Some(id) = socket.socket
-            && opt != SockOpt::Error
-        {
-            return self
-                .core_ref(socket.interface)
-                .get_socket_option(id, u32::from(opt.code()))
-                .map(Response::Value);
-        }
         let value = match opt {
             SockOpt::ReuseAddr => i32::from(socket.reuse_addr),
             SockOpt::RcvBuf => socket.rcvbuf,
@@ -1379,20 +1690,24 @@ impl<D: Device> Netd<D> {
         let Some(File::Socket(socket)) = self.files.get(&file) else {
             return;
         };
-        let Some(id) = socket.socket else {
-            return;
-        };
-        let interface = socket.interface;
         let values = [
             (SockOpt::ReuseAddr, i32::from(socket.reuse_addr)),
             (SockOpt::RcvBuf, socket.rcvbuf),
             (SockOpt::SndBuf, socket.sndbuf),
             (SockOpt::TcpNoDelay, i32::from(socket.nodelay)),
         ];
-        for (option, value) in values {
-            let _ = self
-                .core_mut(interface)
-                .set_socket_option(id, u32::from(option.code()), value);
+        let mut targets = socket.listener_entries();
+        if targets.is_empty()
+            && let Some(id) = socket.socket
+        {
+            targets.push((socket.interface, id));
+        }
+        for (interface, id) in targets {
+            for &(option, value) in &values {
+                let _ =
+                    self.core_mut(interface)
+                        .set_socket_option(id, u32::from(option.code()), value);
+            }
         }
     }
 
@@ -1527,7 +1842,14 @@ impl<D: Device> Netd<D> {
                 let Some(interface) = self.interface_for_name(name.as_str()) else {
                     return self.iface_error(response, Errno::ENODEV);
                 };
-                let Some(lease) = self.core_ref(interface).dhcp_lease() else {
+                // The NIC lease may be a live DHCP lease or the synthetic static lease that
+                // carries the configured DNS list to resolvd.
+                let lease = if interface == Interface::Nic {
+                    self.dhcp_lease()
+                } else {
+                    self.core_ref(interface).dhcp_lease()
+                };
+                let Some(lease) = lease else {
                     return self.iface_error(response, Errno::ENOENT);
                 };
                 let mut offset = 0usize;

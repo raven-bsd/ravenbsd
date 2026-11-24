@@ -17,18 +17,22 @@ use raven_libc_abi::structs::Msghdr;
 use raven_libc_net::NetEnv;
 use raven_libc_net::backend_platform::PlatformBackend;
 use raven_libc_net::fdglue::FdGlue;
-use raven_libc_net::{Net, NoUnix, SendErr};
+use raven_libc_net::{Net, SendErr};
 use raven_libc_platform::backend::RealSys;
 
 use crate::ffi::platform::ShellLock;
 
 mod accept;
+mod duplex;
+mod getpeereid;
 mod getsockname;
 #[path = "socket.rs"]
 mod listen;
 mod recv;
 mod sendmmsg;
 mod socketpair;
+
+use duplex::ShellUnix;
 
 /// The C `socklen_t`.
 pub(crate) type SockLen = core::ffi::c_uint;
@@ -63,7 +67,7 @@ pub(crate) type ShellNet = Net<
     PlatformBackend<'static, RealSys, ShellLock>,
     FdGlue<'static, RealSys, ShellLock>,
     ShellEnv,
-    NoUnix,
+    ShellUnix,
 >;
 
 const UNINIT: u8 = 0;
@@ -88,10 +92,11 @@ pub(crate) fn net() -> &'static ShellNet {
         let platform = crate::ffi::platform::global();
         // SAFETY: this caller won the one-shot initialisation and owns the slot.
         unsafe {
-            (&mut *NET.0.get()).write(Net::new(
+            (&mut *NET.0.get()).write(Net::with_unix(
                 PlatformBackend::new(platform),
                 FdGlue::new(platform),
                 ShellEnv,
+                Some(ShellUnix),
             ));
         }
         STATE.store(READY, Ordering::Release);
@@ -106,6 +111,16 @@ pub(crate) fn net() -> &'static ShellNet {
 /// Run `f` with the process socket object.
 pub(crate) fn with_net<R>(f: impl FnOnce(&ShellNet) -> R) -> R {
     f(net())
+}
+
+/// Refresh the socket records' cached handles after the child's fork hook duplicated them.
+pub(crate) fn refresh_after_fork() {
+    with_net(|net| net.refresh_handles());
+}
+
+/// Publish the live socket records to the platform before `execve` serializes the fd map.
+pub(crate) fn sync_exec_meta() {
+    with_net(|net| net.sync_meta());
 }
 
 /// The ABI `struct mmsghdr`.

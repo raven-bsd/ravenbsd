@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K371 post-K273 release network regression: the default release profile has no
+# /etc/pf.conf, so netd must log `pf absent` and still reach `ready`. The pre-step
+# boots the release image on the K194 tap and proves host/guest ping; this case then
+# boots the same release image on QEMU user networking to prove the getty path and
+# the default netd remain unchanged. `netd: pf loaded` is forbidden: the default
+# profile must not pick up the pf ruleset.
+
+name = "net-postpf-default"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/qtest/cases/net-postpf/default.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^netd: pf absent$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: ready$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '^netd: pf loaded'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 180
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

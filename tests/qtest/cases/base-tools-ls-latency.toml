@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K133 bounded regression for the demo `ls` latency. The Raven default `slash` indicator used to
+# stat every entry; a Scheme stat costs tens of milliseconds, so `ls /bin` took 1-4 s and the
+# demo felt like a 2-3 s hang. The fixed default listing is ~0.5-0.8 s. The 2 s step bounds are
+# normal time plus margin, not a raised cap; they fail if the per-entry stat path returns.
+
+name = "base-tools-ls-latency"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 150
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cat$'
+timeout_secs = 2
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 2
+
+[[step]]
+send = "ls /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^bin/$'
+timeout_secs = 2
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 2
+
+[[step]]
+send = "exit\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 15

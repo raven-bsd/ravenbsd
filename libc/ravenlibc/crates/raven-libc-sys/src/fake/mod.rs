@@ -53,6 +53,8 @@ pub struct Kernel {
     pub children: Vec<ChildProcess>,
     /// Next lineage root id.
     pub next_root: u32,
+    /// Next fake pipe id.
+    pub next_pipe: u32,
     /// Current namespace prefixes.
     pub namespace: Vec<Vec<u8>>,
     /// Memory model.
@@ -86,6 +88,7 @@ impl Kernel {
             handles: HandleTable::for_self(),
             children: Vec::new(),
             next_root: 1,
+            next_pipe: 0,
             namespace: Vec::new(),
             memory: Memory::new(),
             clock: Clock::new(),
@@ -228,6 +231,10 @@ impl Kernel {
 
     /// Dispatch one syscall against this kernel.
     pub fn call(&mut self, number: usize, args: [usize; 6]) -> Result<usize, Errno> {
+        // Raw PIPE2 (`kernel/src/syscall/pipe.rs:21`) is not a raven-abi `Syscall` variant.
+        if number == 0x6f {
+            return self.sys_pipe2(args);
+        }
         let call = Syscall::from_usize(number).ok_or(Errno::ENOSYS)?;
         match call {
             // kernel/src/syscall/basic.rs:20-27
@@ -713,6 +720,37 @@ impl Kernel {
             Object::SchemeFile { .. } => 0,
             _ => 0,
         }
+    }
+
+    fn sys_pipe2(&mut self, args: [usize; 6]) -> Result<usize, Errno> {
+        // `kernel/src/process/pipe.rs:35-38` and `:149`.
+        const O_NONBLOCK: u32 = 0o4000;
+        const O_CLOEXEC: u32 = 0o2000000;
+        let flags = u32::try_from(args[1]).map_err(|_| Errno::EINVAL)?;
+        if flags & !(O_CLOEXEC | O_NONBLOCK) != 0 {
+            return Err(Errno::EINVAL);
+        }
+        let id = self.next_pipe;
+        self.next_pipe = self.next_pipe.wrapping_add(1);
+        let read_rights = Rights(Rights::READ.0 | Rights::DUP.0 | Rights::TRANSFER.0);
+        let write_rights = Rights(Rights::WRITE.0 | Rights::DUP.0 | Rights::TRANSFER.0);
+        let reader = self.insert(Object::Pipe(id as usize), read_rights)?;
+        let writer = match self.insert(Object::Pipe(id as usize), write_rights) {
+            Ok(handle) => handle,
+            Err(error) => {
+                let _ = self.close_handle(reader);
+                return Err(error);
+            }
+        };
+        let mut bytes = [0u8; 8];
+        bytes[..4].copy_from_slice(&reader.0.to_le_bytes());
+        bytes[4..].copy_from_slice(&writer.0.to_le_bytes());
+        if let Err(error) = self.write_user(args[0], &bytes) {
+            let _ = self.close_handle(writer);
+            let _ = self.close_handle(reader);
+            return Err(error);
+        }
+        Ok(0)
     }
 
     fn sys_open(&mut self, args: [usize; 6]) -> Result<usize, Errno> {

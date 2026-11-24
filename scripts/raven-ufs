@@ -1,0 +1,520 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# In-place UFS updater for a Pi 4 SD image or a UFS partition/device. The image or
+# device is never copied; only the detected UFS slice is opened through ufs-inject.
+# A whole GPT disk must be the validated ESP + FreeBSD-UFS layout. Block devices
+# require --yes, must not be mounted, and must not contain the running root.
+
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+cd "$root"
+
+confirm=0
+recursive=0
+delete=0
+manual_offset=
+manual_size=
+inject=${RAVEN_UFS_INJECT:-}
+work=
+is_block=0
+target=
+ufs_offset=0
+ufs_size=0
+fat_start=
+fat_sectors=
+ufs_start=
+ufs_sectors=
+total_sectors=
+
+usage() {
+    cat <<'EOF'
+usage:
+  raven-ufs [--yes] ls IMAGE|DEVICE PATH
+  raven-ufs [--yes] put HOST DEST IMAGE|DEVICE
+  raven-ufs [--yes] [--recursive] rm PATH IMAGE|DEVICE
+  raven-ufs [--yes] mkdir PATH IMAGE|DEVICE
+  raven-ufs [--yes] [--delete] sync HOST_TREE DEST IMAGE|DEVICE
+  raven-ufs [--yes] check IMAGE|DEVICE
+  raven-ufs [--yes] repair IMAGE|DEVICE
+
+  --yes        required for any block-device target; never bypasses mount/root checks
+  --recursive  rm removes a directory tree
+  --delete     sync removes destination entries that are not in HOST_TREE
+  --offset N   explicit UFS byte offset (requires --size)
+  --size N     explicit UFS byte length (requires --offset)
+
+Whole images and whole block devices must contain the Pi 4 GPT layout: one ESP and
+one FreeBSD-UFS partition. A partition device or a raw UFS image is used directly.
+The FAT/ESP partition is never opened for writing.
+EOF
+}
+
+fail() {
+    echo "raven-ufs: $*" >&2
+    exit 1
+}
+
+need_value() {
+    [ "$#" -ge 2 ] || fail "$1 needs a value"
+}
+
+cleanup() {
+    if [ -n "$work" ] && [ -d "$work" ]; then
+        rm -rf "$work"
+    fi
+}
+trap cleanup EXIT INT TERM
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --yes|-y) confirm=1; shift ;;
+        --recursive|-r) recursive=1; shift ;;
+        --delete) delete=1; shift ;;
+        --offset)
+            need_value "$@"
+            manual_offset=$2
+            shift 2
+            ;;
+        --size)
+            need_value "$@"
+            manual_size=$2
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --*)
+            fail "unknown option: $1"
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+[ "$#" -gt 0 ] || {
+    usage >&2
+    exit 2
+}
+command=$1
+shift
+
+pick_inject() {
+    if [ -n "$inject" ]; then
+        [ -x "$inject" ] || fail "RAVEN_UFS_INJECT is not executable: $inject"
+        return 0
+    fi
+    if [ -x "$root/target/debug/ufs-inject" ]; then
+        inject=$root/target/debug/ufs-inject
+        return 0
+    fi
+    cargo build -q -p ufs-inject || fail "cannot build ufs-inject"
+    inject=$root/target/debug/ufs-inject
+    [ -x "$inject" ] || fail "ufs-inject was not built at $inject"
+}
+
+pick_inject
+
+gpt_signature() {
+    [ "$(dd if="$1" bs=1 skip=512 count=8 2>/dev/null || true)" = "EFI PART" ]
+}
+
+gpt_layout() {
+    python3 - "$1" <<'PY'
+import os
+import struct
+import sys
+import zlib
+
+path = sys.argv[1]
+fd = os.open(path, os.O_RDONLY)
+try:
+    size = os.lseek(fd, 0, os.SEEK_END)
+
+    def read_at(offset, length):
+        os.lseek(fd, offset, os.SEEK_SET)
+        data = os.read(fd, length)
+        if len(data) != length:
+            raise SystemExit("short read")
+        return data
+
+    if size < 4096 or size % 512 != 0:
+        raise SystemExit("target is not a whole number of 512-byte sectors")
+    if read_at(510, 2) != b"\x55\xaa":
+        raise SystemExit("protective MBR signature is not 55aa")
+    pmbr = read_at(446, 16)
+    if pmbr[4] != 0xEE:
+        raise SystemExit("protective MBR does not declare a 0xEE GPT partition")
+
+    header = read_at(512, 92)
+    if header[:8] != b"EFI PART":
+        raise SystemExit("primary GPT header signature missing")
+    header_size = struct.unpack_from("<I", header, 12)[0]
+    if header_size < 92 or header_size > 512:
+        raise SystemExit("invalid GPT header size")
+    stored_crc = struct.unpack_from("<I", header, 16)[0]
+    check = bytearray(header[:header_size])
+    check[16:20] = b"\0\0\0\0"
+    if zlib.crc32(check) & 0xFFFFFFFF != stored_crc:
+        raise SystemExit("primary GPT header CRC mismatch")
+    current, backup = struct.unpack_from("<QQ", header, 24)
+    first_usable, last_usable = struct.unpack_from("<QQ", header, 40)
+    entries_lba = struct.unpack_from("<Q", header, 72)[0]
+    count, entry_size = struct.unpack_from("<II", header, 80)
+    if count == 0 or entry_size < 128:
+        raise SystemExit("invalid GPT entry table")
+    if current != 1:
+        raise SystemExit("primary GPT header current LBA is not 1")
+    if backup + 1 != size // 512:
+        raise SystemExit("GPT backup LBA does not match the target size")
+    entries_bytes = count * entry_size
+    entries = read_at(entries_lba * 512, entries_bytes)
+    if zlib.crc32(entries) & 0xFFFFFFFF != struct.unpack_from("<I", header, 88)[0]:
+        raise SystemExit("GPT entry table CRC mismatch")
+
+    backup_header = read_at(backup * 512, 92)
+    if backup_header[:8] != b"EFI PART":
+        raise SystemExit("backup GPT header signature missing")
+    if struct.unpack_from("<Q", backup_header, 24)[0] != backup:
+        raise SystemExit("backup GPT header current LBA mismatch")
+    if struct.unpack_from("<Q", backup_header, 32)[0] != current:
+        raise SystemExit("backup GPT header backup LBA mismatch")
+
+    parts = []
+    for index in range(count):
+        entry = entries[index * entry_size:(index + 1) * entry_size]
+        if entry[:16] == b"\0" * 16:
+            continue
+        begin, end = struct.unpack_from("<QQ", entry, 32)
+        parts.append((entry[:16].hex(), begin, end))
+    fat_type = "28732ac11ff8d211ba4b00a0c93ec93b"
+    ufs_type = "b67c6e51cf6ed6118ff800022d09712b"
+    fat_start = 0
+    fat_sectors = 0
+    if len(parts) == 1:
+        if parts[0][0] != ufs_type:
+            raise SystemExit("single GPT partition is not FreeBSD-UFS")
+        if parts[0][1] < first_usable or parts[0][2] > last_usable:
+            raise SystemExit("UFS partition is outside the GPT usable range")
+        ufs_start, ufs_end = parts[0][1], parts[0][2]
+    elif len(parts) == 2:
+        if parts[0][0] != fat_type or parts[1][0] != ufs_type:
+            raise SystemExit("GPT partition types are not FAT-boot + UFS-root")
+        if parts[0][1] < first_usable or parts[1][2] > last_usable:
+            raise SystemExit("a partition is outside the GPT usable range")
+        if parts[0][2] >= parts[1][1]:
+            raise SystemExit("FAT and UFS partitions overlap")
+        fat_start, fat_end = parts[0][1], parts[0][2]
+        fat_sectors = fat_end - fat_start + 1
+        ufs_start, ufs_end = parts[1][1], parts[1][2]
+    else:
+        raise SystemExit(f"expected 1 UFS or ESP+UFS GPT partition, found {len(parts)}")
+    print(f"fat_start={fat_start}")
+    print(f"fat_sectors={fat_sectors}")
+    print(f"ufs_start={ufs_start}")
+    print(f"ufs_sectors={ufs_end - ufs_start + 1}")
+    print(f"total_sectors={size // 512}")
+finally:
+    os.close(fd)
+PY
+}
+
+detect_gpt() {
+    layout=$(gpt_layout "$1") || fail "GPT validation failed for $1"
+    eval "$layout"
+    ufs_offset=$((ufs_start * 512))
+    ufs_size=$((ufs_sectors * 512))
+    case "$ufs_offset:$ufs_size" in
+        *[!0-9:]*|:*) fail "GPT parser produced a non-numeric UFS slice" ;;
+    esac
+    [ "$ufs_offset" -gt 0 ] && [ "$ufs_size" -gt 0 ] ||
+        fail "GPT parser produced an empty UFS slice"
+}
+
+resolve_target() {
+    target=$1
+    [ -e "$target" ] || fail "target not found: $target"
+    [ ! -d "$target" ] || fail "target is a directory: $target"
+    is_block=0
+    [ -b "$target" ] && is_block=1
+    check_block_safety
+    fat_start=
+    fat_sectors=
+    ufs_start=
+    ufs_sectors=
+    total_sectors=
+
+    if [ -n "$manual_offset" ] || [ -n "$manual_size" ]; then
+        [ -n "$manual_offset" ] && [ -n "$manual_size" ] ||
+            fail "--offset and --size must be used together"
+        ufs_offset=$manual_offset
+        ufs_size=$manual_size
+        return 0
+    fi
+
+    if [ "$is_block" -eq 1 ]; then
+        sysfs=/sys/class/block/$(basename "$(readlink -f "$target")")
+        if [ -e "$sysfs/partition" ]; then
+            ufs_offset=0
+            ufs_size=0
+            return 0
+        fi
+        gpt_signature "$target" || fail "whole block device is not a GPT disk: $target"
+        detect_gpt "$target"
+        return 0
+    fi
+
+    if gpt_signature "$target"; then
+        detect_gpt "$target"
+    else
+        ufs_offset=0
+        ufs_size=0
+    fi
+}
+
+check_block_safety() {
+    if [ "$is_block" -eq 0 ]; then
+        if [ -f "$target" ] && command -v losetup >/dev/null 2>&1; then
+            for loop in $(losetup -j "$target" 2>/dev/null | cut -d: -f1); do
+                [ -n "$loop" ] || continue
+                if command -v lsblk >/dev/null 2>&1; then
+                    mounted=$(lsblk -rno MOUNTPOINT "$loop" 2>/dev/null |
+                        sed '/^[[:space:]]*$/d' | head -n 1 || true)
+                    [ -z "$mounted" ] ||
+                        fail "refusing image with mounted loop device $loop ($mounted)"
+                fi
+            done
+        fi
+        return 0
+    fi
+    [ "$confirm" -eq 1 ] || fail "block device requires --yes: $target"
+
+    mounted=
+    if command -v lsblk >/dev/null 2>&1; then
+        mounted=$(lsblk -rno MOUNTPOINT "$target" 2>/dev/null | sed '/^[[:space:]]*$/d' | head -n 1 || true)
+    fi
+    if [ -z "$mounted" ] && [ -r /proc/mounts ]; then
+        while read -r source mount_point _rest; do
+            case "$source" in
+                "$target"|"$target"[0-9]*|"$target"p[0-9]*)
+                    mounted=$mount_point
+                    break
+                    ;;
+            esac
+        done < /proc/mounts
+    fi
+    [ -z "$mounted" ] || fail "refusing mounted block device $target ($mounted)"
+
+    root_source=$(findmnt -n -o SOURCE / 2>/dev/null || true)
+    if [ -n "$root_source" ]; then
+        root_real=$(readlink -f "$root_source" 2>/dev/null || printf '%s' "$root_source")
+        target_real=$(readlink -f "$target")
+        [ "$target_real" != "$root_real" ] || fail "refusing the running root device: $target"
+        case "$root_real" in
+            "$target_real"|"$target_real"p[0-9]*|"$target_real"[0-9]*)
+                fail "refusing the disk containing the running root: $target"
+                ;;
+        esac
+    fi
+}
+
+ufs_inject() {
+    "$inject" --offset "$ufs_offset" --size "$ufs_size" "$target" "$@"
+}
+
+require_clean_ufs() {
+    ufs_inject check >/dev/null 2>&1 ||
+        fail "target is not a clean UFS filesystem: $target (run: raven-ufs --yes check $target)"
+}
+
+join_dest() {
+    if [ "$dest" = "/" ]; then
+        printf '%s' "$1"
+    else
+        printf '%s%s' "$dest" "$1"
+    fi
+}
+
+expected_path() {
+    printf '%s\n' "$1" >> "$work/expected"
+}
+
+list_ufs_entries() (
+    dir=$1
+    ufs_inject list "$dir" | while IFS= read -r name; do
+        [ -n "$name" ] || continue
+        case "$dir" in
+            /) child=/$name ;;
+            *) child=$dir/$name ;;
+        esac
+        type=$(ufs_inject stat --no-follow "$child" | awk '{print $1}')
+        if [ "$type" = "directory" ]; then
+            list_ufs_entries "$child"
+        fi
+        printf '%s\n' "$child"
+    done
+)
+
+sync_tree() {
+    tree=$1
+    dest=$2
+    [ -d "$tree" ] || fail "sync source is not a directory: $tree"
+    [ -n "$dest" ] || dest=/
+    case "$dest" in
+        /*) ;;
+        *) fail "sync destination must be absolute: $dest" ;;
+    esac
+    [ "$dest" = "/" ] || dest=${dest%/}
+
+    work=$(mktemp -d "${TMPDIR:-/tmp}/raven-ufs.XXXXXX")
+    : > "$work/expected"
+
+    if [ "$dest" != "/" ]; then
+        meta=$(stat -c '%a %u %g %Y' "$tree") || fail "cannot stat $tree"
+        set -- $meta
+        ufs_inject mkdir "$dest" --parents --mode "$1" --uid "$2" --gid "$3" --mtime "$4"
+    fi
+    expected_path "$dest"
+
+    find "$tree" -mindepth 1 -type d -print | LC_ALL=C sort > "$work/dirs"
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        rel=${path#"$tree"}
+        destpath=$(join_dest "$rel")
+        meta=$(stat -c '%a %u %g %Y' "$path") || fail "cannot stat $path"
+        set -- $meta
+        ufs_inject mkdir "$destpath" --parents --mode "$1" --uid "$2" --gid "$3" --mtime "$4"
+        expected_path "$destpath"
+    done < "$work/dirs"
+
+    find "$tree" -mindepth 1 -type f -print | LC_ALL=C sort > "$work/files"
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        rel=${path#"$tree"}
+        destpath=$(join_dest "$rel")
+        ufs_inject put "$path" "$destpath" --parents
+        expected_path "$destpath"
+    done < "$work/files"
+
+    find "$tree" -mindepth 1 -type l -print | LC_ALL=C sort > "$work/links"
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        rel=${path#"$tree"}
+        destpath=$(join_dest "$rel")
+        link=$(readlink "$path") || fail "cannot readlink $path"
+        meta=$(stat -c '%u %g %Y' "$path") || fail "cannot stat $path"
+        set -- $meta
+        ufs_inject symlink "$link" "$destpath" --parents --uid "$1" --gid "$2" --mtime "$3"
+        expected_path "$destpath"
+    done < "$work/links"
+
+    if [ "$delete" -eq 1 ]; then
+        : > "$work/entries"
+        list_ufs_entries "$dest" > "$work/entries"
+        LC_ALL=C sort -r "$work/entries" > "$work/entries.sorted"
+        while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+            if grep -Fxq -- "$entry" "$work/expected"; then
+                continue
+            fi
+            parent=$(dirname "$entry")
+            if [ "$parent" = "/" ] || grep -Fxq -- "$parent" "$work/expected"; then
+                ufs_inject rm "$entry" --recursive
+            fi
+        done < "$work/entries.sorted"
+    fi
+
+    ufs_inject check >/dev/null || fail "fsck is not clean after sync: $target"
+    echo "raven-ufs: sync $tree -> $dest fsck=clean"
+}
+
+case "$command" in
+    ls)
+        [ "$#" -eq 2 ] || {
+            usage >&2
+            exit 2
+        }
+        resolve_target "$1"
+        check_block_safety
+        ufs_inject list "$2"
+        ;;
+    put)
+        [ "$#" -eq 3 ] || {
+            usage >&2
+            exit 2
+        }
+        [ -f "$1" ] || fail "put source is not a regular file: $1"
+        resolve_target "$3"
+        check_block_safety
+        require_clean_ufs
+        ufs_inject put "$1" "$2" --parents
+        ufs_inject check >/dev/null || fail "fsck is not clean after put: $target"
+        echo "raven-ufs: put $2 fsck=clean"
+        ;;
+    rm)
+        [ "$#" -eq 2 ] || {
+            usage >&2
+            exit 2
+        }
+        resolve_target "$2"
+        check_block_safety
+        require_clean_ufs
+        if [ "$recursive" -eq 1 ]; then
+            ufs_inject rm "$1" --recursive
+        else
+            ufs_inject rm "$1"
+        fi
+        ufs_inject check >/dev/null || fail "fsck is not clean after rm: $target"
+        echo "raven-ufs: rm $1 fsck=clean"
+        ;;
+    mkdir)
+        [ "$#" -eq 2 ] || {
+            usage >&2
+            exit 2
+        }
+        resolve_target "$2"
+        check_block_safety
+        require_clean_ufs
+        ufs_inject mkdir "$1" --parents
+        ufs_inject check >/dev/null || fail "fsck is not clean after mkdir: $target"
+        echo "raven-ufs: mkdir $1 fsck=clean"
+        ;;
+    sync)
+        [ "$#" -eq 3 ] || {
+            usage >&2
+            exit 2
+        }
+        [ -d "$1" ] || fail "sync source is not a directory: $1"
+        resolve_target "$3"
+        check_block_safety
+        require_clean_ufs
+        sync_tree "$1" "$2"
+        ;;
+    check)
+        [ "$#" -eq 1 ] || {
+            usage >&2
+            exit 2
+        }
+        resolve_target "$1"
+        check_block_safety
+        ufs_inject check
+        ;;
+    repair)
+        [ "$#" -eq 1 ] || {
+            usage >&2
+            exit 2
+        }
+        resolve_target "$1"
+        check_block_safety
+        ufs_inject repair
+        ufs_inject check
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

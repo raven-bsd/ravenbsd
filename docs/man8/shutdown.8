@@ -1,0 +1,31 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 20, 2026
+.Dt SHUTDOWN 8
+.Os RavenBSD
+.Sh NAME
+.Nm shutdown
+.Nd system power control command
+.Sh SYNOPSIS
+.Nm
+.Fl r
+.Ar now
+.Nm
+.Fl h
+.Ar now
+.Nm
+.Fl p
+.Ar now
+.Sh DESCRIPTION
+The
+.Nm
+command stops services through
+.Xr svcd 8
+and requests the kernel power action.
+It is the administrative form of the same command documented in
+.Xr shutdown 1 .
+.Pp
+It requires effective uid 0.
+.Sh SEE ALSO
+.Xr shutdown 1 ,
+.Xr svcd 8

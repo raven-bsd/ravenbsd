@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K434 S7 marker image case. The release profile includes
+# profiles/release.d/87-ssh-matrix-marker.toml, which stages /etc/ssh-matrix-marker and starts the
+# one-shot ssh-matrix-marker service to write /tmp/ssh-marker. This case builds the S7 image and
+# proves the exact marker bytes are readable from the console, so the matrix row is reproducible
+# from master.
+#
+# Build the case image first:
+#   cargo xtask image --arch x86_64 --profile release --output build/qtest/ssh-s7-marker.img
+# Then run it without rebuilding:
+#   cargo xtask qtest --case ssh-s7-marker --arch x86_64 --no-build
+
+name = "ssh-s7-marker"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 240
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: sshd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: getty up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: ssh-matrix-marker up$'
+unordered = true
+
+[[expect]]
+regex = '^K434-SSH-MARKER-2026-11-22$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "cat /tmp/ssh-marker\n"
+delay_ms = 200
+
+[[step]]
+wait = '^K434-SSH-MARKER-2026-11-22$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|bad ELF'
+
+[[forbid]]
+regex = '(?i)SegmentOutsideUserRange'

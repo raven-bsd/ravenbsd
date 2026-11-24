@@ -186,7 +186,14 @@ impl<S: Syscall> ProcBackend for SyscallBackend<S> {
     }
 
     fn exec(&self, req: &ExecRequest) -> i32 {
-        self.local.exec(req)
+        #[cfg(target_os = "none")]
+        {
+            crate::exec_raw::exec(req)
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            self.local.exec(req)
+        }
     }
 
     fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, i32> {

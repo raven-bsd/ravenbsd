@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S85e: concurrent VFS/filesystem stress on four CPUs.
+# Four file workers and four mount workers run 50 iterations each through vfsd/ramfsd while
+# `smp_user=on` spreads the user threads over the online APs.
+
+# S112: the same case under KVM -smp 4.
+name = "posix-fs-smp-kvm4"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/posix/fs/posix-fs/build-smp.sh"]
+initfs = "build/fixtures/posix-fs-smp/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^smp-fs: services ok$'
+
+[[expect]]
+regex = '^smp-fs: setup ok$'
+
+[[expect]]
+regex = '^smp-fs: latency create_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: latency write_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: latency read_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: latency rename_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: latency mmap_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: latency unlink_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: latency mount_us p50=\d+ p90=\d+ max=\d+$'
+
+[[expect]]
+regex = '^smp-fs: race successes=50/50$'
+
+[[expect]]
+regex = '^smp-fs: done workers=8 iterations=50$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-fs: failed'

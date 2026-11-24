@@ -102,6 +102,21 @@ fn no_search_when_the_payload_already_reaches_the_ceiling() {
 }
 
 #[test]
+fn a_later_mss_drop_starts_the_search_after_a_full_size_decision() {
+    let mut c = connection();
+    c.mss = 1460;
+    assert_eq!(probe_due(&mut c, 0, 600_000, 9_000), None);
+    assert!(c.plp.is_none());
+    c.mss = 536;
+    c.peer_mss = 1000;
+    c.plp_ceiling = 1000;
+    let (size, _) = probe_due(&mut c, 0, 600_000, 4_000)
+        .expect("a later MSS drop must start the path-MTU search and probe");
+    assert!(c.plp.is_some());
+    assert!(size > u32::from(c.mss) && size <= 1_000);
+}
+
+#[test]
 fn a_finished_search_is_probed_again_after_the_interval() {
     let mut c = connection();
     let mut search = Plpmtud::new(536, 1460, 8);

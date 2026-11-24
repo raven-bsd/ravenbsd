@@ -107,11 +107,11 @@ fn absent_at_secure_is_zero() {
 }
 
 #[test]
-fn present_at_secure_is_still_zero_in_v1() {
+fn present_at_secure_comes_from_the_vector() {
     let stack = Stack::new(0, 0, &[(AT_SECURE, 1)]);
     let vector = stack.parse().unwrap();
     assert_eq!(vector.get(AT_SECURE), Some(1));
-    assert_eq!(vector.secure(), 0, "H-7 fixes AT_SECURE at 0 in v1");
+    assert_eq!(vector.secure(), 1, "the vector is the AT_SECURE source");
 }
 
 #[test]

@@ -11,7 +11,8 @@ boot_cmdline = "console=ttyS0 test-exit=1 smp_user=off smp-user-trace"
 qemu_extra = ["-d", "int", "-D", "/tmp/opencode/s75-qemu-int2.log"]
 expect_exit = "success"
 
-# The default (off) mode keeps user threads on the boot processor but still runs the fixture.
+# The emergency `smp_user=off` mode keeps user threads on the boot processor but still runs the
+# fixture; the shipped default is on.
 [[expect]]
 regex = '^smp-user: progress 0=\d+ 1=\d+ 2=\d+ 3=\d+$'
 

@@ -7,9 +7,13 @@
 # TLS is never implemented in-house (DR-45); this script only builds and packages upstream.
 #
 # Usage:
-#   sh addons/tls/build.sh --check   verify the pinned source, provenance and host tools
-#   sh addons/tls/build.sh           build libcrypto/libssl and the openssl CLI
-#   sh addons/tls/build.sh --qtest   build and pack the openssl-version qtest initfs
+#   sh addons/tls/build.sh [--arch x86_64|aarch64] --check   verify the pinned source, provenance
+#   sh addons/tls/build.sh [--arch x86_64|aarch64]           build libcrypto/libssl and openssl
+#   sh addons/tls/build.sh [--arch x86_64|aarch64] --qtest   build and pack the openssl-version qtest
+#
+# The aarch64 build uses the aarch64 libc sysroot, userland/linker/aarch64.ld and the cross
+# aarch64 libgcc for the compiler builtins (the host clang has no aarch64 compiler-rt). No
+# upstream OpenSSL source is modified.
 
 set -eu
 
@@ -18,10 +22,11 @@ cd "$root"
 
 arch=x86_64
 mode=--build
-for argument in "$@"; do
-    case "$argument" in
-        --check | --build | --qtest) mode=$argument ;;
-        *) echo "tls: unknown argument $argument" >&2; exit 2 ;;
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --check | --build | --qtest) mode=$1; shift ;;
+        --arch) arch=$2; shift 2 ;;
+        *) echo "tls: unknown argument $1" >&2; exit 2 ;;
     esac
 done
 
@@ -42,6 +47,26 @@ die() {
     echo "tls: $*" >&2
     exit 2
 }
+
+case "$arch" in
+    x86_64)
+        target=x86_64-unknown-ravenbsd
+        ld_script=$root/tests/libc/target/x86_64.ld
+        openssl_target=linux-x86_64
+        fp_flags=
+        linker_flavor=
+        ;;
+    aarch64)
+        target=aarch64-unknown-ravenbsd
+        ld_script=$root/userland/linker/aarch64.ld
+        openssl_target=linux-aarch64
+        fp_flags=-mgeneral-regs-only
+        linker_flavor=-Wl,-m,aarch64linux
+        ;;
+    *)
+        die "unsupported arch $arch (x86_64 or aarch64)"
+        ;;
+esac
 
 version_value() {
     sed -n "s/^$1=//p" "$version_file" | tr -d '"'
@@ -113,9 +138,17 @@ stage_sysroot() {
         fi
     done
     resource=$(clang --print-resource-dir)
-    builtins=$resource/lib/linux/libclang_rt.builtins-x86_64.a
-    [ -f "$builtins" ] || die "missing compiler-rt builtins: $builtins"
+    if [ "$arch" = aarch64 ]; then
+        builtins=/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a
+    else
+        builtins=$resource/lib/linux/libclang_rt.builtins-x86_64.a
+    fi
+    [ -f "$builtins" ] || die "missing builtins: $builtins"
     cp "$builtins" "$sysroot/usr/lib/libclang_rt.builtins.a"
+    # The RavenBSD forwarding stdatomic.h shadows clang's header and its include_next finds
+    # nothing. Remove it from the staged sysroot so clang's own C11 atomics are used. This is a
+    # build-sysroot workaround for the libc forwarding header; no OpenSSL source is modified.
+    rm -f "$sysroot/usr/include/stdatomic.h"
 }
 
 configure() {
@@ -125,9 +158,9 @@ configure() {
     (
         cd "$build"
         CC=clang \
-        CFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector" \
-        LDFLAGS="--target=x86_64-unknown-ravenbsd --sysroot=$sysroot -fuse-ld=lld -nostdlib -nostartfiles -static -T$root/tests/libc/target/x86_64.ld -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o" \
-        "$source/Configure" linux-x86_64 no-shared no-tests no-asm no-dso no-engine no-async \
+        CFLAGS="--target=$target --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector $fp_flags" \
+        LDFLAGS="--target=$target --sysroot=$sysroot -fuse-ld=lld $linker_flavor -nostdlib -nostartfiles -static -T$ld_script -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o" \
+        "$source/Configure" "$openssl_target" no-shared no-tests no-asm no-dso no-engine no-async \
             no-threads no-legacy no-ssl3 no-comp \
             --prefix="$install" --openssldir="$install/ssl"
     )
@@ -136,9 +169,9 @@ configure() {
 build() {
     stage_sysroot
     find_lld
-    log "build: configuring OpenSSL 3.5.0 for x86_64-unknown-ravenbsd"
+    log "build: configuring OpenSSL 3.5.0 for $target"
     configure
-    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+    clang --target="$target" --sysroot="$sysroot" $fp_flags \
         -std=gnu11 -O1 -D__ravenbsd__=1 -D__unix__=1 \
         -c "$compat" -o "$root/build/tls/tls_compat.o"
     log "build: compiling (jobs=$jobs)"
@@ -151,22 +184,30 @@ build() {
     cp "$build/apps/openssl" "$install/bin/openssl"
     cp "$build/libcrypto.a" "$build/libssl.a" "$install/lib/"
     cp -a "$build/include/openssl/." "$install/include/openssl/"
-    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
-        -I"$build/include" -I"$source/include" -I"$source/apps" \
-        -std=gnu11 -O1 -D__ravenbsd__=1 -D__unix__=1 \
-        -c "$wrapper" -o "$root/build/tls/openssl_version_main.o"
-    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-        -nostdlib -nostartfiles -static -T"$root/tests/libc/target/x86_64.ld" \
-        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-        -Wl,--allow-multiple-definition -Wl,--error-limit=0 \
-        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" \
-        "$root/build/tls/openssl_version_main.o" \
-        "$build/apps/openssl-bin-version.o" "$build/apps/libapps.a" \
-        -L"$build" -L"$sysroot/usr/lib" \
-        -lssl -lcrypto -lc -lclang_rt.builtins \
-        "$root/build/tls/tls_compat.o" "$sysroot/usr/lib/crtn.o" \
-        -o "$install/bin/openssl-version"
-    log "built: $install/bin/openssl $install/bin/openssl-version libcrypto.a libssl.a"
+    # The generated include tree does not contain every public source header (for example
+    # openssl/macros.h). Add the upstream public headers without clobbering generated files.
+    cp -an "$source/include/openssl/." "$install/include/openssl/"
+    if [ "$arch" = x86_64 ]; then
+        clang --target="$target" --sysroot="$sysroot" $fp_flags \
+            -I"$build/include" -I"$source/include" -I"$source/apps" \
+            -std=gnu11 -O1 -D__ravenbsd__=1 -D__unix__=1 \
+            -c "$wrapper" -o "$root/build/tls/openssl_version_main.o"
+        clang --target="$target" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
+            -nostdlib -nostartfiles -static -T"$ld_script" \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+            -Wl,--allow-multiple-definition -Wl,--error-limit=0 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" \
+            "$root/build/tls/openssl_version_main.o" \
+            "$build/apps/openssl-bin-version.o" "$build/apps/libapps.a" \
+            -L"$build" -L"$sysroot/usr/lib" \
+            -lssl -lcrypto -lc -lclang_rt.builtins \
+            "$root/build/tls/tls_compat.o" "$sysroot/usr/lib/crtn.o" \
+            -o "$install/bin/openssl-version"
+        log "built: $install/bin/openssl $install/bin/openssl-version libcrypto.a libssl.a"
+    else
+        # The qtest wrapper uses x86 syscall registers; the aarch64 lane only needs the libraries.
+        log "built: $install/bin/openssl libcrypto.a libssl.a (aarch64; x86-only wrapper skipped)"
+    fi
 }
 
 qtest_initfs() {

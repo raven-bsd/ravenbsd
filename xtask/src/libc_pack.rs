@@ -5,6 +5,7 @@
 //! checks of `donor-map/16` 3.A.5 / C60 section 4.5.
 
 use std::collections::BTreeSet;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -117,6 +118,7 @@ struct Options {
     arch: Arch,
     set: String,
     check: bool,
+    verify: bool,
     probe: Option<String>,
     host_run: bool,
     json: bool,
@@ -127,6 +129,7 @@ fn parse(args: &[String]) -> Result<Options> {
     let mut arch = Arch::X86_64;
     let mut set = "server".to_string();
     let mut check = false;
+    let mut verify = false;
     let mut probe = None;
     let mut host_run = false;
     let mut json = false;
@@ -143,6 +146,7 @@ fn parse(args: &[String]) -> Result<Options> {
                 set = args.get(index).context("--set value")?.clone();
             }
             Some("--check") => check = true,
+            Some("--verify") => verify = true,
             Some("--probe") => {
                 index += 1;
                 probe = Some(args.get(index).context("--probe value")?.clone());
@@ -165,6 +169,7 @@ fn parse(args: &[String]) -> Result<Options> {
         arch,
         set,
         check,
+        verify,
         probe,
         host_run,
         json,
@@ -175,6 +180,14 @@ fn parse(args: &[String]) -> Result<Options> {
 /// Run the command.
 pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     let options = parse(args)?;
+    if options.verify {
+        if verify_stamp(root, &options).is_ok() {
+            println!("libc-pack: verify: ok");
+            return Ok(0);
+        }
+        eprintln!("artifact stale: run cargo xtask libc-pack");
+        return Ok(1);
+    }
     let profile = if options.set == "server" {
         "libc-a-server"
     } else {
@@ -325,7 +338,131 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     // 9. stage the libc sysroot
     stage_sysroot(root, &options)?;
     println!("libc-pack: sysroot: ok");
+    write_stamp(root, &options)?;
+    println!("libc-pack: stamp: ok");
     Ok(0)
+}
+
+/// Stamp file written next to the packed archive (K441).
+pub(crate) const STAMP_FILE: &str = "libc.stamp";
+/// Stamp format; bump when the fields change.
+const STAMP_FORMAT: &str = "k441.1";
+
+/// Hash the libc source tree, `Cargo.lock` and the pinned toolchain.
+///
+/// The hash is over sorted relative paths and file contents, so a source edit without a rebuild
+/// changes it; an mtime-only touch does not. Consumers compare this with the stamp written by the
+/// last `libc-pack` and fail closed when they differ.
+pub(crate) fn source_hash(root: &Path) -> Result<u64> {
+    let mut files = Vec::new();
+    collect_files(&root.join("libc/ravenlibc"), &mut files)?;
+    for name in ["Cargo.lock", "rust-toolchain.toml"] {
+        let path = root.join(name);
+        if path.is_file() {
+            files.push(path);
+        }
+    }
+    files.sort();
+    let mut hasher = DefaultHasher::new();
+    for path in files {
+        let relative = path.strip_prefix(root).unwrap_or(&path);
+        relative.to_string_lossy().hash(&mut hasher);
+        let bytes = std::fs::read(&path)
+            .with_context(|| format!("cannot read source {}", path.display()))?;
+        bytes.hash(&mut hasher);
+    }
+    Ok(hasher.finish())
+}
+
+fn collect_files(directory: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    if !directory.is_dir() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(directory)
+        .with_context(|| format!("cannot list {}", directory.display()))?
+    {
+        let entry = entry.with_context(|| format!("cannot read {}", directory.display()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            if path.file_name().and_then(|name| name.to_str()) == Some("target") {
+                continue;
+            }
+            collect_files(&path, out)?;
+        } else if path.is_file() {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn hash_file(path: &Path) -> Result<u64> {
+    let bytes =
+        std::fs::read(path).with_context(|| format!("cannot read artifact {}", path.display()))?;
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    Ok(hasher.finish())
+}
+
+fn stamp_path(options: &Options) -> PathBuf {
+    options.out.join(STAMP_FILE)
+}
+
+pub(crate) fn stamp_field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    text.lines().find_map(|line| {
+        let rest = line.strip_prefix(key)?;
+        rest.strip_prefix('=')
+    })
+}
+
+fn write_stamp(root: &Path, options: &Options) -> Result<()> {
+    let archive = options.out.join("libc.a");
+    let sysroot_archive = options.out.join("sysroot/usr/lib/libc.a");
+    let text = format!(
+        "format={STAMP_FORMAT}\narch={}\nset={}\nsources={:016x}\nlibc_a={:016x}\nsysroot_libc_a={:016x}\n",
+        options.arch.short(),
+        options.set,
+        source_hash(root)?,
+        hash_file(&archive)?,
+        hash_file(&sysroot_archive)?,
+    );
+    let path = stamp_path(options);
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, text)
+        .with_context(|| format!("cannot write {}", temporary.display()))?;
+    std::fs::rename(&temporary, &path)
+        .with_context(|| format!("cannot publish {}", path.display()))?;
+    Ok(())
+}
+
+fn verify_stamp(root: &Path, options: &Options) -> Result<()> {
+    let text = std::fs::read_to_string(stamp_path(options)).with_context(|| "no libc stamp")?;
+    if stamp_field(&text, "format") != Some(STAMP_FORMAT) {
+        bail!("stamp format mismatch");
+    }
+    if stamp_field(&text, "arch") != Some(options.arch.short()) {
+        bail!("stamp arch mismatch");
+    }
+    if stamp_field(&text, "set") != Some(options.set.as_str()) {
+        bail!("stamp set mismatch");
+    }
+    let sources = stamp_field(&text, "sources").context("stamp sources missing")?;
+    let sources = u64::from_str_radix(sources, 16).context("stamp sources invalid")?;
+    if sources != source_hash(root)? {
+        bail!("sources changed");
+    }
+    let archive = options.out.join("libc.a");
+    let libc_a = stamp_field(&text, "libc_a").context("stamp libc_a missing")?;
+    let libc_a = u64::from_str_radix(libc_a, 16).context("stamp libc_a invalid")?;
+    if libc_a != hash_file(&archive)? {
+        bail!("libc.a changed");
+    }
+    let sysroot_archive = options.out.join("sysroot/usr/lib/libc.a");
+    let sysroot = stamp_field(&text, "sysroot_libc_a").context("stamp sysroot missing")?;
+    let sysroot = u64::from_str_radix(sysroot, 16).context("stamp sysroot invalid")?;
+    if sysroot != hash_file(&sysroot_archive)? {
+        bail!("sysroot libc.a changed");
+    }
+    Ok(())
 }
 
 /// Stage `build/<arch>/sysroot` so the target C tests compile and link without a manual step.

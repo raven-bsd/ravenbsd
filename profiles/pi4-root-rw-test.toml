@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The pi4-root-rw qtest profile: EMMC2 host-backed disk, blockd, read-write UFS through fsd-ufs
+# and vfsd, and the one-shot write/unmount/remount/read-back probe. It is a standalone profile so
+# the 16 MiB UFS payload fits the ESP.
+
+name = "pi4-root-rw-test"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "raven-initfsd", path = "/sbin/initfsd" },
+    { package = "raven-ramfsd", path = "/sbin/ramfsd" },
+    { package = "raven-nulld", path = "/sbin/nulld" },
+    { package = "raven-zerod", path = "/sbin/zerod" },
+    { package = "raven-randd", path = "/sbin/randd" },
+    { package = "raven-vfsd", path = "/sbin/vfsd" },
+    { package = "raven-blockd", path = "/sbin/blockd" },
+    { package = "fsd-ufs", path = "/sbin/fsd-ufs" },
+    { package = "emmc2", path = "/sbin/emmc2" },
+]
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

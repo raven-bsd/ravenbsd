@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# The release session ends when getty exits (the login shell typed `exit`), so the QEMU gate can
-# assert `init exited (0)`. The shell parent starts rsh as a fallback; the release profile disables
-# it in favour of getty.
+# The release session ends when getty exits (the brush login shell typed `exit`), so the QEMU gate
+# can assert `init exited (0)`. The shell parent's rsh service is disabled by rc.conf; getty
+# launches the root session shell chosen by login policy (brush).
 
 [[initfs.files]]
 src = "profiles/release.d/rc.conf"

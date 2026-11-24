@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P1 libc-posix: one on-target C client over the POSIX.1-2024 stdio, string/collation,
+# stdlib, time, locale, wide-character, ctype and process surface. The fixture builds
+# build/libc-test/libc-test from profiles/libc-posix.d/libc-posix.c; the existing
+# libc-test profile stages it as /bin/libc-test and runs it as the one-shot service.
+
+name = "libc-posix"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh profiles/libc-posix.d/build.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-posix: start$'
+
+[[expect]]
+regex = '^libc-posix: stdio ok$'
+
+[[expect]]
+regex = '^libc-posix: string ok$'
+
+[[expect]]
+regex = '^libc-posix: stdlib ok$'
+
+[[expect]]
+regex = '^libc-posix: time ok$'
+
+[[expect]]
+regex = '^libc-posix: locale ok$'
+
+[[expect]]
+regex = '^libc-posix: wchar ok$'
+
+[[expect]]
+regex = '^libc-posix: ctype ok$'
+
+[[expect]]
+regex = '^libc-posix: process ok$'
+
+[[expect]]
+regex = '^libc-posix: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-posix: FAIL'

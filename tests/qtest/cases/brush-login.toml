@@ -1,0 +1,123 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S96: the release login is brush, completion is registered, and no rsh process is running.
+# The scripted completion proof is `complete -p`; TAB itself is interactive.
+
+name = "brush-login"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["cargo xtask build brush --arch x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^(raven# )?brush$'
+
+[[expect]]
+regex = "^(raven# )?complete -W 'help exit' raven-test$"
+
+[[expect]]
+regex = '^(raven# )?no-rsh$'
+
+[[expect]]
+regex = '^(raven# )?command-status:0$'
+
+[[expect]]
+regex = '^(raven# )?ls-status:0$'
+
+[[expect]]
+regex = '^(raven# )?still-alive$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '^rsh: ready$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "echo $0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?brush$'
+timeout_secs = 30
+
+[[step]]
+send = "complete -p raven-test\n"
+delay_ms = 100
+
+[[step]]
+wait = "^(raven# )?complete -W 'help exit' raven-test$"
+timeout_secs = 30
+
+[[step]]
+send = "echo no-rsh\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?no-rsh$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/true; echo command-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?command-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/ls /; echo ls-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?ls-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "echo still-alive\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?still-alive$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

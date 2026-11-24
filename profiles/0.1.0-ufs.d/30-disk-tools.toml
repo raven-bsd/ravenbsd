@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K414: UFS/disk tools on the server root. The storage drivers, blockd and fsd-ufs
+# live in the bootstrap initfs; the payload only needs the static tools and man pages.
+# `tests/fixtures/disk-tools/build.sh` produces the static binaries, so the image
+# build does not depend on a test pre-step.
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/tools/lsblk"
+path = "/bin/lsblk"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/tools/newfs"
+path = "/sbin/newfs"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/tools/gpart"
+path = "/sbin/gpart"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "docs/man1/lsblk.1"
+path = "/usr/share/man/man1/lsblk.1"
+
+[[initfs.files]]
+src = "docs/man8/newfs.8"
+path = "/usr/share/man/man8/newfs.8"
+
+[[initfs.files]]
+src = "docs/man8/gpart.8"
+path = "/usr/share/man/man8/gpart.8"

@@ -1,0 +1,23 @@
+reading from file tests/net-conformance/results/merged/merged-tcg/window-update.pcap, link-type EN10MB (Ethernet), snapshot length 65535
+02:05:29.506127 IP (tos 0x0, ttl 64, id 5630, offset 0, flags [DF], proto TCP (6), length 52)
+    10.0.2.2.40485 > 10.0.2.15.23090: Flags [S], cksum 0x3a17 (correct), seq 1779021453, win 65535, options [mss 1460,wscale 7,sackOK,nop,nop,eol], length 0
+02:05:29.542971 ARP, Ethernet (len 6), IPv4 (len 4), Request who-has 10.0.2.2 tell 10.0.2.15, length 28
+02:05:29.543057 ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.0.2.2 is-at 22:70:4f:b5:ed:f0, length 28
+02:05:29.543081 ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.0.2.2 is-at 22:70:4f:b5:ed:f0, length 28
+02:05:29.560857 IP (tos 0x0, ttl 64, id 1, offset 0, flags [none], proto TCP (6), length 52)
+    10.0.2.15.23090 > 10.0.2.2.40485: Flags [S.], cksum 0x1d93 (correct), seq 459736589, ack 1779021454, win 65535, options [mss 1460,wscale 3,sackOK,eol], length 0
+02:05:29.560983 IP (tos 0x0, ttl 64, id 42858, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40485 > 10.0.2.15.23090: Flags [.], cksum 0x5d5f (correct), seq 1, ack 1, win 0, length 0
+02:05:29.961419 IP (tos 0x0, ttl 64, id 17159, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40485 > 10.0.2.15.23090: Flags [.], cksum 0x5d5f (correct), seq 1, ack 1, win 0, length 0
+02:05:29.961474 IP (tos 0x0, ttl 64, id 6577, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40485 > 10.0.2.15.23090: Flags [.], cksum 0xdd5e (correct), seq 1, ack 1, win 32768, length 0
+02:05:29.984389 IP (tos 0x0, ttl 64, id 2, offset 0, flags [none], proto TCP (6), length 84)
+    10.0.2.15.23090 > 10.0.2.2.40485: Flags [P.], cksum 0x9942 (correct), seq 1:45, ack 1, win 8192, length 44
+02:05:29.984520 IP (tos 0x0, ttl 64, id 26878, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40485 > 10.0.2.15.23090: Flags [.], cksum 0xdd32 (correct), seq 1, ack 45, win 32768, length 0
+02:05:31.182039 IP6 (hlim 255, next-header ICMPv6 (58) payload length: 16) fe80::2070:4fff:feb5:edf0 > ff02::2: [icmp6 sum ok] ICMP6, router solicitation, length 16
+	  source link-address option (1), length 8 (1): 22:70:4f:b5:ed:f0
+	    0x0000:  2270 4fb5 edf0
+02:05:33.961992 IP (tos 0x0, ttl 64, id 63207, offset 0, flags [DF], proto TCP (6), length 40)
+    10.0.2.2.40485 > 10.0.2.15.23090: Flags [R.], cksum 0x5d5b (correct), seq 1, ack 1, win 0, length 0

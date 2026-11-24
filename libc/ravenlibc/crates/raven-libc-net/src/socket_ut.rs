@@ -14,6 +14,8 @@ use raven_libc_abi::socket::{
     SO_PROTOCOL, SO_RCVBUF, SO_RCVTIMEO, SO_TYPE, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM,
     SOL_SOCKET,
 };
+use raven_libc_platform::Handle;
+use raven_libc_platform::fd::{InheritedSocket, SocketEndpoint, SocketMeta};
 use raven_proto_net::{Call, Endpoint, SockOpt};
 
 fn net(caps: Caps) -> Net<FakeNetd, FakeNetd, FakeNetd, FakeNetd> {
@@ -45,6 +47,36 @@ fn socket_is_pending_today() {
 }
 
 #[test]
+fn exec_meta_survives_the_original_fd_close() {
+    let caps = Caps {
+        bare_open: true,
+        ..Caps::default()
+    };
+    let fake = FakeNetd::with_caps(caps);
+    let net = Net::with_unix(fake.clone(), fake.clone(), fake.clone(), Some(fake.clone()));
+    // sshd accepts, then dup2()s the accepted socket onto stdio and closes the original fd.
+    // The OFD (and its netd file) still lives on the duplicated fd; the socket identity must
+    // still be published by the table's OFD key, not by resolving the closed original fd.
+    let ofd = 7u32;
+    let mut rec = SocketRec::new(AF_INET, SOCK_STREAM, 6, SocketState::Connected, 4);
+    rec.sock = Some(Sock(42));
+    net.table.borrow_mut().insert(ofd, rec).expect("insert");
+    assert!(fake.resolve(4).is_err(), "the original accepted fd is gone");
+    net.sync_meta();
+    assert_eq!(
+        fake.socket_meta(ofd),
+        Some(crate::SocketMeta {
+            domain: AF_INET,
+            ty: SOCK_STREAM,
+            proto: 6,
+            state: SocketState::Connected.code(),
+            local: None,
+            peer: None,
+        })
+    );
+}
+
+#[test]
 fn bare_socket_opens_immediately() {
     let caps = Caps {
         bare_open: true,
@@ -54,6 +86,94 @@ fn bare_socket_opens_immediately() {
     let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
     assert_eq!(logs(&net), vec![WireLog::Open(b"net:tcp".to_vec())]);
     assert!(net.poll_interest(fd).is_ok());
+}
+
+#[test]
+fn mptcp_socket_opens_immediately_without_bare_open() {
+    let net = net_without_unix(Caps::default());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    assert_eq!(logs(&net), vec![WireLog::Open(b"net:mptcp".to_vec())]);
+    let mut protocol = [0u8; 4];
+    let written = net
+        .getsockopt(fd, SOL_SOCKET, SO_PROTOCOL, &mut protocol)
+        .expect("protocol");
+    assert_eq!(written, 4);
+    assert_eq!(i32::from_ne_bytes(protocol), crate::mptcp::IPPROTO_MPTCP);
+}
+
+#[test]
+fn mptcp_datagram_protocol_is_eprotonosupport() {
+    let net = net_without_unix(Caps::default());
+    assert_eq!(
+        net.socket(AF_INET, SOCK_DGRAM, crate::mptcp::IPPROTO_MPTCP),
+        Err(Errno::EPROTONOSUPPORT)
+    );
+    assert!(
+        net.socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+            .is_ok()
+    );
+}
+
+#[test]
+fn mptcp_add_path_is_encoded_for_netd() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    let mut value = [0u8; 12];
+    value[0] = AF_INET as u8;
+    value[1] = 1;
+    value
+        .get_mut(4..8)
+        .expect("addr")
+        .copy_from_slice(&[10, 77, 2, 16]);
+    net.setsockopt(
+        fd,
+        crate::mptcp::SOL_MPTCP,
+        crate::mptcp::MPTCP_PM_CMD_ADD_ADDR,
+        &value,
+    )
+    .expect("add path");
+    let requests = fake.mptcp_requests();
+    let request = requests.first().expect("request");
+    assert_eq!(u16::from_le_bytes([request[0], request[1]]), 1);
+    assert_eq!(u16::from_le_bytes([request[2], request[3]]), 4);
+    assert_eq!(
+        u16::from_le_bytes([request[4], request[5]]),
+        crate::mptcp::OP_MPTCP_ADD_ADDR
+    );
+    let decoded = crate::mptcp::PmAddr::decode(request.get(6..).expect("payload")).expect("decode");
+    assert_eq!(decoded.id, 1);
+    assert_eq!(decoded.addr, [10, 77, 2, 16]);
+}
+
+#[test]
+fn mptcp_info_reply_is_copied() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    let info = [2u8, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0];
+    let mut reply = Vec::new();
+    reply.extend_from_slice(&8u16.to_le_bytes());
+    reply.extend_from_slice(&(info.len() as u16).to_le_bytes());
+    reply.extend_from_slice(&info);
+    fake.set_mptcp_reply(&reply);
+    let mut out = [0u8; 12];
+    let used = net
+        .getsockopt(
+            fd,
+            crate::mptcp::SOL_MPTCP,
+            crate::mptcp::MPTCP_INFO,
+            &mut out,
+        )
+        .expect("info");
+    assert_eq!(used, 12);
+    assert_eq!(out, info);
 }
 
 #[test]
@@ -154,7 +274,11 @@ fn tcp_client_wire_sequence() {
             WireLog::Call(Call::SetSockOpt {
                 opt: SockOpt::RcvBuf,
                 value: 65_536
-            })
+            }),
+            WireLog::Call(Call::Connect(Endpoint {
+                ip: [10, 0, 0, 2],
+                port: 80
+            }))
         ]
     );
     let mut out = [0u8; 16];
@@ -250,6 +374,51 @@ fn accept_two_round_trips_and_peer() {
 }
 
 #[test]
+fn inherited_accepted_socket_keeps_its_peer_and_local() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let peer = Endpoint {
+        ip: [10, 0, 2, 2],
+        port: 40_000,
+    };
+    let local = Endpoint {
+        ip: [10, 0, 2, 15],
+        port: 22,
+    };
+    fake.push_inherited(InheritedSocket {
+        fd: 7,
+        ofd: 9,
+        handle: Handle(0x55),
+        status: 0,
+        socket: SocketMeta {
+            domain: AF_INET,
+            ty: SOCK_STREAM,
+            proto: 0,
+            state: 5,
+            local: Some(SocketEndpoint {
+                ip: local.ip,
+                port: local.port,
+            }),
+            peer: Some(SocketEndpoint {
+                ip: peer.ip,
+                port: peer.port,
+            }),
+        },
+    });
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let mut out = [0u8; 16];
+    assert_eq!(net.getpeername(7, &mut out), Ok(16));
+    let parsed = crate::parse_sockaddr(&out).expect("peer");
+    assert_eq!(parsed.ipv4(), Some(peer.ip));
+    assert_eq!(parsed.port(), peer.port);
+
+    let mut local_out = [0u8; 16];
+    assert_eq!(net.getsockname(7, &mut local_out), Ok(16));
+    let parsed = crate::parse_sockaddr(&local_out).expect("local");
+    assert_eq!(parsed.ipv4(), Some(local.ip));
+    assert_eq!(parsed.port(), local.port);
+}
+
+#[test]
 fn connect_twice_is_eisconn() {
     let net = net_without_unix(Caps::default());
     let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
@@ -271,6 +440,26 @@ fn nonblocking_connect_reports_einprogress_then_error_zero() {
         Err(Errno::EINPROGRESS)
     );
     let mut value = [0xffu8; 4];
+    assert_eq!(net.getsockopt(fd, SOL_SOCKET, SO_ERROR, &mut value), Ok(4));
+    assert_eq!(i32::from_le_bytes(value), 0);
+}
+
+/// S174: a non-blocking connect that fails must read `ECONNREFUSED` from `SO_ERROR` once, then 0.
+#[test]
+fn so_error_reads_the_deferred_refusal_once() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)
+        .expect("socket");
+    fake.refuse_next_connect();
+    assert_eq!(
+        net.connect(fd, &addr([10, 0, 0, 2], 80)),
+        Err(Errno::EINPROGRESS)
+    );
+    let mut value = [0xffu8; 4];
+    assert_eq!(net.getsockopt(fd, SOL_SOCKET, SO_ERROR, &mut value), Ok(4));
+    assert_eq!(i32::from_le_bytes(value), i32::from(Errno::ECONNREFUSED.0));
     assert_eq!(net.getsockopt(fd, SOL_SOCKET, SO_ERROR, &mut value), Ok(4));
     assert_eq!(i32::from_le_bytes(value), 0);
 }
@@ -869,7 +1058,11 @@ fn all_wire_options_reach_the_backend_in_call_order() {
             Call::SetSockOpt {
                 opt: SockOpt::TcpNoDelay,
                 value: 1
-            }
+            },
+            Call::Connect(Endpoint {
+                ip: [10, 0, 0, 2],
+                port: 80
+            })
         ]
     );
 }
@@ -919,4 +1112,35 @@ fn stored_local_port_orders_open_bind_then_options() {
             ..
         }))
     ));
+}
+
+#[test]
+fn lazy_socket_binds_and_listens() {
+    let net = net_without_unix(Caps::default());
+    let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
+    net.bind(fd, &addr([0, 0, 0, 0], 22)).expect("bind");
+    net.listen(fd, 128).expect("listen");
+    assert!(net.poll_interest(fd).is_ok());
+}
+
+#[test]
+fn refresh_handles_replaces_a_stale_socket_cache() {
+    let caps = Caps {
+        bare_open: true,
+        ..Caps::default()
+    };
+    let net = net_without_unix(caps);
+    let fd = net.socket(AF_INET, SOCK_STREAM, 0).expect("socket");
+    let info = net.fds().resolve(fd).expect("resolve");
+    let live = info.sock.expect("live handle");
+    {
+        let mut table = net.table.borrow_mut();
+        let record = table.get_mut(info.ofd).expect("record");
+        record.sock = Some(Sock(live.0.wrapping_add(1000)));
+    }
+    net.refresh_handles();
+    assert_eq!(
+        net.table.borrow().get(info.ofd).expect("record").sock,
+        Some(live)
+    );
 }

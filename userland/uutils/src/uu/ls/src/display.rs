@@ -6,6 +6,7 @@
 // spell-checker:ignore (ToDO) somegroup nlink tabsize dired subdired dtype colorterm stringly
 // spell-checker:ignore nohash strtime clocale ilog drwxr oneline
 
+use crate::OutputBuffer;
 use core::ops::RangeInclusive;
 use std::cell::LazyCell;
 #[cfg(unix)]
@@ -22,7 +23,7 @@ use std::{
     ffi::{OsStr, OsString},
     fmt::Write as FmtWrite,
     fs::{self, DirEntry, FileType, Metadata},
-    io::{BufWriter, Stdout, Write},
+    io::Write,
 };
 
 use ansi_width::ansi_width;
@@ -161,7 +162,7 @@ enum SizeOrDeviceId {
 /// needs to place the header in `//SUBDIRED//`.
 pub fn show_dir_name(
     path_data: &PathData,
-    out: &mut BufWriter<Stdout>,
+    out: &mut OutputBuffer,
     config: &Config,
 ) -> std::io::Result<usize> {
     let escaped_name =
@@ -449,7 +450,7 @@ fn display_commas_format(
     names: impl Iterator<Item = DisplayWithQuote>,
     width: u16,
     line_ending: LineEnding,
-    out: &mut BufWriter<Stdout>,
+    out: &mut OutputBuffer,
 ) -> UResult<()> {
     let mut names = names.peekable();
     let mut current_col = 0;
@@ -481,7 +482,7 @@ fn display_commas_format(
 fn display_oneline_format(
     names: impl Iterator<Item = DisplayWithQuote>,
     line_ending: LineEnding,
-    out: &mut BufWriter<Stdout>,
+    out: &mut OutputBuffer,
 ) -> UResult<()> {
     for name in names {
         write_os_str(out, &name.displayed)?;
@@ -494,7 +495,7 @@ fn display_grid(
     names: impl Iterator<Item = DisplayWithQuote>,
     width: u16,
     direction: Direction,
-    out: &mut BufWriter<Stdout>,
+    out: &mut OutputBuffer,
     quoted: bool,
     tab_size: usize,
 ) -> UResult<()> {
@@ -1184,6 +1185,15 @@ fn display_item_long(
 
 fn indicator_char(path: &PathData, style: Option<IndicatorStyle>) -> Option<char> {
     let style = style?;
+    // `slash` only marks directories. Resolve it from the cached file type instead of
+    // `classify_file`, which calls `is_executable_file` and therefore stats every entry;
+    // a Scheme stat costs tens of milliseconds on RavenBSD.
+    if matches!(style, IndicatorStyle::Slash) {
+        return path
+            .file_type()
+            .filter(|file_type| file_type.is_dir())
+            .map(|_| '/');
+    }
     let sym = classify_file(path);
 
     match style {

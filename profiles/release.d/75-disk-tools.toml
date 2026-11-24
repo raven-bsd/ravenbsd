@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S98/S110 guest disk tools: lsblk, newfs and gpart with their man pages, plus the virtio-blk,
+# blockd and fsd-ufs stack.
+#
+# The four tools the login shell runs are staged statically: the release userland is dynamic
+# PIE, and libc `posix_spawn` cannot load an interpreter image through `raven-spawn`
+# (`spawn_image_with_fdmap` refuses it), so a dynamic `/bin/lsblk` would not execute from the
+# shell. `tests/fixtures/disk-tools/build.sh` builds them from the same sources per target arch;
+# S99 uses the same static staging for the UFS demo. `disk-tool-svcctl`/`-mount`/`-umount` are the same
+# first-party tools at test-only paths (their normal `/bin/svcctl` and `/sbin/mount` paths are
+# owned by the shell fragment).
+#
+# The driver entry lives in the single shared `/etc/drivers.toml` staged by 20-net; this
+# fragment does not stage a second table. blockd and fsd-ufs are `enable = false`, so a release
+# image booted without a scratch disk is unchanged; the disk-tools qtest starts them after login
+# now that svcd grants the late scheme prefixes.
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/{arch}/tools/lsblk"
+path = "/bin/lsblk"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/{arch}/tools/newfs"
+path = "/sbin/newfs"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/{arch}/tools/gpart"
+path = "/sbin/gpart"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/{arch}/tools/disk-tool-svcctl"
+path = "/sbin/disk-tool-svcctl"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/{arch}/tools/disk-tool-mount"
+path = "/sbin/disk-tool-mount"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/disk-tools/{arch}/tools/disk-tool-umount"
+path = "/sbin/disk-tool-umount"
+mode = 0o755
+generated = true
+
+[[initfs.programs]]
+package = "virtio-blk"
+path = "/sbin/virtio-blk"
+
+[[initfs.programs]]
+package = "raven-blockd"
+path = "/sbin/blockd"
+
+[[initfs.programs]]
+package = "fsd-ufs"
+path = "/sbin/fsd-ufs"
+
+[[initfs.files]]
+src = "userland/init/services/blockd.toml"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "userland/init/services/fsd-ufs.toml"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "docs/man1/lsblk.1"
+path = "/usr/share/man/man1/lsblk.1"
+
+[[initfs.files]]
+src = "docs/man8/newfs.8"
+path = "/usr/share/man/man8/newfs.8"
+
+[[initfs.files]]
+src = "docs/man8/gpart.8"
+path = "/usr/share/man/man8/gpart.8"

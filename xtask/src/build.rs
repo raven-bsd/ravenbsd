@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::process::{CommandSpec, run as run_command};
+use crate::profiles::Profile;
 use crate::repo::Workspace;
 
 /// A buildable component.
@@ -274,6 +275,122 @@ pub(crate) fn is_release_image_profile(arch: Arch, profile_name: &str) -> bool {
     )
 }
 
+/// True when this image must embed a release kernel and loader.
+///
+/// The release image names are release by default, and any profile can opt in with
+/// `[image] release = true` (the explicit switch for demo and test profiles).
+pub(crate) fn image_build_release(arch: Arch, profile: &Profile) -> bool {
+    profile.image.release || is_release_image_profile(arch, &profile.name)
+}
+
+/// Profile-qualified artifact name for a kernel or loader build.
+///
+/// A release artifact keeps the historical `kernel.elf`/`loader.efi` names so `make release` and
+/// the image path agree; a debug build uses a `-debug` name and never overwrites a release file.
+pub(crate) fn artifact_filename(component: Component, release: bool) -> Option<&'static str> {
+    match component {
+        Component::Kernel => Some(if release {
+            "kernel.elf"
+        } else {
+            "kernel-debug.elf"
+        }),
+        Component::Loader => Some(if release {
+            "loader.efi"
+        } else {
+            "loader-debug.efi"
+        }),
+        Component::User => None,
+    }
+}
+
+/// Profile-qualified artifact path for a kernel or loader.
+pub(crate) fn profile_artifact_path(
+    root: &Path,
+    arch: Arch,
+    component: Component,
+    release: bool,
+) -> PathBuf {
+    match artifact_filename(component, release) {
+        Some(name) => root.join("build").join(arch.as_str()).join(name),
+        None => artifact_path(root, arch, component, ""),
+    }
+}
+
+/// Sidecar recording which cargo profile produced an artifact.
+pub(crate) fn artifact_profile_path(artifact: &Path) -> PathBuf {
+    let mut name = artifact.as_os_str().to_os_string();
+    name.push(".profile");
+    PathBuf::from(name)
+}
+
+/// Parse a sidecar stamp: `Some(true)` for release, `Some(false)` for debug.
+pub(crate) fn parse_artifact_profile(bytes: &[u8]) -> Option<bool> {
+    match std::str::from_utf8(bytes).ok()?.trim() {
+        "release" => Some(true),
+        "debug" => Some(false),
+        _ => None,
+    }
+}
+
+/// Read an artifact's profile stamp.
+pub(crate) fn read_artifact_profile(artifact: &Path) -> Option<bool> {
+    fs::read(artifact_profile_path(artifact))
+        .ok()
+        .and_then(|bytes| parse_artifact_profile(&bytes))
+}
+
+/// Record the cargo profile next to a freshly built artifact.
+pub(crate) fn write_artifact_profile(artifact: &Path, release: bool) -> Result<()> {
+    let path = artifact_profile_path(artifact);
+    let text = if release { "release\n" } else { "debug\n" };
+    fs::write(&path, text).with_context(|| format!("cannot write {}", path.display()))
+}
+
+/// Reject an artifact whose sidecar does not name the requested profile.
+pub(crate) fn verify_artifact_profile(artifact: &Path, release: bool) -> Result<()> {
+    let expected = if release { "release" } else { "debug" };
+    match read_artifact_profile(artifact) {
+        Some(actual) if actual == release => Ok(()),
+        Some(_) => bail!(
+            "{} was built with the {} profile; the image requested {expected}",
+            artifact.display(),
+            if release { "debug" } else { "release" }
+        ),
+        None => bail!(
+            "{} has no build-profile stamp; rebuild it with cargo xtask build",
+            artifact.display()
+        ),
+    }
+}
+
+/// Copy a kernel or loader into its profile path and stamp it.
+///
+/// A release build also refreshes the historical artifact name. A debug build writes only the
+/// `-debug` name when a release artifact already occupies the historical path, so a debug image
+/// never invalidates a release kernel or loader.
+fn install_artifact(
+    root: &Path,
+    arch: Arch,
+    component: Component,
+    release: bool,
+    source: &Path,
+) -> Result<PathBuf> {
+    let destination = profile_artifact_path(root, arch, component, release);
+    copy_artifact(source, &destination)?;
+    write_artifact_profile(&destination, release)?;
+    let legacy = artifact_path(root, arch, component, "");
+    if release {
+        if legacy != destination {
+            copy_artifact(&destination, &legacy)?;
+            write_artifact_profile(&legacy, true)?;
+        }
+    } else if !legacy.exists() {
+        copy_artifact(&destination, &legacy)?;
+        write_artifact_profile(&legacy, false)?;
+    }
+    Ok(destination)
+}
+
 /// True when `data` contains `short` as a standalone build-id token.
 ///
 /// The embedded id is `<short>[-dirty][ <date>]`. A longer hash that merely contains `short`
@@ -347,15 +464,6 @@ pub(crate) fn require_clean_release_head(root: &Path, profile_name: &str) -> Res
         );
     }
     Ok(())
-}
-
-/// The Pi 4 kernel artifact that the image flattens into `kernel8.img`.
-pub(crate) fn pi4_kernel_artifact(root: &Path) -> Result<PathBuf> {
-    Ok(root
-        .join("build/cargo/kernel-aarch64-pi4")
-        .join(target_for(Component::Kernel, Arch::Aarch64)?)
-        .join("debug")
-        .join("raven-kernel"))
 }
 
 /// Build one component and copy its artifacts into `build/<arch>/`.
@@ -438,15 +546,21 @@ pub(crate) fn run(
     let artifact_dir = target_dir.join(target).join(profile_dir);
     match component {
         Component::Kernel => {
-            copy_artifact(
+            install_artifact(
+                &workspace.root,
+                arch,
+                Component::Kernel,
+                release,
                 &artifact_dir.join("raven-kernel"),
-                &artifact_path(&workspace.root, arch, Component::Kernel, ""),
             )?;
         }
         Component::Loader => {
-            copy_artifact(
+            install_artifact(
+                &workspace.root,
+                arch,
+                Component::Loader,
+                release,
                 &artifact_dir.join("raven-loader.efi"),
-                &artifact_path(&workspace.root, arch, Component::Loader, ""),
             )?;
         }
         Component::User => {
@@ -461,6 +575,79 @@ pub(crate) fn run(
         }
     }
     Ok(0)
+}
+
+/// Build the Pi 4 kernel with `RAVEN_PI4=1` and the requested cargo profile.
+///
+/// The generic component build has no `RAVEN_PI4` switch, so the Pi image path uses this entry
+/// for both debug and release kernels. The result is copied and stamped like any other artifact.
+pub(crate) fn run_pi4_kernel(root: &Path, release: bool) -> Result<PathBuf> {
+    let workspace = Workspace::load(root)?;
+    let package = workspace
+        .kernel()
+        .ok_or_else(|| anyhow::anyhow!("component 'kernel' does not exist yet"))?
+        .name
+        .clone();
+    let target = target_for(Component::Kernel, Arch::Aarch64)?;
+    let target_dir = root.join("build/cargo/kernel-aarch64-pi4");
+    let flags = rustflags_string(Component::Kernel, Arch::Aarch64, root, None, false);
+    let head = crate::repo::head_info(root)?;
+    let build_id = if head.dirty {
+        format!("{}-dirty", head.short)
+    } else {
+        head.short.clone()
+    };
+    let mut args = vec![
+        "build".to_string(),
+        "-p".to_string(),
+        package,
+        "--target".to_string(),
+        target.to_string(),
+        "--target-dir".to_string(),
+        target_dir.display().to_string(),
+    ];
+    if release {
+        args.push("--release".to_string());
+    }
+    let mut spec = CommandSpec::new("cargo", args, root)
+        .env("RUSTFLAGS", flags)
+        .env("RAVEN_PI4", "1")
+        .env("SOURCE_DATE_EPOCH", head.epoch.to_string())
+        .env("RAVEN_BUILD_ID", build_id)
+        .env_remove("CARGO_ENCODED_RUSTFLAGS");
+    for key in std::env::vars()
+        .map(|(key, _)| key)
+        .filter(|key| key.starts_with("CARGO_PROFILE_"))
+    {
+        spec = spec.env_remove(key);
+    }
+    if release {
+        spec = spec.env(
+            "CARGO_PROFILE_RELEASE_LTO",
+            release_lto_for(Component::Kernel, Arch::Aarch64),
+        );
+    }
+    println!(
+        "==> build kernel aarch64 (pi4, {target}{})",
+        if release {
+            format!(
+                ", release, {}",
+                release_summary(Component::Kernel, Arch::Aarch64)
+            )
+        } else {
+            String::new()
+        }
+    );
+    let code = run_command(&spec)?;
+    if code != 0 {
+        bail!("Pi kernel build failed with exit code {code}");
+    }
+    let profile_dir = if release { "release" } else { "debug" };
+    let source = target_dir
+        .join(target)
+        .join(profile_dir)
+        .join("raven-kernel");
+    install_artifact(root, Arch::Aarch64, Component::Kernel, release, &source)
 }
 
 fn select_packages(

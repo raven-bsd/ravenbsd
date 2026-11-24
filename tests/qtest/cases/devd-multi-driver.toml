@@ -1,0 +1,156 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K179: both virtio functions in one boot. devd must match and launch virtio-blk (1af4:1042,
+# UFS disk) and virtio-net (1af4:1041, QEMU user network) without losing either. The case mounts
+# the UFS partition and pings the QEMU gateway in the same login session. The profile keeps
+# netd disabled in rc.conf, so the test starts it explicitly after the driver's nic: scheme is
+# registered; the K176 pivot profile owns the service-managed netd ordering.
+
+name = "devd-multi-driver"
+arch = "x86_64"
+profile = "ufs-demo"
+timeout_secs = 420
+pre = ["sh scripts/ufs-demo.sh --prepare"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/fixtures/ufs-demo/disk.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^devd: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1042 irq_line=[0-9]+ irq_pin=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-blk: registered disk$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|devd: .*failed|nic:info: no such file|mount: .*error|mount: .*invalid|blockd: .*failed|virtio-(blk|net): .*failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "mount ufs: /mnt && echo mount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mount-ok$'
+timeout_secs = 60
+
+[[step]]
+send = "echo k179 > /mnt/k179.txt; cat /mnt/k179.txt; echo io-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k179$'
+timeout_secs = 30
+
+[[step]]
+wait = '^io-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "umount /mnt && echo umount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^umount-ok$'
+timeout_secs = 30
+
+# A background job that writes to the controlling tty can be stopped by job control
+# (TOSTOP); redirect netd's console output and print it back from the shell.
+[[step]]
+send = "/sbin/netd netd nic > /tmp/netd.log 2>&1 &\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "sleep 3; cat /tmp/netd.log\n"
+delay_ms = 100
+
+[[step]]
+wait = '^netd: interface eth0 10\.0\.2\.15/24$'
+timeout_secs = 60
+
+[[step]]
+send = "ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

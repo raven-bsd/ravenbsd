@@ -4,12 +4,17 @@
 //! The pty queues and the foreground process group.
 
 use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
-use raven_tty_core::{Discipline, Event, Output, Settings};
+use raven_tty_core::{Discipline, Event, Output, Settings, Termios, Winsize};
 
 /// POSIX SIGINT.
 pub const SIGINT: u32 = 2;
+/// POSIX SIGQUIT.
+pub const SIGQUIT: u32 = 3;
+/// POSIX SIGWINCH.
+pub const SIGWINCH: u32 = 28;
 
 /// Where an interrupt/hangup signal is sent.
 pub trait SignalSink {
@@ -20,6 +25,7 @@ pub trait SignalSink {
 /// One pty pair.
 pub struct Pty<S: SignalSink> {
     discipline: Discipline,
+    winsize: Winsize,
     to_master: VecDeque<u8>,
     to_slave: VecDeque<u8>,
     eof: bool,
@@ -33,6 +39,7 @@ impl<S: SignalSink> Pty<S> {
     pub fn new(sink: S) -> Self {
         Self {
             discipline: Discipline::new(),
+            winsize: Winsize::default(),
             to_master: VecDeque::new(),
             to_slave: VecDeque::new(),
             eof: false,
@@ -50,6 +57,40 @@ impl<S: SignalSink> Pty<S> {
     /// Set the mode/echo settings and return the discarded pending input count.
     pub fn set_settings(&mut self, settings: Settings) -> usize {
         self.discipline.set_settings(settings)
+    }
+
+    /// The complete terminal attribute record shared by the master and the slave.
+    #[must_use]
+    pub fn termios(&self) -> Termios {
+        self.discipline.termios()
+    }
+
+    /// Set the complete terminal attribute record and return the discarded pending input count.
+    pub fn set_termios(&mut self, termios: Termios) -> usize {
+        self.discipline.set_termios(termios)
+    }
+
+    /// The window size shared by the master and the slave.
+    #[must_use]
+    pub const fn winsize(&self) -> Winsize {
+        self.winsize
+    }
+
+    /// Set the window size and signal the foreground group on an actual change.
+    ///
+    /// A fresh pair starts at `0x0` (NetBSD). An identical write is a no-op; a change is stored
+    /// first and then sent as one `SIGWINCH` to the foreground process group (NetBSD
+    /// `sys/kern/tty.c:1478-1487`, FreeBSD `tty_set_winsize` 1838-1845). A hung-up pair sends
+    /// nothing, so a resize cannot reach a job after its terminal closed.
+    pub fn set_winsize(&mut self, winsize: Winsize) {
+        if self.winsize == winsize {
+            return;
+        }
+        self.winsize = winsize;
+        if self.eof || self.fg_pgrp <= 0 {
+            return;
+        }
+        let _ = self.sink.signal(-self.fg_pgrp, SIGWINCH);
     }
 
     /// Drive input from the master side through the discipline.
@@ -71,15 +112,25 @@ impl<S: SignalSink> Pty<S> {
                 Event::EndOfFile => self.eof = true,
             }
         }
+        if output.quit && self.fg_pgrp > 0 {
+            let _ = self.sink.signal(-self.fg_pgrp, SIGQUIT);
+        }
     }
 
-    /// Write output from the slave side; it becomes readable on the master.
+    /// Write output from the slave side; it becomes readable on the master after `OPOST`.
     pub fn write_slave(&mut self, data: &[u8]) {
-        self.to_master.extend(data.iter().copied());
+        let mut output = Vec::with_capacity(data.len());
+        self.discipline.process_output(data, &mut output);
+        self.to_master.extend(output);
     }
 
-    /// Read bytes for the master side, or `EAGAIN` when no data is queued.
+    /// Read bytes for the master side, `EAGAIN` while the slave is open, or `EIO` after it is
+    /// gone. Queued master data drains first. Donor: FreeBSD `sys/kern/tty_pts.c:110 ptsdev_read`
+    /// returns `EIO` at `:223` when the slave side is finished.
     pub fn read_master(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
+        if self.eof && self.to_master.is_empty() {
+            return Err(Errno::EIO);
+        }
         take(&mut self.to_master, buffer, self.eof)
     }
 

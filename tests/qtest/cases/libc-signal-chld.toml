@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K548/PG-7: asynchronous SIGCHLD delivery through the kernel's SIG_SETUP entry.
+# The fixture blocks SIGCHLD, lets a child exit and reap it, then unblocks (the pending
+# signal runs the handler). It then forks again and reaps the second child while SIGCHLD
+# is unblocked, so the handler must run during the blocking wait. The wait loop accepts
+# EINTR and retries; the libc must not suppress the interrupted wait. It runs as
+# /bin/libc-test under the libc-test profile.
+
+name = "libc-signal-chld"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/libc/target/build.sh signal-chld x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-signal-chld: start$'
+
+[[expect]]
+regex = '^libc-signal-chld: sigaction ok$'
+
+[[expect]]
+regex = '^libc-signal-chld: blocked child reaped$'
+
+[[expect]]
+regex = '^libc-signal-chld: pending handler ran$'
+
+[[expect]]
+regex = '^libc-signal-chld: wait eintr ok$'
+
+[[expect]]
+regex = '^libc-signal-chld: wait handler ran$'
+
+[[expect]]
+regex = '^libc-signal-chld: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-signal-chld: fail'

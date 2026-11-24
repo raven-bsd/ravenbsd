@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-mpsc-wake-image"
+version = "0.1.0"
+description = "K155 host tool: add the std fixture to the shell-test initfs"
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "mpsc-wake-image"
+path = "src/main.rs"
+
+[dependencies]
+raven-initfs = { path = "../../../../../crates/raven-initfs", features = ["std"] }

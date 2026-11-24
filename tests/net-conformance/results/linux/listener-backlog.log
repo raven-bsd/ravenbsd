@@ -1,0 +1,5 @@
+endpoint: READY
+backlog SYN-ACK src=28469 10.26.3.1:24006->10.26.3.2:28469 [SA] seq=2107712533 ack=3257956883 win=64240 len=0 mss=1460 ws=None sack=True
+backlog synacks=1/5 (backlog 1, syncookies off)
+RESULT listener-backlog PASS synacks=1/5, backlog drops observed elapsed=2.17s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/listener-backlog.pcap

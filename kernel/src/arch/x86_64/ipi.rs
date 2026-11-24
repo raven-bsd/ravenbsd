@@ -69,12 +69,71 @@ core::arch::global_asm!(
     ipi_stub tlb_isr, tlb_interrupt
     ipi_stub call_isr, call_interrupt
     ipi_stub ap_timer_isr, ap_timer_interrupt
+
+    /* NMI entry. Unlike a maskable IPI, an NMI can land inside the syscall entry/exit
+     * `swapgs` window, where CS is already kernel but GS is still the user base. Read the
+     * privileged KERNEL_GS_BASE MSR: a kernel address there means the bases are not swapped
+     * yet, so swap before any per-CPU access. r15 holds the swap flag across the handler. */
+    .macro nmi_ipi_stub name, target
+    .global \name
+    .type \name, @function
+\name:
+    cld
+    push rax
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push r8
+    push r9
+    push r10
+    push r11
+    push rbp
+    push r15
+    mov rbp, rsp
+    xor r15d, r15d
+    mov ecx, 0xc0000102
+    rdmsr
+    shl rdx, 32
+    or rax, rdx
+    mov rcx, rax
+    shr rcx, 47
+    cmp rcx, 0x1ffff
+    jb 1f
+    swapgs
+    mov r15, 1
+1:
+    mov rdi, rbp
+    and rsp, -16
+    call \target
+    mov rsp, rbp
+    test r15, r15
+    jz 2f
+    swapgs
+2:
+    pop r15
+    pop rbp
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rax
+    iretq
+    .size \name, . - \name
+    .endm
+
+    nmi_ipi_stub nmi_tlb_isr, nmi_tlb_interrupt
 "#
 );
 
 unsafe extern "C" {
     fn reschedule_isr();
     fn tlb_isr();
+    fn nmi_tlb_isr();
     fn call_isr();
     fn ap_timer_isr();
 }
@@ -85,6 +144,7 @@ pub fn install() -> bool {
         u16::from(RESCHEDULE_VECTOR),
         reschedule_isr as *const () as u64,
     ) && idt::set_handler(u16::from(TLB_VECTOR), tlb_isr as *const () as u64)
+        && idt::set_handler(2, nmi_tlb_isr as *const () as u64)
         && idt::set_handler(u16::from(CALL_VECTOR), call_isr as *const () as u64)
         && idt::set_handler(u16::from(AP_TIMER_VECTOR), ap_timer_isr as *const () as u64)
 }
@@ -104,8 +164,17 @@ pub fn send_reschedule(cpu: usize) {
 }
 
 /// Ask `cpu` to flush its TLB.
+///
+/// S159 delivers the shootdown as an NMI so the target takes it even while IF is clear in a
+/// long EXIT, usercopy-fault or scheduler critical section. A fixed IPI waits for IF=1 and can
+/// miss the 100 ms deadline; the donor NetBSD shootdown waits indefinitely with interrupts
+/// enabled (`x86_tlb.c` `pmap_tlb_shootnow`), which is not acceptable as a kernel-wide hang.
 pub fn send_tlb(cpu: usize) {
-    send(cpu, TLB_VECTOR);
+    if cpu >= smp::online_cpus() || cpu == smp::percpu::this_cpu() {
+        return;
+    }
+    let destination = ap_start::apic_id(cpu);
+    apic::send_nmi(destination);
 }
 
 /// Run the probe handler on `cpu`.
@@ -124,8 +193,21 @@ extern "C" fn reschedule_interrupt(rsp: u64) {
 
 #[unsafe(no_mangle)]
 extern "C" fn tlb_interrupt(_rsp: u64) {
-    smp::shootdown::handle_ipi();
+    let _ = smp::shootdown::handle_ipi();
     apic::eoi();
+}
+
+/// NMI form of the TLB shootdown (S159).
+///
+/// NMI is not an in-service local-APIC interrupt, so this handler deliberately does not send an
+/// EOI. The handler only touches the shootdown atomics and `invlpg`; it is safe in any kernel
+/// context, including an IF=0 critical section. An NMI with no pending shootdown is reported
+/// through the emergency console, preserving the previous generic NMI diagnostic.
+#[unsafe(no_mangle)]
+extern "C" fn nmi_tlb_interrupt(_rsp: u64) {
+    if !smp::shootdown::handle_ipi() {
+        crate::kprintln_emergency!("EXCEPTION: nmi with no pending shootdown");
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -138,6 +220,7 @@ extern "C" fn call_interrupt(_rsp: u64) {
 extern "C" fn ap_timer_interrupt(rsp: u64) {
     // SAFETY: `rsp` is the interrupted kernel stack pointer; RIP is at `rsp + 80`, CS at +88.
     let cs = unsafe { core::ptr::read_volatile(rsp.saturating_add(88) as *const u64) };
+    crate::time::on_ap_tick();
     crate::sched::tick();
     apic::eoi();
     crate::sched::timer_return(cs & 3 == 3);

@@ -1,0 +1,275 @@
+
+   Compiling raven-kernel v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/kernel)
+   Compiling spin v0.9.9
+   Compiling raven-mem v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/crates/raven-mem)
+   Compiling acpi v5.2.0
+error[E0433]: cannot find module or crate `std` in this scope
+ --> kernel/src/memory/../../../crates/raven-frames/src/cache_ut.rs:8:5
+  |
+8 | use std::collections::BTreeSet;
+  |     ^^^ use of unresolved module or unlinked crate `std`
+  |
+  = help: if you wanted to use a crate named `std`, use `cargo add std` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `crate::buddy`
+ --> kernel/src/memory/../../../crates/raven-frames/src/cache_ut.rs:7:12
+  |
+7 | use crate::buddy::{Block, BuddyAllocator, BuddyError, NoPager, Pager};
+  |            ^^^^^ unresolved import
+  |
+help: a similar path exists
+  |
+7 | use crate::process::tests::frame::buddy::{Block, BuddyAllocator, BuddyError, NoPager, Pager};
+  |            +++++++++++++++++++++++
+
+error: cannot find macro `vec` in this scope
+   --> kernel/src/syscall/record_lock_ut.rs:137:9
+    |
+137 |         vec![Range { start: 0, end: 39 }, Range { start: 60, end: 99 },]
+    |         ^^^
+    |
+help: consider importing this macro
+    |
+  6 + use alloc::vec;
+    |
+
+error: cannot find macro `vec` in this scope
+   --> kernel/src/syscall/record_lock_ut.rs:117:9
+    |
+117 |         vec![
+    |         ^^^
+    |
+help: consider importing this macro
+    |
+  6 + use alloc::vec;
+    |
+
+error: cannot find macro `format` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:244:33
+    |
+244 |                 CmdLine::parse(&format!("loglevel={text}")).loglevel(),
+    |                                 ^^^^^^
+    |
+help: consider importing this macro
+    |
+141 +     use alloc::format;
+    |
+
+error: cannot find macro `format` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:218:24
+    |
+218 |             let text = format!("test-exit={value}");
+    |                        ^^^^^^
+    |
+help: consider importing this macro
+    |
+141 +     use alloc::format;
+    |
+
+error: cannot find macro `format` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:209:24
+    |
+209 |             let text = format!("test-exit={value}");
+    |                        ^^^^^^
+    |
+help: consider importing this macro
+    |
+141 +     use alloc::format;
+    |
+
+error: cannot find macro `format` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:203:30
+    |
+203 |         assert_eq!(line.get(&format!("k{MAX_TOKENS}")), None);
+    |                              ^^^^^^
+    |
+help: consider importing this macro
+    |
+141 +     use alloc::format;
+    |
+
+error: cannot find macro `format` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:202:30
+    |
+202 |         assert_eq!(line.get(&format!("k{}", MAX_TOKENS - 1)), Some("v"));
+    |                              ^^^^^^
+    |
+help: consider importing this macro
+    |
+141 +     use alloc::format;
+    |
+
+error: cannot find macro `format` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:198:28
+    |
+198 |             text.push_str(&format!("k{index}=v "));
+    |                            ^^^^^^
+    |
+help: consider importing this macro
+    |
+141 +     use alloc::format;
+    |
+
+error[E0433]: cannot find module or crate `std` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:378:5
+    |
+378 |     std::thread::Builder::new()
+    |     ^^^ use of unresolved module or unlinked crate `std`
+    |
+    = help: if you wanted to use a crate named `std`, use `cargo add std` to add it to your `Cargo.toml`
+
+error[E0433]: cannot find type `String` in this scope
+   --> kernel/src/../../crates/raven-cmdline/src/imp.rs:196:24
+    |
+196 |         let mut text = String::new();
+    |                        ^^^^^^ use of undeclared type `String`
+    |
+    = note: struct `crate::process::tests::String` exists but is inaccessible
+help: consider importing this struct
+    |
+141 +     use alloc::string::String;
+    |
+
+error[E0425]: cannot find type `Vec` in this scope
+  --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:49:21
+   |
+49 |     let mut sorted: Vec<(u64, u64)> = live
+   |                     ^^^ not found in this scope
+   |
+   = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+   |
+ 6 + use alloc::vec::Vec;
+   |
+
+error[E0425]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:193:23
+    |
+193 |         let mut live: Vec<(u64, usize)> = Vec::new();
+    |                       ^^^ not found in this scope
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0433]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:193:43
+    |
+193 |         let mut live: Vec<(u64, usize)> = Vec::new();
+    |                                           ^^^ use of undeclared type `Vec`
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0425]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:247:19
+    |
+247 |     let mut live: Vec<(u64, usize)> = Vec::new();
+    |                   ^^^ not found in this scope
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0433]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:247:39
+    |
+247 |     let mut live: Vec<(u64, usize)> = Vec::new();
+    |                                       ^^^ use of undeclared type `Vec`
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0425]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:392:27
+    |
+392 |             let mut live: Vec<u64> = Vec::new();
+    |                           ^^^ not found in this scope
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0433]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/buddy_ut.rs:392:38
+    |
+392 |             let mut live: Vec<u64> = Vec::new();
+    |                                      ^^^ use of undeclared type `Vec`
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0425]: cannot find type `Vec` in this scope
+  --> kernel/src/memory/../../../crates/raven-frames/src/cache_ut.rs:77:17
+   |
+77 |     let frames: Vec<u64> = (0..12)
+   |                 ^^^ not found in this scope
+   |
+   = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+   |
+ 6 + use alloc::vec::Vec;
+   |
+
+error[E0425]: cannot find type `Vec` in this scope
+   --> kernel/src/memory/../../../crates/raven-frames/src/cache_ut.rs:143:22
+    |
+143 |     let mut to_free: Vec<u64> = live.iter().copied().take(32).collect();
+    |                      ^^^ not found in this scope
+    |
+    = note: struct `crate::syscall::record_lock::tests::Vec` exists but is inaccessible
+help: consider importing this struct
+    |
+  6 + use alloc::vec::Vec;
+    |
+
+error[E0433]: cannot find `LockStats` in `crate`
+   --> kernel/src/../../crates/raven-turnstile/src/donation_ut.rs:214:36
+    |
+214 |     assert_eq!(d.stats(99), crate::LockStats::default());
+    |                                    ^^^^^^^^^ could not find `LockStats` in the crate root
+    |
+help: consider importing this struct through its public re-export
+    |
+  6 + use crate::sync::LockStats;
+    |
+help: if you import `LockStats`, refer to it directly
+    |
+214 -     assert_eq!(d.stats(99), crate::LockStats::default());
+214 +     assert_eq!(d.stats(99), LockStats::default());
+    |
+
+error[E0152]: found duplicate lang item `panic_impl`
+   --> kernel/src/log.rs:233:1
+    |
+233 | / fn panic(info: &PanicInfo<'_>) -> ! {
+234 | |     crate::arch::serial::init();
+235 | |     let mut serial = Serial;
+236 | |     let location = info.location();
+...   |
+251 | |     crate::arch::halt()
+252 | | }
+    | |_^
+    |
+    = note: the lang item is first defined in crate `std` (which `raven_kernel` depends on)
+    = note: first definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.so, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rlib, /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+    = note: second definition in the local crate (`raven_kernel`)
+
+Some errors have detailed explanations: E0152, E0425, E0432, E0433.
+For more information about an error, try `rustc --explain E0152`.
+error: could not compile `raven-kernel` (bin "raven-kernel" test) due to 23 previous errors

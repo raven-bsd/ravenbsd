@@ -1,0 +1,56 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 21, 2026
+.Dt KSTAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm kstat
+.Nd print typed kernel statistics
+.Sh SYNOPSIS
+.Nm
+.Op Fl n
+.Op Fl h
+.Op Ar module:instance:name
+.Sh DESCRIPTION
+.Nm reads the bounded DTrace per-CPU ring statistics through the existing
+.Dv DTRACE_STATS
+syscall and prints them as typed
+.Dq module:instance:name
+records.
+The first consumer exposes the per-CPU
+.Dq produced ,
+.Dq consumed ,
+.Dq dropped
+and
+.Dq capacity
+counters plus checked global sums and the represented CPU count.
+.Pp
+The model uses 30-byte name components and the Illumos
+.Dv KSTAT_DATA_*
+types and units.
+A malformed name is rejected with a stated error; a full
+caller buffer or aggregate overflow is an error, never a wrap.
+.Bl -tag -width Ds
+.It Fl n
+Emit one JSON object per line instead of the human
+.Dq kstat: name=... type=... unit=... value=...
+lines.
+.It Fl h
+Print usage.
+.It Ar module:instance:name
+Print only the exact named record.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Bd -literal -offset indent
+$ kstat dtrace:global:produced
+kstat: name=dtrace:global:produced type=uint64 unit=count value=17
+
+$ kstat -n dtrace:cpu0:capacity
+{"name":"dtrace:cpu0:capacity","type":"uint64","unit":"count","value":4096}
+.Ed
+.Sh SEE ALSO
+.Xr dtrace 1
+.Sh STANDARDS
+RavenBSD ABI v1.

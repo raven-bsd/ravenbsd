@@ -1,0 +1,51 @@
+# RavenBSD top-level Make help manifest.
+group:Start
+setup|Install host packages, the pinned Rust toolchain and firmware paths
+doctor|Report installed and missing host prerequisites
+group:Build
+dev|Debug build of every component that exists
+release|Optimised build of every component
+kernel|Build the kernel (ARCH, PLATFORM, RELEASE=1)
+loader|Build the UEFI loader (ARCH, RELEASE=1)
+brush|Build the brush shell (ARCH, RELEASE=1)
+image|Build a bootable image (ARCH, PLATFORM, PROFILE)
+run|Boot the selected profile in QEMU
+group:Test
+check|Full gate: stable guard, fmt, clippy, tests, provenance
+check-fast|Fast changed-package gate for everyday edits
+check-build|Compile all workspace tests; fail on unowned failure (pre-tag: check-fast, check-build, qtests)
+check-full|Full allocator stress gate
+guard|Stable-Rust guard only
+test|Full check plus every QEMU integration test
+ufs-selftest|Validate the in-place UFS image/card updater
+qemu-ufs|Boot the QEMU UFS-root preflight (development)
+soak-smoke|Bounded soak/freeze harness smoke (default 120 s)
+group:Release
+release-gate|Full release check plus the QEMU release-login gate
+soak-24h|Owner 24 h soak/freeze run (timeout 90000)
+world|Build the libc-world test set
+posix-gaps|List POSIX conformance gaps
+posix-check|Run the POSIX conformance profile
+toolchain|Rebuild the pinned Rust toolchain
+group:Maintenance
+provenance|SPDX, donor and dependency provenance check
+info|Code statistics: Rust code lines, files and the language mix
+space|Show target/build disk use and free space
+prune|Remove safe build caches (dry-run; PRUNE_APPLY=1 deletes)
+clean|Remove build output
+distclean|Remove build output, vendor and local caches
+help-xtask|Raw xtask command list
+help|Show this grouped help
+group:Variables
+ARCH|Target architecture: x86_64, aarch64 or riscv64
+PLATFORM|Board platform: generic or pi4
+PROFILE|Image profile: base, shell, release, pi4-release, ...
+RELEASE|Set to 1 for an optimised component build
+VERBOSE|Set to 1 to print the commands xtask runs
+SOAK_SECONDS|Smoke workload seconds (default 120)
+SOAK_INTERVAL|Smoke workload cycle seconds (default 5)
+SOAK_PROFILE|Soak image profile (default release)
+SPACE_MIN_GB|Minimum free GiB required before an image build (default 20)
+PRUNE_APPLY|Set to 1 to delete pruned files instead of dry-run
+PRUNE_DAYS|Age in days for old build images and logs (default 14)
+PRUNE_DEPS|Set to 1 to run cargo-sweep on old dependency artifacts

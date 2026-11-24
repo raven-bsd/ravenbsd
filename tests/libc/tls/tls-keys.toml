@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S188: POSIX pthread key destructor order. Thread 1's key A destructor reads key B (which must
+# still be 42); thread 2's destructor re-sets its own key and must run exactly the iteration bound.
+
+name = "tls-keys"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/libc/tls/build.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^tls-keys: a dtor value=7 b=42$'
+
+[[expect]]
+regex = '^tls-keys: b dtor value=42$'
+
+[[expect]]
+regex = '^tls-keys: reader ok a=1 b=1 b-value=42$'
+
+[[expect]]
+regex = '^tls-keys: self dtor count=4 value=1$'
+unordered = true
+
+[[expect]]
+regex = '^tls-keys: self ok runs=4$'
+
+[[expect]]
+regex = '^tls-keys: PASS$'

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Host-backed EMMC2 fake card, blockd, read-write fsd-ufs and vfsd. The GPT+UFS
+# image is injected at /etc/pi4-root.img by the image builder.
+
+[[initfs.programs]]
+package = "emmc2"
+path = "/sbin/emmc2"
+
+[[initfs.programs]]
+package = "raven-blockd"
+path = "/sbin/blockd"
+
+[[initfs.programs]]
+package = "fsd-ufs"
+path = "/sbin/fsd-ufs"
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/emmc2.manifest"
+path = "/etc/services.d/emmc2.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-root-rw-test.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-rootfs.d/fsd-ufs-rw.manifest"
+path = "/etc/services.d/fsd-ufs.toml"

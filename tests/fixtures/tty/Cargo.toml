@@ -36,6 +36,7 @@ path = "src/hup_child.rs"
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-libc-proc = { path = "../../../libc/ravenlibc/crates/raven-libc-proc" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
 raven-scheme = { path = "../../../crates/raven-scheme" }

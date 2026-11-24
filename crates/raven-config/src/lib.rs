@@ -18,13 +18,19 @@
 mod config;
 mod error;
 mod merge;
+mod network;
 mod node;
 mod schema;
 mod services;
+pub mod users;
 
 pub use config::{Config, ConfigLoader};
 pub use error::ConfigError;
 pub use merge::merge;
+pub use network::{
+    HOSTNAME_MAX, NETWORK_DROP_IN, NetworkConfig, NetworkMode, StaticNetwork,
+    from_node as network_from_node, validate_hostname, write_drop_in as write_network_drop_in,
+};
 pub use node::Node;
 pub use schema::{check_secret_mode, parse_duration, parse_size, validate_path};
 pub use services::{ServiceSet, load_services, set_enabled};

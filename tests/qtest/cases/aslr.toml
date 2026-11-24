@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K502: ASLR probe. The dynamic PIE parent execs itself 20 times; each child reports the stack
+# top, first anonymous mmap base, PIE load base and interpreter base. The probe checks the
+# documented windows, page alignment and the spread. A no-exec fork child must inherit the parent
+# layout. The fixed case (`aslr=off`) expects identical layouts and the same baseline.
+name = "aslr"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/aslr/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^aslr: stable same=1$'
+
+[[expect]]
+regex = '^aslr: fork inherits same=1$'
+
+[[expect]]
+regex = '^aslr: run=\d+ stack=0x[0-9a-f]+ mmap=0x[0-9a-f]+ pie=0x[0-9a-f]+ interp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^aslr: summary distinct-stack=\d+ distinct-mmap=\d+ distinct-pie=\d+ distinct-interp=\d+$'
+
+[[expect]]
+regex = '^aslr: pass runs=20$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|aslr: FAIL|aslr: fixed-layout'

@@ -4,8 +4,13 @@
 use core::ffi::{c_int, c_ulong};
 
 use raven_libc_abi::structs::Termios;
-use raven_libc_platform::xlat::{FIOCLEX, FIONBIO, TCGETS, TCSETS, TCSETSF, TCSETSW};
+use raven_libc_compat::Winsize;
+use raven_libc_platform::xlat::{
+    FIOCLEX, FIONBIO, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGWINSZ, TIOCSWINSZ,
+};
 
+use crate::compat::TIOCSCTTY;
+use crate::compat::pty_state::PROC_CTTY_SET;
 use crate::stdio::va::{List, reader};
 use crate::va::VaReaderExt;
 
@@ -49,12 +54,56 @@ fn dispatch(
             raven_libc_platform::ioctl::ioctl_tcsets(crate::ffi::platform::global(), fd, &value)?;
             Ok(0)
         }
+        TIOCGWINSZ => {
+            if argument == 0 {
+                return Err(raven_libc_platform::Errno::EFAULT);
+            }
+            let size =
+                raven_libc_platform::ioctl::tcgetwinsize(crate::ffi::platform::global(), fd)?;
+            // SAFETY: the caller's TIOCGWINSZ contract is a writable `struct winsize`.
+            unsafe {
+                core::ptr::write(
+                    argument as *mut Winsize,
+                    Winsize {
+                        ws_row: size.row,
+                        ws_col: size.col,
+                        ws_xpixel: size.xpixel,
+                        ws_ypixel: size.ypixel,
+                    },
+                );
+            }
+            Ok(0)
+        }
+        TIOCSWINSZ => {
+            if argument == 0 {
+                return Err(raven_libc_platform::Errno::EFAULT);
+            }
+            // SAFETY: the caller's TIOCSWINSZ contract is a readable `struct winsize`.
+            let value = unsafe { core::ptr::read(argument as *const Winsize) };
+            let size = raven_libc_platform::ioctl::Winsize {
+                row: value.ws_row,
+                col: value.ws_col,
+                xpixel: value.ws_xpixel,
+                ypixel: value.ws_ypixel,
+            };
+            raven_libc_platform::ioctl::tcsetwinsize(crate::ffi::platform::global(), fd, &size)?;
+            Ok(0)
+        }
         FIONBIO | FIOCLEX => raven_libc_platform::ioctl::ioctl(
             crate::ffi::platform::global(),
             fd,
             request,
             argument as i32,
         ),
+        // `TIOCSCTTY` is a kernel session operation, not a scheme CALL: give the kernel the
+        // descriptor's live terminal handle. OpenSSH `pty_make_controlling_tty` calls this.
+        request if request == TIOCSCTTY as u32 => {
+            let handle = crate::ffi::platform::global().get(fd)?.handle();
+            // SAFETY: `PROC_CTTY_SET` takes one live scheme-file handle owned by the caller.
+            let raw = unsafe { raven_libc_sys::arch::syscall1(PROC_CTTY_SET, handle.0 as usize) };
+            raven_libc_sys::errno::ret(raw)?;
+            Ok(0)
+        }
         _ => raven_libc_platform::ioctl::ioctl(
             crate::ffi::platform::global(),
             fd,

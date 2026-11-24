@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K238 net-two-reads-exec service: run the exec/fork phase of the two-read fixture.
+name = "net-two-reads-exec"
+exec = "/bin/net-two-reads-exec"
+needs = ["scheme:net"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

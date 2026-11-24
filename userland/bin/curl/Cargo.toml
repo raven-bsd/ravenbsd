@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "curl"
+version = "0.1.0"
+description = "Simple curl for RavenBSD HTTP and the OpenSSL TLS add-on."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "curl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "curl"
+path = "src/main.rs"
+
+[features]
+default = []
+# Link the owner-approved OpenSSL add-on through raven-tls. The base build stays C-free and
+# returns EUNAVAILABLE for HTTPS.
+tls = ["dep:raven-tls", "dep:raven-scheme", "dep:raven-proto-net"]
+
+[dependencies]
+raven-http = { path = "../../../crates/raven-http" }
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-tls = { path = "../../../crates/raven-tls", optional = true }
+raven-scheme = { path = "../../../crates/raven-scheme", optional = true }
+raven-proto-net = { path = "../../../crates/raven-proto-net", optional = true }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-http-net = { path = "../../../crates/raven-http-net" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[lints]
+workspace = true

@@ -12,7 +12,10 @@
 extern crate alloc;
 
 pub mod dtb;
+pub mod pci;
 pub mod platform;
 
 #[cfg(test)]
 mod dtb_ut;
+#[cfg(test)]
+mod pci_ut;

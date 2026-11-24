@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K185: apply raven-ufs to the assembled qemu-ufs root disk, then boot it. The
+# release bootstrap ESP and the standard root disk are built by the harness; the
+# pre step copies the assembled root disk and updates /etc/ufs-update.txt in place.
+
+name = "ufs-update"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 240
+pre = ["sh tests/fixtures/ufs-update/prepare.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/qtest/ufs-update-root.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^k185-first$'
+
+[[expect]]
+regex = '^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|no UFS root device|cannot access'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/cat /etc/ufs-update.txt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k185-first$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/df -h /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

@@ -12,6 +12,7 @@ fn spec(script: &str, timeout: Duration) -> RunSpec {
         program: "sh".to_string(),
         args: vec!["-c".to_string(), script.to_string()],
         timeout,
+        keep_ansi: false,
     }
 }
 
@@ -209,6 +210,133 @@ fn timeout_leaves_no_process_matching_the_runner() {
     assert!(
         !pgrep.status.success(),
         "process survived the timeout: {}",
+        String::from_utf8_lossy(&pgrep.stdout)
+    );
+}
+
+#[test]
+fn a_watched_run_stops_after_the_last_expectation() {
+    let text = "name = \"watch\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 30\n\
+                expect_exit = \"success\"\n\
+                [[expect]]\nregex = \"^hello$\"\n\
+                [[expect]]\nregex = \"^world$\"\n";
+    let case = Case::parse(text).expect("case");
+    let started = Instant::now();
+    let output = run_watched(
+        &spec(
+            "printf 'hello\\n'; printf 'world\\n'; sleep 30",
+            Duration::from_secs(30),
+        ),
+        None,
+        &case,
+        None,
+    )
+    .unwrap();
+    assert!(output.completed);
+    assert!(!output.timed_out);
+    assert!(output.step_failure.is_none());
+    assert_eq!(output.status, None);
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+#[test]
+fn a_watched_run_does_not_match_a_partial_line() {
+    let text = "name = \"partial\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 30\n\
+                expect_exit = \"success\"\n\
+                [[expect]]\nregex = \"^hello$\"\n";
+    let case = Case::parse(text).expect("case");
+    let started = Instant::now();
+    let output = run_watched(
+        &spec(
+            "printf 'hel'; sleep 1; printf 'lo'; sleep 1; printf '\\n'; sleep 30",
+            Duration::from_secs(30),
+        ),
+        None,
+        &case,
+        None,
+    )
+    .unwrap();
+    assert!(output.completed);
+    assert!(
+        started.elapsed() >= Duration::from_millis(1800),
+        "matched before the newline after {:?}",
+        started.elapsed()
+    );
+    assert!(output.lines.contains(&"hello".to_string()));
+}
+
+#[test]
+fn an_unordered_expectation_matches_before_an_earlier_ordered_line() {
+    let text = "name = \"race\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 30\n\
+                expect_exit = \"success\"\n\
+                [[expect]]\nregex = \"^child$\"\n\
+                [[expect]]\nregex = \"^monitor$\"\nunordered = true\n";
+    let case = Case::parse(text).expect("case");
+    let started = Instant::now();
+    let output = run_watched(
+        &spec(
+            "printf 'monitor\\n'; printf 'child\\n'; sleep 30",
+            Duration::from_secs(30),
+        ),
+        None,
+        &case,
+        None,
+    )
+    .unwrap();
+    assert!(output.completed);
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+#[test]
+fn a_watched_run_writes_the_serial_log() {
+    let temp = crate::testutil::TempDir::new("runner-log");
+    let log = temp.path().join("serial.log");
+    let text = "name = \"watch-log\"\narch = \"x86_64\"\nprofile = \"base\"\n\
+                timeout_secs = 30\nexpect_exit = \"success\"\n\
+                [[expect]]\nregex = \"^hello$\"\n";
+    let case = Case::parse(text).expect("case");
+    let output = run_watched(
+        &spec("printf 'hello\\n'; sleep 30", Duration::from_secs(30)),
+        None,
+        &case,
+        Some(&log),
+    )
+    .unwrap();
+    assert!(output.completed);
+    let captured = std::fs::read_to_string(&log).expect("serial log exists");
+    assert!(captured.contains("hello"), "{captured:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_live_runner_holding_a_file_is_terminated_and_released() {
+    use std::os::unix::process::CommandExt;
+
+    let temp = crate::testutil::TempDir::new("runner-lock");
+    let image = temp.path().join("case.img");
+    std::fs::write(&image, b"image").unwrap();
+    let marker = format!("raven-qtest-lock-{}", std::process::id());
+    let script = format!("# {marker}\nexec 3>>{}; sleep 30", image.display());
+    let mut command = Command::new("sh");
+    command.arg("-c").arg(&script);
+    command.process_group(0);
+    let mut child = command.spawn().expect("fake qemu starts");
+    thread::sleep(Duration::from_millis(100));
+
+    kill_tree(&mut child);
+    let status = child.wait().expect("fake qemu is reaped");
+    assert!(!status.success(), "the process must not exit successfully");
+
+    // No live handle remains: the image can be replaced in place.
+    std::fs::write(&image, b"replacement").expect("the image handle was released");
+    let pgrep = Command::new("pgrep")
+        .arg("-f")
+        .arg(&marker)
+        .output()
+        .expect("pgrep runs");
+    assert!(
+        !pgrep.status.success(),
+        "process survived the reap: {}",
         String::from_utf8_lossy(&pgrep.stdout)
     );
 }

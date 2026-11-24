@@ -14,6 +14,8 @@ use core::cell::UnsafeCell;
 use core::mem::size_of;
 use core::ptr::NonNull;
 
+use acpi::address::AddressSpace;
+use acpi::fadt::Fadt;
 use acpi::madt::Madt;
 use acpi::mcfg::Mcfg;
 use acpi::{AcpiHandler, AcpiTables, PhysicalMapping};
@@ -115,6 +117,16 @@ pub struct AcpiInfo {
     pub mcfg_start_bus: u8,
     /// Last bus of the first MCFG entry.
     pub mcfg_end_bus: u8,
+    /// FADT PM1a control I/O port (zero when unavailable).
+    pub pm1a_control: u16,
+    /// FADT PM1b control I/O port (zero when unavailable).
+    pub pm1b_control: u16,
+    /// FADT reset I/O port (zero when unavailable).
+    pub reset_register: u16,
+    /// FADT reset value.
+    pub reset_value: u8,
+    /// True when the FADT advertises a usable system-reset register.
+    pub reset_supported: bool,
 }
 
 impl AcpiInfo {
@@ -134,6 +146,11 @@ impl AcpiInfo {
             mcfg_base: 0,
             mcfg_start_bus: 0,
             mcfg_end_bus: 0,
+            pm1a_control: 0,
+            pm1b_control: 0,
+            reset_register: 0,
+            reset_value: 0,
+            reset_supported: false,
         }
     }
 
@@ -314,6 +331,30 @@ fn parse(rsdp: usize) -> Result<AcpiInfo, ()> {
         info.mcfg_base = entry.base_address;
         info.mcfg_start_bus = entry.bus_number_start;
         info.mcfg_end_bus = entry.bus_number_end;
+    }
+    if let Ok(fadt) = tables.find_table::<Fadt>() {
+        if let Ok(block) = fadt.pm1a_control_block()
+            && matches!(block.address_space, AddressSpace::SystemIo)
+            && block.address <= u64::from(u16::MAX)
+        {
+            info.pm1a_control = block.address as u16;
+        }
+        if let Ok(Some(block)) = fadt.pm1b_control_block()
+            && matches!(block.address_space, AddressSpace::SystemIo)
+            && block.address <= u64::from(u16::MAX)
+        {
+            info.pm1b_control = block.address as u16;
+        }
+        let flags = fadt.flags;
+        if flags.supports_system_reset_via_fadt()
+            && let Ok(register) = fadt.reset_register()
+            && matches!(register.address_space, AddressSpace::SystemIo)
+            && register.address <= u64::from(u16::MAX)
+        {
+            info.reset_register = register.address as u16;
+            info.reset_value = fadt.reset_value;
+            info.reset_supported = true;
+        }
     }
     info.cpus = 0;
     info.io_apic_count = 0;

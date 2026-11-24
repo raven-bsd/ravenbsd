@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-lock-time-tlb-repro"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/lock-time/build.sh"]
+initfs = "build/smp/lock-time/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = []
+expect_exit = "success"
+
+# TLB-shootdown reproducer for kernel/src/smp/shootdown.rs:122.
+# Memory pressure runs on every futex hop (mem_period=1) and the timer threads are off
+# (timers=0), so the only stress is map/unmap + the futex ring. S113 fixed target IPI delivery;
+# the former 100 ms acknowledgement timeout is gone, so this case is now a strict clean gate.
+[[step]]
+wait = '^lock-time: ready$'
+send = "10 4 on 1 0\n"
+delay_ms = 50
+
+[[expect]]
+regex = '^lock-time: workers=8 timers=0 iterations=10 cpus=4 mode=on mem_period=1$'
+
+[[expect]]
+regex = '^lock-time: iter=0 hops=[1-9]\d* p50_ns=\d+ p90_ns=\d+ p99_ns=\d+ max_ns=\d+ timer_p50_ns=\d+ timer_p90_ns=\d+ timer_max_ns=\d+ samples=[1-9]\d* timer_samples=\d+$'
+
+[[expect]]
+regex = '^lock-time: summary iterations=10 hops=[1-9]\d* worst_p90_ns=\d+ worst_max_ns=\d+ worst_timer_p90_ns=\d+ worst_timer_max_ns=\d+ mem_period=1$'
+
+[[expect]]
+regex = '^lock-time: complete iterations=10 workers=8 timers=0$'
+
+[[expect]]
+regex = '^lock-time: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp: tlb shootdown timeout'

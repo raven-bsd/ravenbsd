@@ -1,9 +1,34 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 HOME=/root
-TERM=${TERM:-vt100}
+TERM=vt100
 USER=root
 LOGNAME=root
-SHELL=/bin/rsh
-PS1='\u@\h:\w# '
-export PATH HOME TERM USER LOGNAME SHELL PS1
+SHELL=/bin/brush
+# Raven Violet (K80): the visible text stays `raven# ` so the serial transcripts are stable.
+PS1='\[\e[38;5;183m\]raven# \[\e[0m\]'
+RAVEN_PROFILE=loaded
+export PATH HOME TERM USER LOGNAME SHELL PS1 RAVEN_PROFILE
 umask 022
+
+# The release login is brush; register a deterministic completion spec for the transcript
+# gate. TAB completion itself is interactive, so the scripted proof is `complete -p`. A
+# non-brush shell that sources this profile ignores the missing builtin.
+complete -W 'help exit' raven-test || true
+
+# The Pi 4 release stages the full brush rc (history and the user@host prompt). The x86_64
+# release keeps this profile-only prompt; both paths load /etc/profile first.
+if [ -r /etc/brush/brushrc ]; then
+    . /etc/brush/brushrc
+fi
+
+# K183: interactive-only short listing aliases. `brush -c` does not read this login profile,
+# and the `$-` guard keeps a non-interactive login script from inheriting them.
+case $- in
+    *i*)
+        alias l='ls -CF --color=auto'
+        alias ll='ls -lah --color=auto'
+        alias ls='ls --color=auto'
+        LS_COLORS=${LS_COLORS:-di=1;34:ln=1;36:so=1;35:pi=33:ex=1;32:bd=1;33:cd=1;33}
+        export LS_COLORS
+        ;;
+esac

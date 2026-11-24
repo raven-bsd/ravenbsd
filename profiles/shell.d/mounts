@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The default file namespace. One absolute mount point followed by the scheme
+# that owns it. /tmp is the dedicated 1777 tmpfs ramfs instance; all other
+# ramfs mounts (for example /etc in the test profiles) keep the 0755 ramfs.
+
+/ initfs:
+/tmp tmpfs:
+/dev/null null:
+/dev/zero zero:
+/dev/random rand:
+/dev/urandom rand:
+/dev/pts pty:

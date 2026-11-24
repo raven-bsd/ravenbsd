@@ -1,0 +1,138 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K171: fast static external commands must not produce an ECHILD/"No child process" shell error.
+# The release 4G image runs uname/true/hostname/svcctl and a five-iteration loop; the shell must
+# return each status without reaping the child in the stop poll.
+
+name = "shell-wait"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/release/check-loader.sh", "cargo xtask build brush --arch x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-m", "4096",
+    "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^RavenBSD raven 0\.1 .* x86_64$'
+
+[[expect]]
+regex = '^raven$'
+
+[[expect]]
+regex = '^svcctl: usage:'
+
+[[expect]]
+regex = '^wait-ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)No child process|i/o error|ECHILD|process: child exited'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 180
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 180
+
+[[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD raven 0\.1 .* x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "true\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "hostname\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl\n"
+delay_ms = 100
+
+[[step]]
+wait = '^svcctl: usage:'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "for i in 1 2 3 4 5; do true; uname -a >/dev/null; hostname >/dev/null; svcctl >/dev/null 2>&1; done; echo wait-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wait-ok$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

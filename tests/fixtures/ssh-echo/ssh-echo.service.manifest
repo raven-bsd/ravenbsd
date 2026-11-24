@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K434 S0 echo service. Runs after netd publishes the net scheme; the host peer connects to
+# 10.0.2.15:23097 and receives an exact echo. Test tooling only.
+
+name = "ssh-echo"
+exec = "/bin/ssh-echo"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

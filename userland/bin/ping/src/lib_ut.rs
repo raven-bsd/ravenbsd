@@ -11,13 +11,16 @@ fn defaults_apply_to_a_bare_host() {
     assert_eq!(options.host, "127.0.0.1");
     assert_eq!(options.count, DEFAULT_COUNT);
     assert_eq!(options.timeout_secs, DEFAULT_TIMEOUT_SECS);
+    assert_eq!(options.interval_secs, DEFAULT_INTERVAL_SECS);
     assert_eq!(options.payload_len, DEFAULT_PAYLOAD);
 }
 
 #[test]
 fn bounded_options_parse() {
-    let options = parse(&["-c", "2", "-w", "3", "-s", "16", "10.0.0.1"]).expect("options");
+    let options =
+        parse(&["-c", "2", "-i", "2", "-w", "3", "-s", "16", "10.0.0.1"]).expect("options");
     assert_eq!(options.count, 2);
+    assert_eq!(options.interval_secs, 2);
     assert_eq!(options.timeout_secs, 3);
     assert_eq!(options.payload_len, 16);
 }
@@ -38,6 +41,14 @@ fn option_limits_are_enforced() {
         Err(ParseError::BadTimeout)
     );
     assert_eq!(
+        parse(&["-i", "0", "127.0.0.1"]),
+        Err(ParseError::BadInterval)
+    );
+    assert_eq!(
+        parse(&["-i", "61", "127.0.0.1"]),
+        Err(ParseError::BadInterval)
+    );
+    assert_eq!(
         parse(&["-s", "1401", "127.0.0.1"]),
         Err(ParseError::BadPayload)
     );
@@ -48,11 +59,25 @@ fn option_limits_are_enforced() {
 fn malformed_operands_are_rejected() {
     assert_eq!(parse(&[]), Err(ParseError::Usage));
     assert_eq!(parse(&["-c"]), Err(ParseError::MissingValue));
+    assert_eq!(parse(&["-i"]), Err(ParseError::MissingValue));
+    assert_eq!(
+        parse(&["-i", "one", "127.0.0.1"]),
+        Err(ParseError::BadInterval)
+    );
     assert_eq!(parse(&["-z", "127.0.0.1"]), Err(ParseError::Usage));
     assert_eq!(parse(&["127.0.0.1", "127.0.0.2"]), Err(ParseError::Usage));
-    assert_eq!(parse(&["300.0.0.1"]), Err(ParseError::BadAddress));
-    assert_eq!(parse(&["127.0.0"]), Err(ParseError::BadAddress));
-    assert_eq!(parse(&["127.0.0.1.2"]), Err(ParseError::BadAddress));
+    assert_eq!(parse(&[""]), Err(ParseError::BadHost));
+}
+
+#[test]
+fn hostnames_are_accepted() {
+    let options = parse(&["ping.test"]).expect("hostname");
+    assert_eq!(options.host, "ping.test");
+    let options = parse(&["example.com"]).expect("fqdn");
+    assert_eq!(options.host, "example.com");
+    let options = parse(&["-c", "1", "missing.test"]).expect("hostname with options");
+    assert_eq!(options.host, "missing.test");
+    assert_eq!(options.count, 1);
 }
 
 #[test]

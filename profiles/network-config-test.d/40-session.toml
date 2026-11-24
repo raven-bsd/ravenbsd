@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 static test session: reuse release rc.conf/svcd.conf so rsh is disabled and getty ends
+# the guest. The sources stay owned by the release profile; this only stages them.
+[[initfs.files]]
+src = "profiles/release.d/rc.conf"
+path = "/etc/rc.conf"
+
+[[initfs.files]]
+src = "profiles/release.d/svcd.conf"
+path = "/etc/svcd.conf"
+mode = 0o644

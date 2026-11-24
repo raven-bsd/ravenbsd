@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "profiles/network-config-test-dhcp/network.toml"
+path = "/etc/raven/conf.d/network.toml"

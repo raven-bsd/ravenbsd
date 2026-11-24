@@ -81,6 +81,34 @@ fn read_write_edit_and_quit() {
 }
 
 #[test]
+fn feed_line_processes_blocks_incrementally_and_quits() {
+    let mut editor = Editor::new();
+    let mut io = MemoryIo::default();
+    for line in [
+        "a", "one", "two", ".", "2i", "middle", ".", "1,2c", "changed", ".", "1p", "q",
+    ] {
+        editor.feed_line(line, &mut io).unwrap();
+    }
+    assert_eq!(editor.lines(), ["changed", "two"]);
+    assert_eq!(editor.take_output(), "changed\n");
+    assert!(editor.quit());
+    assert!(!editor.input_pending());
+}
+
+#[test]
+fn feed_line_keeps_an_unterminated_block_open() {
+    let mut editor = Editor::new();
+    let mut io = MemoryIo::default();
+    editor.feed_line("a", &mut io).unwrap();
+    editor.feed_line("line", &mut io).unwrap();
+    assert!(editor.input_pending());
+    assert!(editor.lines().is_empty());
+    editor.feed_line(".", &mut io).unwrap();
+    assert!(!editor.input_pending());
+    assert_eq!(editor.lines(), ["line"]);
+}
+
+#[test]
 fn invalid_commands_and_shell_escape_are_rejected() {
     let mut editor = Editor::new();
     let mut io = MemoryIo::default();

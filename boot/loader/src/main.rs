@@ -61,6 +61,9 @@ static ALLOCATOR: uefi::allocator::Allocator = uefi::allocator::Allocator;
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
     serial::init_serial_only();
+    // A panic may happen after the boot-services console is gone; the panic line must never
+    // recurse into a second ConOut failure.
+    serial::disable_conout();
     serial::log(format_args!("error: panic: {info}"));
     exit_qemu(0x11)
 }

@@ -122,6 +122,16 @@ pub fn handle_close(handle: Handle) -> Result<(), Errno> {
     result(syscall1(Syscall::HANDLE_CLOSE as usize, handle.0 as usize)).map(|_| ())
 }
 
+/// Remove rights from a handle and every derived handle.
+pub fn handle_revoke(handle: Handle, mask: u32) -> Result<(), Errno> {
+    result(syscall2(
+        Syscall::HANDLE_REVOKE as usize,
+        handle.0 as usize,
+        mask as usize,
+    ))
+    .map(|_| ())
+}
+
 /// Register a scheme name for the calling process.
 pub fn scheme_register(name: &str) -> Result<(), Errno> {
     result(syscall3(
@@ -326,6 +336,19 @@ pub fn proc_wait(process: Handle) -> Result<i32, Errno> {
         &mut code as *mut i32 as usize,
     ))?;
     Ok(code)
+}
+
+/// Non-blocking wait: `None` while the child is live, `Some(code)` once it exits.
+pub fn proc_try_wait(process: Handle) -> Result<Option<i32>, Errno> {
+    let pid = result(syscall2(0x3E, process.0 as usize, 0))?;
+    let mut code = 0i32;
+    let raw = syscall6(0x48, 1, pid, 1, &mut code as *mut i32 as usize, 0, 0);
+    let waited = result(raw)?;
+    if waited == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(code >> 8))
+    }
 }
 
 /// Fill a mapped buffer with `value`.

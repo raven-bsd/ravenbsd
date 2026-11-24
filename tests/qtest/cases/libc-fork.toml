@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K196: POSIX fork through libc on the kernel PROC_FORK clone. The child returns 0, the parent
+# gets the pid, the child's private write stays out of the parent (COW), an inherited descriptor
+# reaches the same file, and waitpid reports the child's exit status.
+
+name = "libc-fork"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/target/build.sh fork"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-fork: start$'
+
+[[expect]]
+regex = '^libc-fork: child value=99$'
+unordered = true
+
+[[expect]]
+regex = '^libc-fork: parent pid=[0-9]+$'
+
+[[expect]]
+regex = '^libc-fork: wait status=7$'
+
+[[expect]]
+regex = '^libc-fork: cow ok$'
+
+[[expect]]
+regex = '^libc-fork: fd ok$'
+
+[[expect]]
+regex = '^libc-fork: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-fork: fail'

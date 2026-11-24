@@ -129,6 +129,8 @@ pub(crate) struct LineEditor<'a> {
     style: Style,
     /// Whether the last action was completion (so another lists the candidates).
     pub completed_last: bool,
+    /// The dimmed history suffix shown after the line, if any.
+    hint: Option<String>,
 }
 
 /// The state of an incremental history search (Ctrl-R).
@@ -174,6 +176,7 @@ impl<'a> LineEditor<'a> {
             renderer: Renderer::new(style),
             style,
             completed_last: false,
+            hint: None,
         }
     }
 
@@ -187,6 +190,26 @@ impl<'a> LineEditor<'a> {
 
     pub const fn searching(&self) -> bool {
         self.search.is_some()
+    }
+
+    /// Recomputes the dimmed history suffix for the current line.
+    ///
+    /// The hint is only shown with the cursor at the end of a non-empty,
+    /// single-line buffer, and never while searching.
+    pub fn update_hint(&mut self, history: &(impl History + ?Sized), enabled: bool) {
+        self.hint = if enabled
+            && self.search.is_none()
+            && self.buffer.cursor() == self.buffer.text().len()
+        {
+            super::autosuggest::suffix(self.buffer.text(), history)
+        } else {
+            None
+        };
+    }
+
+    /// Drops the hint (plain modes and non-Vt drawing).
+    pub fn clear_hint(&mut self) {
+        self.hint = None;
     }
 
     /// Refreshes semantic highlighting for the current buffer and cursor.
@@ -212,17 +235,19 @@ impl<'a> LineEditor<'a> {
     pub fn draw(&mut self, out: &mut impl Write, columns: usize) -> std::io::Result<()> {
         let prompt = self.search_prompt();
         let prompt = prompt.as_deref().unwrap_or(self.prompt);
-        self.renderer.draw(
+        self.renderer.draw_with_hint(
             out,
             prompt,
             self.buffer.text(),
             self.buffer.cursor(),
             columns,
+            self.hint.as_deref(),
         )
     }
 
     /// Draws the line a last time, and moves to the next.
     pub fn finish(&mut self, out: &mut impl Write, columns: usize) -> std::io::Result<()> {
+        self.hint = None;
         let prompt = self.search_prompt();
         let prompt = prompt.as_deref().unwrap_or(self.prompt);
         self.renderer
@@ -290,6 +315,16 @@ impl<'a> LineEditor<'a> {
         columns: usize,
     ) -> std::io::Result<Option<String>> {
         use InputFunction as F;
+
+        // Right and End accept a visible history hint; without one they keep their
+        // readline movement.
+        if matches!(function, F::ForwardChar | F::EndOfLine)
+            && self.buffer.cursor() == self.buffer.text().len()
+            && let Some(hint) = self.hint.take()
+        {
+            self.buffer.insert(&hint);
+            return Ok(None);
+        }
 
         let b = &mut self.buffer;
         match function {
@@ -842,3 +877,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "line_editor_ut.rs"]
+mod autosuggest_tests;

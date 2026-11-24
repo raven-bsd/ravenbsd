@@ -33,6 +33,14 @@ fn gpio_pins_parse_and_are_bounded() {
 }
 
 #[test]
+fn gpio_calls_encode_command_and_argument() {
+    assert_eq!(encode_gpio_call(GPIO_SET_FUNCTION, 1), [0, 1]);
+    assert_eq!(encode_gpio_call(GPIO_SET_PULL, 0), [1, 0]);
+    assert_eq!(encode_gpio_call(GPIO_LEVEL, 0), [2, 0]);
+    assert_eq!(encode_gpio_call(GPIO_SET_LEVEL, 1), [3, 1]);
+}
+
+#[test]
 fn unknown_paths_are_enoent() {
     assert_eq!(parse_resource("nonsense"), Err(Errno::ENOENT));
     assert_eq!(parse_resource("gpio"), Err(Errno::ENOENT));

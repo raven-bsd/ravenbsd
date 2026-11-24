@@ -1,0 +1,9 @@
+endpoint: READY
+retransmit 10.26.3.1:24004->10.26.3.2:29646 [AP] seq=3463679384 ack=3256040795 win=502 len=1024 mss=None ws=None sack=False
+RESULT out-of-order-sack PASS SACK hole 3463679384 retransmitted len=1024 elapsed=0.39s
+PCAP /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net-conformance/results/linux/out-of-order-sack.pcap
+endpoint: ACCEPTED ('10.26.3.2', 29646)
+endpoint: WROTE 1024
+endpoint: WROTE 2048
+endpoint: WROTE 3072
+endpoint: WROTE 4096

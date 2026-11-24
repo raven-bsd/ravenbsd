@@ -25,10 +25,12 @@ pub fn run(cmdline: &CmdLine) {
         Some(name @ ("heap" | "paging")) => memory(name),
         Some("timer") => timer_selftest(),
         Some("sched") => crate::sched::selftest::run(),
+        Some("sched-saturation") => crate::sched::selftest::run_saturation(),
         Some("locking") => crate::sync::selftest(),
         #[cfg(feature = "lockstat")]
         Some("lockstat") => crate::sync::selftest_lockstat(),
         Some("ipc-donation") => crate::sync::selftest_ipc_donation(),
+        Some("cyclic-smp") => crate::time::cyclic_smp_selftest(),
         _ => {}
     }
 }

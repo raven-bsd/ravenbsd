@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Reference decode captured with Linux tcpdump 4.99.1 / libpcap 1.10.1.
+# file|line|required substring
+# `line` is 1-based in the tcpdump output; `*` means anywhere in the output.
+arp.pcap|1|ARP, Request who-has 192.0.2.10 tell 10.0.0.5, length 28
+arp.pcap|2|ARP, Reply 192.0.2.10 is-at 02:00:00:00:00:0b, length 28
+ipv4-tcp-handshake.pcap|1|IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [S], seq 1000, win 65535, options [mss 1460,sackOK,wscale 7,nop,nop,nop], length 0
+ipv4-tcp-handshake.pcap|2|IP 192.0.2.10.80 > 10.0.0.5.40000: Flags [S.], seq 5000, ack 1001, win 64240, options [mss 1460,sackOK,wscale 7,nop,nop,nop], length 0
+ipv4-tcp-handshake.pcap|3|IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [.], ack 1, win 65535, length 0
+ipv4-tcp-handshake.pcap|4|Flags [P.], seq 1:19, ack 1, win 65535, length 18: HTTP: GET / HTTP/1.0
+ipv4-tcp-handshake.pcap|5|IP 192.0.2.10.80 > 10.0.0.5.40000: Flags [.], ack 19, win 65535, length 0
+ipv4-tcp-handshake.pcap|6|IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [F.], seq 19, ack 1, win 65535, length 0
+ipv4-tcp-handshake.pcap|7|IP 192.0.2.10.80 > 10.0.0.5.40000: Flags [F.], seq 1, ack 20, win 65535, length 0
+ipv4-tcp-handshake.pcap|8|IP 10.0.0.5.40000 > 192.0.2.10.80: Flags [.], ack 2, win 65535, length 0
+ipv4-udp-dns.pcap|1|IP 10.0.0.5.53000 > 192.0.2.53.53: 4660+ A? example.com. (29)
+ipv4-udp-dns.pcap|2|IP 192.0.2.53.53 > 10.0.0.5.53000: 4660 1/0/0 A 192.0.2.10 (45)
+ipv4-icmp-echo.pcap|1|IP 10.0.0.5 > 192.0.2.10: ICMP echo request, id 4660, seq 1, length 16
+ipv4-icmp-echo.pcap|2|IP 192.0.2.10 > 10.0.0.5: ICMP echo reply, id 4660, seq 1, length 16
+ipv6-tcp-http.pcap|1|IP6 2001:db8::5.40000 > 2001:db8::10.80: Flags [S], seq 7000, win 65535, options [mss 1460,sackOK,wscale 7,nop,nop,nop], length 0
+ipv6-tcp-http.pcap|2|IP6 2001:db8::10.80 > 2001:db8::5.40000: Flags [S.], seq 9000, ack 7001, win 64240, options [mss 1460,sackOK,wscale 7,nop,nop,nop], length 0
+ipv6-tcp-http.pcap|3|IP6 2001:db8::5.40000 > 2001:db8::10.80: Flags [.], ack 1, win 65535, length 0
+ipv6-tcp-http.pcap|4|Flags [P.], seq 1:19, ack 1, win 65535, length 18: HTTP: GET / HTTP/1.0
+ipv6-tcp-http.pcap|5|IP6 2001:db8::5.40000 > 2001:db8::10.80: Flags [F.], seq 19, ack 1, win 65535, length 0
+ipv6-udp-icmp.pcap|1|IP6 2001:db8::5.53000 > 2001:db8::53.53: 4660+ A? example.com. (29)
+ipv6-udp-icmp.pcap|2|IP6 2001:db8::53.53 > 2001:db8::5.53000: 4660 1/0/0 A 192.0.2.10 (45)
+ipv6-udp-icmp.pcap|3|IP6 2001:db8::5 > 2001:db8::10: ICMP6, echo request, id 22136, seq 2, length 14
+ipv6-udp-icmp.pcap|4|IP6 2001:db8::10 > 2001:db8::5: ICMP6, echo reply, id 22136, seq 2, length 14
+ipv4-fragmented-udp.pcap|*|id 7238, offset 0, flags [+], proto UDP (17), length 1500
+ipv4-fragmented-udp.pcap|*|id 7238, offset 1480, flags [+], proto UDP (17), length 1500
+ipv4-fragmented-udp.pcap|*|id 7238, offset 2960, flags [none], proto UDP (17), length 68

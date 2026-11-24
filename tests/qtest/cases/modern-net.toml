@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K202: read-only `raven net` on the QEMU user network. The release initfs supplies netd,
+# getty/login and the network tools; the pre step builds a case-specific release initfs and adds
+# the target `raven` binary. The case asserts the real interface address (10.0.2.15/24) and
+# default gateway (10.0.2.2), plus `raven net status` exit 0. It does not write network
+# configuration. K219: the pre never reuses the shared build/x86_64/initfs.img, so a preceding
+# modern-admin build cannot leave the admin/rsh initfs in place.
+
+name = "modern-net"
+arch = "x86_64"
+profile = "raven-admin-test"
+timeout_secs = 600
+pre = ["sh tests/qtest/cases/modern-net/build.sh"]
+initfs = "build/fixtures/modern-net/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"net\.if","name":"[^"]+","state":"up","address":"10\.0\.2\.15","prefix":24,'
+
+[[expect]]
+regex = '^default\s+10\.0\.2\.2\s+\S+'
+
+[[expect]]
+regex = '^net-status-ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|command not found'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 360
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 360
+
+[[step]]
+send = "/usr/sbin/raven --json net if\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"net\.if","name":"[^"]+","state":"up","address":"10\.0\.2\.15","prefix":24,'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven net route\n"
+delay_ms = 100
+
+[[step]]
+wait = '^default\s+10\.0\.2\.2\s+\S+'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven net status && echo net-status-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^net-status-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

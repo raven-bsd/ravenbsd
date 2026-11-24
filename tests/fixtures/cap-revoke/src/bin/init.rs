@@ -10,7 +10,8 @@
 
 use raven_abi::types::Rights;
 use raven_cap_revoke::{
-    PAGE, handle_close, memobj_create, nanosleep, proc_wait, revoke, stage, start, transfer,
+    PAGE, handle_close, memobj_create, nanosleep, proc_fork, proc_wait, revoke, stage, start,
+    thread_create, transfer,
 };
 use raven_initfs::Initfs;
 use raven_rt::entry;
@@ -33,22 +34,39 @@ const FIRST_GRANT: u32 = 3;
 fn revoke_case(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let object = memobj_create(PAGE).map_err(|_| "revoke memobj")?;
     let staged = stage(initfs, "/client1").map_err(|_| "revoke stage")?;
-    // Reduced rights: the child gets MAP|READ, not the source's WRITE/DUP/TRANSFER.
-    let granted = transfer(staged.process, object, Rights::MAP.union(Rights::READ))
-        .map_err(|_| "revoke transfer")?;
-    if granted.index() != FIRST_GRANT {
-        println!("cap: revoke grant index {}", granted.index());
+    // Handle 3: MAP|READ|DUP, the revoked lineage. Handle 4: READ|DUP, never had MAP.
+    let granted = transfer(
+        staged.process,
+        object,
+        Rights::MAP.union(Rights::READ).union(Rights::DUP),
+    )
+    .map_err(|_| "revoke transfer")?;
+    let never = transfer(staged.process, object, Rights::READ.union(Rights::DUP))
+        .map_err(|_| "revoke transfer never")?;
+    if granted.index() != FIRST_GRANT || never.index() != FIRST_GRANT.saturating_add(1) {
+        println!(
+            "cap: revoke grant index {} {}",
+            granted.index(),
+            never.index()
+        );
         return Err("revoke grant index");
     }
+    // The fork shares the lineage nodes and the two handles; both processes must see the revoke.
+    let forked = proc_fork(staged.process).map_err(|_| "revoke fork")?;
+    let thread =
+        thread_create(forked, staged.entry, staged.stack, 0).map_err(|_| "revoke clone")?;
+    handle_close(thread);
     start(&staged).map_err(|_| "revoke start")?;
     nanosleep(HOLD_NS);
-    // Revoke MAP on the lineage; the child's derived handle loses MAP (EPERM).
+    // Revoke MAP on the source lineage; every descendant in both processes loses it (EPERM).
     revoke(object, Rights::MAP).map_err(|_| "revoke")?;
     let code = proc_wait(staged.process).map_err(|_| "revoke wait")?;
+    let fork_code = proc_wait(forked).map_err(|_| "revoke fork wait")?;
+    handle_close(forked);
     handle_close(staged.process);
     handle_close(object);
-    if code != 0 {
-        println!("cap: revoke client exit {code}");
+    if code != 0 || fork_code != 0 {
+        println!("cap: revoke client exit {code} fork exit {fork_code}");
         return Err("revoke client exit");
     }
     println!("cap: revoke case ok");

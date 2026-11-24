@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K445 release-profile conformance: run K1-K6 against the release initfs (uutils/brush, dynamic
+# userland, shipped netd/pty), not the network-config-test profile.  The K6-ready handshake is
+# retained and the hostfwd ports are per-run ephemeral.
+name = "ssh-contract-release-kvm4"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+pre = [
+    "SSH_CONTRACT_OUT=build/fixtures/ssh-contract-release sh tests/smp/ssh-contract/build-release.sh",
+    "SSH_CONTRACT_OUT=build/fixtures/ssh-contract-release SSH_CONTRACT_K6_READY=1 sh tests/smp/ssh-contract/start-host.sh",
+]
+initfs = "build/fixtures/ssh-contract-release/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-enable-kvm", "-cpu", "host", "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23096,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/ssh-contract-release/monitor.sock,server=on,wait=off",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONTRACT K1 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K2 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K3 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K4 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K5 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K6-listen PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K6 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K7 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8-shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K9 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K10 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 10/10$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)CONTRACT K([1-9]|10)(-listen|-shutdown)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

@@ -36,6 +36,20 @@ fn sigresend_is_the_agreed_number() {
 }
 
 #[test]
+fn kick_bits_are_the_pg7_set() {
+    assert_eq!(KICK_CHECK, 1);
+    assert_eq!(KICK_CANCEL, 2);
+    assert_eq!(KICK_SYNCCALL, 4);
+    assert_eq!(KICK_TIMER, 8);
+    assert_eq!(KICK_KNOWN, 15);
+    assert_eq!(
+        KICK_CHECK | KICK_CANCEL | KICK_SYNCCALL | KICK_TIMER,
+        KICK_KNOWN
+    );
+    assert_eq!(KICK_KNOWN & !KICK_KNOWN, 0);
+}
+
+#[test]
 fn fault_record_matches_c58() {
     assert_eq!(core::mem::size_of::<FaultRecord>(), 24);
     assert_eq!(core::mem::align_of::<FaultRecord>(), 8);

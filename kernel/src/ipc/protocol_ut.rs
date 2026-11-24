@@ -14,13 +14,14 @@ fn sample() -> SchemePacket {
     packet.response_addr = 0x7000_1000_0000;
     packet.response_len = 4096;
     packet.offset = 123;
-    packet.set_path(b"echo:hello").unwrap();
+    packet.set_path(b"/tmp/root/inside").unwrap();
+    packet.root_len = 9;
     packet
 }
 
 #[test]
 fn packet_size_and_offsets_are_stable() {
-    assert_eq!(PACKET_SIZE, 528);
+    assert_eq!(PACKET_SIZE, 536);
     assert_eq!(size_of::<Opcode>(), 2);
 }
 
@@ -67,7 +68,8 @@ fn roundtrip_preserves_every_field() {
     assert_eq!(decoded.response_addr, packet.response_addr);
     assert_eq!(decoded.response_len, packet.response_len);
     assert_eq!(decoded.offset, packet.offset);
-    assert_eq!(decoded.path_bytes(), b"echo:hello");
+    assert_eq!(decoded.path_bytes(), b"/tmp/root/inside");
+    assert_eq!(decoded.root_len, 9);
     assert_eq!(decoded.data_bytes(), b"");
     let mut read = SchemePacket::request(Opcode::Read, 1, 1);
     read.set_data(b"payload").unwrap();
@@ -97,6 +99,9 @@ fn length_limits_are_enforced() {
     assert_eq!(packet.validate(false), Err(PacketError::BadLength));
     let mut packet = SchemePacket::request(Opcode::Open, 1, 1);
     packet.data_len = (MAX_PATH + 1) as u32;
+    assert_eq!(packet.validate(false), Err(PacketError::BadLength));
+    let mut packet = SchemePacket::request(Opcode::Open, 1, 1);
+    packet.root_len = (MAX_PATH + 1) as u32;
     assert_eq!(packet.validate(false), Err(PacketError::BadLength));
 }
 
@@ -344,4 +349,80 @@ fn seek_opcode_and_positional_offset_roundtrip() {
     assert_eq!(decoded.offset, (-4i64) as u64);
     assert_eq!(decoded.flags, 2);
     assert!(decoded.validate(false).is_ok());
+}
+
+#[test]
+fn the_wire_version_is_one() {
+    assert_eq!(VERSION, 1);
+    let packet = SchemePacket::request(Opcode::Read, 1, 1);
+    assert_eq!(packet.version, 1);
+    assert_eq!(packet.validate(false), Ok(()));
+    let mut future = packet;
+    future.version = 2;
+    assert_eq!(future.validate(false), Err(PacketError::BadVersion));
+}
+
+#[test]
+fn c14_kinds_are_exactly_the_declared_transferable_set() {
+    for kind in ObjectKind::ALL {
+        let expected = matches!(
+            kind,
+            ObjectKind::MemObject
+                | ObjectKind::MemObjectInitfs
+                | ObjectKind::SchemeFile
+                | ObjectKind::SchemeServer
+                | ObjectKind::RootDevice
+                | ObjectKind::MmioRegion
+                | ObjectKind::BootBlob
+                | ObjectKind::DmaBuffer
+                | ObjectKind::Irq
+                | ObjectKind::Pipe
+                | ObjectKind::Duplex
+                | ObjectKind::Timer
+                | ObjectKind::UserEvent
+        );
+        assert_eq!(transferable(kind), expected, "{kind:?}");
+    }
+    // The four kinds that never cross a transfer stay refused.
+    for kind in [
+        ObjectKind::Process,
+        ObjectKind::Namespace,
+        ObjectKind::Thread,
+        ObjectKind::EventQueue,
+    ] {
+        assert!(!transferable(kind), "{kind:?} must not be transferable");
+    }
+}
+
+#[test]
+fn transfer_rights_are_source_and_mask_and_zero_removes_all() {
+    let source = Rights(Rights::READ.0 | Rights::WRITE.0 | Rights::TRANSFER.0);
+    assert_eq!(transfer_rights(source, 0), Rights::NONE);
+    assert_eq!(transfer_rights(source, Rights::READ.0), Rights::READ);
+    assert_eq!(transfer_rights(source, Rights::WRITE.0), Rights::WRITE);
+    assert_eq!(transfer_rights(source, u32::MAX), source);
+    assert_eq!(transfer_rights(Rights::NONE, u32::MAX), Rights::NONE);
+}
+
+#[test]
+fn four_attachments_roundtrip_in_the_tail() {
+    let mut packet = SchemePacket {
+        attach_count: MAX_ATTACHMENTS as u32,
+        ..Default::default()
+    };
+    for (index, slot) in packet.attach.iter_mut().enumerate() {
+        *slot = Attachment {
+            handle: 10 + index as u32,
+            rights_mask: Rights::READ.0,
+        };
+    }
+    let decoded = decode(&to_vec(&packet).unwrap()).unwrap();
+    assert_eq!(decoded.attach_count, 4);
+    assert_eq!(
+        decoded.attach[3],
+        Attachment {
+            handle: 13,
+            rights_mask: Rights::READ.0
+        }
+    );
 }

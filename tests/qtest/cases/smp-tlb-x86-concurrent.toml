@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S118: x86_64 four-way concurrent unmap/TLB-shootdown regression. Three workers and the
+# controller park distinct 16-page mappings and unmap them together on four CPUs; the controller
+# then remaps a shared page 64 times while the three readers sample the same address. A stale TLB
+# entry or a lost shootdown acknowledgement shows up as a stale read or the kernel timeout line.
+name = "smp-tlb-x86-concurrent"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/smp/x86_64/build.sh"]
+initfs = "build/smp-x86/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+# A user thread ran on an application processor; the four-way barrier needs all four CPUs to run
+# user threads.
+[[expect]]
+regex = '^smp-user: cpu [1-9] first user thread pid=\d+ tid=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^smp-x86-tlb: map=0x[0-9a-f]+ alias=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^smp-x86-tlb: concurrent-shootdown waiters=4$'
+
+[[expect]]
+regex = '^smp-x86-tlb: workers ready$'
+
+[[expect]]
+regex = '^smp-x86-tlb: summary waiters=4 tlb_rounds=64 tlb_stale=0$'
+
+[[expect]]
+regex = '^smp-x86-tlb: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-x86-tlb: fail|smp-x86-tlb: worker .* failed|stale round|smp: tlb shootdown timeout'

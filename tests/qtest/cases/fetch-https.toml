@@ -1,0 +1,131 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K199: verified HTTPS through the raven-tls/OpenSSL add-on. The host `openssl s_server -WWW`
+# serves the same known body; the trust fixture is the T3 test CA. The untrusted-CA and missing
+# default-CA cases must fail, never fall back to an unverified download.
+
+name = "fetch-https"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/fixtures/fetch/build.sh https"]
+initfs = "build/fixtures/fetch/https-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "curl -I --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; echo curl-head=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^HTTP/1\.1 200'
+timeout_secs = 120
+
+[[step]]
+wait = '^Content-Length: 15'
+timeout_secs = 30
+
+[[step]]
+wait = '^curl-head=0$'
+timeout_secs = 30
+
+[[step]]
+send = "curl --cacert /tls-ca.pem https://10.0.2.2:24443/known.txt; ec=$?; echo; echo curl-https=$ec\n"
+delay_ms = 100
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 120
+
+[[step]]
+wait = '^curl-https=0$'
+timeout_secs = 30
+
+[[step]]
+send = "wget --cacert /tls-ca.pem -O /tmp/https-known.txt https://10.0.2.2:24443/known.txt; echo wget-https=$?; cat /tmp/https-known.txt; echo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget: https://10\.0\.2\.2:24443/known\.txt -> /tmp/https-known\.txt \(15 bytes\)$'
+timeout_secs = 120
+
+[[step]]
+wait = '^wget-https=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 30
+
+[[step]]
+send = "curl --cacert /tls-untrusted.pem https://10.0.2.2:24443/known.txt; echo untrusted=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl: TLS: TLS handshake failed$'
+timeout_secs = 60
+
+[[step]]
+wait = '^untrusted=1$'
+timeout_secs = 30
+
+[[step]]
+send = "curl https://10.0.2.2:24443/known.txt; echo default-ca=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl: TLS: CA bundle missing or malformed$'
+timeout_secs = 60
+
+[[step]]
+wait = '^default-ca=1$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|body-mismatch|status-mismatch'

@@ -20,23 +20,34 @@ pub unsafe extern "C" fn openpty(
     termios: *const Termios,
     window: *const Winsize,
 ) -> c_int {
-    if master.is_null() || slave.is_null() || name.is_null() {
+    if master.is_null() || slave.is_null() {
+        // SAFETY: the errno cell is this thread's.
+        unsafe { super::set_errno(super::EINVAL) };
         return -1;
     }
     let mut buffer = [0u8; 128];
     // SAFETY: `termios`/`window` are either null or valid C records.
     let term = unsafe { termios.as_ref() };
     let win = unsafe { window.as_ref() };
-    match raven_libc_compat::openpty(&mut RealPty, Some(&mut buffer), term, win) {
+    // FreeBSD lib/libutil/pty.c:74 and NetBSD pty.c:77 make the name optional. OpenSSH passes
+    // NULL (sshpty.c:63); only the master/slave out-pointers are required.
+    let result = if name.is_null() {
+        raven_libc_compat::openpty(&mut RealPty, None, term, win)
+    } else {
+        raven_libc_compat::openpty(&mut RealPty, Some(&mut buffer), term, win)
+    };
+    match result {
         Ok((master_fd, slave_fd)) => {
             // SAFETY: the out-pointers are writable.
             unsafe {
                 *master = master_fd;
                 *slave = slave_fd;
-                super::write_cstr(
-                    name,
-                    &buffer[..super::c_len(buffer.as_ptr().cast(), buffer.len())],
-                );
+                if !name.is_null() {
+                    super::write_cstr(
+                        name,
+                        &buffer[..super::c_len(buffer.as_ptr().cast(), buffer.len())],
+                    );
+                }
             }
             0
         }

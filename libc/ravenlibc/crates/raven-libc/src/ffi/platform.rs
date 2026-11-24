@@ -45,16 +45,41 @@ const READY: u8 = 2;
 static STARTUP_FDMAP: AtomicUsize = AtomicUsize::new(0);
 /// The number of entries in [`STARTUP_FDMAP`].
 static STARTUP_FDMAP_N: AtomicUsize = AtomicUsize::new(0);
+/// The spawner's `AT_RAVEN_CWD` pointer, recorded by the start.
+static STARTUP_CWD: AtomicUsize = AtomicUsize::new(0);
 /// Set once the start has recorded the fdmap.
 static STARTUP_RECORDED: AtomicBool = AtomicBool::new(false);
 /// Set before the startup runs, so a recursive `global` cannot apply it twice.
 static STARTUP_APPLIED: AtomicBool = AtomicBool::new(false);
+/// Set before the start cwd is applied, so a recursive `global` cannot apply it twice.
+static STARTUP_CWD_APPLIED: AtomicBool = AtomicBool::new(false);
+/// Set when `execve` supplied the `__RAVEN_FDMAP` entry: the exec caller's fd table is
+/// authoritative, including deliberately closed descriptors 0/1/2. A spawned service with no
+/// fdmap still adopts the console.
+static EXEC_INHERITED: AtomicBool = AtomicBool::new(false);
+
+/// Longest accepted child cwd (including the trailing NUL).
+const MAX_CWD: usize = 4096;
 
 /// Record the inherited fdmap for the lazy platform startup.
 pub(crate) fn set_startup_fdmap(pointer: usize, count: usize) {
     STARTUP_FDMAP_N.store(count, Ordering::Release);
     STARTUP_FDMAP.store(pointer, Ordering::Release);
     STARTUP_RECORDED.store(true, Ordering::Release);
+}
+
+/// Record the loader's `AT_RAVEN_CWD` for the platform startup.
+///
+/// The string lives on the initial stack for the whole process. If the platform was already
+/// initialised by an early `global` call, apply the cwd immediately.
+pub(crate) fn set_startup_cwd(pointer: usize) {
+    STARTUP_CWD.store(pointer, Ordering::Release);
+    if pointer != 0 && STATE.load(Ordering::Acquire) == READY {
+        // SAFETY: READY was published with Release after the one-shot write, and the value is
+        // never moved again (`static` storage).
+        let platform = unsafe { (&*PLATFORM.0.get()).assume_init_ref() };
+        apply_startup_cwd(platform);
+    }
 }
 
 struct Global(UnsafeCell<MaybeUninit<Platform<RealSys, ShellLock>>>);
@@ -86,6 +111,7 @@ pub(crate) fn global() -> &'static Platform<RealSys, ShellLock> {
     // SAFETY: READY was published with Release after the write, and the value is never moved
     // again (`static` storage).
     let platform = unsafe { (&*PLATFORM.0.get()).assume_init_ref() };
+    apply_startup_cwd(platform);
     // The start records the fdmap at step 9b, possibly after an early `global` from an IFUNC
     // resolver. Apply the startup on the first call after the record; `APPLIED` is set before
     // the work so a recursive `global` cannot run it twice.
@@ -95,30 +121,98 @@ pub(crate) fn global() -> &'static Platform<RealSys, ShellLock> {
     platform
 }
 
+/// Apply the loader-provided `AT_RAVEN_CWD`, once.
+fn apply_startup_cwd(platform: &Platform<RealSys, ShellLock>) {
+    let pointer = STARTUP_CWD.load(Ordering::Acquire);
+    if pointer == 0 || STARTUP_CWD_APPLIED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let bytes = pointer as *const u8;
+    for length in 0..MAX_CWD {
+        // SAFETY: the loader wrote a NUL-terminated cwd string on the initial stack; the scan
+        // stays below MAX_CWD and stops at the first NUL.
+        if unsafe { *bytes.add(length) } == 0 {
+            // SAFETY: the bytes up to `length` were readable from the same stack string, which
+            // lives for the whole process.
+            let cwd = unsafe { core::slice::from_raw_parts(bytes, length) };
+            platform.init_cwd(Some(cwd));
+            return;
+        }
+    }
+}
+
 /// Install the spawner's descriptors and adopt standard descriptors on the first use.
 fn apply_startup(platform: &Platform<RealSys, ShellLock>) {
+    #[cfg(target_os = "none")]
+    restore_exec_umask(platform);
     restore_inherited_fds(platform);
-    ensure_standard_fds(platform);
+    if !EXEC_INHERITED.load(Ordering::Acquire) {
+        ensure_standard_fds(platform);
+    }
+}
+
+/// Restore the caller's process mask from the `execve` environment hand-off, once.
+///
+/// The kernel keeps no umask; the BSD donor keeps it in the process credential where exec cannot
+/// clear it (`p_pd->pd_cmask`, FreeBSD `kern_descrip.c:2707`). Raven's libc passes it through the
+/// exec metadata channel and removes the entry here, so it never becomes a user-visible variable.
+#[cfg(target_os = "none")]
+fn restore_exec_umask(platform: &Platform<RealSys, ShellLock>) {
+    let name = raven_libc_platform::exec_umask::ENV_NAME;
+    let Some(value) = crate::stdlib::env_support::get(name) else {
+        return;
+    };
+    if let Some(mask) = raven_libc_platform::exec_umask::decode(value) {
+        platform.set_umask(mask);
+    }
+    let _ = crate::stdlib::env_support::unset(name);
 }
 
 /// Install the `RFDM` block the spawner mapped into this process.
 fn restore_inherited_fds(platform: &Platform<RealSys, ShellLock>) {
     let pointer = STARTUP_FDMAP.load(Ordering::Acquire);
     let count = STARTUP_FDMAP_N.load(Ordering::Acquire);
-    if pointer == 0 || count == 0 || count > 1024 {
+    if pointer != 0 && count != 0 && count <= 1024 {
+        let Some(len) = ENTRY_LEN
+            .checked_mul(count)
+            .and_then(|entries| entries.checked_add(HEADER_LEN))
+        else {
+            return;
+        };
+        // SAFETY: the start recorded the spawner-mapped header+entry block; it is mapped for the
+        // lifetime of the process and the bounds are the decoded count.
+        let bytes = unsafe { core::slice::from_raw_parts(pointer as *const u8, len) };
+        if let Ok(block) = FdMap::decode(bytes) {
+            let _ = platform.restore_fdmap(&block);
+        }
         return;
     }
-    let Some(len) = ENTRY_LEN
-        .checked_mul(count)
-        .and_then(|entries| entries.checked_add(HEADER_LEN))
-    else {
-        return;
-    };
-    // SAFETY: the start recorded the spawner-mapped header+entry block; it is mapped for the
-    // lifetime of the process and the bounds are the decoded count.
-    let bytes = unsafe { core::slice::from_raw_parts(pointer as *const u8, len) };
-    if let Ok(block) = FdMap::decode(bytes) {
-        let _ = platform.restore_fdmap(&block);
+    restore_exec_fdmap(platform);
+}
+
+/// Restore the fd table that `execve` serialized into [`ENV_NAME`].
+///
+/// The kernel keeps the handles across `exec`; the environment entry carries the identity
+/// `fd -> handle` mapping. `FD_CLOEXEC` entries are restored with their flag and then closed so
+/// the new image never observes them.
+fn restore_exec_fdmap(platform: &Platform<RealSys, ShellLock>) {
+    #[cfg(not(target_os = "none"))]
+    {
+        let _ = platform;
+    }
+    #[cfg(target_os = "none")]
+    {
+        let name = raven_libc_platform::fd::inherit::ENV_NAME;
+        let Some(value) = crate::stdlib::env_support::get(name) else {
+            return;
+        };
+        EXEC_INHERITED.store(true, Ordering::Release);
+        if let Ok(block) = FdMap::decode_env(value)
+            && platform.restore_fdmap(&block).is_ok()
+        {
+            let _ = platform.close_cloexec_fds();
+        }
+        let _ = crate::stdlib::env_support::unset(name);
     }
 }
 

@@ -270,7 +270,7 @@ s! {
         bytes: [u8; _PTHREAD_ATTR_SIZE],
     }
     #[repr(C)]
-    #[repr(align(4))]
+    #[repr(align(8))]
     pub struct pthread_barrier_t {
         bytes: [u8; _PTHREAD_BARRIER_SIZE],
     }
@@ -280,12 +280,12 @@ s! {
         bytes: [u8; _PTHREAD_BARRIERATTR_SIZE],
     }
     #[repr(C)]
-    #[repr(align(4))]
+    #[repr(align(8))]
     pub struct pthread_mutex_t {
         bytes: [u8; _PTHREAD_MUTEX_SIZE],
     }
     #[repr(C)]
-    #[repr(align(4))]
+    #[repr(align(8))]
     pub struct pthread_rwlock_t {
         bytes: [u8; _PTHREAD_RWLOCK_SIZE],
     }
@@ -295,12 +295,12 @@ s! {
         bytes: [u8; _PTHREAD_MUTEXATTR_SIZE],
     }
     #[repr(C)]
-    #[repr(align(1))]
+    #[repr(align(4))]
     pub struct pthread_rwlockattr_t {
         bytes: [u8; _PTHREAD_RWLOCKATTR_SIZE],
     }
     #[repr(C)]
-    #[repr(align(4))]
+    #[repr(align(8))]
     pub struct pthread_cond_t {
         bytes: [u8; _PTHREAD_COND_SIZE],
     }
@@ -368,15 +368,15 @@ s! {
         __unused1: Padding<[c_int; 12]>,
     }
 }
-const _PTHREAD_ATTR_SIZE: usize = 32;
-const _PTHREAD_RWLOCKATTR_SIZE: usize = 1;
-const _PTHREAD_RWLOCK_SIZE: usize = 4;
-const _PTHREAD_BARRIER_SIZE: usize = 24;
+const _PTHREAD_ATTR_SIZE: usize = 56;
+const _PTHREAD_RWLOCKATTR_SIZE: usize = 8;
+const _PTHREAD_RWLOCK_SIZE: usize = 56;
+const _PTHREAD_BARRIER_SIZE: usize = 32;
 const _PTHREAD_BARRIERATTR_SIZE: usize = 4;
-const _PTHREAD_CONDATTR_SIZE: usize = 8;
-const _PTHREAD_COND_SIZE: usize = 8;
-const _PTHREAD_MUTEX_SIZE: usize = 12;
-const _PTHREAD_MUTEXATTR_SIZE: usize = 20;
+const _PTHREAD_CONDATTR_SIZE: usize = 4;
+const _PTHREAD_COND_SIZE: usize = 48;
+const _PTHREAD_MUTEX_SIZE: usize = 40;
+const _PTHREAD_MUTEXATTR_SIZE: usize = 4;
 const _PTHREAD_ONCE_SIZE: usize = 4;
 const _PTHREAD_SPINLOCK_SIZE: usize = 4;
 

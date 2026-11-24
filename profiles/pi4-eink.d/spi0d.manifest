@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# SPI0 scheme provider. devd launches /sbin/spi0d from the driver table with the SPI0 MMIO
+# window; this svcd entry stays disabled so there is exactly one launcher and only exists to
+# publish the `spi` prefix to einkd. The panel BUSY wait stays in einkd.
+name = "spi0d"
+exec = "/sbin/spi0d"
+restart = "never"
+max_restarts = 0
+enable = false
+provides = ["scheme:spi"]

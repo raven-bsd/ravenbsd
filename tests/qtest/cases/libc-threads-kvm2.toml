@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "libc-threads-kvm2"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/target/build.sh threads x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-threads: start$'
+
+[[expect]]
+regex = '^libc-threads: create-join ok$'
+
+[[expect]]
+regex = '^libc-threads: mutex ok total=40000$'
+
+[[expect]]
+regex = '^libc-threads: cond ok$'
+
+[[expect]]
+regex = '^libc-threads: once ok$'
+
+[[expect]]
+regex = '^libc-threads: tsd ok$'
+
+[[expect]]
+regex = '^libc-threads: tls ok$'
+
+[[expect]]
+regex = '^libc-threads: rwlock ok$'
+
+[[expect]]
+regex = '^libc-threads: sem ok$'
+
+[[expect]]
+regex = '^libc-threads: barrier ok$'
+
+[[expect]]
+regex = '^libc-threads: detach ok$'
+
+[[expect]]
+regex = '^libc-threads: stack ok$'
+
+[[expect]]
+regex = '^libc-threads: c11 ok$'
+
+[[expect]]
+regex = '^libc-threads: exit value ok$'
+
+[[expect]]
+regex = '^libc-threads: timedwait ok$'
+
+[[expect]]
+regex = '^libc-threads: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-[a-z]+: FAIL'

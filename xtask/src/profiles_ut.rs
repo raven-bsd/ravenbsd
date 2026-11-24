@@ -156,6 +156,30 @@ fn generated_files_must_live_under_build() {
 }
 
 #[test]
+fn external_bsp_generated_source_is_allowed() {
+    let tree = Tree::new();
+    tree.profile("base", BASE);
+    tree.write(
+        "profiles/base.d/bsp.toml",
+        "[[initfs.files]]\nsrc = \"../ravenbsd-rpi/build/aarch64/einkd\"\npath = \"/sbin/einkd\"\nmode = 493\ngenerated = true\n",
+    );
+    let profile = Profile::load(&tree.root, "base").unwrap();
+    assert!(profile.initfs.files[0].generated);
+}
+
+#[test]
+fn external_bsp_traversal_is_rejected() {
+    let tree = Tree::new();
+    tree.profile("base", BASE);
+    tree.write(
+        "profiles/base.d/bsp.toml",
+        "[[initfs.files]]\nsrc = \"../ravenbsd-rpi/build/../../etc/passwd\"\npath = \"/x\"\ngenerated = true\n",
+    );
+    let error = Profile::load(&tree.root, "base").unwrap_err().to_string();
+    assert!(error.contains("not repo-relative"));
+}
+
+#[test]
 fn regular_file_source_is_still_required() {
     let tree = Tree::new();
     tree.profile("base", BASE);
@@ -579,4 +603,18 @@ fn a_disabled_service_needs_no_pin() {
         one_shot_restart_violations(&tree.root).unwrap(),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn image_release_is_additive_across_extends_and_fragments() {
+    let tree = Tree::new();
+    tree.profile("base", BASE);
+    tree.profile(
+        "demo",
+        "name = \"demo\"\nextends = \"base\"\n[image]\nrelease = true\n[boot]\ncmdline = \"console=ttyS0\"\nlog_level = \"info\"\n",
+    );
+    assert!(Profile::load(&tree.root, "demo").unwrap().image.release);
+    assert!(!Profile::load(&tree.root, "base").unwrap().image.release);
+    tree.write("profiles/base.d/30-image.toml", "[image]\nrelease = true\n");
+    assert!(Profile::load(&tree.root, "base").unwrap().image.release);
 }

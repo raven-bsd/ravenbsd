@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-random-pool"
+version = "0.1.0"
+description = "K524 AT_RANDOM and GETRANDOM pool fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-random-pool"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

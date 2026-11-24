@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::socket::{
     AF_INET, AF_INET6, AF_UNIX, MSG_DONTWAIT, MSG_NOSIGNAL, MSG_PEEK, MSG_TRUNC, MSG_WAITALL,
-    SO_ERROR, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM, SOL_SOCKET,
+    SO_ERROR, SO_PEERCRED, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM, SOL_SOCKET,
 };
 use raven_proto_net::{Call, Endpoint, Shutdown as WireShutdown, SockOpt};
 
@@ -21,6 +21,7 @@ use crate::msg::{gather, total_len};
 use crate::opts::{self, RecordOption};
 use crate::ready::{self, PollInterest};
 use crate::record::{SocketRec, SocketState};
+use crate::unix::UnixShutdown;
 use crate::{CallReply, Caps, Net, NetBackend, NetEnv, Sock, SocketFds, UnixBackend, WaitItem};
 
 /// Returned by `recvmsg`.
@@ -57,9 +58,10 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         }
         validate_proto(base, proto)?;
         let caps = self.backend.caps();
-        let (handle, state) = if caps.bare_open {
+        let mptcp = proto == crate::mptcp::IPPROTO_MPTCP;
+        let (handle, state) = if caps.bare_open || mptcp {
             let mut buffer = [0u8; 16];
-            let path = crate::msg::bare_path(base, &mut buffer)?;
+            let path = crate::msg::bare_path_proto(proto, base, &mut buffer)?;
             (Some(self.backend.open(path)?), SocketState::Open)
         } else {
             (None, SocketState::Pending)
@@ -89,7 +91,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             return Err(Errno::EPROTONOSUPPORT);
         }
         let unix = self.unix.as_ref().ok_or(Errno::EAFNOSUPPORT)?;
-        let (left, right) = unix.pair(base)?;
+        let (left, right) = unix.pair_flags(base, nonblock, cloexec)?;
         let first = self.install_pair_socket(base, left, cloexec, nonblock)?;
         let second = match self.install_pair_socket(base, right, cloexec, nonblock) {
             Ok(fd) => fd,
@@ -171,7 +173,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let backlog = clamp_backlog(backlog)?;
         if rec.sock.is_none() {
             let mut buffer = [0u8; 64];
-            let path = crate::msg::socket_path(rec.ty, local, &mut buffer)?;
+            let path = crate::msg::socket_path_proto(rec.proto, rec.ty, local, &mut buffer)?;
             let sock = self.backend.open(path)?;
             self.fds.attach(info.ofd, sock);
             rec.sock = Some(sock);
@@ -183,6 +185,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         }
         let sock = rec.sock.ok_or(Errno::EBADF)?;
         self.backend.call(sock, Call::Listen { backlog })?;
+        self.fds.event(info.ofd, sock);
         rec.state = SocketState::Listening;
         rec.accepting = true;
         Ok(())
@@ -278,7 +281,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let was_pending = rec.sock.is_none();
         if was_pending {
             let mut buffer = [0u8; 64];
-            let path = crate::msg::socket_path(rec.ty, endpoint, &mut buffer)?;
+            let path = crate::msg::socket_path_proto(rec.proto, rec.ty, endpoint, &mut buffer)?;
             let sock = self.backend.open(path)?;
             self.fds.attach(info.ofd, sock);
             rec.sock = Some(sock);
@@ -293,6 +296,10 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 rec.sock = None;
                 return Err(error);
             }
+            // Opening `net:tcp/<endpoint>` selects the interface; the scheme still needs the
+            // explicit `CONNECT` that starts the handshake.
+            self.backend.call(sock, Call::Connect(endpoint))?;
+            self.fds.event(info.ofd, sock);
             rec.peer = Some(endpoint);
             rec.state = SocketState::Connected;
             if nonblock || rec.nonblock {
@@ -306,6 +313,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let result = self.backend.call(sock, Call::Connect(endpoint));
         match result {
             Ok(_) => {
+                self.fds.event(info.ofd, sock);
                 rec.peer = Some(endpoint);
                 if nonblock || rec.nonblock {
                     rec.state = SocketState::Connecting;
@@ -315,6 +323,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 Ok(())
             }
             Err(error) if error == Errno::EAGAIN || error == Errno::EINPROGRESS => {
+                self.fds.event(info.ofd, sock);
                 rec.state = SocketState::Connecting;
                 rec.peer = Some(endpoint);
                 if nonblock || rec.nonblock {
@@ -362,12 +371,6 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         if let Err(error) = flags::send_supported(flags_in) {
             return Err(SendErr {
                 errno: error,
-                raise_sigpipe: false,
-            });
-        }
-        if !control.is_empty() {
-            return Err(SendErr {
-                errno: Errno::EOPNOTSUPP,
                 raise_sigpipe: false,
             });
         }
@@ -449,7 +452,8 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             }
             let endpoint = destination.unwrap_or_default();
             let mut buffer = [0u8; 64];
-            let path = match crate::msg::socket_path(rec.ty, endpoint, &mut buffer) {
+            let path = match crate::msg::socket_path_proto(rec.proto, rec.ty, endpoint, &mut buffer)
+            {
                 Ok(path) => path,
                 Err(error) => {
                     return Err(SendErr {
@@ -489,11 +493,48 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
                 });
             }
         };
+        if !control.is_empty() && rec.domain != AF_UNIX {
+            return Err(SendErr {
+                errno: Errno::EOPNOTSUPP,
+                raise_sigpipe: false,
+            });
+        }
+        if rec.domain == AF_UNIX && !control.is_empty() {
+            let Some(unix) = self.unix.as_ref() else {
+                return Err(SendErr {
+                    errno: Errno::EAFNOSUPPORT,
+                    raise_sigpipe: false,
+                });
+            };
+            return match unix.unix_sendmsg(&self.backend, sock, data, control, flags_in) {
+                Ok(count) => Ok(count),
+                Err(Errno::EPIPE) => Err(SendErr {
+                    errno: Errno::EPIPE,
+                    raise_sigpipe: flags_in & MSG_NOSIGNAL == 0,
+                }),
+                Err(Errno::EAGAIN) => Err(SendErr {
+                    errno: Errno::EAGAIN,
+                    raise_sigpipe: false,
+                }),
+                Err(error) => Err(SendErr {
+                    errno: error,
+                    raise_sigpipe: false,
+                }),
+            };
+        }
         let nonblock = rec.nonblock || info.nonblock || flags_in & MSG_DONTWAIT != 0;
         let deadline = Deadline::new(&self.env, rec.sndtimeo_ms);
         loop {
             let write_to = if opened_now { None } else { destination };
-            match self.backend.write(sock, data, write_to) {
+            let result = if rec.domain == AF_UNIX {
+                match self.unix.as_ref() {
+                    Some(unix) => unix.unix_write(&self.backend, sock, data),
+                    None => Err(Errno::EAFNOSUPPORT),
+                }
+            } else {
+                self.backend.write(sock, data, write_to)
+            };
+            match result {
                 Ok(count) => return Ok(count),
                 Err(Errno::EAGAIN) => {
                     if nonblock {
@@ -557,6 +598,52 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             });
         }
         let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+        if rec.domain == AF_UNIX && !control_out.is_empty() {
+            if flags_in & MSG_PEEK != 0 {
+                return Err(Errno::EOPNOTSUPP);
+            }
+            let max_read = total_len_iov(iov).min(raven_proto_net::MAX_DATAGRAM);
+            let mut buffer = vec![0u8; max_read];
+            let nonblock = rec.nonblock || info.nonblock || flags_in & MSG_DONTWAIT != 0;
+            let deadline = Deadline::new(&self.env, rec.rcvtimeo_ms);
+            let unix = self.unix.as_ref().ok_or(Errno::EAFNOSUPPORT)?;
+            loop {
+                match unix.unix_recvmsg(
+                    &self.backend,
+                    sock,
+                    &mut buffer,
+                    control_out.len(),
+                    flags_in,
+                ) {
+                    Ok(received) => {
+                        if received.control.len() > control_out.len() {
+                            return Err(Errno::EMSGSIZE);
+                        }
+                        if let Some(slot) = control_out.get_mut(..received.control.len()) {
+                            slot.copy_from_slice(&received.control);
+                        }
+                        let data = buffer.get(..received.len.min(buffer.len())).unwrap_or(&[]);
+                        let used = scatter(data, iov);
+                        return Ok(RecvMsg {
+                            len: used,
+                            name_len: 0,
+                            control_len: received.control.len(),
+                            flags: 0,
+                        });
+                    }
+                    Err(Errno::EAGAIN) => {
+                        if nonblock || deadline.expired(&self.env) {
+                            return Err(Errno::EAGAIN);
+                        }
+                        self.wait_one(sock, true, deadline.remaining(&self.env))?;
+                    }
+                    Err(error) => {
+                        rec.state = SocketState::Closed;
+                        return Err(error);
+                    }
+                }
+            }
+        }
         let nonblock = rec.nonblock || info.nonblock || flags_in & MSG_DONTWAIT != 0;
         let want_all = flags_in & MSG_WAITALL != 0 && rec.ty == SOCK_STREAM;
         let max_read = total_len_iov(iov).min(raven_proto_net::MAX_DATAGRAM);
@@ -574,16 +661,27 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             }
             let peek = flags_in & MSG_PEEK != 0;
             let result = if read_len <= stack.len() {
-                if peek {
-                    self.backend
-                        .peek(sock, stack.get_mut(..read_len).unwrap_or(&mut []))
+                let buffer = stack.get_mut(..read_len).unwrap_or(&mut []);
+                if rec.domain == AF_UNIX {
+                    match self.unix.as_ref() {
+                        Some(unix) if peek => unix.unix_peek(&self.backend, sock, buffer),
+                        Some(unix) => unix.unix_read(&self.backend, sock, buffer),
+                        None => Err(Errno::EAFNOSUPPORT),
+                    }
+                } else if peek {
+                    self.backend.peek(sock, buffer)
                 } else {
-                    self.backend
-                        .read(sock, stack.get_mut(..read_len).unwrap_or(&mut []))
+                    self.backend.read(sock, buffer)
                 }
             } else {
                 large = vec![0u8; read_len];
-                if peek {
+                if rec.domain == AF_UNIX {
+                    match self.unix.as_ref() {
+                        Some(unix) if peek => unix.unix_peek(&self.backend, sock, &mut large),
+                        Some(unix) => unix.unix_read(&self.backend, sock, &mut large),
+                        None => Err(Errno::EAFNOSUPPORT),
+                    }
+                } else if peek {
                     self.backend.peek(sock, &mut large)
                 } else {
                     self.backend.read(sock, &mut large)
@@ -652,7 +750,13 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             _ => return Err(Errno::EINVAL),
         };
         let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
-        self.backend.call(sock, Call::Shutdown { how: wire })?;
+        if rec.domain == AF_UNIX {
+            let unix = self.unix.as_ref().ok_or(Errno::EAFNOSUPPORT)?;
+            let selector = UnixShutdown::from_posix(how).ok_or(Errno::EINVAL)?;
+            unix.shutdown(sock, selector)?;
+        } else {
+            self.backend.call(sock, Call::Shutdown { how: wire })?;
+        }
         let (read, write) = match rec.state {
             SocketState::Shutdown { read, write } => (read, write),
             _ => (false, false),
@@ -669,6 +773,13 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let table = self.table.borrow();
         let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if rec.domain == AF_UNIX {
+            let unnamed = SockAddr::Un {
+                path: [0u8; 108],
+                len: 0,
+            };
+            return Ok(write_sockaddr(&unnamed, out));
+        }
         let local = if let Some(local) = rec.local {
             Some(local)
         } else if let Some(sock) = rec.sock {
@@ -694,6 +805,16 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let table = self.table.borrow();
         let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if rec.domain == AF_UNIX {
+            if rec.state != SocketState::Connected {
+                return Err(Errno::ENOTCONN);
+            }
+            let unnamed = SockAddr::Un {
+                path: [0u8; 108],
+                len: 0,
+            };
+            return Ok(write_sockaddr(&unnamed, out));
+        }
         let peer = if let Some(peer) = rec.peer {
             Some(peer)
         } else if let Some(sock) = rec.sock {
@@ -710,6 +831,23 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         Ok(write_sockaddr(&SockAddr::from_endpoint(peer), out))
     }
 
+    /// `getpeereid`: the creator uid/gid of a connected `AF_UNIX` endpoint.
+    pub fn getpeereid(&self, fd: i32) -> Result<(u32, u32), Errno> {
+        let info = self.fds.resolve(fd)?;
+        let table = self.table.borrow();
+        let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if rec.domain != AF_UNIX {
+            return Err(Errno::EOPNOTSUPP);
+        }
+        let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+        let cred = self
+            .unix
+            .as_ref()
+            .ok_or(Errno::EOPNOTSUPP)?
+            .peercred(sock)?;
+        Ok((cred.uid, cred.gid))
+    }
+
     /// `getsockopt`.
     pub fn getsockopt(
         &self,
@@ -721,12 +859,70 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let mut table = self.table.borrow_mut();
         let rec = table.get_mut(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if level == crate::mptcp::SOL_MPTCP {
+            if rec.proto != crate::mptcp::IPPROTO_MPTCP {
+                return Err(Errno::ENOPROTOOPT);
+            }
+            let control = match name {
+                crate::mptcp::MPTCP_INFO => crate::mptcp::Control::Info,
+                crate::mptcp::MPTCP_SUBFLOW_ADDRS => crate::mptcp::Control::Subflows,
+                _ => return Err(Errno::ENOPROTOOPT),
+            };
+            let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+            let mut request = [0u8; 64];
+            let used = control.encode(&mut request)?;
+            let mut reply = [0u8; 256];
+            let count =
+                self.backend
+                    .mptcp_control(sock, request.get(..used).unwrap_or(&[]), &mut reply)?;
+            return crate::mptcp::decode_reply(reply.get(..count).unwrap_or(&[]), name, out);
+        }
+        if level == SOL_SOCKET && name == SO_PEERCRED {
+            if rec.domain != AF_UNIX {
+                return Err(Errno::EOPNOTSUPP);
+            }
+            let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+            let cred = self
+                .unix
+                .as_ref()
+                .ok_or(Errno::EOPNOTSUPP)?
+                .peercred(sock)?;
+            let slot = out.get_mut(..12).ok_or(Errno::EINVAL)?;
+            let pid = i32::try_from(cred.pid).unwrap_or(i32::MAX);
+            slot.get_mut(0..4)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&pid.to_ne_bytes());
+            slot.get_mut(4..8)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&cred.uid.to_ne_bytes());
+            slot.get_mut(8..12)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&cred.gid.to_ne_bytes());
+            return Ok(12);
+        }
         if level == SOL_SOCKET && name == SO_ERROR {
-            let mut value = rec.so_error;
+            // The pending error lives in netd/`raven-tcpip`; read it once and let the server
+            // clear it (`FreeBSD sogetopt`). The cached value is the blocking-connect result and
+            // must not mask a deferred refusal with a zero default.
+            let value = match rec.sock {
+                Some(sock) => {
+                    match self.backend.call(
+                        sock,
+                        Call::GetSockOpt {
+                            opt: SockOpt::Error,
+                        },
+                    )? {
+                        CallReply::Value(value) => value,
+                        _ => return Err(Errno::EPROTO),
+                    }
+                }
+                None => 0,
+            };
             rec.so_error = 0;
-            if rec.state == SocketState::Connecting {
+            if value != 0 {
+                rec.state = SocketState::Open;
+            } else if rec.state == SocketState::Connecting {
                 rec.state = SocketState::Connected;
-                value = 0;
             }
             return opts::write_i32(out, value);
         }
@@ -791,6 +987,37 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let info = self.fds.resolve(fd)?;
         let mut table = self.table.borrow_mut();
         let rec = table.get_mut(info.ofd).ok_or(Errno::ENOTSOCK)?;
+        if level == crate::mptcp::SOL_MPTCP {
+            if rec.proto != crate::mptcp::IPPROTO_MPTCP {
+                return Err(Errno::ENOPROTOOPT);
+            }
+            let control = match name {
+                crate::mptcp::MPTCP_PM_CMD_ADD_ADDR => {
+                    crate::mptcp::Control::AddAddr(crate::mptcp::PmAddr::decode(value)?)
+                }
+                crate::mptcp::MPTCP_PM_CMD_DEL_ADDR => {
+                    crate::mptcp::Control::DelAddr(*value.first().ok_or(Errno::EINVAL)?)
+                }
+                crate::mptcp::MPTCP_PM_CMD_SET_FLAGS => {
+                    crate::mptcp::Control::SetFlags(crate::mptcp::PmAddr::decode(value)?)
+                }
+                _ => return Err(Errno::ENOPROTOOPT),
+            };
+            let sock = rec.sock.ok_or(Errno::ENOTCONN)?;
+            let mut request = [0u8; 64];
+            let used = control.encode(&mut request)?;
+            let mut reply = [0u8; 256];
+            let count =
+                self.backend
+                    .mptcp_control(sock, request.get(..used).unwrap_or(&[]), &mut reply)?;
+            let mut sink = [0u8; 4];
+            return crate::mptcp::decode_reply(
+                reply.get(..count).unwrap_or(&[]),
+                crate::mptcp::MPTCP_INFO,
+                &mut sink,
+            )
+            .map(|_| ());
+        }
         if let Some(is_read) = opts::timeout_slot(name) {
             let (sec, usec) = opts::read_timeval(value)?;
             let millis = opts::timeout_ms(sec, usec);
@@ -930,7 +1157,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
 
 fn validate_proto(ty: i32, proto: i32) -> Result<(), Errno> {
     let accepted = if ty == SOCK_STREAM {
-        proto == 0 || proto == 6
+        proto == 0 || proto == 6 || proto == crate::mptcp::IPPROTO_MPTCP
     } else {
         proto == 0 || proto == 17
     };

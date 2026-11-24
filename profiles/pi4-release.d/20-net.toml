@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# NET1 Pi 4 network tools. The netd and resolvd programs/manifests are staged by
+# 20-userspace; this fragment adds the address/route inspection tool used by the
+# board procedure. The release image keeps the DHCP-first netd manifest and does
+# not add a static QEMU address on the board.
+
+[[initfs.programs]]
+package = "raven-ifconfig"
+path = "/sbin/ifconfig"

@@ -22,19 +22,19 @@ regex = '^setuid: 0644=denied$'
 regex = '^setuid: setuid-0644=denied$'
 
 [[expect]]
-regex = '^setuid-child: mode=0755 uid=1000 euid=1000 gid=1000 egid=1000$'
+regex = '^setuid-child: mode=0755 uid=1000 euid=1000 gid=1000 egid=1000 auxv-uid=1000 auxv-euid=1000 auxv-gid=1000 auxv-egid=1000 secure=0 random-nonzero=1$'
 
 [[expect]]
-regex = '^setuid-child: mode=4755 uid=1000 euid=0 gid=1000 egid=1000$'
+regex = '^setuid-child: mode=4755 uid=1000 euid=0 gid=1000 egid=1000 auxv-uid=1000 auxv-euid=0 auxv-gid=1000 auxv-egid=1000 secure=1 random-nonzero=1$'
 
 [[expect]]
-regex = '^setuid-child: mode=2755 uid=1000 euid=1000 gid=1000 egid=0$'
+regex = '^setuid-child: mode=2755 uid=1000 euid=1000 gid=1000 egid=0 auxv-uid=1000 auxv-euid=1000 auxv-gid=1000 auxv-egid=0 secure=1 random-nonzero=1$'
 
 [[expect]]
 regex = '^setuid: script=bad-elf$'
 
 [[expect]]
-regex = '^setuid-child: mode=nosuid uid=1000 euid=1000 gid=1000 egid=1000$'
+regex = '^setuid-child: mode=nosuid uid=1000 euid=1000 gid=1000 egid=1000 auxv-uid=1000 auxv-euid=1000 auxv-gid=1000 auxv-egid=1000 secure=0 random-nonzero=1$'
 
 [[expect]]
 regex = '^setuid: exited-handle=ok$'

@@ -539,6 +539,10 @@ impl FsUsage {
     }
 }
 
+/// Filesystem type used when the platform's `statvfs` has no type field.
+#[cfg(target_os = "ravenbsd")]
+const UNKNOWN_FS_TYPE: i64 = 0;
+
 #[cfg(unix)]
 pub trait FsMeta {
     fn fs_type(&self) -> i64;
@@ -692,11 +696,18 @@ impl FsMeta for StatFs {
         ))]
         return self.f_type.try_into().unwrap();
     }
+    #[cfg(target_os = "ravenbsd")]
+    fn fs_type(&self) -> i64 {
+        // Raven's statvfs has no f_type. Zero is the defined "unknown" value; it is not
+        // matched by pretty_fstype, which renders it as `UNKNOWN (0x0)`.
+        UNKNOWN_FS_TYPE
+    }
     #[cfg(not(any(
         target_vendor = "apple",
         target_os = "linux",
         target_os = "android",
-        target_os = "freebsd"
+        target_os = "freebsd",
+        target_os = "ravenbsd"
     )))]
     fn fs_type(&self) -> i64 {
         // FIXME: statvfs doesn't have an equivalent, so we need to do something else

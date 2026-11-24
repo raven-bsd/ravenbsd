@@ -99,7 +99,8 @@ fn fork_and_exec_are_enosys() {
             entry: 0,
             sp: 0,
             arg: 0,
-            fork_flags: 0
+            fork_flags: 0,
+            tp: 0
         }),
         Err(ENOSYS)
     );

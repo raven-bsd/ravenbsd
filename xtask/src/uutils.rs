@@ -46,6 +46,7 @@ pub(crate) const SELECTED: &[(&str, &str)] = &[
     ("id", "uu_id"),
     ("chmod", "uu_chmod"),
     ("chown", "uu_chown"),
+    ("tty", "uu_tty"),
 ];
 
 const USAGE: &str = "\

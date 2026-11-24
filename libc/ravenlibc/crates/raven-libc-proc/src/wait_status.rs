@@ -7,7 +7,9 @@
 //! exits are `code << 8`, signals are `sig | 0x80` with the core bit, stops are
 //! `(sig << 8) | 0x7f`, and a continued child is `0xffff`.
 
-use crate::consts::{__WALL, P_ALL, P_PGID, P_PID, WAIT_OPTION_MASK, WEXITED};
+use crate::consts::{
+    __WALL, KERNEL_WCONTINUED, P_ALL, P_PGID, P_PID, WAIT_OPTION_MASK, WCONTINUED, WEXITED,
+};
 use crate::errors::{EINVAL, Errno};
 
 /// One decoded wait status.
@@ -64,6 +66,22 @@ pub fn decode(raw: i32) -> Option<WaitStatus> {
         sig,
         core: raw & 0x80 != 0,
     })
+}
+
+/// Translate the public `sys/wait.h` option word to the raw `PROC_WAIT_EX` option word.
+///
+/// The C header keeps the musl/Linux values (`WCONTINUED = 8`, `WEXITED = 4`). The kernel's
+/// `PROC_WAIT_EX` ABI has no `WEXITED` bit (it always reports exits) and uses
+/// [`KERNEL_WCONTINUED`] for continued children, so the two public bits are replaced by the
+/// kernel bit. Unsupported bits stay in the word and are rejected by the kernel with `EINVAL`,
+/// preserving the existing `WNOWAIT`/`__WALL` behaviour.
+#[must_use]
+pub fn kernel_wait_options(options: u32) -> u32 {
+    let mut kernel = options & !(WCONTINUED | WEXITED);
+    if options & WCONTINUED != 0 {
+        kernel |= KERNEL_WCONTINUED;
+    }
+    kernel
 }
 
 /// The id-selection kind of `wait6`/`waitid`.

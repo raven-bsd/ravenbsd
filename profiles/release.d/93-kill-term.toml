@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K434 test-only kill(SIGTERM) console fixture. It is built by
+# tests/fixtures/kill-term/build.sh and never contains product code.
+[[initfs.files]]
+src = "build/fixtures/kill-term/{arch}/kill-term"
+path = "/bin/kill-term"
+mode = 0o755
+generated = true

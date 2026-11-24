@@ -21,6 +21,8 @@ pub fn run() -> ! {
             super::schedule_locked();
         }
         #[cfg(target_arch = "x86_64")]
+        crate::sched::smp::percpu::note_idle();
+        #[cfg(target_arch = "x86_64")]
         // SAFETY: ring-0 `sti; hlt; cli`; the timer gate is installed before the idle loop starts.
         unsafe {
             core::arch::asm!("sti", "hlt", "cli", options(nomem, nostack),);

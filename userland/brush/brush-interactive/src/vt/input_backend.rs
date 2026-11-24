@@ -33,6 +33,15 @@ pub struct VtInputBackend<T: Terminal = StdTerminal> {
     reader: LineReader,
 }
 
+/// Whether the interactive session may show history hints.
+fn autosuggest_enabled() -> bool {
+    let plain = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty())
+        || std::env::var("TERM").is_ok_and(|term| term == "dumb")
+        || std::env::var("RAVEN_PLAIN_PROMPT").is_ok_and(|value| value == "1")
+        || std::env::var("RAVEN_AUTOSUGGEST").is_ok_and(|value| value == "0");
+    !plain
+}
+
 impl Default for VtInputBackend<StdTerminal> {
     fn default() -> Self {
         Self::new(StdTerminal::default())
@@ -46,11 +55,9 @@ impl<T: Terminal> VtInputBackend<T> {
     ///
     /// * `terminal` - The terminal to edit on.
     pub fn new(terminal: T) -> Self {
-        Self {
-            terminal,
-            reader: LineReader::default(),
-        }
-        .with_ui_options(&crate::UIOptions::default())
+        let mut reader = LineReader::default();
+        reader.autosuggest = autosuggest_enabled();
+        Self { terminal, reader }.with_ui_options(&crate::UIOptions::default())
     }
 
     /// Applies the shared UI settings for syntax highlighting and color.
@@ -59,6 +66,9 @@ impl<T: Terminal> VtInputBackend<T> {
     #[must_use]
     pub const fn with_ui_options(mut self, options: &crate::UIOptions) -> Self {
         self.reader.highlighting = !options.disable_highlighting && !options.disable_color;
+        self.reader.autosuggest = self.reader.autosuggest
+            && !options.disable_color
+            && !options.disable_highlighting;
         self
     }
 
@@ -70,6 +80,7 @@ impl<T: Terminal> VtInputBackend<T> {
     #[must_use]
     pub const fn with_basic_style(mut self) -> Self {
         self.reader.style = Style::Basic;
+        self.reader.autosuggest = false;
         self
     }
 

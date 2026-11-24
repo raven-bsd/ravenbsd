@@ -1,0 +1,163 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K199/K198/K216 staging gate: the release image must actually contain the first-party curl/wget
+# binaries and run them from the release shell (they are static /bin tools, not dynamic PIE).
+# The gate executes both version flags and performs a real local QEMU user-net fetch.
+# K219: the fixture server uses the unique port 18082; build.sh installed stops its previous pid,
+# waits, and verifies the listening socket before the guest boots.
+name = "fetch-installed"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/fixtures/fetch/build.sh installed"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^.*login:'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^-rwxr-xr-x .* /bin/curl$'
+
+[[expect]]
+regex = '^-rwxr-xr-x .* /bin/wget$'
+
+[[expect]]
+regex = '^curl 0\.1\.0 \(RavenBSD\)$'
+
+[[expect]]
+regex = '^curl-version=0$'
+
+[[expect]]
+regex = '^wget 0\.1\.0 \(RavenBSD\)$'
+
+[[expect]]
+regex = '^wget-version=0$'
+
+[[expect]]
+regex = '^known-http-body$'
+
+[[expect]]
+regex = '^curl-fetch=0$'
+
+[[expect]]
+regex = '^wget-fetch=0$'
+
+[[expect]]
+regex = '^hostname = "raven"$'
+
+[[expect]]
+regex = '^mode = "dhcp"$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/ls -l /bin/curl /bin/wget\n"
+delay_ms = 100
+
+[[step]]
+wait = '^-rwxr-xr-x .* /bin/wget$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/curl --version; echo curl-version=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^curl 0\.1\.0 \(RavenBSD\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^curl-version=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/wget --version; echo wget-version=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget 0\.1\.0 \(RavenBSD\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^wget-version=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/curl http://10.0.2.2:18082/known.txt; echo; echo curl-fetch=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 60
+
+[[step]]
+wait = '^curl-fetch=0$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/wget -O /tmp/installed-wget.txt http://10.0.2.2:18082/known.txt; echo wget-fetch=$?; /bin/cat /tmp/installed-wget.txt; echo\n"
+delay_ms = 100
+
+[[step]]
+wait = '^wget-fetch=0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^known-http-body$'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/raven/conf.d/network.toml\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mode = "dhcp"$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

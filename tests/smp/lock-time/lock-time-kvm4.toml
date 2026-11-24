@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-lock-time-kvm4"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/lock-time/build.sh"]
+initfs = "build/smp/lock-time/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-accel", "kvm", "-cpu", "host"]
+expect_exit = "success"
+
+# KVM -smp 4 uses the harness default -smp 4 plus the KVM accelerator.
+[[step]]
+wait = '^lock-time: ready$'
+send = "50 4 on 16 4\n"
+delay_ms = 50
+
+[[expect]]
+regex = '^lock-time: workers=8 timers=4 iterations=50 cpus=4 mode=on mem_period=16$'
+
+[[expect]]
+regex = '^lock-time: iter=0 hops=[1-9]\d* p50_ns=\d+ p90_ns=\d+ p99_ns=\d+ max_ns=\d+ timer_p50_ns=\d+ timer_p90_ns=\d+ timer_max_ns=\d+ samples=[1-9]\d* timer_samples=[1-9]\d*$'
+
+[[expect]]
+regex = '^lock-time: iter=49 hops=[1-9]\d* p50_ns=\d+ p90_ns=\d+ p99_ns=\d+ max_ns=\d+ timer_p50_ns=\d+ timer_p90_ns=\d+ timer_max_ns=\d+ samples=[1-9]\d* timer_samples=[1-9]\d*$'
+
+[[expect]]
+regex = '^lock-time: per-cpu cpu0=[1-9]\d* cpu1=[1-9]\d* cpu2=[1-9]\d* cpu3=[1-9]\d*$'
+
+[[expect]]
+regex = '^lock-time: summary iterations=50 hops=[1-9]\d* worst_p90_ns=\d+ worst_max_ns=\d+ worst_timer_p90_ns=\d+ worst_timer_max_ns=\d+ mem_period=16$'
+
+[[expect]]
+regex = '^lock-time: complete iterations=50 workers=8 timers=4$'
+
+[[expect]]
+regex = '^lock-time: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|lock-time: failed'

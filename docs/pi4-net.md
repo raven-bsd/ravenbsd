@@ -3,9 +3,33 @@
 
 # Pi 4 GENET release network (REL4)
 
-Status: **host model and evidence kit only. No Pi 4 board result is claimed.** The GENET link,
-DHCP lease and gateway ping have not run on hardware; every value below is UNVERIFIED until the
-owner supplies the serial transcript and this script passes on it.
+Status: **host model and QEMU gateway gate (OBSERVED); Pi 4 board result UNVERIFIED.** The GENET
+link, LAN DHCP lease and external 8.8.8.8 ping have not run on hardware; every board value below
+is UNVERIFIED until the owner supplies the serial transcript and the evidence script passes on it.
+The QEMU `pi4-net` gate uses user networking and the 10.0.2.2 gateway, not a board claim.
+
+## NET1 QEMU gateway gate
+
+`cargo xtask qtest --case pi4-net --arch x86_64` boots the `hw-net` server image with the B70
+probe and a real QEMU user-network DHCP lease. It asserts:
+
+```
+b70: lease eth0 10.0.2.15/24 router=10.0.2.2 dns=10.0.2.3
+b70: route default via 10.0.2.2 dev eth0
+b70: ping 10.0.2.2 seq=1 rtt=...
+b70: ping 3 packets transmitted, 3 received, 0% packet loss
+b70: resolv.conf nameserver=10.0.2.3
+b70: dns localhost=127.0.0.1
+b70: done
+```
+
+The lease, route, gateway reply and DNS answer are real QEMU user-net behaviour; there is no
+synthetic external reply. The board procedure replaces the 10.0.2.2 gateway with the LAN gateway
+and adds `ping 8.8.8.8` plus a DNS lookup through `resolvd`.
+
+The Pi 4 release profile stages `netd` in `dhcp-first` mode, `resolvd`, `ping`, `route` and
+`ifconfig`; `profiles/pi4-release.d/20-net.toml` adds the inspection tool. A platform NIC publishes
+`eth0` only after a validated lease; a QEMU image keeps the fixed user-mode address.
 
 ## Release gate
 
@@ -206,8 +230,9 @@ negative synthetic fixtures; that proves the parser, not the board path.
 4. **DHCP.** Confirm `netd` applied a lease. The gate line must name the address, prefix,
    gateway and DNS (or `none`). A static address or an APIPA `169.254/16` address is not a
    DHCP result.
-5. **Ping.** Run `ping <gateway>` (three probes are enough) and keep the per-sequence and summary
-   lines. At least one reply is required; a timeout-only run is a failure, not a partial pass.
+5. **Ping/DNS.** Run `ping <gateway>` and `ping 8.8.8.8` (three probes each are enough) and keep
+   the per-sequence and summary lines. At least one reply from each is required; a timeout-only
+   run is a failure, not a partial pass. Resolve a name through `resolvd` and record the answer.
 6. **Gate the log.**
 
    ```
@@ -245,6 +270,22 @@ case remains the end-to-end proof of the QEMU default path.
 There is no `pi4-net` QEMU case: QEMU has no GENET v5 model, and adding a fake PCI device would not
 exercise the Pi 4 platform path. The frame service runs in the host tests and the target code is
 compile-checked; the board run is the evidence the owner must supply.
+
+## NET1 donor reconciliation (DR-57/52)
+
+Revisions from `ravenbsd-resources/donors.lock`: `netbsd 36eddebcc36cb0775aa2962005b9c05419a6ff01`,
+`freebsd 133344405f532bd54ff3629a77d4c4e062f01fdb`, `illumos-gate
+586678ac1bcbd77644a6ec4dac7f79d676cfb4ec`, `linux adc218676eef25575469234709c2d87185ca223a`.
+
+| Topic | Illumos finding | BSD file/licence | Linux finding | Decision |
+|---|---|---|---|---|
+| DHCP lease validation | `dhcpagent`/`ipadm` lease and interface state machine (CDDL, behaviour only) | NetBSD `sbin/dhcpcd` / `lib/libc` lease handling and route installation (BSD-2/3); FreeBSD `dhclient` (BSD) | `dhcpcd`/`NetworkManager` outcome only | First-party `raven-tcpip` DHCP client + `netd` validation; no donor code |
+| Default route | `route` and `ipadm` install a gateway route with the lease | NetBSD `sbin/route` and kernel `rtrequest` semantics (BSD) | `ip route` outcome only | `NetCore::set_ipv4`/route table; `netd` publishes only a validated lease |
+| DNS | `resolv.conf`/`resolvd` service model | NetBSD `resolv.conf`/`res_send` (ISC/BSD) | glibc/systemd-resolved outcome only | First-party `resolvd` reading the netd lease; no donor code |
+| Ping | ICMP echo through the socket layer | NetBSD `ping` (BSD-3) and ICMP handling | iputils ping outcome only | First-party `raven-ping` + `netd` ICMP core; no donor code |
+| Tests | N/A | N/A | N/A | Host netd/resolvd/ping tests + QEMU `pi4-net` (10.0.2.2); board UNVERIFIED |
+
+No `PROVENANCE.toml` import is added because no donor file was copied or transpiled.
 
 ## UNVERIFIED values
 

@@ -29,3 +29,9 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "/bin/child-4755=$target_dir/$target/release/raven-setuid-child:4755" \
     "/bin/child-2755=$target_dir/$target/release/raven-setuid-child:2755" \
     "/bin/child-script=$root/tests/fixtures/setuid/script:4755"
+
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/auxv-initfs.img" \
+    "/init=$target_dir/$target/release/raven-setuid-auxv" \
+    "/sbin/initfsd=$target_dir/$target/release/raven-initfsd" \
+    "/bin/child=$target_dir/$target/release/raven-setuid-child:0755"

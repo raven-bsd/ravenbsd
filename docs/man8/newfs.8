@@ -1,0 +1,38 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 18, 2026
+.Dt NEWFS 8
+.Os RavenBSD
+.Sh NAME
+.Nm newfs
+.Nd construct a UFS1/UFS2 filesystem on a block device
+.Sh SYNOPSIS
+.Nm
+.Op Fl O Ar 1|2
+.Op Fl b Ar block-size
+.Op Fl f Ar fragment-size
+.Op Fl s Ar size
+.Op Fl L Ar label
+.Op Ar block:0
+.Sh DESCRIPTION
+The
+.Nm
+utility formats a block device through the
+.Dq block:
+scheme using the pure-Rust UFS formatter.
+The default is UFS2 with 4096-byte blocks and 512-byte fragments.
+The
+.Fl O
+option selects UFS1 or UFS2.
+The optional
+.Fl s
+size accepts k/m/g suffixes and must be a multiple of the block size.
+An open or format failure is reported and exits non-zero.
+No format result is fabricated.
+.Sh EXIT STATUS
+Returns 0 on success.
+Returns 1 on an open or format error.
+Returns 2 on usage errors.
+.Sh SEE ALSO
+.Xr lsblk 1 ,
+.Xr gpart 8

@@ -181,6 +181,22 @@ syscalls! {
     IRQ_ACK = 0x76;
 }
 
+/// `proc_reboot(how: u32) -> !` powers off, halts or reboots the machine.
+///
+/// Root-only (`euid == 0`); `how` is a mask of [`RB_HALT`], [`RB_POWER_OFF`] and
+/// [`RB_AUTOBOOT`]. The variant is deliberately not in [`Syscall`], so existing exhaustive libc
+/// matches stay intact; the kernel dispatches the raw number before `Syscall::from_usize`.
+pub const PROC_REBOOT: usize = 0x46;
+
+/// Reboot to the normal multi-user state.
+pub const RB_AUTOBOOT: u32 = 0;
+/// Halt without powering off.
+pub const RB_HALT: u32 = 0x0000_0008;
+/// Power off if the platform supports it.
+pub const RB_POWER_OFF: u32 = 0x0000_4000;
+/// Mask of reboot flags accepted by [`PROC_REBOOT`].
+pub const RB_FLAGS: u32 = RB_HALT | RB_POWER_OFF;
+
 /// `trace_set(id: u64) -> 0`.
 ///
 /// Sets the calling thread's current trace id (`R-OBS-6`); zero clears it. Unprivileged: a thread
@@ -198,6 +214,13 @@ pub const TRACE_SET: usize = 0x0B;
 /// [`Syscall`] variant; the lock table lives in the kernel so close and process-exit release are
 /// exact.
 pub const RECORD_LOCK: usize = 0x0C;
+
+/// `proc_chroot(path: *const u8, len: usize) -> 0` sets the calling process's root.
+///
+/// Root-only (`euid == 0`); the path is resolved inside the current root, must name a directory
+/// and is stored as a normalized absolute path without a trailing slash. A raw constant, not a
+/// [`Syscall`] variant, so the existing exhaustive matches downstream stay intact.
+pub const PROC_CHROOT: usize = 0x0D;
 
 /// `msync(proc: Handle, addr: usize, len: usize, flags: usize) -> 0`.
 ///
@@ -233,6 +256,42 @@ pub const THREAD_SET_TLS: usize = 0x23;
 /// meanings are the C58/PG-8 PROPOSED set (CHECK, CANCEL, SYNCCALL, TIMER);
 /// this constant and the kernel do not raise signals.
 pub const THREAD_KICK: usize = 0x81;
+
+/// `proc_sigrecv_ex(out: *mut [u64; 6], flags: u32, deliverable: u64) -> signo` (raw 0x85).
+///
+/// The six-word output is `[signo, sender_pid, si_code, si_uid, si_value, 0]`. With
+/// [`PROC_SIGRECV_DELIVERABLE`] the kernel selects only a queued signal whose bit is in
+/// `deliverable`; every masked signal stays queued. Raw constant, not a `Syscall` variant.
+pub const PROC_SIGRECV_EX: usize = 0x85;
+
+/// `proc_sigqueue(target: pid, signo: i32, value: u64) -> 0` (raw 0x86).
+///
+/// Queues one `SI_QUEUE` record carrying `value` for `target`. Raw constant.
+pub const PROC_SIGQUEUE: usize = 0x86;
+
+/// `PROC_SIGRECV_EX` flag: select only a signal whose bit is in the deliverable mask.
+pub const PROC_SIGRECV_DELIVERABLE: u32 = 2;
+
+/// `sigaction(signo: i32, act: *const SigAction, old: *mut SigAction) -> 0` (raw 0x87).
+///
+/// Installs, replaces or reads the per-process handler for one signal. `act` is null to read
+/// without changing; `old` is null to ignore the previous value. The structure layout is the
+/// System V amd64 `struct sigaction` (see `tickets/CONTRACTS.md` C19 and the S160 offset table),
+/// not the retired `SIG_SETUP` model. Raw constant, not a `Syscall` variant.
+pub const SIGACTION: usize = 0x87;
+
+/// `sigprocmask(how: i32, set: *const u64, old: *mut u64) -> 0` (raw 0x88).
+///
+/// POSIX `SIG_BLOCK`/`SIG_UNBLOCK`/`SIG_SETMASK` on the calling thread's mask. The mask is
+/// per-thread; handlers are per-process. A signal that becomes unblocked and is pending is
+/// delivered before the call returns to user mode. Raw constant.
+pub const SIGPROCMASK: usize = 0x88;
+
+/// `sigaltstack(ss: *const Stack, old: *mut Stack) -> 0` (raw 0x89).
+///
+/// Installs or reads the per-thread alternate signal stack (`SS_ONSTACK`/`SS_DISABLE`
+/// semantics). Raw constant.
+pub const SIGALTSTACK: usize = 0x89;
 
 /// `thread_self() -> tid`.
 ///

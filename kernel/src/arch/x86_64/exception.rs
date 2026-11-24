@@ -3,14 +3,26 @@
 
 //! Exception and interrupt stubs and reporting.
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use crate::arch::x86_64::syscall::{deliver_fault, terminate_fault};
 use crate::arch::x86_64::trapframe::TrapFrame;
-use crate::{backtrace, kprintln};
+use crate::{backtrace, kprintln_emergency};
 use raven_abi::layout::x86_64::HHDM_BASE;
 use raven_abi::signal;
 
+/// One-shot `log-lock-fault` injection marker.
+static LOG_LOCK_INJECTED: AtomicBool = AtomicBool::new(false);
+
 /// Direct-map window above [`HHDM_BASE`] valid for PC/return-address checks.
 const HHDM_WINDOW: u64 = 1 << 47;
+
+/// `log-lock-fault` boot flag: hold the log lock before the fatal exception transcript.
+fn log_lock_fault() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "log-lock-fault")
+}
 
 const NAMES: [&str; 32] = [
     "divide error",
@@ -159,7 +171,7 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             }
             terminate_fault(signal::FAULT_BREAKPOINT);
         }
-        kprintln!("EXCEPTION: breakpoint");
+        kprintln_emergency!("EXCEPTION: breakpoint");
         return;
     }
     if vector == 0 && from_user {
@@ -197,7 +209,36 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             if deliver_fault(frame, kind, cr2) {
                 return;
             }
-            crate::process::page_fault(cr2);
+            // K495 rev181: the fault RIP alone cannot identify the null/data source. Print the
+            // general registers next to the fault line so the owner can map the instruction.
+            let pid = crate::process::current().map_or(0, |process| process.id);
+            crate::kprintln!(
+                "process: fault-regs pid={} rip=0x{:x} rsp=0x{:x} rax=0x{:x} rbx=0x{:x} \
+                 rcx=0x{:x} rdx=0x{:x} rsi=0x{:x} rdi=0x{:x} rbp=0x{:x} r8=0x{:x} \
+                 r9=0x{:x} r10=0x{:x} r11=0x{:x} r12=0x{:x} r13=0x{:x} r14=0x{:x} \
+                 r15=0x{:x} cr2=0x{:x} err=0x{:x}",
+                pid,
+                frame.rip,
+                frame.rsp,
+                frame.rax,
+                frame.rbx,
+                frame.rcx,
+                frame.rdx,
+                frame.rsi,
+                frame.rdi,
+                frame.rbp,
+                frame.r8,
+                frame.r9,
+                frame.r10,
+                frame.r11,
+                frame.r12,
+                frame.r13,
+                frame.r14,
+                frame.r15,
+                cr2,
+                frame.error_code
+            );
+            crate::process::page_fault(cr2, frame.rip);
         }
     }
     if vector >= 32 {
@@ -213,14 +254,18 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         crate::process::user_exception(vector);
     }
 
+    if !from_user && log_lock_fault() && !LOG_LOCK_INJECTED.swap(true, Ordering::AcqRel) {
+        crate::log::hold_lock_for_test();
+    }
+
     let name = NAMES.get(vector).copied().unwrap_or("unknown");
-    kprintln!(
+    kprintln_emergency!(
         "EXCEPTION: {} (vector {}, error {:#x})",
         name,
         vector,
         frame.error_code
     );
-    kprintln!(
+    kprintln_emergency!(
         "r15={:016x} r14={:016x} r13={:016x} r12={:016x} r11={:016x} r10={:016x}",
         frame.r15,
         frame.r14,
@@ -229,7 +274,7 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         frame.r11,
         frame.r10
     );
-    kprintln!(
+    kprintln_emergency!(
         "r9={:016x} r8={:016x} rbp={:016x} rdi={:016x} rsi={:016x} rdx={:016x}",
         frame.r9,
         frame.r8,
@@ -238,7 +283,7 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         frame.rsi,
         frame.rdx
     );
-    kprintln!(
+    kprintln_emergency!(
         "rcx={:016x} rbx={:016x} rax={:016x} vector={} error={:#x}",
         frame.rcx,
         frame.rbx,
@@ -246,7 +291,7 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         frame.vector,
         frame.error_code
     );
-    kprintln!(
+    kprintln_emergency!(
         "rip={:016x} cs={:016x} rflags={:016x} rsp={:016x} ss={:016x}",
         frame.rip,
         frame.cs,
@@ -256,9 +301,9 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
     );
 
     if vector == 14 {
-        kprintln!("cr2=0x{:016x}", read_cr2());
+        kprintln_emergency!("cr2=0x{:016x}", read_cr2());
         let error = frame.error_code;
-        kprintln!(
+        kprintln_emergency!(
             "page-fault: present={} write={} user={} reserved={} instruction={}",
             error & 1,
             (error >> 1) & 1,
@@ -267,8 +312,8 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             (error >> 4) & 1
         );
     }
-    kprintln!("cr3=0x{:016x}", read_cr3());
-    kprintln!("handler_rsp=0x{:016x}", frame as *const TrapFrame as u64);
+    kprintln_emergency!("cr3=0x{:016x}", read_cr3());
+    kprintln_emergency!("handler_rsp=0x{:016x}", frame as *const TrapFrame as u64);
     dump_backtrace(frame);
 
     if crate::log::test_exit() {
@@ -312,16 +357,16 @@ fn dump_backtrace(frame: &TrapFrame) {
         // SAFETY: both ends of the 8-byte read are inside the kernel image or HHDM window.
         unsafe { Some(core::ptr::read_volatile(address as *const u64)) }
     };
-    kprintln!("backtrace:");
+    kprintln_emergency!("backtrace:");
     let count = backtrace::walk(
         frame.rbp,
         read,
         valid_backtrace_address,
         |depth, rbp, rip| {
-            kprintln!("bt[{}] rip=0x{:016x} rbp=0x{:016x}", depth, rip, rbp);
+            kprintln_emergency!("bt[{}] rip=0x{:016x} rbp=0x{:016x}", depth, rip, rbp);
         },
     );
     if count == 0 {
-        kprintln!("bt[] <no frame>");
+        kprintln_emergency!("bt[] <no frame>");
     }
 }

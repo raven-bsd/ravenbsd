@@ -12,14 +12,15 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::collections::BTreeMap;
+    use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::rc::Rc;
     use alloc::string::String;
+    use alloc::vec::Vec;
     use core::cell::Cell;
 
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
-    use raven_proto_fs::Stat;
+    use raven_proto_fs::{O_RDWR, Stat};
     use raven_proto_net::socket::{Call, Response, SocketRequest};
     use raven_rt::entry;
     use raven_rt::event::{EventQueue, EvqEvent, READABLE, event_create, event_signal};
@@ -28,46 +29,90 @@ mod program {
         Server,
     };
 
+    use netd::network::{LoadError, NetworkConfig, NetworkMode};
     use netd::nic::NicMode;
-    use netd::{Loopback, NetEvent, Netd};
+    use netd::{FilterPolicy, LoadError as FilterLoadError, Loopback, NetEvent, Netd};
 
     entry!(main);
 
     const MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 0x01];
     const OPEN_WRITE: u32 = 2;
+    /// Doorbells kept per file (one per process that polls the shared descriptor).
+    const MAX_DOORBELLS_PER_FILE: usize = 16;
 
     struct NetHandler {
         netd: Netd<Loopback>,
-        events: BTreeMap<u64, Handle>,
+        /// Readiness doorbells per open file. A file is shared by every process that holds a
+        /// handle to it, so all holders are rung.
+        events: BTreeMap<u64, Vec<Handle>>,
+        /// Files whose level is re-checked after the next stack poll (accepted backlog).
+        rearm: BTreeSet<u64>,
         nic_retry_ms: i64,
         nic_mode: NicMode,
         printed_eth0: bool,
         release_dhcp: bool,
         release_ping: bool,
         release_unavailable: bool,
+        network: Option<NetworkConfig>,
+        network_ready: bool,
+        network_deadline_ms: i64,
+        hostname: Option<String>,
+        hostname_applied: bool,
+        static_mode: bool,
+        /// Test-only `tx-debug` counter print at the NIC reclaim decision.
+        tx_debug: bool,
+        /// `/etc/pf.conf` policy shared by every interface.
+        pf: Option<FilterPolicy>,
     }
 
     fn main(args: raven_rt::Args) -> i32 {
         let now = now_ms();
         let require_nic = args.get(1) == Some("nic");
-        let netd = Netd::new(Loopback::new(MAC), MAC, now);
+        // Fail closed: a present but malformed ruleset stops netd instead of starting
+        // unfiltered. An absent file keeps the historical no-filter behaviour.
+        let pf = match load_pf_policy() {
+            Ok(policy) => policy,
+            Err(error) => {
+                raven_rt::eprintln!("netd: pf config: {error}; refusing to start");
+                return 1;
+            }
+        };
+        match &pf {
+            Some(policy) => raven_rt::println!(
+                "netd: pf loaded rules={} nat={}",
+                policy.rules(),
+                policy.nat_rules()
+            ),
+            None => raven_rt::println!("netd: pf absent"),
+        }
+        let netd = Netd::with_filter(Loopback::new(MAC), MAC, now, pf.clone());
         let mut handler = NetHandler {
             netd,
             events: BTreeMap::new(),
+            rearm: BTreeSet::new(),
             nic_retry_ms: now,
             nic_mode: NicMode::select(&args),
             printed_eth0: false,
             release_dhcp: false,
             release_ping: false,
             release_unavailable: false,
+            network: None,
+            network_ready: false,
+            network_deadline_ms: now.saturating_add(10_000),
+            hostname: None,
+            hostname_applied: false,
+            static_mode: false,
+            tx_debug: args.iter().any(|argument| argument == "tx-debug"),
+            pf,
         };
-        if require_nic {
-            if let Err(error) = handler.try_nic(now) {
-                raven_rt::eprintln!("netd: nic: {error}");
-                return 1;
-            }
-        } else {
-            let _ = handler.try_nic(now);
+        handler.load_network(now);
+        // A `nic:` driver may register a moment after svcd launches netd. Register `net:` for
+        // loopback first and retry the NIC from the main loop so a late driver never fails netd
+        // or delays getty. The service manifest still waits for `scheme:nic` where available.
+        if let Err(error) = handler.try_nic(now)
+            && require_nic
+        {
+            raven_rt::eprintln!("netd: nic: {error}; waiting for the driver");
         }
         handler.publish_and_feed();
         let registered = Rc::new(Cell::new(None));
@@ -109,6 +154,9 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
+            for line in handler.netd.take_filter_log() {
+                raven_rt::println!("{line}");
+            }
             // No stack timer pending: block on the scheme-server source and its client events.
             // The one-second cap is only a safety net for a missed wakeup, not a heartbeat.
             let timeout_ns = handler
@@ -130,6 +178,25 @@ mod program {
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             handler.publish_and_feed();
+            for line in handler.netd.take_filter_log() {
+                raven_rt::println!("{line}");
+            }
+        }
+    }
+
+    /// Load `/etc/pf.conf`, retrying while the file service starts. Missing means no filter;
+    /// malformed means the caller must exit without starting the stack.
+    fn load_pf_policy() -> Result<Option<FilterPolicy>, String> {
+        let deadline = now_ms().saturating_add(10_000);
+        loop {
+            match netd::load_pf() {
+                Ok(Some(ruleset)) => return Ok(Some(FilterPolicy::new(ruleset))),
+                Ok(None) => return Ok(None),
+                Err(FilterLoadError::NotReady) if now_ms() < deadline => {
+                    let _ = raven_rt::nanosleep(5_000_000);
+                }
+                Err(error) => return Err(error.message()),
+            }
         }
     }
 
@@ -138,11 +205,92 @@ mod program {
             if self.netd.has_nic() {
                 return Ok(());
             }
-            let _config = netd::nic::attach(&mut self.netd, now, self.nic_mode)?;
+            if !self.load_network(now) {
+                return Ok(());
+            }
+            let static_config = self.network.as_ref().and_then(NetworkConfig::static_config);
+            let _config = netd::nic::attach(
+                &mut self.netd,
+                now,
+                self.nic_mode,
+                static_config,
+                self.pf.clone(),
+                self.tx_debug,
+            )?;
             Ok(())
         }
 
+        /// Read and validate the network drop-in once. Returns false only while the file
+        /// service is still starting, so the caller can retry without attaching a wrong mode.
+        fn load_network(&mut self, now: i64) -> bool {
+            if self.network_ready {
+                return true;
+            }
+            match netd::network::load() {
+                Ok(Some(config)) => {
+                    self.static_mode = config.mode == NetworkMode::Static;
+                    self.hostname = config.hostname.clone();
+                    match config.mode {
+                        NetworkMode::Static => raven_rt::println!(
+                            "netd: network config mode=static hostname={}",
+                            config.hostname.as_deref().unwrap_or("(image default)")
+                        ),
+                        NetworkMode::Dhcp => raven_rt::println!(
+                            "netd: network config mode=dhcp hostname={}",
+                            config.hostname.as_deref().unwrap_or("(image default)")
+                        ),
+                    }
+                    self.network = Some(config);
+                    self.network_ready = true;
+                    true
+                }
+                Ok(None) => {
+                    self.network_ready = true;
+                    true
+                }
+                Err(LoadError::NotReady) => {
+                    if now >= self.network_deadline_ms {
+                        self.network_ready = true;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Err(error @ LoadError::Invalid(_)) => {
+                    raven_rt::eprintln!(
+                        "netd: network config: {}; using image default",
+                        error.message()
+                    );
+                    self.network_ready = true;
+                    true
+                }
+            }
+        }
+
+        fn apply_hostname(&mut self) {
+            if self.hostname_applied {
+                return;
+            }
+            let Some(name) = self.hostname.clone() else {
+                return;
+            };
+            if Self::write_hostname(&name) {
+                raven_rt::println!("netd: hostname {name}");
+                self.hostname_applied = true;
+            }
+        }
+
+        fn write_hostname(name: &str) -> bool {
+            let Ok(mut file) = raven_rt::fs::open("sys:/hostname", O_RDWR) else {
+                return false;
+            };
+            let written = file.write(name.as_bytes()).is_ok();
+            let _ = file.close();
+            written
+        }
+
         fn publish_and_feed(&mut self) {
+            self.apply_hostname();
             if !self.printed_eth0
                 && let Some(config) = self.netd.published_nic()
             {
@@ -161,7 +309,7 @@ mod program {
         }
 
         fn feed_dhcp(&mut self) {
-            if self.release_dhcp || self.release_unavailable {
+            if self.static_mode || self.release_dhcp || self.release_unavailable {
                 return;
             }
             if self.netd.published_nic().is_none() {
@@ -215,9 +363,31 @@ mod program {
                     raven_netcore::Event::Accepted { listener, .. } => listener,
                 };
                 for file in self.netd.files_for_socket(ready.interface, socket) {
-                    if let Some(event) = self.events.get(&file) {
-                        let _ = event_signal(*event, 1);
-                    }
+                    self.ring(file);
+                }
+            }
+            // An accept can leave a second connection in the backlog and the stack raises no new
+            // edge for it. A read deliberately does not re-arm: the doorbell latch is cleared only
+            // by EVQ_WAIT, so a signal after a partial read outlives the read and an inherited
+            // socket sees a spurious ready later. The live query (K244) is the verdict; the edge
+            // is only the wake-up.
+            let touched = core::mem::take(&mut self.rearm);
+            for file in touched {
+                if self
+                    .netd
+                    .socket_readiness(file)
+                    .is_ok_and(|ready| ready.readable)
+                {
+                    self.ring(file);
+                }
+            }
+        }
+
+        /// Ring every doorbell attached to `file`.
+        fn ring(&self, file: u64) {
+            if let Some(events) = self.events.get(&file) {
+                for event in events {
+                    let _ = event_signal(*event, 1);
                 }
             }
         }
@@ -322,6 +492,9 @@ mod program {
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+            if let Ok(SocketRequest::Call(Call::Accept)) = SocketRequest::decode(request) {
+                self.rearm.insert(file);
+            }
             self.netd
                 .call(file, request, response)
                 .map_err(HandlerError::Errno)
@@ -339,9 +512,24 @@ mod program {
                     return Err(HandlerError::Errno(Errno::EINVAL));
                 }
                 let event = event_create().map_err(HandlerError::Errno)?;
-                if let Some(previous) = self.events.insert(file, event) {
-                    let _ = raven_rt::handle_close(previous);
+                // The transition that made the socket ready may have happened before this
+                // doorbell existed (an accepted socket is opened after its data arrived; an
+                // inherited descriptor is polled long after). The live query is the truth, not
+                // the edge: ring now if there is something to collect.
+                if self
+                    .netd
+                    .socket_readiness(file)
+                    .is_ok_and(|ready| ready.readable || ready.writable)
+                {
+                    let _ = event_signal(event, 1);
                 }
+                let doorbells = self.events.entry(file).or_default();
+                if doorbells.len() >= MAX_DOORBELLS_PER_FILE {
+                    // Bounded: drop the oldest. Its holder keeps a valid but silent handle.
+                    let oldest = doorbells.remove(0);
+                    let _ = raven_rt::handle_close(oldest);
+                }
+                doorbells.push(event);
                 let mut data = [0u8; 6];
                 Response::Ok
                     .encode(&mut data)
@@ -349,6 +537,9 @@ mod program {
                 let mut reply = CallReply::with_data(&data)?;
                 reply.attach(event, 0)?;
                 return Ok(reply);
+            }
+            if let Ok(SocketRequest::Call(Call::Accept)) = SocketRequest::decode(request) {
+                self.rearm.insert(file);
             }
             let written = self
                 .netd
@@ -358,10 +549,14 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            if let Some(event) = self.events.remove(&file) {
-                let _ = raven_rt::handle_close(event);
+            let last = self.netd.close(file).map_err(HandlerError::Errno)?;
+            if last {
+                self.rearm.remove(&file);
+                for event in self.events.remove(&file).unwrap_or_default() {
+                    let _ = raven_rt::handle_close(event);
+                }
             }
-            self.netd.close(file).map_err(HandlerError::Errno)
+            Ok(())
         }
 
         fn dup(&mut self, file: u64) -> HandlerResult<u64> {

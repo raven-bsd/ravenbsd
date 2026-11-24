@@ -2,12 +2,20 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Bounded stateful connection table with pf timeouts.
+//!
+//! Donor: `pf_state_key_setup()` (`sys/netpfil/pf/pf.c:2059`) builds the two state keys
+//! (`sk` on the wire, `nk` in the stack); `pf_find_state()` (`pf.c:2233`) looks a packet up
+//! against both; `pf_create_state()` (`pf.c:6631`) fails closed at `max_states` with
+//! `PFRES_MAXSTATES` instead of evicting a live connection; `pf_state_expires()` (`pf.c:2964`)
+//! selects the timeout. The table is a flat vector because the 0.1.0 bound
+//! ([`MAX_STATES`]) is small and deterministic.
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::address::Ipv4Addr;
+use crate::address::IpAddr;
 use crate::ast::{Direction, Packet, Protocol, tcp_flag};
+use crate::nat::Translation;
 
 /// Largest number of tracked connections.
 pub const MAX_STATES: usize = 4096;
@@ -43,6 +51,8 @@ pub struct Timeouts {
     pub other_single: u64,
     /// Bidirectional other-protocol flow.
     pub other_multiple: u64,
+    /// IP fragment lifetime (`PFTM_FRAG`).
+    pub fragment: u64,
 }
 
 impl Default for Timeouts {
@@ -62,6 +72,7 @@ impl Default for Timeouts {
             other_first: 60,
             other_single: 30,
             other_multiple: 60,
+            fragment: 60,
         }
     }
 }
@@ -83,17 +94,17 @@ pub enum TcpState {
     Closed,
 }
 
-/// The fields that identify one connection.
+/// The fields that identify one side of a connection.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StateKey {
     /// Transport protocol.
     pub protocol: Protocol,
     /// Source address of the first packet.
-    pub source: Ipv4Addr,
+    pub source: IpAddr,
     /// Source port (zero for ICMP).
     pub source_port: u16,
     /// Destination address of the first packet.
-    pub destination: Ipv4Addr,
+    pub destination: IpAddr,
     /// Destination port (zero for ICMP).
     pub destination_port: u16,
     /// Bound interface, or `None` for a floating state.
@@ -112,6 +123,24 @@ impl StateKey {
             source_port: packet.source_port,
             destination: packet.destination,
             destination_port: packet.destination_port,
+            interface: interface.map(String::from),
+            direction: packet.direction,
+        }
+    }
+
+    /// Build the wire-side key of a translated packet (donor `nk`).
+    #[must_use]
+    pub fn translated(
+        packet: &Packet<'_>,
+        interface: Option<&str>,
+        translation: Translation,
+    ) -> Self {
+        Self {
+            protocol: packet.protocol,
+            source: translation.source,
+            source_port: translation.source_port,
+            destination: translation.destination,
+            destination_port: translation.destination_port,
             interface: interface.map(String::from),
             direction: packet.direction,
         }
@@ -160,10 +189,14 @@ pub enum Orientation {
 /// One tracked connection.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StateEntry {
-    /// Connection key.
+    /// Connection key of the packet as evaluated (donor `sk`).
     pub key: StateKey,
+    /// Wire-side key when the connection was translated (donor `nk`).
+    pub peer: Option<StateKey>,
     /// Index of the rule that created the state.
     pub rule: usize,
+    /// Translation applied to the creating packet.
+    pub translation: Option<Translation>,
     /// Creation time in seconds.
     pub created: u64,
     /// Last packet time in seconds.
@@ -197,15 +230,19 @@ pub struct StateHit {
     pub orientation: Orientation,
     /// Current TCP state (for non-TCP flows, `First`).
     pub tcp: TcpState,
+    /// Translation the packet needs (forward or reversed), when the state is translated.
+    pub translation: Option<Translation>,
 }
 
-/// Whether a state entry was created or already existed.
+/// Whether a state entry was created, already existed or was refused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StateDisposition {
     /// No entry existed and one was created.
     Created,
     /// An entry already existed and was refreshed.
     Existing,
+    /// The table is at its limit (donor `PFRES_MAXSTATES`); the packet must be dropped.
+    Rejected,
 }
 
 /// The bounded connection table.
@@ -268,12 +305,30 @@ impl StateTable {
         before - self.entries.len()
     }
 
+    /// True when a live state already owns `(address, port)`.
+    #[must_use]
+    pub fn in_use(&self, address: IpAddr, port: u16) -> bool {
+        self.entries.iter().any(|entry| {
+            let created = entry
+                .translation
+                .is_some_and(|t| t.source == address && t.source_port == port);
+            let key = entry.key.source == address && entry.key.source_port == port;
+            created || key
+        })
+    }
+
     /// Find a state for `packet`, refresh it and return the creating rule.
     pub fn lookup(&mut self, packet: &Packet<'_>, now: u64) -> Option<StateHit> {
-        let (index, orientation) =
-            self.entries.iter().enumerate().find_map(|(index, entry)| {
-                entry.key.orientation(packet).map(|side| (index, side))
-            })?;
+        let (index, orientation) = self.entries.iter().enumerate().find_map(|(index, entry)| {
+            if let Some(side) = entry.key.orientation(packet) {
+                return Some((index, side));
+            }
+            entry
+                .peer
+                .as_ref()
+                .and_then(|peer| peer.orientation(packet))
+                .map(|side| (index, side))
+        })?;
         let entry = self.entries.get_mut(index)?;
         if entry.expires <= now {
             self.entries.remove(index);
@@ -294,21 +349,48 @@ impl StateTable {
         update_tcp(entry, packet, orientation);
         let timeout = timeout_for(&self.timeouts, entry, packet.protocol, orientation);
         entry.expires = now.saturating_add(timeout);
+        // The reverse rewrite restores the pre-translation tuple recorded in `key`
+        // (donor `sk`); `translation` describes the forward wire tuple.
+        let translation = match orientation {
+            Orientation::Forward => entry.translation,
+            Orientation::Reverse => entry.translation.map(|translation| Translation {
+                rule: translation.rule,
+                source: entry.key.destination,
+                source_port: entry.key.destination_port,
+                destination: entry.key.source,
+                destination_port: entry.key.source_port,
+            }),
+        };
         Some(StateHit {
             rule: entry.rule,
             orientation,
             tcp: entry.tcp,
+            translation,
         })
     }
 
     /// Create a state for a passing packet, or return the existing disposition.
     ///
     /// The caller has already checked [`StateTable::lookup`]; this method is for the rule path.
+    /// A full table returns [`StateDisposition::Rejected`]; it never evicts a live connection
+    /// (donor `pf_create_state()` checks `max_states` first and drops).
     pub fn establish(
         &mut self,
         rule: usize,
         packet: &Packet<'_>,
         interface: Option<&str>,
+        now: u64,
+    ) -> StateDisposition {
+        self.establish_with(rule, packet, interface, None, now)
+    }
+
+    /// Create a state, recording the translation when the connection is translated.
+    pub fn establish_with(
+        &mut self,
+        rule: usize,
+        packet: &Packet<'_>,
+        interface: Option<&str>,
+        translation: Option<Translation>,
         now: u64,
     ) -> StateDisposition {
         let timeouts = self.timeouts;
@@ -324,13 +406,16 @@ impl StateTable {
         }
         self.expire(now);
         if self.entries.len() >= self.limit {
-            self.evict_oldest();
+            return StateDisposition::Rejected;
         }
         let key = StateKey::from_packet(packet, interface);
+        let peer = translation.map(|t| StateKey::translated(packet, interface, t));
         let tcp = initial_tcp_state(packet);
         let mut entry = StateEntry {
             key,
+            peer,
             rule,
+            translation,
             created: now,
             last_seen: now,
             expires: 0,
@@ -348,17 +433,6 @@ impl StateTable {
         entry.expires = now.saturating_add(timeout);
         self.entries.push(entry);
         StateDisposition::Created
-    }
-
-    fn evict_oldest(&mut self) {
-        if let Some((index, _)) = self
-            .entries
-            .iter()
-            .enumerate()
-            .min_by_key(|(_, entry)| (entry.expires, entry.last_seen))
-        {
-            self.entries.remove(index);
-        }
     }
 }
 
@@ -386,7 +460,7 @@ fn timeout_for(
                 timeouts.udp_first
             }
         }
-        Protocol::Icmp => {
+        Protocol::Icmp | Protocol::Icmpv6 => {
             if orientation == Orientation::Reverse {
                 timeouts.icmp_error
             } else {

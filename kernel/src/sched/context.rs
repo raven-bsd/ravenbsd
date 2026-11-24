@@ -177,6 +177,40 @@ pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
     Ok(saved)
 }
 
+/// Account the user-mode interval that ends now, then clear the entry stamp.
+fn account_user_time(thread: &Thread) {
+    if !thread.user {
+        return;
+    }
+    let start = thread.user_enter_ns.swap(0, Ordering::AcqRel);
+    if start != 0 {
+        let elapsed = crate::time::now_ns().saturating_sub(start);
+        if elapsed != 0 {
+            thread.process.user_ns.fetch_add(elapsed, Ordering::AcqRel);
+        }
+    }
+}
+
+/// Start a user-mode interval when the thread is about to run in ring 3.
+fn start_user_time(thread: &Thread) {
+    if thread.user {
+        thread
+            .user_enter_ns
+            .store(crate::time::now_ns(), Ordering::Release);
+    }
+}
+
+/// True while a user thread is inside a syscall (its FP state is parked).
+#[cfg(target_arch = "x86_64")]
+fn thread_in_syscall(thread: &Thread) -> bool {
+    thread.user && thread.fpu_saved.load(Ordering::Acquire)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn thread_in_syscall(_thread: &Thread) -> bool {
+    false
+}
+
 /// Switch from `from` to `to`.
 ///
 /// # Safety
@@ -191,6 +225,16 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     // SAFETY: the scheduler critical section gives exclusive access to the CPU state.
     unsafe {
         sync::set_preempt_count(to.preempt_count.load(Ordering::SeqCst));
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        crate::sched::smp::percpu::note_switch(to.user);
+        // The per-CPU diagnostic follows the incoming thread: a blocked syscall thread keeps
+        // `fpu_saved` set even after it leaves the CPU, so do not carry its marker over.
+        crate::sched::smp::percpu::note_syscall(to.user && to.fpu_saved.load(Ordering::Acquire));
+        crate::sched::smp::percpu::note_page_fault(false);
+        crate::sched::smp::percpu::note_page_fault_phase(0);
+        crate::sched::smp::percpu::note_wait_phase(0);
     }
 
     ap_start::set_kernel_rsp(to.kernel_stack_top);
@@ -212,14 +256,20 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     // its user state is already parked in the thread area by `sched_syscall_enter`. Restore the
     // incoming state unless that thread is in a syscall too; its state is restored on syscall
     // exit. A new thread gets its FINIT/MXCSR defaults from `FpuArea::new`.
-    let from_in_syscall = from.user && from.fpu_saved.load(Ordering::Acquire);
+    let from_in_syscall = thread_in_syscall(from);
+    if !from_in_syscall {
+        account_user_time(from);
+    }
     if !from_in_syscall {
         // SAFETY: the scheduler owns the CPU state and the thread's area is live.
         unsafe {
             fpu::save(from.fpu_area_ptr());
         }
     }
-    let to_in_syscall = to.user && to.fpu_saved.load(Ordering::Acquire);
+    let to_in_syscall = thread_in_syscall(to);
+    if !to_in_syscall {
+        start_user_time(to);
+    }
     if !to_in_syscall {
         // SAFETY: same ownership; `to` is alive for the switch.
         unsafe {
@@ -402,6 +452,7 @@ fn idle_forever() -> ! {
 #[cfg(target_arch = "x86_64")]
 unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
     let percpu = ap_start::percpu_address(crate::sched::smp::percpu::this_cpu());
+    crate::sched::smp::percpu::note_user_flags(0x202);
     let gs_base = rdmsr(IA32_GS_BASE);
     if gs_base == percpu {
         // The kernel arrived from ring 3 through a syscall/trap and is in swapped state.
@@ -592,17 +643,75 @@ pub(crate) fn read_rsp() -> u64 {
 /// before any Rust syscall code runs. Kernel threads are ignored.
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
-pub extern "C" fn sched_syscall_enter() {
+pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapframe::TrapFrame) {
+    crate::sched::smp::percpu::note_syscall(true);
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`.
+        let flags = unsafe { (*frame).rflags };
+        // SAFETY: the same live trap frame is valid; the stub still owns it for this call.
+        let number = unsafe { (*frame).rax };
+        crate::sched::smp::percpu::note_user_flags(flags);
+        crate::sched::smp::percpu::note_syscall_number(number);
+    }
     let Some(thread) = crate::sched::current_thread() else {
         return;
     };
     if !thread.user {
         return;
     }
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`; this call owns it.
+        let number = unsafe { (*frame).rax };
+        // SAFETY: `frame` is the live trap frame the syscall stub passed in `rdi`; the
+        // enclosing `!frame.is_null()` check proves it is non-null, and the stub keeps the
+        // frame alive for the duration of this call.
+        let pc = unsafe { (*frame).rip };
+        thread.process.last_syscall.store(number, Ordering::Relaxed);
+        thread.process.last_pc.store(pc, Ordering::Relaxed);
+        thread.process.in_syscall.fetch_add(1, Ordering::Relaxed);
+    }
+    account_user_time(&thread);
     if !thread.fpu_saved.swap(true, Ordering::AcqRel) {
         // SAFETY: the syscall entry path owns the CPU and the thread is current.
         unsafe {
             fpu::save(thread.fpu_area_ptr());
+        }
+    }
+    // syscall entry masks IF. The memory, scheme IPC and futex syscalls can be long; keep only
+    // those interruptible so a target CPU can take an SMP TLB IPI while the other syscall paths
+    // stay non-preemptible. Router/wait-queue state uses IRQ-safe locks, so the wake graph
+    // remains protected even with IF enabled here. `sched_syscall_exit` masks again before the
+    // final swapgs/sysretq pair.
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`.
+        let number = unsafe { (*frame).rax as usize };
+        let interruptible = matches!(
+            raven_abi::syscall::Syscall::from_usize(number),
+            Some(
+                raven_abi::syscall::Syscall::MAP
+                    | raven_abi::syscall::Syscall::UNMAP
+                    | raven_abi::syscall::Syscall::PROTECT
+                    | raven_abi::syscall::Syscall::THREAD_CREATE
+                    | raven_abi::syscall::Syscall::THREAD_EXIT
+                    | raven_abi::syscall::Syscall::EXIT
+                    | raven_abi::syscall::Syscall::FUTEX
+                    | raven_abi::syscall::Syscall::SCHEME_REGISTER
+                    | raven_abi::syscall::Syscall::OPEN
+                    | raven_abi::syscall::Syscall::READ
+                    | raven_abi::syscall::Syscall::WRITE
+                    | raven_abi::syscall::Syscall::CLOSE
+                    | raven_abi::syscall::Syscall::DUP
+                    | raven_abi::syscall::Syscall::FSTAT
+                    | raven_abi::syscall::Syscall::CALL
+                    | raven_abi::syscall::Syscall::RECV
+                    | raven_abi::syscall::Syscall::SEND
+            )
+        ) || matches!(
+            number,
+            crate::syscall::ipc::PREAD | crate::syscall::ipc::PWRITE | crate::syscall::ipc::SEEK
+        );
+        if interruptible {
+            ap_start::enable_local_interrupts();
         }
     }
 }
@@ -611,18 +720,29 @@ pub extern "C" fn sched_syscall_enter() {
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn sched_syscall_exit() {
+    crate::sched::smp::percpu::note_syscall(false);
+    // Keep the swapgs/sysretq return path non-interruptible: after swapgs the GS pair is in the
+    // user state and a kernel-mode interrupt would read the wrong per-CPU block.
+    ap_start::disable_local_interrupts();
     let Some(thread) = crate::sched::current_thread() else {
         return;
     };
     if !thread.user {
         return;
     }
+    let _ = thread
+        .process
+        .in_syscall
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            Some(value.saturating_sub(1))
+        });
     if thread.fpu_saved.swap(false, Ordering::AcqRel) {
         // SAFETY: the syscall return path owns the CPU and the thread is current.
         unsafe {
             fpu::restore(thread.fpu_area_const_ptr());
         }
     }
+    start_user_time(&thread);
 }
 
 /// Read the current stack pointer.

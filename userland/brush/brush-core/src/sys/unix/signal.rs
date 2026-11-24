@@ -178,6 +178,17 @@ pub(crate) fn mask_sigttou() -> Result<(), error::Error> {
     Ok(())
 }
 
+/// RavenBSD has no scheduler-level job control and `PROC_WAIT_EX` reports exits as well as
+/// stops. A `waitid(WUNTRACED|WNOHANG)` from the shell therefore reaps a fast child's exit
+/// status before `try_wait` can read it. Report no stopped child; the exec future remains the
+/// single wait/reap path, so the real exit status is still returned.
+#[cfg(target_os = "ravenbsd")]
+pub(crate) fn poll_for_stopped_children(
+    _pid: sys::process::ProcessId,
+) -> Result<bool, error::Error> {
+    Ok(false)
+}
+
 /// Returns whether the given child process has stopped, consuming its stop status, and leaving
 /// other children's stops to whoever waits on them. On NetBSD and OpenBSD, where one child
 /// can't be looked at (see `waitid_one`), any child's stop counts, as before.
@@ -185,6 +196,7 @@ pub(crate) fn mask_sigttou() -> Result<(), error::Error> {
 /// # Arguments
 ///
 /// * `pid` - The child's process ID.
+#[cfg(not(target_os = "ravenbsd"))]
 pub(crate) fn poll_for_stopped_children(
     pid: sys::process::ProcessId,
 ) -> Result<bool, error::Error> {
@@ -208,12 +220,20 @@ pub(crate) fn poll_for_stopped_children(
     Ok(found_stopped)
 }
 
+/// RavenBSD's wait ABI cannot observe a stop without reaping an exit; see
+/// [`poll_for_stopped_children`].
+#[cfg(target_os = "ravenbsd")]
+pub(crate) fn poll_for_stopped_child(_pid: sys::process::ProcessId) -> Result<bool, error::Error> {
+    Ok(false)
+}
+
 /// Returns whether the given child process has stopped since that was last
 /// reported. Doesn't reap the child if it has exited.
 ///
 /// # Arguments
 ///
 /// * `pid` - The child's process ID.
+#[cfg(not(target_os = "ravenbsd"))]
 pub(crate) fn poll_for_stopped_child(pid: sys::process::ProcessId) -> Result<bool, error::Error> {
     let flags = nix::sys::wait::WaitPidFlag::WUNTRACED | nix::sys::wait::WaitPidFlag::WNOHANG;
     match waitid_one(pid, flags) {
