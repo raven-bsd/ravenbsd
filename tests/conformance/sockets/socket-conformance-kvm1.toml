@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S174 socket conformance, KVM1. The half-close row is the K9 red row until the
-# virtio-net TX completion/close path is fixed; the other rows must pass.
+# S174 socket conformance, KVM1. The half-close row pins the K574/K9 contract:
+# guest FIN after HALFACK, peer EOF/HUP, no RST; the other rows must pass.
 name = "socket-conformance-kvm1"
 arch = "x86_64"
 profile = "network-config-test"

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import select
 import socket
 import struct
 import sys
@@ -130,21 +131,36 @@ def main() -> int:
             stream.sendall(b"PONG")
             read_eof(stream)
             rows.append("shutdown FIN then PONG")
-        # Row 6: half-close; the guest sends HALFACK then expects a peer RST.
-        stream = connect(args.host, args.port)
-        stream.settimeout(10.0)
-        stream.sendall(b"\x06DATA")
-        stream.shutdown(socket.SHUT_WR)
-        ack = bytearray()
-        while len(ack) < 7:
-            chunk = stream.recv(7 - len(ack))
-            if not chunk:
-                break
-            ack += chunk
-        rows.append(f"half ack={bytes(ack)!r}")
-        stream.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                          struct.pack("ii", 1, 0))
-        stream.close()
+        # Row 6: guest-initiated half-close. The host shuts down its write side, the guest
+        # reads EOF, writes HALFACK, drains it and sends FIN. The host must read HALFACK, then
+        # EOF and HUP, with no RST; no SO_LINGER is used.
+        try:
+            with connect(args.host, args.port) as stream:
+                stream.settimeout(10.0)
+                stream.sendall(b"\x06DATA")
+                stream.shutdown(socket.SHUT_WR)
+                ack = bytearray()
+                while len(ack) < 7:
+                    chunk = stream.recv(7 - len(ack))
+                    if not chunk:
+                        raise OSError("eof before HALFACK")
+                    ack += chunk
+                if ack != b"HALFACK":
+                    raise OSError(f"half ack {bytes(ack)!r}")
+                tail = stream.recv(1)
+                if tail != b"":
+                    raise OSError(f"half tail {tail!r}")
+                poller = select.poll()
+                poller.register(stream, select.POLLIN | select.POLLHUP)
+                events = poller.poll(5000)
+                if not events or not (events[0][1] & select.POLLHUP):
+                    rows.append("half FAIL no POLLHUP")
+                else:
+                    rows.append("half HALFACK, EOF, POLLHUP, no RST")
+        except ConnectionResetError:
+            rows.append("half FAIL RST")
+        except OSError as error:
+            rows.append(f"half error={error}")
         # Row 7: shutdown(SHUT_RD); the guest reads EOF and still writes RDACK.
         try:
             with connect(args.host, args.port) as stream:

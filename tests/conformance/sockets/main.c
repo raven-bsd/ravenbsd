@@ -3,7 +3,7 @@
 //
 // S174 socket conformance probe. One-shot guest service; prints CONFORM rows for:
 // sockaddr layout/byte order, SO_REUSEADDR, accept/getpeername, SO_ERROR once,
-// shutdown(SHUT_WR) FIN + read-after-EOF, the half-close HUP row,
+// shutdown(SHUT_WR) FIN + read-after-EOF, the half-close FIN/EOF/HUP row,
 // shutdown(SHUT_RD), shutdown(SHUT_RDWR), and listener close/rebind.
 
 #include <errno.h>
@@ -274,6 +274,7 @@ static int row_half(int listen_fd)
         close(fd);
         return fail("half", "DATA");
     }
+    /* The peer half-closed its write side: the guest reads EOF and can still write. */
     if (read(fd, &fin, 1) != 0) {
         close(fd);
         return fail("half", "peer FIN read");
@@ -282,17 +283,31 @@ static int row_half(int listen_fd)
         close(fd);
         return fail("half", "HALFACK");
     }
+    /* Guest-initiated half-close: the queued HALFACK drains and SHUT_WR emits the FIN. */
+    if (shutdown(fd, SHUT_WR) != 0) {
+        close(fd);
+        return fail("half", "shutdown WR");
+    }
+    if (read(fd, &fin, 1) != 0) {
+        close(fd);
+        return fail("half", "EOF after our FIN");
+    }
+    errno = 0;
+    if (write(fd, &fin, 1) >= 0 || errno != EPIPE) {
+        char detail[48];
+        (void)snprintf(detail, sizeof(detail), "write errno=%d", errno);
+        close(fd);
+        return fail("half", detail);
+    }
     pfd.fd = fd;
-    pfd.events = POLLIN;
-    for (int attempt = 0; attempt < 150; attempt++) {
-        pfd.revents = 0;
-        if (poll(&pfd, 1, 20) > 0 && (pfd.revents & POLLHUP) != 0) {
-            close(fd);
-            return pass("half", "POLLHUP after peer RST");
-        }
+    pfd.events = POLLIN | POLLHUP;
+    pfd.revents = 0;
+    if (poll(&pfd, 1, 5000) <= 0 || (pfd.revents & POLLIN) == 0) {
+        close(fd);
+        return fail("half", "EOF not readable after our FIN");
     }
     close(fd);
-    return fail("half", "no POLLHUP");
+    return pass("half", "EOF, FIN, EPIPE");
 }
 
 static int row_shutrd(int listen_fd)
