@@ -3,15 +3,17 @@
 
 //! `syscall` MSR setup and the assembly entry stub.
 
+use core::sync::atomic::Ordering;
 use raven_abi::errno::Errno;
 use raven_abi::signal::{self, ENTRY_SP, FaultRecord, MContext};
-use raven_usercopy::is_user_address;
+use raven_usercopy::{UserSlice, is_user_address};
 
 use crate::arch::x86_64::gdt::{KERNEL_CS, KERNEL_SS, STAR_USER_BASE, USER_CS, USER_SS};
 use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::arch::x86_64::usermode::{percpu_address, percpu_init};
 use crate::process;
 use crate::syscall::thread;
+use crate::usercopy::{copy_from_user, copy_to_user};
 
 const IA32_EFER: u32 = 0xC000_0080;
 const IA32_STAR: u32 = 0xC000_0081;
@@ -188,6 +190,107 @@ const USER_RFLAGS_SET: u64 = 0x202;
 /// the 20 KiB kernel stack by a 256-byte frame per call.
 static SIGNAL_CONTEXT: spin::Mutex<MContext> = spin::Mutex::new(MContext::zero());
 
+/// System V amd64 `stack_t` (24 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserStack {
+    ss_sp: u64,
+    ss_flags: i32,
+    _pad: i32,
+    ss_size: u64,
+}
+
+/// System V amd64 `ucontext_t` (936 bytes; `uc_mcontext` is the C36 256-byte `MContext`).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserUContext {
+    uc_flags: u64,
+    uc_link: u64,
+    uc_stack: UserStack,
+    uc_mcontext: MContext,
+    uc_sigmask: [u64; 16],
+    uc_fpregs: [u64; 64],
+}
+
+/// System V amd64 `siginfo_t` (128 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserSigInfo {
+    si_signo: i32,
+    si_errno: i32,
+    si_code: i32,
+    _pad: i32,
+    fields: [u8; 112],
+}
+
+/// NetBSD amd64 `struct sigframe_siginfo`: return address, `siginfo_t`, `ucontext_t`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SigFrame {
+    sf_ra: u64,
+    sf_si: UserSigInfo,
+    sf_uc: UserUContext,
+}
+
+const _: () = assert!(core::mem::size_of::<UserStack>() == 24);
+const _: () = assert!(core::mem::size_of::<UserUContext>() == 936);
+const _: () = assert!(core::mem::offset_of!(UserUContext, uc_stack) == 16);
+const _: () = assert!(core::mem::offset_of!(UserUContext, uc_mcontext) == 40);
+const _: () = assert!(core::mem::offset_of!(UserUContext, uc_sigmask) == 296);
+const _: () = assert!(core::mem::size_of::<UserSigInfo>() == 128);
+const _: () = assert!(core::mem::size_of::<SigFrame>() == 1072);
+const _: () = assert!(core::mem::offset_of!(SigFrame, sf_si) == 8);
+const _: () = assert!(core::mem::offset_of!(SigFrame, sf_uc) == 136);
+
+const ZERO_UCONTEXT: UserUContext = UserUContext {
+    uc_flags: 0,
+    uc_link: 0,
+    uc_stack: UserStack {
+        ss_sp: 0,
+        ss_flags: 0,
+        _pad: 0,
+        ss_size: 0,
+    },
+    uc_mcontext: MContext::zero(),
+    uc_sigmask: [0; 16],
+    uc_fpregs: [0; 64],
+};
+
+const ZERO_SIGINFO: UserSigInfo = UserSigInfo {
+    si_signo: 0,
+    si_errno: 0,
+    si_code: 0,
+    _pad: 0,
+    fields: [0; 112],
+};
+
+impl UserSigInfo {
+    /// Store one `u32` field in the `siginfo_t` union area.
+    fn set_u32(&mut self, offset: usize, value: u32) {
+        if let Some(slot) = self.fields.get_mut(offset..offset.saturating_add(4)) {
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+    }
+
+    /// Store one `u64` field in the `siginfo_t` union area.
+    fn set_u64(&mut self, offset: usize, value: u64) {
+        if let Some(slot) = self.fields.get_mut(offset..offset.saturating_add(8)) {
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+    }
+}
+
+const ZERO_FRAME: SigFrame = SigFrame {
+    sf_ra: 0,
+    sf_si: ZERO_SIGINFO,
+    sf_uc: ZERO_UCONTEXT,
+};
+
+/// Scratch frame for one delivery/return: keeping the 1072-byte `sigframe` off the kernel stack
+/// follows the S44 archive's `MContext` scratch decision (the fault path already runs near the
+/// stack guard). Delivery and `SIGRETURN` are short and serialised per CPU.
+static SIGNAL_FRAME: spin::Mutex<SigFrame> = spin::Mutex::new(ZERO_FRAME);
+
 /// Snapshot the interrupted user state in the C36 `mcontext_t` layout.
 #[allow(clippy::indexing_slicing)] // Register indices are compile-time constants within `gregs`.
 pub fn context_from_frame(frame: &TrapFrame, context: &mut MContext) {
@@ -245,12 +348,180 @@ pub fn restore_signal_context(frame: &mut TrapFrame, context: &MContext) {
     frame.vector = 0;
 }
 
-/// Restore a `SIGRETURN` context from the registered user area into the frame.
+/// Restore a `SIGRETURN` frame.
+///
+/// A kernel-built handler returns through the sigcode to this syscall with `rsp = sf_ra + 8`
+/// (the handler `ret` popped the return address), so the `sigframe` is at `rsp - 8` and the
+/// `ucontext_t` starts at `fp + 136`. The retired `SIG_SETUP` model keeps its own fallback until
+/// the crate removes it (C19 removes the registration).
 pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
+    if crate::sched::current_thread()
+        .is_some_and(|thread| thread.sig_in_handler.load(Ordering::Acquire))
+    {
+        return sigreturn_kernel_frame(frame);
+    }
     let mut context = SIGNAL_CONTEXT.lock();
     thread::sigreturn(&mut context)?;
     restore_signal_context(frame, &context);
     Ok(())
+}
+
+/// Read the C19 `ucontext_t` back from the active kernel `sigframe` and restore it.
+fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
+    let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
+    let fp = thread.sig_frame.load(Ordering::Acquire);
+    if fp == 0 || !is_user_address(fp) {
+        return Err(Errno::EFAULT);
+    }
+    if frame.rsp != fp.checked_add(8).ok_or(Errno::EFAULT)? {
+        return Err(Errno::EINVAL);
+    }
+    let address = fp
+        .checked_add(core::mem::offset_of!(SigFrame, sf_uc) as u64)
+        .ok_or(Errno::EFAULT)?;
+    let mut scratch = SIGNAL_FRAME.lock();
+    scratch.sf_uc = ZERO_UCONTEXT;
+    let bytes = unsafe {
+        // SAFETY: the scratch `ucontext_t` is a live POD mirror; the mutable byte view covers
+        // exactly its size and the copy fills it before it is read.
+        core::slice::from_raw_parts_mut(
+            &mut scratch.sf_uc as *mut UserUContext as *mut u8,
+            core::mem::size_of::<UserUContext>(),
+        )
+    };
+    copy_from_user(
+        bytes,
+        UserSlice::new(address, core::mem::size_of::<UserUContext>() as u64)?,
+    )?;
+    let unblockable = process::signal_bit(crate::process::status::SIGKILL)
+        | process::signal_bit(crate::process::status::SIGSTOP);
+    thread.sig_blocked.store(
+        scratch.sf_uc.uc_sigmask.first().copied().unwrap_or(0) & !unblockable,
+        Ordering::Release,
+    );
+    thread.sig_in_handler.store(false, Ordering::Release);
+    thread.sig_frame.store(0, Ordering::Release);
+    thread.sig_on_altstack.store(false, Ordering::Release);
+    restore_signal_context(frame, &scratch.sf_uc.uc_mcontext);
+    Ok(())
+}
+
+/// Address of a `sigframe` below the AMD64 128-byte red zone, 8 modulo 16 as if after a `call`.
+fn frame_address(stack_top: u64) -> Option<u64> {
+    let below = stack_top.checked_sub(128)?;
+    let base = below.checked_sub(core::mem::size_of::<SigFrame>() as u64)?;
+    let fp = if base & 0xf == 8 {
+        base
+    } else {
+        (base & !0xf).checked_sub(8)?
+    };
+    let end = fp.checked_add(core::mem::size_of::<SigFrame>() as u64 - 1)?;
+    if fp & 0xf != 8 || end >= below || !is_user_address(fp) || !is_user_address(end) {
+        return None;
+    }
+    Some(fp)
+}
+
+/// Build and enter a C19 `sigframe` for the oldest deliverable kernel signal.
+///
+/// Returns false when no kernel `sigaction` handler is pending, so the caller can fall back to
+/// the retired `SIG_SETUP` entry while libc still registers it.
+fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
+    let Some(process) = process::current() else {
+        return false;
+    };
+    let Some(thread) = crate::sched::current_thread() else {
+        return false;
+    };
+    if !thread.user || thread.sig_in_handler.load(Ordering::Acquire) {
+        return false;
+    }
+    let blocked = thread.sig_blocked.load(Ordering::Acquire);
+    let Some((record, action)) = process.next_kernel_signal(blocked) else {
+        return false;
+    };
+    let mut context = SIGNAL_CONTEXT.lock();
+    context_from_frame(frame, &mut context);
+    let old_mask = blocked;
+    let mut new_mask = old_mask | action.mask;
+    if action.flags & process::SA_NODEFER == 0 {
+        new_mask |= process::signal_bit(record.signo);
+    }
+    let unblockable = process::signal_bit(crate::process::status::SIGKILL)
+        | process::signal_bit(crate::process::status::SIGSTOP);
+    thread
+        .sig_blocked
+        .store(new_mask & !unblockable, Ordering::Release);
+    let alt_sp = thread.sig_alt_sp.load(Ordering::Acquire);
+    let alt_size = thread.sig_alt_size.load(Ordering::Acquire);
+    let alt_flags = thread.sig_alt_flags.load(Ordering::Acquire);
+    let on_altstack = action.flags & process::SA_ONSTACK != 0
+        && alt_flags & crate::process::SS_DISABLE == 0
+        && alt_sp != 0
+        && !thread.sig_on_altstack.load(Ordering::Acquire);
+    let stack_top = if on_altstack {
+        match alt_sp.checked_add(alt_size) {
+            Some(top) => top,
+            None => process::exit_process(Errno::EFAULT.to_ret() as i32),
+        }
+    } else {
+        frame.rsp
+    };
+    let Some(fp) = frame_address(stack_top) else {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    };
+    let mut sigframe = SIGNAL_FRAME.lock();
+    sigframe.sf_ra = crate::process::SIGCODE_BASE;
+    sigframe.sf_si = ZERO_SIGINFO;
+    sigframe.sf_uc = ZERO_UCONTEXT;
+    sigframe.sf_si.si_signo = record.signo as i32;
+    sigframe.sf_si.si_code = record.code as i32;
+    sigframe.sf_si.set_u32(0, record.sender as u32);
+    sigframe.sf_si.set_u32(4, record.uid);
+    if record.code == process::SI_QUEUE_CODE {
+        sigframe.sf_si.set_u64(8, record.value);
+    }
+    sigframe.sf_uc.uc_stack = UserStack {
+        ss_sp: if on_altstack { alt_sp } else { 0 },
+        ss_flags: if on_altstack {
+            crate::process::SS_ONSTACK as i32
+        } else {
+            0
+        },
+        _pad: 0,
+        ss_size: alt_size,
+    };
+    sigframe.sf_uc.uc_mcontext = *context;
+    sigframe.sf_uc.uc_sigmask[0] = old_mask;
+    let size = core::mem::size_of::<SigFrame>();
+    let bytes = unsafe {
+        // SAFETY: the scratch frame is a live, fully initialised POD frame; the byte view covers
+        // exactly its size and is only read for the copy.
+        core::slice::from_raw_parts(&*sigframe as *const SigFrame as *const u8, size)
+    };
+    let Ok(destination) = UserSlice::new(fp, size as u64) else {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    };
+    if copy_to_user(destination, bytes).is_err() {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    }
+    drop(sigframe);
+    drop(context);
+    if action.flags & process::SA_RESETHAND != 0 {
+        process
+            .sigacts
+            .lock()
+            .set(record.signo, process::SigAction::default_action());
+    }
+    thread.sig_in_handler.store(true, Ordering::Release);
+    thread.sig_frame.store(fp, Ordering::Release);
+    thread.sig_on_altstack.store(on_altstack, Ordering::Release);
+    frame.rdi = u64::from(record.signo);
+    frame.rsi = fp + core::mem::offset_of!(SigFrame, sf_si) as u64;
+    frame.rdx = fp + core::mem::offset_of!(SigFrame, sf_uc) as u64;
+    frame.rip = action.handler;
+    frame.rsp = fp;
+    true
 }
 
 /// Enter the registered entry with `bits` in `rdi`, the optional fault record
@@ -285,6 +556,9 @@ fn enter_signal(
 /// Called after the syscall result is in the frame and before `sysretq`, so
 /// the saved context is exactly the interrupted user state.
 pub fn deliver_signal(frame: &mut TrapFrame) {
+    if deliver_kernel_signal(frame) {
+        return;
+    }
     if let Some(due) = thread::signal_resend_due() {
         let fault_pointer = {
             let mut context = SIGNAL_CONTEXT.lock();
@@ -377,3 +651,7 @@ const _: () = {
     assert!(USER_SS == 0x1B);
     assert!(SYSCALL_FMASK & 0x200 != 0);
 };
+
+#[cfg(test)]
+#[path = "syscall_ut.rs"]
+mod tests;
