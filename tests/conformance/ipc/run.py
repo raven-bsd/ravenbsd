@@ -78,7 +78,14 @@ def build_image() -> None:
     )
 
 
-def run_probe(command: str, timeout: int = 60) -> tuple[int, str]:
+def run_probe(command: str, timeout: int = 20) -> tuple[int, str, str, bool]:
+    """Run one probe and return (rc, stdout, stderr, timed_out).
+
+    Raven's sshd does not close the session channel after the remote command exits (K448): even
+    `ssh true` stays open. The probe's `S180-IPC done failures=` marker is therefore the completion
+    witness; the client is bounded by the timeout and killed after it, and the row evidence is the
+    captured output.
+    """
     ssh = [
         "ssh", "-p", str(PORT),
         "-o", "StrictHostKeyChecking=no",
@@ -87,7 +94,7 @@ def run_probe(command: str, timeout: int = 60) -> tuple[int, str]:
         "-o", "PubkeyAuthentication=no",
         "-o", "KbdInteractiveAuthentication=no",
         "-o", "NumberOfPasswordPrompts=1",
-        "-o", "ConnectTimeout=20",
+        "-o", "ConnectTimeout=15",
         "raven@127.0.0.1", command,
     ]
     env = dict(os.environ)
@@ -99,9 +106,11 @@ def run_probe(command: str, timeout: int = 60) -> tuple[int, str]:
         result = subprocess.run(ssh, cwd=str(ROOT), stdin=subprocess.DEVNULL,
                                 capture_output=True, timeout=timeout, env=env,
                                 start_new_session=True)
-        return result.returncode, result.stdout.decode("utf-8", "replace")
+        return (result.returncode, result.stdout.decode("utf-8", "replace"),
+                result.stderr.decode("utf-8", "replace"), False)
     except subprocess.TimeoutExpired as error:
-        return -1, (error.stdout or b"").decode("utf-8", "replace")
+        return (-1, (error.stdout or b"").decode("utf-8", "replace"),
+                (error.stderr or b"").decode("utf-8", "replace"), True)
 
 
 def rows(output: str) -> dict[str, str]:
@@ -151,24 +160,35 @@ def main() -> int:
             time.sleep(0.2)
 
         failures: list[str] = []
-        normal_rc, normal = run_probe("/bin/ipc-conformance --all")
+        normal_rc, normal, normal_err, normal_timed = run_probe("/bin/ipc-conformance --all")
         (OUT / "normal.log").write_text(normal, encoding="utf-8")
+        (OUT / "normal.stderr").write_text(normal_err, encoding="utf-8")
         print(normal, end="", flush=True)
         normal_rows = rows(normal)
         for name in ("rights", "credentials", "cloexec", "fifo", "seqpacket", "stream"):
             if normal_rows.get(name) != "PASS":
                 failures.append(f"normal:{name}={normal_rows.get(name)}")
-        if "S180-IPC done failures=0" not in normal:
+        if "S180-IPC done failures=" not in normal:
+            failures.append("normal:incomplete-output")
+        elif "S180-IPC done failures=0" not in normal:
             failures.append("normal:done-not-zero")
+        if normal_timed and "S180-IPC done failures=" not in normal:
+            failures.append("normal:probe-timeout")
 
-        mutation_rc, mutation = run_probe("/bin/ipc-conformance --mutation-rights")
+        mutation_rc, mutation, mutation_err, mutation_timed = run_probe(
+            "/bin/ipc-conformance --mutation-rights")
         (OUT / "mutation.log").write_text(mutation, encoding="utf-8")
+        (OUT / "mutation.stderr").write_text(mutation_err, encoding="utf-8")
         print(mutation, end="", flush=True)
         mutation_rows = rows(mutation)
         if mutation_rows.get("rights") != "FAIL":
             failures.append(f"mutation:rights={mutation_rows.get('rights')}")
+        if "S180-IPC done failures=" not in mutation:
+            failures.append("mutation:incomplete-output")
 
-        print(f"S180-IPC-RUN normal_rc={normal_rc} mutation_rc={mutation_rc}", flush=True)
+        print(f"S180-IPC-RUN normal_rc={normal_rc} normal_timed={normal_timed} "
+              f"mutation_rc={mutation_rc} mutation_timed={mutation_timed} "
+              f"ssh_session_close=timeout", flush=True)
         if failures:
             print(f"S180-IPC-RUN FAIL reasons={';'.join(failures)}", flush=True)
             return 1
