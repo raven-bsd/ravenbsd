@@ -2,7 +2,9 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # S192: 100 fork/wait cycles in one process. The initfs has only /init; no services. A kernel
-# stack overflow in process creation is a double fault.
+# stack overflow in process creation is a double fault. The size row pins the boxed Process: the
+# inline SigActs (2600 B) and CaptureSlots (1056 B) put Process at 5064 bytes and enlarge the
+# process-create frame past the stack guard, so a regression to 5064 is caught even before it faults.
 
 name = "process-create-loop"
 arch = "x86_64"
@@ -10,9 +12,12 @@ profile = "base"
 timeout_secs = 240
 pre = ["sh tests/qtest/cases/process-create-loop-fixture/build.sh"]
 initfs = "build/qtest/process-create-loop/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s192-size=1"
 qemu_extra = []
 expect_exit = "success"
+
+[[expect]]
+regex = '^s192: process=1424 sigacts=2600 capture=1056 waitq=48 handle=24 ids=120 namespace=56$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
