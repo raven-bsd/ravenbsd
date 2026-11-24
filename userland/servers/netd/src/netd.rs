@@ -37,6 +37,8 @@ pub const SOCKET_FILE: u32 = S_IFSOCK | 0o666;
 const LOOPBACK_NAME: &str = "lo";
 const LOOPBACK_MTU: u16 = 65_535;
 const NIC_NAME: &str = "eth0";
+/// QEMU user-mode (slirp) DNS server; the fixed address is `10.0.2.15/24`, gateway `10.0.2.2`.
+const QEMU_USER_DNS: [u8; 4] = [10, 0, 2, 3];
 /// NIC frame rings are drained at least this often even when no stack timer is armed.
 const NIC_POLL_MS: u64 = 10;
 const MAX_OPEN_FILES: usize = 256;
@@ -574,9 +576,18 @@ impl<D: Device> Netd<D> {
             gateway: config.gateway,
             up: true,
         });
+        if config.is_qemu_user() {
+            // QEMU user-mode has an immediate fixed address but is not `Static`; resolvd still
+            // asks for `net:`'s DHCP lease. Publish the synthetic lease with slirp's DNS so the
+            // resolver starts instead of reporting ENOENT for a configured interface.
+            let mut dns = Vec::new();
+            dns.push(QEMU_USER_DNS);
+            self.set_nic_dns(dns);
+        }
     }
 
-    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static mode.
+    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static or
+    /// QEMU fixed-address mode.
     pub fn set_nic_dns(&mut self, dns: Vec<[u8; 4]>) {
         self.nic_dns = dns;
         self.nic_lease = self.static_lease();
@@ -647,7 +658,10 @@ impl<D: Device> Netd<D> {
 
     fn static_lease(&self) -> Option<DhcpLease> {
         let config = self.nic_config?;
-        if !matches!(config.addressing, NicAddressing::Static) {
+        if !matches!(
+            config.addressing,
+            NicAddressing::Static | NicAddressing::QemuUser
+        ) {
             return None;
         }
         let control = self.nic_control.as_ref()?;
