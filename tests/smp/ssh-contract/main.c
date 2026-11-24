@@ -969,15 +969,27 @@ static int check_half_close(void) {
     // the EPIPE the contract requires.
     (void)poll(NULL, 0, 50);
     wrote = write(conn, "X", 1);
-    revents = poll_one(conn, POLLIN | POLLHUP, 3000);
-    for (int attempt = 0; attempt < 50 && (revents & POLLHUP) == 0; attempt++) {
-        (void)poll(NULL, 0, 20);
-        revents = poll_one(conn, POLLIN | POLLHUP, 100);
-    }
-    if (revents < 0 || (revents & POLLHUP) == 0) {
-        char detail[96];
-        (void)snprintf(detail, sizeof(detail), "half hup revents=0x%x", (unsigned)revents);
-        return fail(detail);
+    {
+        ssize_t probe = wrote;
+        int probe_errno = wrote < 0 ? errno : 0;
+
+        revents = poll_one(conn, POLLIN | POLLHUP, 3000);
+        for (int attempt = 0; attempt < 50 && (revents & POLLHUP) == 0; attempt++) {
+            (void)poll(NULL, 0, 20);
+            revents = poll_one(conn, POLLIN | POLLHUP, 100);
+        }
+        if (revents < 0 || (revents & POLLHUP) == 0) {
+            int so_error = 0;
+            socklen_t so_len = sizeof(so_error);
+            int so_rc = getsockopt(conn, SOL_SOCKET, SO_ERROR, &so_error, &so_len);
+            char detail[192];
+
+            (void)snprintf(detail, sizeof(detail),
+                           "half hup revents=0x%x errno=%d x_write=%zd x_errno=%d "
+                           "so_rc=%d so_error=%d",
+                           (unsigned)revents, errno, probe, probe_errno, so_rc, so_error);
+            return fail(detail);
+        }
     }
     wrote = write(conn, "X", 1);
     if (wrote >= 0 || errno != EPIPE) {
@@ -1206,8 +1218,87 @@ int main(int argc, char **argv) {
     return diag_main();
 #else
     signal(SIGPIPE, SIG_IGN);
+    // The release console prints the getty prompt without a newline; terminate that line before
+    // the contract rows so the release smoke can assert both the brush login and K1-K10.
+    say("\n");
     if (argc > 1 && strcmp(argv[1], "diag") == 0) {
         return diag_main();
+    }
+    if (argc > 1 && strcmp(argv[1], "k1k6") == 0) {
+        row = "K1";
+        if (check_poll() != 0) {
+            return 1;
+        }
+        row = "K2";
+        if (check_read() != 0) {
+            return 1;
+        }
+        row = "K3";
+        if (check_write() != 0) {
+            return 1;
+        }
+        row = "K4";
+        if (check_dup_exec() != 0) {
+            return 1;
+        }
+        row = "K5";
+        if (check_pty() != 0) {
+            return 1;
+        }
+        row = "K6-listen";
+        if (check_listen_only() != 0) {
+            return 1;
+        }
+        row = "K6";
+        if (check_accept() != 0) {
+            return 1;
+        }
+        say("CONTRACT SUMMARY PASS 6/6\n");
+        return 0;
+    }
+    if (argc > 1 && strcmp(argv[1], "k1k8") == 0) {
+        row = "K1";
+        if (check_poll() != 0) {
+            return 1;
+        }
+        row = "K2";
+        if (check_read() != 0) {
+            return 1;
+        }
+        row = "K3";
+        if (check_write() != 0) {
+            return 1;
+        }
+        row = "K4";
+        if (check_dup_exec() != 0) {
+            return 1;
+        }
+        row = "K5";
+        if (check_pty() != 0) {
+            return 1;
+        }
+        row = "K6-listen";
+        if (check_listen_only() != 0) {
+            return 1;
+        }
+        row = "K6";
+        if (check_accept() != 0) {
+            return 1;
+        }
+        row = "K7";
+        if (check_eof_pipe() != 0) {
+            return 1;
+        }
+        row = "K8";
+        if (check_eof_socket() != 0) {
+            return 1;
+        }
+        row = "K8-shutdown";
+        if (check_own_shutdown() != 0) {
+            return 1;
+        }
+        say("CONTRACT SUMMARY PASS 8/8\n");
+        return 0;
     }
     row = "K1";
     if (check_poll() != 0) {

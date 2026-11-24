@@ -11,20 +11,25 @@ boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1 s36-
 qemu_extra = []
 expect_exit = "success"
 
+# The getty `login: ` prompt is written without a trailing newline, so a prompt that lands
+# between two s36 lines prefixes the next one. Allow that console prefix on the early lines
+# (the same convention the cycles row below already uses); the exact s36 message is still
+# required at the end of the line.
+
 # Scenario 4: a created-but-never-started process is reaped by PROC_WAIT.
 [[expect]]
-regex = '^s36: unstarted reaped$'
+regex = '^.*s36: unstarted reaped$'
 
 # Scenario 7: the child status wins over the SIGCHLD kick; no spurious EINTR.
 [[expect]]
-regex = '^s36: wait race ok$'
+regex = '^.*s36: wait race ok$'
 
 [[expect]]
-regex = '^s36: wait race handle ok$'
+regex = '^.*s36: wait race handle ok$'
 
 # Scenario 8: a caught signal delivered while blocked still returns EINTR.
 [[expect]]
-regex = '^s36: wait eintr ok$'
+regex = '^.*s36: wait eintr ok$'
 
 # Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
 [[expect]]

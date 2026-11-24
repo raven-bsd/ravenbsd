@@ -36,7 +36,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help help-xtask setup doctor check check-full check-full-if-needed guard kernel loader brush dev release image run test world provenance \
-	posix-gaps posix-check toolchain clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
+	posix-gaps posix-check toolchain toolchain-dist toolchain-dist-test clean distclean check-fast check-build ufs-selftest qemu-ufs soak-smoke soak-24h \
 	tcp-soak-smoke tcp-soak-24h info space prune
 
 help:
@@ -173,6 +173,12 @@ TOOLCHAIN_STAGE ?= 1
 
 toolchain:
 	@TOOLCHAIN_STAGE=$(TOOLCHAIN_STAGE) sh toolchain/build.sh
+
+toolchain-dist:
+	sh toolchain/dist.sh
+
+toolchain-dist-test:
+	sh toolchain/test-dist.sh
 
 clean:
 	@echo "removing build output"

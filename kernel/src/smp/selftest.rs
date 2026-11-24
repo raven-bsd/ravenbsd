@@ -171,6 +171,48 @@ fn sleeper_thread() {
     sched::exit_thread(0)
 }
 
+/// Blocking mutex used only by the donation-close churn; locking it registers the caller in the
+/// donation graph (`KernelTurnstile::register` from `Mutex::lock`).
+static DONATION_LOCK: crate::sync::Mutex<u32> = crate::sync::Mutex::new(0);
+
+/// Bounded donation churn: a thread acquires the priority-inheritance mutex (registering it in
+/// the kernel weak registry and the crate graph), releases it, and exits. The exit boundary must
+/// drop the kernel registration; the registered count has to return to the pre-churn baseline.
+fn donation_close_test(cpus: usize) -> Result<(usize, usize), (&'static str, usize, usize)> {
+    use crate::sched::thread::ThreadState;
+
+    const CYCLES: usize = 8;
+    const WAIT_NS: u64 = 1_000_000_000;
+    let target = cpus.saturating_sub(1);
+    sleep::sleep_ns(20_000_000);
+    let base = crate::sync::registered_count();
+    for _ in 0..CYCLES {
+        let thread = match sched::spawn_kernel_on(target, "donation-close", donation_thread) {
+            Ok(thread) => thread,
+            Err(_) => return Err(("spawn", crate::sync::registered_count(), base)),
+        };
+        let deadline = sleep::now_ns().saturating_add(WAIT_NS);
+        while thread.state() != ThreadState::Dead {
+            if sleep::now_ns() > deadline {
+                return Err(("not dead", crate::sync::registered_count(), base));
+            }
+            sleep::sleep_ns(50_000);
+        }
+    }
+    sleep::sleep_ns(20_000_000);
+    let after = crate::sync::registered_count();
+    if after != base {
+        return Err(("registered retained", after, base));
+    }
+    Ok((after, base))
+}
+
+fn donation_thread() {
+    let guard = DONATION_LOCK.lock();
+    drop(guard);
+    sched::exit_thread(0);
+}
+
 /// Cross-CPU FIFO call row: the FIFO carries every call; the old single-slot mailbox does not.
 fn call_fifo_test(cpus: usize) -> Result<(u32, u32, u32, u64), &'static str> {
     const COUNT: u32 = 32;
@@ -392,6 +434,17 @@ fn monitor() {
         Err((reason, [sleepers, live, queued, reap])) => {
             kprintln!(
                 "selftest: smp sleeper-close failed: {reason} sleepers={sleepers} live={live} queued={queued} reap={reap}"
+            );
+            boot::exit_qemu(0x11);
+        }
+    }
+    match donation_close_test(cpus) {
+        Ok((registered, base)) => kprintln!(
+            "selftest: smp donation-close cycles=8 registered={registered} base={base} ok"
+        ),
+        Err((reason, registered, base)) => {
+            kprintln!(
+                "selftest: smp donation-close failed: {reason} registered={registered} base={base}"
             );
             boot::exit_qemu(0x11);
         }

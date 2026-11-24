@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K434 rev209: an ordinary userland-spawned child on aarch64. The console shell starts
+# `/bin/true` (uutils, exits at once) and `/bin/sleep 1`; both go through the rsh
+# `spawn_with_attributes` path (fd map, pipes for the console streams) that svcd does not use.
+# A hang here is the reported aarch64 spawned-child stop.
+
+name = "aarch64-spawn-child"
+arch = "aarch64"
+profile = "shell-test"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^SPAWN-TRUE:0$'
+
+[[expect]]
+regex = '^SPAWN-SLEEP:0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fatal runtime error|spawn: '
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/true; echo SPAWN-TRUE:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^SPAWN-TRUE:0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "/bin/sleep 1; echo SPAWN-SLEEP:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^SPAWN-SLEEP:0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

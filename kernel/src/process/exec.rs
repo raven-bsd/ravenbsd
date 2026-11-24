@@ -23,7 +23,7 @@ use raven_abi::types::Handle;
 use raven_elf::Elf;
 
 use super::handle::Object;
-use super::{AddressSpace, Process, ProcessError, ProcessState, UserAddressSpace};
+use super::{AddressSpace, Process, ProcessError, ProcessState, SS_DISABLE, UserAddressSpace};
 
 /// Largest exec image accepted from the caller.
 ///
@@ -209,6 +209,22 @@ pub fn replace_image_from_user(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
+    // C19 `execsigs`: handlers reset to SIG_DFL (SIG_IGN stays ignored), pending cleared and
+    // the alternate signal stack reset. The legacy per-thread SIG_SETUP entry and its context
+    // are part of the old image; no entry from it may survive into the new image.
+    caller.sigacts.lock().exec_reset();
+    thread.signal_entry.store(0, Ordering::Release);
+    thread.signal_ctx_offset.store(0, Ordering::Release);
+    thread.signal_ctx_abs.store(0, Ordering::Release);
+    thread.signal_flags.store(0, Ordering::Release);
+    thread.signal_active_ctx.store(0, Ordering::Release);
+    thread.signal_depth.store(0, Ordering::Release);
+    thread.signal_mask.store(0, Ordering::Release);
+    thread.resend.store(false, Ordering::Release);
+    thread.kick_bits.store(0, Ordering::Release);
+    thread.altstack_sp.store(0, Ordering::Release);
+    thread.altstack_size.store(0, Ordering::Release);
+    thread.altstack_flags.store(SS_DISABLE, Ordering::Release);
     caller.exec_done.store(true, Ordering::Release);
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;

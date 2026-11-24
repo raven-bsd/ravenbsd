@@ -289,14 +289,14 @@ pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
                 if deliver_fault(frame, kind, frame.far) {
                     return;
                 }
-                crate::process::page_fault(frame.far)
+                crate::process::page_fault(frame.far, frame.elr)
             }
             EC_IABT_LOWER => {
                 let kind = abort_kind(data_abort(esr.iss()).dfsc);
                 if deliver_fault(frame, kind, frame.far) {
                     return;
                 }
-                crate::process::page_fault(frame.far)
+                crate::process::page_fault(frame.far, frame.elr)
             }
             EC_BREAKPOINT_LOWER | EC_SOFTWARE_STEP | EC_WATCHPOINT | EC_BRK => {
                 if deliver_fault(frame, signal::FAULT_BREAKPOINT, frame.elr) {

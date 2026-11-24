@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S182 runner negative check: a table that declares skip= must fail the runner. It is never
+# executed; the runner rejects it before QEMU starts and the summary is FAIL.
+
+name = "conformance-aarch64-negative-skip"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 1
+skip = "negative check: an aarch64 conformance row may not be skipped"
+expect_exit = "success"

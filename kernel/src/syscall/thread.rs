@@ -14,7 +14,10 @@ use raven_abi::syscall::{THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::{UserSlice, is_user_address};
 
-use crate::process::{self, Process, ProcessState, handle::Object};
+use crate::cmdline::CmdLine;
+use crate::kprintln;
+use crate::memory::paging;
+use crate::process::{self, Process, ProcessState, SIG_MAX, SS_DISABLE, SigAction, handle::Object};
 use crate::sched;
 use crate::sched::thread::ThreadState;
 use crate::syscall::SyscallFrame;
@@ -304,6 +307,170 @@ pub fn set_tls(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// `sigaction(signo, act, old) -> 0` (raw 0x87).
+///
+/// The disposition is per process; the raw structure is the System V amd64 `struct sigaction`
+/// (40 bytes on Raven: handler, 128-bit mask, flags, restorer). `act == 0` reads the current
+/// action; `old == 0` skips the previous action. `SIGKILL`/`SIGSTOP` and the 32..34 range are
+/// rejected with `EINVAL`, matching the libc `sigaction` rules.
+pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let signo = frame.rdi as u32;
+    if !(1..=SIG_MAX).contains(&signo) || (32..=34).contains(&signo) {
+        return Err(Errno::EINVAL);
+    }
+    let mut previous = {
+        let table = caller.sigacts.lock();
+        table.get(signo).ok_or(Errno::EINVAL)?
+    };
+    if frame.rsi != 0 {
+        let mut action = SigAction::default();
+        // SAFETY: `action` is a live, initialised SigAction; the byte view covers exactly it and
+        // is not aliased while `copy_from_user` runs.
+        let bytes = unsafe {
+            core::slice::from_raw_parts_mut(
+                &mut action as *mut SigAction as *mut u8,
+                size_of::<SigAction>(),
+            )
+        };
+        copy_from_user(
+            bytes,
+            UserSlice::new(frame.rsi as u64, size_of::<SigAction>() as u64)?,
+        )?;
+        let mut table = caller.sigacts.lock();
+        previous = table.get(signo).ok_or(Errno::EINVAL)?;
+        table.install(signo, action)?;
+    }
+    if frame.rdx != 0 {
+        // SAFETY: the source is a live SigAction value; the byte view is exact and immutable for
+        // the duration of the user copy.
+        let bytes = unsafe {
+            core::slice::from_raw_parts(
+                &previous as *const SigAction as *const u8,
+                size_of::<SigAction>(),
+            )
+        };
+        copy_to_user(
+            UserSlice::new(frame.rdx as u64, size_of::<SigAction>() as u64)?,
+            bytes,
+        )?;
+    }
+    Ok(0)
+}
+
+/// `sigprocmask(how, set, old) -> 0` (raw 0x88).
+///
+/// POSIX `SIG_BLOCK`/`SIG_UNBLOCK`/`SIG_SETMASK` on the calling thread's mask. `SIGKILL` and
+/// `SIGSTOP` cannot be blocked. The handler table stays per process.
+pub fn sigprocmask(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let how = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    if how > 2 {
+        return Err(Errno::EINVAL);
+    }
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    let old = thread.sigmask.load(Ordering::Acquire);
+    if frame.rsi != 0 {
+        let mut set = 0u64;
+        // SAFETY: `set` is a live local; the mutable byte view covers exactly it.
+        let bytes = unsafe {
+            core::slice::from_raw_parts_mut(&mut set as *mut u64 as *mut u8, size_of::<u64>())
+        };
+        copy_from_user(
+            bytes,
+            UserSlice::new(frame.rsi as u64, size_of::<u64>() as u64)?,
+        )?;
+        let mut next = match how {
+            0 => old | set,
+            1 => old & !set,
+            _ => set,
+        };
+        // `SIGKILL` and `SIGSTOP` are not blockable.
+        next &=
+            !((1u64 << (process::status::SIGKILL - 1)) | (1u64 << (process::status::SIGSTOP - 1)));
+        thread.sigmask.store(next, Ordering::Release);
+    }
+    if frame.rdx != 0 {
+        let bytes = old.to_ne_bytes();
+        copy_to_user(
+            UserSlice::new(frame.rdx as u64, size_of::<u64>() as u64)?,
+            &bytes,
+        )?;
+    }
+    Ok(0)
+}
+
+/// `sigaltstack(ss, old) -> 0` (raw 0x89).
+///
+/// Per-thread alternate signal stack (`stack_t`: `ss_sp`, `ss_flags`, `ss_size`). `SS_DISABLE`
+/// clears it; `SS_ONSTACK` is a query state, never accepted on install.
+pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    let old_sp = thread.altstack_sp.load(Ordering::Acquire);
+    let old_flags = thread.altstack_flags.load(Ordering::Acquire);
+    let old_size = thread.altstack_size.load(Ordering::Acquire);
+    if frame.rdi != 0 {
+        #[repr(C)]
+        struct Stack {
+            sp: usize,
+            flags: i32,
+            size: usize,
+        }
+        let mut stack = Stack {
+            sp: 0,
+            flags: 0,
+            size: 0,
+        };
+        // SAFETY: `stack` is a live Stack; the mutable byte view covers exactly it.
+        let bytes = unsafe {
+            core::slice::from_raw_parts_mut(&mut stack as *mut Stack as *mut u8, size_of::<Stack>())
+        };
+        copy_from_user(
+            bytes,
+            UserSlice::new(frame.rdi as u64, size_of::<Stack>() as u64)?,
+        )?;
+        let flags = u32::try_from(stack.flags).map_err(|_| Errno::EINVAL)?;
+        if flags & !SS_DISABLE != 0 {
+            return Err(Errno::EINVAL);
+        }
+        if flags == SS_DISABLE {
+            thread.altstack_sp.store(0, Ordering::Release);
+            thread.altstack_size.store(0, Ordering::Release);
+            thread.altstack_flags.store(SS_DISABLE, Ordering::Release);
+        } else {
+            if stack.sp == 0 || !is_user_address(stack.sp as u64) || stack.size < 6144 {
+                return Err(Errno::EINVAL);
+            }
+            thread.altstack_sp.store(stack.sp as u64, Ordering::Release);
+            thread
+                .altstack_size
+                .store(stack.size as u64, Ordering::Release);
+            thread.altstack_flags.store(0, Ordering::Release);
+        }
+    }
+    if frame.rdx != 0 {
+        #[repr(C)]
+        struct Stack {
+            sp: usize,
+            flags: i32,
+            size: usize,
+        }
+        let stack = Stack {
+            sp: usize::try_from(old_sp).map_err(|_| Errno::EFAULT)?,
+            flags: i32::try_from(old_flags).map_err(|_| Errno::EINVAL)?,
+            size: usize::try_from(old_size).map_err(|_| Errno::EFAULT)?,
+        };
+        // SAFETY: `stack` is a live Stack; the immutable byte view covers exactly it.
+        let bytes = unsafe {
+            core::slice::from_raw_parts(&stack as *const Stack as *const u8, size_of::<Stack>())
+        };
+        copy_to_user(
+            UserSlice::new(frame.rdx as u64, size_of::<Stack>() as u64)?,
+            bytes,
+        )?;
+    }
+    Ok(0)
+}
+
 /// One pending signal entry, resolved on the return-to-user path (PG-7).
 pub struct SignalEntry {
     /// Kick bits delivered as the entry's first argument.
@@ -389,6 +556,21 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
         .store(context_absolute, Ordering::Release);
     thread.signal_flags.store(flags, Ordering::Release);
     thread.signal_entry.store(entry, Ordering::Release);
+    if CmdLine::parse(paging::cmdline())
+        .get("k495-debug")
+        .is_some()
+    {
+        // K495 rev180: record the registered entry so a fault RIP can be compared with it. A
+        // caller address here is the class Ken identified for the SIG_SETUP resume defect.
+        kprintln!(
+            "signal: SIG_SETUP pid={} entry=0x{:x} offset=0x{:x} abs=0x{:x} flags=0x{:x}",
+            caller.id,
+            entry,
+            context_offset,
+            context_absolute,
+            flags
+        );
+    }
     Ok(0)
 }
 

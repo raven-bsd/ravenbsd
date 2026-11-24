@@ -36,6 +36,9 @@ regex = '^selftest: smp tlb nested ok rounds=32$'
 regex = '^selftest: smp sleeper-close cycles=8 sleepers=0 live=0 queued=0 reap=0 ok$'
 
 [[expect]]
+regex = '^selftest: smp donation-close cycles=8 registered=\d+ base=\d+ ok$'
+
+[[expect]]
 regex = '^selftest: smp ok cpus=4 switches=\d+$'
 
 [[forbid]]

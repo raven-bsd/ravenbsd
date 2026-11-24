@@ -332,7 +332,16 @@ pub mod tty {
             let mut line: Vec<u8> = Vec::new();
             let mut buffer = [0u8; 64];
             loop {
-                let count = client.read(self.handle, 0, &mut buffer)?;
+                let count = match client.read(self.handle, 0, &mut buffer) {
+                    Ok(count) => count,
+                    // The console server must not block its dispatch loop on an idle read
+                    // (that starves the console output path and queues tty requests); poll.
+                    Err(Errno::EAGAIN) => {
+                        let _ = raven_rt::nanosleep(10_000_000);
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                };
                 if count == 0 {
                     return Err(Errno::EIO);
                 }

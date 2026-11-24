@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K445 release K1-K8 evidence: the canonical release userland, with the probe
+# restricted to K1-K8 so the non-K9 rows can be green while K9 stays Carl's gate.
+name = "ssh-contract-release-k1k8-kvm1"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+pre = [
+    "SSH_CONTRACT_OUT=build/fixtures/ssh-contract-k1k8 SSH_CONTRACT_SERVICE=tests/smp/ssh-contract/ssh-contract-k1k8.service.toml sh tests/smp/ssh-contract/build-release.sh",
+    "SSH_CONTRACT_OUT=build/fixtures/ssh-contract-k1k8 SSH_CONTRACT_K6_READY=1 SSH_CONTRACT_K1K8=1 sh tests/smp/ssh-contract/start-host.sh",
+]
+initfs = "build/fixtures/ssh-contract-k1k8/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-enable-kvm", "-cpu", "host", "-smp", "1",
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23096,hostfwd=tcp:127.0.0.1:0-:23097,hostfwd=tcp:127.0.0.1:0-:23098",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/ssh-contract-k1k8/monitor.sock,server=on,wait=off",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONTRACT K1 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K2 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K3 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K4 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K5 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K6-listen PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K6 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K7 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8 PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT K8-shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONTRACT SUMMARY PASS 8/8$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)CONTRACT K([1-8])(-listen|-shutdown)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'

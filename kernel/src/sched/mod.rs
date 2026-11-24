@@ -118,9 +118,10 @@ unsafe impl Sync for GlobalCell {}
 static GLOBAL: GlobalCell = GlobalCell(UnsafeCell::new(None));
 static CPUS: [SpinMutex<Option<CpuSched>>; MAX_CPUS] = [const { SpinMutex::new(None) }; MAX_CPUS];
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
-/// `smp_user=on`: schedule user threads on application processors.  Off is the default until the
-/// soak gate passes, and the off mode is exercised by `smp-user-off`.
-static USER_SMP: AtomicBool = AtomicBool::new(false);
+/// User threads are scheduled on application processors by default. `smp_user=off` is the
+/// emergency disable (bringing a machine up while a default-on failure is being fixed);
+/// `smp_user=on` remains accepted as an explicit default.
+static USER_SMP: AtomicBool = AtomicBool::new(true);
 /// `smp-user-trace`: print the first user thread on each CPU and cross-CPU wakeups.
 static USER_TRACE: AtomicBool = AtomicBool::new(false);
 /// One-shot per-CPU marker for the first user thread (trace evidence only).
@@ -132,6 +133,8 @@ fn read_user_smp_flags() {
     for token in cmdline.split_ascii_whitespace() {
         if token == "smp_user=on" {
             USER_SMP.store(true, Ordering::Release);
+        } else if token == "smp_user=off" {
+            USER_SMP.store(false, Ordering::Release);
         } else if token == "smp-user-trace" {
             USER_TRACE.store(true, Ordering::Release);
         }
@@ -292,9 +295,10 @@ pub fn enqueue(thread: Arc<Thread>) -> bool {
     if !INITIALIZED.load(Ordering::Acquire) {
         return false;
     }
-    // User threads spread across the online CPUs when `smp_user=on`; otherwise they stay on the
-    // boot processor. Both architectures now have a per-CPU EL0/syscall path and per-thread
-    // FP/SIMD state, so aarch64 user threads follow the same policy. Kernel threads stay local.
+    // User threads spread across the online CPUs by default; `smp_user=off` is the emergency
+    // disable that keeps them on the boot processor. Both architectures now have a per-CPU
+    // EL0/syscall path and per-thread FP/SIMD state, so aarch64 user threads follow the same
+    // policy. Kernel threads stay local.
     let cpu = if thread.user {
         if user_smp_enabled() {
             pick_user_cpu()

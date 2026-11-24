@@ -53,9 +53,9 @@ fn dist_trace() -> bool {
 
 /// Choose the destination CPU for a new external IRQ.
 ///
-/// With `smp_user=off` every external IRQ stays on the BSP (CPU 0). With `smp_user=on` the
-/// destination round-robins over the application processors, leaving the BSP to the kernel timer
-/// and the serial console.
+/// With `smp_user=off` (the emergency disable) every external IRQ stays on the BSP (CPU 0).
+/// With the default-on policy the destination round-robins over the application processors,
+/// leaving the BSP to the kernel timer and the serial console.
 fn select_irq_cpu() -> u32 {
     if !crate::sched::user_smp_enabled() {
         return 0;

@@ -165,15 +165,19 @@ RESOURCE_COLUMNS = [
     "after_session", "qemu_rss_kb", "heap_used", "heap_free", "frames_free",
     "frames_alloc", "procs", "threads", "ofds", "pt_frames", "stack_frames",
     "init_pages", "vfsd_pages", "netd_pages", "sshd_pages",
-    "c3072_free", "c3072_used", "c3072_slabs", "serial_heap_kb", "panic",
+    "c3072_free", "c3072_used", "c3072_slabs", "live_threads", "reap",
+    "slot_drops", "slot_denies", "stacks_fresh", "stacks_cached",
+    "stacks_dropped", "sshd_procs", "sshd_threads", "dma_used", "donations",
+    "serial_heap_kb", "panic",
 ]
 RESOURCE_NOTE = (
     "guest heap/frame bytes, live processes/threads, handle (OFD) lineage, page-table frames, "
-    "kernel-stack frames, per-process user pages and the 3072-byte kmem class counters come from "
-    "the test-only K449-METRICS kernel line, enabled by `k449-metrics=<seconds>` on the image "
-    "cmdline; on an image without that "
-    "key those fields are '-' and only the host QEMU RSS and the serial boot heap/panic remain. "
-    "The K449-METRICS sampler is a diagnostic, not a product service, and the SSH rows are "
+    "kernel-stack frames, per-process user pages, the 3072-byte kmem class counters, live thread "
+    "slots, reap depth, kernel stack fresh/cached/dropped counts, sshd/sshd-session process/thread "
+    "counts, DMA pages in use and donation-registered threads come from the test-only K449-METRICS "
+    "kernel line, enabled by `k449-metrics=<seconds>` on the image cmdline; on an image without "
+    "that key those fields are '-' and only the host QEMU RSS and the serial boot heap/panic "
+    "remain. The K449-METRICS sampler is a diagnostic, not a product service, and the SSH rows are "
     "untouched."
 )
 
@@ -193,7 +197,10 @@ METRICS_RE = re.compile(
     r"frames_alloc=(\d+) procs=(\d+) threads=(\d+) ofds=(\d+) "
     r"pt_frames=(\d+) stack_frames=(\d+) init_pages=(\d+) "
     r"vfsd_pages=(\d+) netd_pages=(\d+) sshd_pages=(\d+) "
-    r"c3072_free=(\d+) c3072_used=(\d+) c3072_slabs=(\d+)"
+    r"c3072_free=(\d+) c3072_used=(\d+) c3072_slabs=(\d+) "
+    r"live_threads=(\d+) reap=(\d+) slot_drops=(\d+) slot_denies=(\d+) "
+    r"stacks_fresh=(\d+) stacks_cached=(\d+) stacks_dropped=(\d+) "
+    r"sshd_procs=(\d+) sshd_threads=(\d+) dma_used=(\d+) donations=(\d+)"
 )
 
 
@@ -205,8 +212,43 @@ def parse_metrics_line(text: str) -> dict | None:
     keys = ["heap_used", "heap_free", "frames_free", "frames_alloc",
             "procs", "threads", "ofds", "pt_frames", "stack_frames",
             "init_pages", "vfsd_pages", "netd_pages", "sshd_pages",
-            "c3072_free", "c3072_used", "c3072_slabs"]
+            "c3072_free", "c3072_used", "c3072_slabs", "live_threads",
+            "reap", "slot_drops", "slot_denies", "stacks_fresh",
+            "stacks_cached", "stacks_dropped", "sshd_procs", "sshd_threads",
+            "dma_used", "donations"]
     return {key: int(value) for key, value in zip(keys, matches[-1])}
+
+
+# kernel/src/memory/heap.rs `MAX_SLABS`: the per-class slab table bound.
+C3072_SLAB_CAP = 256
+
+
+def class_gate(sample: dict, session: int) -> str | None:
+    """Return a loud line when the 3072-byte kmem class is exhausted.
+
+    The 3072-byte class, not the frame pool, is the release-gate resource: a 2160-byte
+    request can fail while frames are free when this class is full. A zero free list is
+    normal while the cache can still grow, so the gate also requires the slab table at
+    its cap (kernel/src/memory/heap.rs `MAX_SLABS = 256`). Samples from an image without
+    the counters carry None and do not trip the gate.
+    """
+    free = sample.get("c3072_free")
+    slabs = sample.get("c3072_slabs")
+    if free is None or slabs is None:
+        return None
+    if free != 0 or slabs < C3072_SLAB_CAP:
+        return None
+    return (
+        f"CLASS-EXHAUSTED session={session} c3072_free=0 "
+        f"c3072_used={sample.get('c3072_used')} "
+        f"c3072_slabs={sample.get('c3072_slabs')} "
+        f"frames_free={sample.get('frames_free')} "
+        f"frames_alloc={sample.get('frames_alloc')} "
+        f"heap_used={sample.get('heap_used')} "
+        f"heap_free={sample.get('heap_free')} "
+        f"pt_frames={sample.get('pt_frames')} "
+        f"stack_frames={sample.get('stack_frames')}"
+    )
 
 
 def utc_from_epoch(epoch: float) -> str:
@@ -230,7 +272,9 @@ def format_resource_table(rows: list[dict]) -> str:
     """Render the resource samples as a compact table (missing values are '-')."""
     header = ["after", "rss_kb", "heap_u", "heap_f", "fr_free", "fr_alloc",
               "procs", "thr", "ofds", "pt", "stk", "init", "vfsd", "netd",
-              "sshd", "c3f", "c3u", "c3s", "heap_kb", "panic"]
+              "sshd", "c3f", "c3u", "c3s", "live_thr", "reap", "slot_d",
+              "slot_n", "stk_f", "stk_c", "stk_d", "sshd_p", "sshd_t",
+              "dma", "don", "heap_kb", "panic"]
     lines = ["  ".join(header)]
 
     def value(item: object) -> str:
@@ -256,6 +300,17 @@ def format_resource_table(rows: list[dict]) -> str:
             value(row.get("c3072_free")),
             value(row.get("c3072_used")),
             value(row.get("c3072_slabs")),
+            value(row.get("live_threads")),
+            value(row.get("reap")),
+            value(row.get("slot_drops")),
+            value(row.get("slot_denies")),
+            value(row.get("stacks_fresh")),
+            value(row.get("stacks_cached")),
+            value(row.get("stacks_dropped")),
+            value(row.get("sshd_procs")),
+            value(row.get("sshd_threads")),
+            value(row.get("dma_used")),
+            value(row.get("donations")),
             value(row.get("serial_heap_kb")),
             "yes" if row.get("panic") else "no",
         ]))
@@ -277,7 +332,10 @@ def selftest() -> int:
         "K449-METRICS heap_used=10 heap_free=20 frames_free=30 frames_alloc=40 "
         "procs=5 threads=6 ofds=7 pt_frames=8 stack_frames=9 init_pages=10 "
         "vfsd_pages=11 netd_pages=12 sshd_pages=13 "
-        "c3072_free=14 c3072_used=15 c3072_slabs=16\n"
+        "c3072_free=14 c3072_used=15 c3072_slabs=16 "
+        "live_threads=17 reap=18 slot_drops=19 slot_denies=20 "
+        "stacks_fresh=21 stacks_cached=22 stacks_dropped=23 "
+        "sshd_procs=24 sshd_threads=25 dma_used=26 donations=27\n"
     )
     check("metrics-heap-used", metrics and metrics["heap_used"], 10)
     check("metrics-frames-free", metrics and metrics["frames_free"], 30)
@@ -293,7 +351,31 @@ def selftest() -> int:
     check("metrics-c3072-free", metrics and metrics["c3072_free"], 14)
     check("metrics-c3072-used", metrics and metrics["c3072_used"], 15)
     check("metrics-c3072-slabs", metrics and metrics["c3072_slabs"], 16)
+    check("metrics-live-threads", metrics and metrics["live_threads"], 17)
+    check("metrics-reap", metrics and metrics["reap"], 18)
+    check("metrics-stacks-cached", metrics and metrics["stacks_cached"], 22)
+    check("metrics-sshd-procs", metrics and metrics["sshd_procs"], 24)
+    check("metrics-sshd-threads", metrics and metrics["sshd_threads"], 25)
+    check("metrics-donations", metrics and metrics["donations"], 27)
     check("metrics-missing", parse_metrics_line("no metrics here\n"), None)
+    exhausted = class_gate({
+        "c3072_free": 0, "c3072_used": 256, "c3072_slabs": 256,
+        "frames_free": 377507840, "frames_alloc": 38944768,
+        "heap_used": 6344848, "heap_free": 995184,
+        "pt_frames": 1, "stack_frames": 2,
+    }, 57)
+    check("class-gate-zero", bool(exhausted) and "session=57" in exhausted, True)
+    check("class-gate-used", "c3072_used=256" in (exhausted or ""), True)
+    check("class-gate-frames", "frames_free=377507840" in (exhausted or ""), True)
+    check("class-gate-one", class_gate({"c3072_free": 1}, 57), None)
+    check("class-gate-absent", class_gate({"c3072_free": None}, 57), None)
+    check("class-gate-not-capped", class_gate({
+        "c3072_free": 0, "c3072_used": 37, "c3072_slabs": 37,
+        "frames_free": 370499584, "frames_alloc": 45936640,
+    }, 1), None)
+    check("class-gate-capped-one", class_gate({
+        "c3072_free": 1, "c3072_used": 255, "c3072_slabs": 256,
+    }, 56), None)
     check(
         "banner-line-remote",
         is_banner_line(
@@ -398,8 +480,10 @@ def boot(run: Path, image: Path, net: str, accel: str) -> tuple[
     shutil.copyfile(OVMF_VARS, vars_path)
     serial = boot_dir / "serial.log"
     serial.write_bytes(b"")
+    smp = os.environ.get("RAVEN_QEMU_SMP", "4")
+    accel = os.environ.get("RAVEN_QEMU_ACCEL", "")
     argv = [
-        "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
+        "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", smp,
         *qemu_accel_args(accel),
         "-serial", f"file:{serial}", "-display", "none", "-monitor", "none",
         "-no-reboot",
@@ -411,6 +495,8 @@ def boot(run: Path, image: Path, net: str, accel: str) -> tuple[
         "-netdev", netdev,
         "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
     ]
+    if accel:
+        argv.extend(["-accel", accel])
     qemu_err = boot_dir / "qemu.err"
     with open(qemu_err, "wb") as err:
         child = subprocess.Popen(
@@ -666,8 +752,15 @@ def main(argv: list[str]) -> int:
                 f"auth={bool(row['auth_line'])} exit_status={bool(row['exit_status_line'])} "
                 f"free={bool(row['free_line'])} {row['result']}"
             )
+            gate_sample = sample_host(child, serial, number)
+            alarm = class_gate(gate_sample, number)
+            if alarm:
+                (run / "class-gate.txt").write_text(alarm + "\n", encoding="utf-8")
+                print(f"reconnect-soak: {alarm}")
+                failures += 1
+                break
             if options["resource_every"] > 0 and number % options["resource_every"] == 0:
-                resource_rows.append(sample_host(child, serial, number))
+                resource_rows.append(gate_sample)
             if row["result"] != "PASS":
                 failures += 1
                 if not options["keep_going"]:

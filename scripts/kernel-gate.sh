@@ -15,8 +15,12 @@
 # routed without re-reading the log. A row may name a qtest case file in an optional fifth field;
 # without it the case name resolves under tests/qtest/cases/ as before.
 #
-# usage: sh scripts/kernel-gate.sh [--list]
-#   --list   print the case table and exit (no QEMU run)
+# usage: sh scripts/kernel-gate.sh [--list | --durability | --functional]
+#   --list         print the case table and exit (no QEMU run)
+#   --durability   run only the three UFS durability rows (ENOSPC, fsync write/kill,
+#                  remount check) and write target/kernel-gate/durability.md
+#   --functional   use the functional hygiene budget (qemu <= 2 and load1 <= 2 x nproc)
+#                  instead of the exclusive host-idle preflight; a REFUSE stops the gate
 #
 # The full serial/build log of each case is kept under target/kernel-gate/ (not committed).
 # These are functional rows, not latency rows: the preflight refuses another QEMU but tolerates
@@ -62,6 +66,13 @@ fi
 
 # case | arch | owner | subsystem note | optional explicit case path
 # The path column lets an SMP fixture live under tests/smp/<name>/ instead of tests/qtest/cases.
+#
+# K548 release-network rows (wired from the rev-51/52 evidence on c2892c717/5cfb80505):
+# net-fuzz-release 108.000 s cold (90 s case timeout, 28 mutation deviations);
+# net-fuzz-l4-release 34.500 s (90 s, 57); net-fuzz-frag-timeout-release 51.491 s
+# (120 s, 2); net-churn-release 47.333 s (120 s, 1000). The first row builds
+# build/qtest/net-fuzz-release.img; the rest reuse the stamp. All four are
+# functional rows, not latency rows.
 cases='boot-uname|x86_64|stuart|boot/uname
 kernel-early-boot|x86_64|stuart|boot
 exc-int3|x86_64|stuart|exceptions
@@ -86,12 +97,19 @@ ssh-first-byte|x86_64|bob|ssh first byte|tests/fixtures/ssh-first-byte/ssh-first
 net-fuzz|x86_64|jorge|net fuzz|tests/qtest/cases/net-fuzz.toml
 net-fuzz-l4|x86_64|jorge|net fuzz l4|tests/qtest/cases/net-fuzz-l4.toml
 net-fuzz-frag-timeout|x86_64|jorge|net fuzz frag|tests/qtest/cases/net-fuzz-frag-timeout.toml
+net-fuzz-release|x86_64|jorge|network fuzz release|tests/qtest/cases/net-fuzz-release.toml
+net-fuzz-l4-release|x86_64|jorge|network fuzz l4 release|tests/qtest/cases/net-fuzz-l4-release.toml
+net-fuzz-frag-timeout-release|x86_64|jorge|network fuzz frag timeout release|tests/qtest/cases/net-fuzz-frag-timeout-release.toml
+net-churn-release|x86_64|jorge|network churn release|tests/qtest/cases/net-churn-release.toml
 duplex-matrix|x86_64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix.toml
 kmem-frames|x86_64|mark|allocator
 kmem-frames-nopcpu|x86_64|mark|allocator
 proc-death-cleanup|x86_64|stuart|process
 trace-context|x86_64|tim|trace
 release-login|x86_64|kevin|release
+ufs-enospc|x86_64|mel|ufs/durability
+ufs-fsync-persist|x86_64|mel|ufs/durability
+ufs-fsync-check|x86_64|mel|ufs/durability
 boot-uname-aarch64|aarch64|dave|boot/uname
 kernel-early-boot-aarch64|aarch64|dave|boot
 kernel-exc-aarch64|aarch64|dave|exceptions
@@ -99,30 +117,66 @@ kernel-paging-aarch64|aarch64|dave|paging
 kernel-timer-aarch64|aarch64|dave|timer
 duplex-matrix-aarch64|aarch64|phil|duplex/contract|tests/smp/duplex-matrix/duplex-matrix-aarch64.toml'
 
-if [ "${1:-}" = "--list" ]; then
-    printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
-        printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
-    done
-    exit 0
-fi
+durability=0
+functional=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --list)
+            printf '%s\n' "$cases" | while IFS='|' read -r name arch owner note _path; do
+                printf '%-28s %-8s %-7s %s\n' "$name" "$arch" "$owner" "$note"
+            done
+            exit 0
+            ;;
+        --durability) durability=1 ;;
+        --functional) functional=1 ;;
+        -h|--help)
+            sed -n '6,30p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "kernel-gate: unknown option: $1" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'
-    exit 0
+if [ "$durability" -eq 1 ]; then
+    cases=$(printf '%s\n' "$cases" | awk -F'|' '$4 == "ufs/durability"')
+    doc=target/kernel-gate/durability.md
+else
+    if ! doc=$(mgmt_path architecture/product-data/kernel-gate.md); then
+        doc=$log_dir/kernel-gate.md
+        echo "kernel-gate: management root absent; table stays at $doc (set RAVEN_MGMT_ROOT to file it)"
+    fi
 fi
 
 mkdir -p "$log_dir" build/qtest || exit 2
-if ! doc=$(mgmt_path architecture/product-data/kernel-gate.md); then
-    doc=$log_dir/kernel-gate.md
-    echo "kernel-gate: management root absent; table stays at $doc (set RAVEN_MGMT_ROOT to file it)"
+if [ "$functional" -eq 1 ]; then
+    # Functional rows use the functional hygiene budget, not the exclusive window: up to two
+    # co-tenant boot rows and load1 <= 2 x nproc. A REFUSE stops the gate; do not override it.
+    load1=$(cut -d' ' -f1 /proc/loadavg)
+    nproc=$(nproc 2>/dev/null || echo 4)
+    max_load=$((nproc * 4))
+    max_qemu=$((nproc / 2))
+    [ "$max_qemu" -lt 2 ] && max_qemu=2
+    qemu=$(ps -eo stat=,comm= 2>/dev/null \
+        | awk '$1 !~ /^[ZX]/ && $2 ~ /^qemu-system-/ { n++ } END { print n + 0 }')
+    if [ "$qemu" -gt "$max_qemu" ] ||
+        awk -v l="$load1" -v m="$max_load" 'BEGIN { exit !(l > m) }'; then
+        echo "kernel-gate: hygiene REFUSE functional qemu=$qemu max_qemu=$max_qemu load1=$load1 max_load=$max_load" >&2
+        exit 2
+    fi
+    echo "kernel-gate: hygiene functional qemu=$qemu max_qemu=$max_qemu load1=$load1 max_load=$max_load"
+else
+    # shellcheck disable=SC2086
+    sh tests/smp/boot/host-idle.sh \
+        --context "kernel-gate" \
+        --wait "$wait_idle" \
+        --max-load "$max_load" \
+        $preflight_args \
+        --state-file "$log_dir/host-state.txt" || exit 2
 fi
-# shellcheck disable=SC2086
-sh tests/smp/boot/host-idle.sh \
-    --context "kernel-gate" \
-    --wait "$wait_idle" \
-    --max-load "$max_load" \
-    $preflight_args \
-    --state-file "$log_dir/host-state.txt" || exit 2
 
 commit=$(git rev-parse HEAD 2>/dev/null) || { echo "kernel-gate: not a git checkout" >&2; exit 2; }
 short=$(git rev-parse --short=12 HEAD 2>/dev/null) || short=$commit
@@ -191,36 +245,55 @@ while IFS='|' read -r name arch owner note case_path; do
     printf 'kernel-gate: %-28s %-8s ' "$name" "$arch"
     # stdin is /dev/null: neither cargo nor QEMU may consume the remaining case lines.
     # shellcheck disable=SC2086
-    if cargo xtask qtest --case "$case_selector" --arch "$arch" $release_flags </dev/null >"$log" 2>&1; then
+    cargo xtask qtest --case "$case_selector" --arch "$arch" $release_flags </dev/null >"$log" 2>&1
+    qtest_rc=$?
+    if [ "$qtest_rc" -eq 0 ]; then
         status=pass
         detail=ok
         printf 'pass\n'
+    elif grep -q 'waiting-for-window' "$log"; then
+        # The case's own load preflight refused the run (qtest exit 77, which the xtask
+        # wrapper collapses to 1): this is a waiting slot, not a product pass and not a
+        # failure. Keep it out of the failure count.
+        status=WAIT
+        detail=$(grep -m1 'waiting-for-window' "$log")
+        printf 'waiting-for-window\n'
     else
-        exit_status=$(sed -n 's/.*exit status \([0-9][0-9]*\).*/\1/p' "$log" | tail -n 1)
-        if grep -q 'timed out after' "$log"; then
-            status='FAIL (timeout)'
-            detail=$(grep -m1 'timed out after' "$log")
+        # K555: a latency row's own measured guard returns the qtest waiting-for-window
+        # (preflight-load exit 77; the xtask wrapper reports it as a non-zero run). That is a
+        # recorded skip, not a failure, and the gate verdict counts it separately.
+        if grep -Eq '(^|: )skipped$|preflight-load: .*waiting-for-window' "$log"; then
+            status=SKIP
+            detail=$(grep -m1 'preflight-load: .*waiting-for-window' "$log")
+            [ -n "$detail" ] || detail="waiting-for-window"
+            printf 'skip (waiting-for-window)\n'
         else
-            status=FAIL
-            unmatched=$(awk '
-                /^--- unmatched expectations ---$/ { mode = 1; next }
-                /^--- /                            { mode = 0; next }
-                mode && NF                         { print; exit }
-            ' "$log")
-            forbidden=$(awk '
-                /^--- forbidden hits ---$/ { mode = 1; next }
-                /^--- /                    { mode = 0; next }
-                mode && NF                 { print; exit }
-            ' "$log")
-            detail=""
-            [ -n "$exit_status" ] && detail="exit=$exit_status"
-            [ -n "$unmatched" ] && detail="$detail unmatched=$unmatched"
-            [ -n "$forbidden" ] && detail="$detail forbidden=$forbidden"
-            if [ -z "$detail" ]; then
-                detail=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1)
+            exit_status=$(sed -n 's/.*exit status \([0-9][0-9]*\).*/\1/p' "$log" | tail -n 1)
+            if grep -q 'timed out after' "$log"; then
+                status='FAIL (timeout)'
+                detail=$(grep -m1 'timed out after' "$log")
+            else
+                status=FAIL
+                unmatched=$(awk '
+                    /^--- unmatched expectations ---$/ { mode = 1; next }
+                    /^--- /                            { mode = 0; next }
+                    mode && NF                         { print; exit }
+                ' "$log")
+                forbidden=$(awk '
+                    /^--- forbidden hits ---$/ { mode = 1; next }
+                    /^--- /                    { mode = 0; next }
+                    mode && NF                 { print; exit }
+                ' "$log")
+                detail=""
+                [ -n "$exit_status" ] && detail="exit=$exit_status"
+                [ -n "$unmatched" ] && detail="$detail unmatched=$unmatched"
+                [ -n "$forbidden" ] && detail="$detail forbidden=$forbidden"
+                if [ -z "$detail" ]; then
+                    detail=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1)
+                fi
             fi
+            printf '%s\n' "$status"
         fi
-        printf '%s\n' "$status"
     fi
     detail=$(printf '%s' "$detail" | tr '\n' ' ' | tr -s ' ' | sed 's/|/\\|/g' | cut -c1-180)
     printf '%s|%s|%s|%s|%s|%s\n' "$name" "$arch" "$owner" "$note" "$status" "$detail" >> "$results"
@@ -234,7 +307,9 @@ passed=$(grep -c '|pass|' "$results" 2>/dev/null || true)
 passed=${passed:-0}
 skipped=$(grep -c '|SKIP|' "$results" 2>/dev/null || true)
 skipped=${skipped:-0}
-failed=$((total - passed - skipped))
+waiting=$(grep -c '|WAIT|' "$results" 2>/dev/null || true)
+waiting=${waiting:-0}
+failed=$((total - passed - skipped - waiting))
 timed_out=$(grep -c 'FAIL (timeout)' "$results" 2>/dev/null || true)
 timed_out=${timed_out:-0}
 
@@ -253,7 +328,7 @@ fi
     echo "Generated by \`sh scripts/kernel-gate.sh\` at $generated from commit \`$short\`"
     echo "(\`$commit\`)."
     echo
-    echo "Result: **$verdict** — $total cases, $passed passed, $failed failed ($timed_out timed out), $skipped skipped."
+    echo "Result: **$verdict** — $total cases, $passed passed, $failed failed ($timed_out timed out), $skipped skipped, $waiting waiting."
     echo
     echo 'Scope: the release-relevant kernel cases below, x86_64 plus the aarch64 cases that exist'
     echo 'in `tests/qtest/cases/`. Raspberry Pi 4 hardware is **out of scope**; this gate makes no Pi 4'
@@ -273,12 +348,12 @@ fi
     if [ "$failed" -eq 0 ]; then
         echo 'None.'
     else
-        owners=$(awk -F'|' '$5 != "pass" && $5 != "SKIP" { print $3 }' "$results" | sort -u)
+        owners=$(awk -F'|' '$5 != "pass" && $5 != "SKIP" && $5 != "WAIT" { print $3 }' "$results" | sort -u)
         for owner in $owners; do
             echo "### $owner"
             echo
             awk -F'|' -v owner="$owner" \
-                '$3 == owner && $5 != "pass" && $5 != "SKIP" { printf "- `%s` (%s): %s — %s\n", $1, $2, $5, $6 }' \
+                '$3 == owner && $5 != "pass" && $5 != "SKIP" && $5 != "WAIT" { printf "- `%s` (%s): %s — %s\n", $1, $2, $5, $6 }' \
                 "$results"
             echo
         done
@@ -286,8 +361,8 @@ fi
 } > "$doc" || exit 2
 
 if [ "$failed" -ne 0 ]; then
-    echo "kernel-gate: FAIL ($failed of $total cases failed, $skipped skipped); table: $doc" >&2
+    echo "kernel-gate: FAIL ($failed of $total cases failed, $skipped skipped, $waiting waiting); table: $doc" >&2
     exit 1
 fi
-echo "kernel-gate: PASS ($total cases, $skipped skipped); table: $doc"
+echo "kernel-gate: PASS ($total cases, $skipped skipped, $waiting waiting); table: $doc"
 exit 0

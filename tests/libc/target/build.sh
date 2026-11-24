@@ -230,20 +230,29 @@ compile_obj() {
 }
 
 link_static() {
+    # A case may own `_start` (K548's exec-timing entry timestamp). Then crt1.o is not linked:
+    # the case supplies the entry, and the start function it calls is the same one crt1 uses.
+    if [ "${3:-0}" = 1 ]; then
+        crt1=
+    else
+        crt1="$sysroot/usr/lib/crt1.o"
+    fi
     if [ -n "$builtins" ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
-            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            $crt1 "$sysroot/usr/lib/crti.o" \
+            "$sysroot/usr/lib/crtbegin.o" "$1" \
             -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
-            "$sysroot/usr/lib/crtn.o" -o "$2"
+            "$sysroot/usr/lib/crtend.o" "$sysroot/usr/lib/crtn.o" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
-            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            $crt1 "$sysroot/usr/lib/crti.o" \
+            "$sysroot/usr/lib/crtbegin.o" "$1" \
             -L"$sysroot/usr/lib" -lc \
-            "$sysroot/usr/lib/crtn.o" -o "$2"
+            "$sysroot/usr/lib/crtend.o" "$sysroot/usr/lib/crtn.o" -o "$2"
     fi
 }
 
@@ -322,6 +331,20 @@ else
     compile_obj "$src" "$obj"
 fi
 
+# A static case that defines `_start` owns the entry; crt1.o must not be linked beside it.
+own_start=0
+if [ "$link_kind" = static ]; then
+    symbol_tool=
+    if command -v llvm-nm >/dev/null 2>&1; then
+        symbol_tool=llvm-nm
+    elif command -v nm >/dev/null 2>&1; then
+        symbol_tool=nm
+    fi
+    if [ -n "$symbol_tool" ] && "$symbol_tool" "$obj" 2>/dev/null | grep -Eq ' T _start$'; then
+        own_start=1
+    fi
+fi
+
 case $binaries in
     *libc-child*)
         child_src=$root/libc/ravenlibc/tests/c/libc-child.c
@@ -338,7 +361,7 @@ esac
 
 case $link_kind in
     static)
-        link_static "$obj" "$out/libc-test"
+        link_static "$obj" "$out/libc-test" "$own_start"
         : > "$out/libplug.so"
         : > "$out/libc.so.1"
         : > "$out/ld-elf.so.1"

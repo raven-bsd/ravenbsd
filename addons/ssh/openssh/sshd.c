@@ -924,6 +924,14 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s,
 	struct sshbuf *buf;
 	socklen_t fromlen;
 	sigset_t nsigset, osigset;
+	/*
+	 * RavenBSD: libc has no asynchronous signal-handler dispatch (PG-7), so
+	 * main_sigchld_handler never runs and received_sigchld never becomes set.
+	 * Reap the exited sshd-session children synchronously on every loop wake,
+	 * and bound the ppoll wait so the last session is reaped without waiting
+	 * for the next connection.
+	 */
+	const struct timespec reap_interval = { 1, 0 };
 
 	/* pipes connected to unauthenticated child sshd processes */
 	child_alloc();
@@ -954,6 +962,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s,
 	 */
 	for (;;) {
 		sigprocmask(SIG_BLOCK, &nsigset, &osigset);
+		/* RavenBSD: no async handler dispatch, so reap here (PG-7 gap). */
+		child_reap_all_exited();
 		if (received_sigterm) {
 			logit("Received signal %d; terminating.",
 			    (int) received_sigterm);
@@ -1011,8 +1021,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s,
 			}
 		}
 
-		/* Wait until a connection arrives or a child exits. */
-		ret = ppoll(pfd, npfd, NULL, &osigset);
+		/* Wait until a connection arrives, a child exits, or the reap interval. */
+		ret = ppoll(pfd, npfd, &reap_interval, &osigset);
 		if (ret == -1 && errno != EINTR) {
 			error("ppoll: %.100s", strerror(errno));
 			if (errno == EINVAL)

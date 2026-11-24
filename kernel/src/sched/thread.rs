@@ -65,9 +65,18 @@ static LIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
 
 /// Every thread object ever created, weakly (S36b leaked-thread diagnostic only).
 static ALL_THREADS: Mutex<Vec<alloc::sync::Weak<Thread>>> = Mutex::new(Vec::new());
+/// Prune dead weak entries once the registry reaches this length.
+const ALL_THREADS_PRUNE: usize = 256;
 
 fn remember_thread(thread: &Arc<Thread>) {
-    ALL_THREADS.lock().push(Arc::downgrade(thread));
+    let mut registry = ALL_THREADS.lock();
+    // A Weak keeps the ArcInner allocation alive after the value is dropped. The diagnostic
+    // registry must not retain the 960-byte Thread block of every exited thread: prune weak
+    // entries whose strong count is zero, keeping live and genuinely leaked threads visible.
+    if registry.len() >= ALL_THREADS_PRUNE {
+        registry.retain(|weak| weak.strong_count() > 0);
+    }
+    registry.push(Arc::downgrade(thread));
 }
 
 /// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
@@ -255,6 +264,43 @@ impl Drop for ThreadSlot {
 pub fn live_threads() -> usize {
     LIVE_THREADS.load(Ordering::Acquire)
 }
+
+/// Thread-slot drops since boot (diagnostic).
+pub fn slots_dropped() -> usize {
+    SLOTS_DROPPED.load(Ordering::Acquire)
+}
+
+/// Every Thread object still reachable from the weak registry.
+///
+/// Returns `(alive, strong_refs_1, strong_refs_2plus, dead_state)`.
+pub fn all_thread_census() -> [u64; 4] {
+    let mut stats = [0u64; 4];
+    for weak in ALL_THREADS.lock().iter() {
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        stats[0] = stats[0].saturating_add(1);
+        if Arc::strong_count(&thread).saturating_sub(1) <= 1 {
+            stats[1] = stats[1].saturating_add(1);
+        } else {
+            stats[2] = stats[2].saturating_add(1);
+        }
+        if thread.state() == ThreadState::Dead {
+            stats[3] = stats[3].saturating_add(1);
+        }
+    }
+    stats
+}
+
+/// Thread slots released since boot (K530 churn diagnostic).
+pub fn slot_drops() -> usize {
+    SLOTS_DROPPED.load(Ordering::Acquire)
+}
+
+/// Thread admission denials since boot (K530 churn diagnostic).
+pub fn slot_denies() -> usize {
+    SLOT_DENIES.load(Ordering::Acquire)
+}
 /// Mask keeping a tid in the musl lock-word / PG-2 30-bit range.
 const TID_MASK: u32 = 0x3fff_ffff;
 
@@ -414,6 +460,14 @@ pub struct Thread {
     pub signal_depth: AtomicU32,
     /// User signal mask restored by the last `SIGRESEND` (passed to the entry).
     pub signal_mask: AtomicU64,
+    /// Blocked signal mask for this thread (`sigprocmask`, C19); handlers stay per process.
+    pub sigmask: AtomicU64,
+    /// Alternate signal stack base (`sigaltstack`), zero when disabled.
+    pub altstack_sp: AtomicU64,
+    /// Alternate signal stack size.
+    pub altstack_size: AtomicU64,
+    /// Alternate signal stack flags (`SS_DISABLE`/`SS_ONSTACK`).
+    pub altstack_flags: AtomicU32,
     /// A `SIGRESEND` re-entry is waiting for the return-to-user path.
     pub resend: AtomicBool,
     /// Current cross-process trace id (`R-OBS-6`); zero means "not traced".
@@ -585,6 +639,10 @@ impl Thread {
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
+            sigmask: AtomicU64::new(0),
+            altstack_sp: AtomicU64::new(0),
+            altstack_size: AtomicU64::new(0),
+            altstack_flags: AtomicU32::new(0),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: slot,
@@ -689,6 +747,10 @@ impl Thread {
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
+            sigmask: AtomicU64::new(0),
+            altstack_sp: AtomicU64::new(0),
+            altstack_size: AtomicU64::new(0),
+            altstack_flags: AtomicU32::new(0),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
@@ -748,6 +810,10 @@ impl Thread {
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
+            sigmask: AtomicU64::new(0),
+            altstack_sp: AtomicU64::new(0),
+            altstack_size: AtomicU64::new(0),
+            altstack_flags: AtomicU32::new(0),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
@@ -910,4 +976,9 @@ pub fn stack_frames() -> u64 {
     STACK_FRESH
         .load(Ordering::Relaxed)
         .saturating_mul(STACK_RESERVED_PAGES)
+}
+
+/// Stacks dropped because the cache was full (diagnostic).
+pub fn stack_drops() -> u64 {
+    STACK_DROPS.load(Ordering::Relaxed)
 }
