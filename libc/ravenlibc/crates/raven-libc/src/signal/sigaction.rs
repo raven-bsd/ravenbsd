@@ -1,21 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-//! `sigaction(3)`.
+//! `sigaction(3)`: the raw kernel 0x87 request and the C 152-byte action.
 use core::ffi::c_int;
 
-use raven_libc_signal::{Disposition, ENOSYS_ERR, SigKernel, SysKernel};
-
-use super::DISP;
-
-/// The C `struct sigaction` (152 bytes; C36 layout).
-#[repr(C)]
-pub(crate) struct SigAction {
-    pub(crate) handler: usize,
-    pub(crate) mask: [u64; 16],
-    pub(crate) flags: c_int,
-    pub(crate) pad: c_int,
-    pub(crate) restorer: usize,
-}
+use raven_libc_abi::errno::Errno;
+use raven_libc_abi::structs::Sigaction;
+use raven_libc_signal::sigaction_abi::{KernelSigAction, from_c, to_c};
 
 /// Install or query a disposition.
 ///
@@ -24,63 +14,41 @@ pub(crate) struct SigAction {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sigaction(
     sig: c_int,
-    new: *const SigAction,
-    old: *mut SigAction,
+    new: *const Sigaction,
+    old: *mut Sigaction,
 ) -> c_int {
     let request = if new.is_null() {
         None
     } else {
         // SAFETY: the caller supplies a readable sigaction.
-        let action = unsafe { &*new };
-        // A function handler needs the kernel's PG-7 entry before the first asynchronous
-        // signal can be delivered. SIG_DFL/SIG_IGN stay entirely in the libc table.
-        if action.handler > 1 {
-            let caps = SysKernel::new().caps();
-            if !caps.entry || !caps.sigreturn {
-                crate::ffi::errno::set(ENOSYS_ERR);
-                return -1;
-            }
-            if let Err(error) = super::ensure_entry() {
-                crate::ffi::errno::set(error);
-                return -1;
-            }
-        }
-        Some(Disposition {
-            handler: action.handler,
-            mask: action.mask[0],
-            flags: action.flags as u32,
-        })
+        Some(from_c(unsafe { &*new }))
     };
-    let mut previous = Disposition::DEFAULT;
-    match raven_libc_signal::dispositions::sigaction(
-        &DISP,
-        sig,
-        request.as_ref(),
-        if old.is_null() {
-            None
-        } else {
-            Some(&mut previous)
-        },
-    ) {
-        Ok(()) => {
-            if !old.is_null() {
-                // SAFETY: the caller supplies a writable sigaction.
-                unsafe {
-                    *old = SigAction {
-                        handler: previous.handler,
-                        mask: [0; 16],
-                        flags: previous.flags as c_int,
-                        pad: 0,
-                        restorer: 0,
-                    };
-                    (*old).mask[0] = previous.mask;
-                }
-            }
-            0
-        }
-        Err(error) => {
-            crate::ffi::errno::set(error);
-            -1
-        }
+    let mut previous = KernelSigAction::default();
+    let new_ptr = request
+        .as_ref()
+        .map_or(0, |action| action as *const KernelSigAction as usize);
+    let old_ptr = if old.is_null() {
+        0
+    } else {
+        &mut previous as *mut KernelSigAction as usize
+    };
+    // SAFETY: the kernel copies the 40-byte request and the previous action from the pointers,
+    // which are live for the call.
+    let raw = unsafe {
+        raven_libc_sys::arch::syscall3(
+            raven_abi::syscall::SIGACTION,
+            sig as usize,
+            new_ptr,
+            old_ptr,
+        )
+    };
+    if raw < 0 {
+        crate::ffi::errno::set(Errno(raw.unsigned_abs() as u16));
+        return -1;
     }
+    if !old.is_null() {
+        // SAFETY: the caller supplies a writable sigaction.
+        to_c(&previous, unsafe { &mut *old });
+    }
+    0
 }
