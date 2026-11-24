@@ -35,7 +35,12 @@ pub unsafe extern "C" fn sigaction(
     // SAFETY: the kernel copies the 40-byte request and the previous action from the pointers,
     // which are live for the call.
     let raw = unsafe {
-        raven_libc_sys::arch::syscall3(raven_abi::syscall::SIGACTION, sig as usize, new_ptr, old_ptr)
+        raven_libc_sys::arch::syscall3(
+            raven_abi::syscall::SIGACTION,
+            sig as usize,
+            new_ptr,
+            old_ptr,
+        )
     };
     if raw < 0 {
         crate::ffi::errno::set(Errno(raw.unsigned_abs() as u16));

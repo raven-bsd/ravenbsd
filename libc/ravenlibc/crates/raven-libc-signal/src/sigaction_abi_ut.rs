@@ -41,7 +41,12 @@ fn kernel_action_round_trips_only_the_128_bit_mask() {
     assert_eq!(out.sa_flags, 4);
     assert!(out.sa_restorer.is_null());
     assert!(out.sa_mask.bytes[2..].iter().all(|word| *word == 0));
-    assert_eq!(out.sa_mask, SigsetT { bytes: [0x11, 0x22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] });
+    assert_eq!(
+        out.sa_mask,
+        SigsetT {
+            bytes: [0x11, 0x22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        }
+    );
 }
 
 #[test]
