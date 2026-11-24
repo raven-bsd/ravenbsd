@@ -11,6 +11,7 @@ use std::cell::RefCell;
 
 unsafe extern "C" {
     fn write(fd: i32, buffer: *const u8, length: usize) -> isize;
+    fn pthread_exit(value: *mut core::ffi::c_void) -> !;
 }
 
 struct ThreadValue;
@@ -92,5 +93,9 @@ fn main() -> std::process::ExitCode {
             write(1, message.as_ptr(), message.len());
         }
     }));
-    std::process::ExitCode::from(destructor_read_child() as u8)
+    let _ = destructor_read_child();
+    // The contract case: pthread_exit from the main thread runs the key destructors while the
+    // TLS is addressable. The same-key read in SelfRead::drop is the std AccessError.
+    // SAFETY: pthread_exit is the libc thread-exit entry; a null value is the thread result.
+    unsafe { pthread_exit(core::ptr::null_mut()) }
 }
