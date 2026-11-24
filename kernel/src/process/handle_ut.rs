@@ -15,18 +15,15 @@ use super::{register_lineage, revoke_descendants};
 fn revoked_mask_is_removed_from_a_derived_handle_in_another_process() {
     // Process A: a root capability and a duplicate (the HANDLE_DUP path, which registers).
     let mut first: HandleTable<u8> = HandleTable::new();
-    let root = first
-        .insert(0, Rights::READ | Rights::WRITE)
-        .expect("root");
-    let derived = first
-        .dup(root, Rights::READ | Rights::WRITE)
-        .expect("dup");
+    let root = first.insert(0, Rights::READ | Rights::WRITE).expect("root");
+    let derived = first.dup(root, Rights::READ | Rights::WRITE).expect("dup");
     let lineage = first.lineage_node(derived).expect("lineage");
     register_lineage(Arc::clone(&lineage));
 
     // Process B: a handle derived through the transfer/attachment path, which uses
-    // `insert_derived` exactly like handle_xfer/router/duplex/linux do. The kernel's
-    // cross-process walk can only see it if the caller registers the derived node.
+    // `insert_derived` exactly like handle_xfer/router/duplex/linux do. Registration lets the
+    // eager `revoke_descendants` walk mark it; the strong parent chain is what makes the lookup
+    // observe the revoke (`LineageNode::revoked`).
     let mut second: HandleTable<u8> = HandleTable::new();
     let child = second
         .insert_derived(1, Rights::READ | Rights::WRITE, &lineage)
@@ -36,8 +33,15 @@ fn revoked_mask_is_removed_from_a_derived_handle_in_another_process() {
     let (target, applied) = first
         .revoke_target(root, Rights::WRITE)
         .expect("revoke target");
-    revoke_descendants(&target, applied);
 
+    // The parent chain is the linearization point: B sees the revoke before the eager walk.
+    assert_eq!(
+        second.get(child, Rights::WRITE).err(),
+        Some(Errno::EPERM),
+        "C17: the parent chain must expose A's revoke in B"
+    );
+
+    revoke_descendants(&target, applied);
     assert_eq!(
         second.get(child, Rights::WRITE).err(),
         Some(Errno::EPERM),
