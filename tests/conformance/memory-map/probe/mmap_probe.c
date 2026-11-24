@@ -34,7 +34,7 @@ static int child_signal(pid_t pid) {
 
 // A private or shared anonymous mapping; the parent writes after fork and the child reads after
 // a pipe handshake. Private must keep the pre-fork zero; shared must see the parent's 0x11.
-static void cow_row(int shared, const char *name) {
+static void cow_row(int shared, int expect_shared, const char *name) {
     int sync[2];
     if (pipe(sync) < 0) {
         row(name, 0, "pipe=1 ");
@@ -64,7 +64,7 @@ static void cow_row(int shared, const char *name) {
     int status = 0;
     (void)waitpid(pid, &status, 0);
     int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-    int expected = shared ? 0x11 : 0x00;
+    int expected = expect_shared ? 0x11 : 0x00;
     char extra[64];
     (void)snprintf(extra, sizeof extra, "child=%d expected=%d ", code, expected);
     row(name, code == expected, extra);
@@ -208,8 +208,8 @@ int main(int argc, char **argv) {
     }
     row("anon-zero", zeroed, "");
 
-    cow_row(mutation_private_shared ? 1 : 0, "cow-private");
-    cow_row(1, "cow-shared");
+    cow_row(mutation_private_shared ? 1 : 0, 0, "cow-private");
+    cow_row(1, 1, "cow-shared");
     mprotect_row();
     fixed_row();
     sigbus_row();
