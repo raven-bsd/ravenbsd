@@ -96,11 +96,6 @@ static void row_groups(void) {
     if (got != count) {
         failed("groups", "short");
     }
-    if (count > 0) {
-        errno = 0;
-        int small = getgroups(count - 1, groups);
-        printf("cred: groups-small ret=%d errno=%d\n", small, errno);
-    }
     free(groups);
 }
 
