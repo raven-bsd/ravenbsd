@@ -2121,6 +2121,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-kernel-conformance"
+version = "0.1.0"
+
+[[package]]
 name = "raven-kill"
 version = "0.1.0"
 dependencies = [
@@ -3449,6 +3453,14 @@ dependencies = [
  "raven-elf",
  "raven-initfs",
  "raven-ipc",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s166-mask"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 

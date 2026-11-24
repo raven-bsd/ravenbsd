@@ -130,12 +130,14 @@ members = [
     "tests/qtest/cases/signal-entry-fixture",
     "tests/qtest/cases/signal-fault-fixture",
     "tests/qtest/cases/sigresend-fixture",
+    "tests/qtest/cases/sigprocmask-fixture",
     "tests/qtest/cases/shared-futex-fixture",
     "tests/qtest/cases/robust-futex-fixture",
     "tests/qtest/cases/handle-copy-fixture",
     "tests/qtest/cases/proc-fork-fixture",
     "tests/qtest/cases/thread-tid-fixture",
     "xtask",
+    "tests/host/kernel-conformance",
     "tests/qtest",
     "tests/genet",
     "tests/ufs-oracle",
@@ -385,7 +387,7 @@ members = [
     "libc/ravenlibc/crt",
     "libc/ravenlibc/ld",
 ]
-default-members = ["crates/*", "libc/ravenlibc/crates/*", "tests/genet"]
+default-members = ["crates/*", "libc/ravenlibc/crates/*", "tests/genet", "tests/host/kernel-conformance"]
 
 [workspace.package]
 edition = "2024"

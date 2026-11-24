@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# CONTRACTS C10 serial: COM1 (0x3F8) at 115200 8N1 carries the loader's `loader: ` lines and
+# then the kernel's C4 banner. The loader line proves the prefix; the kernel lines prove the same
+# polled COM1 path after the handoff. The divisor/line-format programming is not observable in
+# the captured text, so tests/host/kernel-conformance/src/lib.rs asserts 0x3F8, divisor 1
+# (115200), 8N1 and `fmt::Write` from the source.
+
+name = "kernel-conformance-serial"
+arch = "x86_64"
+profile = "base"
+# OVMF plus the kernel bring-up; same margin as boot-uname.
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^loader: memory map: \d+ regions$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\) .+$'
+
+[[expect]]
+regex = '^mem: \d+ MiB usable in \d+ regions$'
+
+[[expect]]
+regex = '^init: starting$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
