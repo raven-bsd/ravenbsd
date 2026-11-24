@@ -687,6 +687,19 @@ impl Thread {
         Ok(thread)
     }
 
+    /// Copy the creating thread's blocked mask before the thread is published.
+    ///
+    /// POSIX `pthread_create` and NetBSD `pthread_create.3` ("The signal mask is inherited from
+    /// the creating thread"); FreeBSD `kern_thread.c` `thread_alloc` copies the target process
+    /// mask. The new thread is not on any run queue yet, so the write is private; `sched::enqueue`
+    /// publishes it under the run-queue lock.
+    pub fn inherit_signal_mask(&self, creator: &Thread) {
+        self.sig_blocked.store(
+            creator.sig_blocked.load(Ordering::Acquire),
+            Ordering::Release,
+        );
+    }
+
     /// Create a kernel thread that starts at `entry`.
     pub fn new_kernel(
         name: String,

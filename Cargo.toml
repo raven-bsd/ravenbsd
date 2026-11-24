@@ -130,6 +130,7 @@ members = [
     "tests/qtest/cases/signal-entry-fixture",
     "tests/qtest/cases/signal-fault-fixture",
     "tests/qtest/cases/sigresend-fixture",
+    "tests/qtest/cases/sigprocmask-fixture",
     "tests/qtest/cases/shared-futex-fixture",
     "tests/qtest/cases/robust-futex-fixture",
     "tests/qtest/cases/handle-copy-fixture",

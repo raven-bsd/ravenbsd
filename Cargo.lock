@@ -3457,6 +3457,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s166-mask"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-s17-pager"
 version = "0.1.0"
 dependencies = [

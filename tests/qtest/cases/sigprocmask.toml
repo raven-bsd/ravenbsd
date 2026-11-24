@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S166 per-thread signal mask: THREAD_CREATE inherits the creator's mask, a blocked signal stays
+# pending and is delivered only after the unblock, and SIGRETURN restores uc_sigmask exactly
+# (including a handler edit). The sibling row proves a later mask change is invisible.
+
+name = "sigprocmask"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/sigprocmask-fixture/build.sh"]
+initfs = "build/fixtures/sigprocmask/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^sigprocmask: start$'
+
+[[expect]]
+regex = '^sigprocmask: install ok$'
+
+[[expect]]
+regex = '^sigprocmask: pending blocked=1 delivered=0$'
+
+[[expect]]
+regex = '^sigprocmask: unblock delivered=1 mask=0x0$'
+
+[[expect]]
+regex = '^sigprocmask: restore captured=0x800 after=0xa00 ok=1$'
+
+[[expect]]
+regex = '^sigprocmask: child inherit us1=1 mask=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^sigprocmask: sibling main=0x[0-9a-f]+ child=0x[0-9a-f]+ invisible=1$'
+
+[[expect]]
+regex = '^sigprocmask: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|sigprocmask: fail|sigprocmask: .*failed|sigprocmask: timeout'
