@@ -124,6 +124,11 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static USER_SMP: AtomicBool = AtomicBool::new(true);
 /// `smp-user-trace`: print the first user thread on each CPU and cross-CPU wakeups.
 static USER_TRACE: AtomicBool = AtomicBool::new(false);
+/// `smp-user-first`: print only the per-CPU first-user marker (quiet soak evidence).
+///
+/// The cross-CPU wake line is high-volume; on a shared 115200-baud console it can starve the
+/// login prompt. The soak uses this flag to observe user threads on every CPU without the flood.
+static USER_FIRST: AtomicBool = AtomicBool::new(false);
 /// One-shot per-CPU marker for the first user thread (trace evidence only).
 static USER_RAN: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
 
@@ -137,6 +142,8 @@ fn read_user_smp_flags() {
             USER_SMP.store(false, Ordering::Release);
         } else if token == "smp-user-trace" {
             USER_TRACE.store(true, Ordering::Release);
+        } else if token == "smp-user-first" {
+            USER_FIRST.store(true, Ordering::Release);
         }
     }
 }
@@ -146,8 +153,13 @@ pub fn user_smp_enabled() -> bool {
     USER_SMP.load(Ordering::Acquire)
 }
 
-/// True when the S75 evidence trace is enabled.
-fn user_trace() -> bool {
+/// True when the per-CPU first-user marker is enabled (`smp-user-trace` or `smp-user-first`).
+fn user_first_trace() -> bool {
+    USER_TRACE.load(Ordering::Acquire) || USER_FIRST.load(Ordering::Acquire)
+}
+
+/// True when the cross-CPU wake trace is enabled (`smp-user-trace` only).
+fn user_wake_trace() -> bool {
     USER_TRACE.load(Ordering::Acquire)
 }
 
@@ -175,6 +187,10 @@ pub fn init() -> Result<(), Errno> {
         return Ok(());
     }
     read_user_smp_flags();
+    kprintln!(
+        "sched: user SMP {} (smp_user=off disables)",
+        if user_smp_enabled() { "on" } else { "off" }
+    );
     if !context::init_fpu() {
         return Err(Errno::EINVAL);
     }
@@ -520,7 +536,7 @@ fn schedule_locked() {
         next.last_cpu
             .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
         let first_run = next.user
-            && user_trace()
+            && user_first_trace()
             && USER_RAN
                 .get(cpu)
                 .is_some_and(|flag| !flag.swap(true, Ordering::AcqRel));
@@ -1136,7 +1152,7 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
             state.need_resched = true;
             drop(slot);
             if cpu != this_cpu() {
-                if thread.user && user_trace() {
+                if thread.user && user_wake_trace() {
                     kprintln!("smp-user: wake tid {} -> cpu {}", thread.tid, cpu);
                 }
                 smp::bringup::send_reschedule(cpu);

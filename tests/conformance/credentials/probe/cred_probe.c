@@ -12,6 +12,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -126,6 +128,20 @@ static void row_umask(void) {
     }
     close(fd);
     printf("cred: umask-file mode=%04o\n", (unsigned)(status.st_mode & 0777));
+    if ((status.st_mode & 0777) != (0666 & ~(mode_t)027)) {
+        // Diagnostic only, printed when the row is red: show the mode, the owner and what a plain
+        // path chmod of the same mode does on this mount.
+        errno = 0;
+        int chmod_result = chmod(first, 0640);
+        int chmod_error = errno;
+        struct stat after;
+        int stat_result = stat(first, &after);
+        printf("cred: umask-diag chmod-ret=%d chmod-errno=%d stat-ret=%d stat-mode=%04o "
+               "stat-uid=%u\n",
+               chmod_result, chmod_error, stat_result,
+               stat_result == 0 ? (unsigned)(after.st_mode & 0777) : 0u,
+               stat_result == 0 ? (unsigned)after.st_uid : 0u);
+    }
     unlink(first);
 
     previous = umask(077);
@@ -342,6 +358,34 @@ static int umask_exec(void) {
     return 1;
 }
 
+// Run the two S189 rows from an svcd one-shot service. svcd starts the service as root; the SSH
+// harness runs the probe as the `raven` account, so switch to that account first and keep the row
+// context identical (the create/chmod path is ownership-sensitive). The exec row is last because
+// execv replaces this image.
+static int umask_service(void) {
+    if (geteuid() == 0) {
+        struct passwd *raven = getpwnam("raven");
+        if (raven == NULL) {
+            failed("umask-service", "getpwnam raven");
+            return 1;
+        }
+        if (initgroups("raven", raven->pw_gid) != 0) {
+            failed("umask-service", "initgroups");
+            return 1;
+        }
+        if (setgid(raven->pw_gid) != 0 || setuid(raven->pw_uid) != 0) {
+            failed("umask-service", "drop to raven");
+            return 1;
+        }
+    }
+    int before = failures;
+    row_umask();
+    if (failures != before) {
+        return 1;
+    }
+    return umask_exec();
+}
+
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -350,6 +394,9 @@ int main(int argc, char **argv) {
     }
     if (argc > 1 && strcmp(argv[1], "umask-exec") == 0) {
         return umask_exec();
+    }
+    if (argc > 1 && strcmp(argv[1], "umask-service") == 0) {
+        return umask_service();
     }
 
     int mutation_ignore_hard_limit =
