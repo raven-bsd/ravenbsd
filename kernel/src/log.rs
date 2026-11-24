@@ -125,6 +125,14 @@ fn level_enabled(level: LogLevel) -> bool {
     LEVEL.load(Ordering::Acquire) >= level as u8
 }
 
+/// Write raw bytes under the console lock, so a user `DEBUG_WRITE` cannot interleave with a kernel
+/// log line. Donor: FreeBSD `sys/kern/kern_cons.c:566 cnputsn` holds `cnputs_mtx` across the whole
+/// string (the same console-lock shape as [`_print_line`]).
+pub fn write_bytes(bytes: &[u8]) {
+    let _guard = SERIAL.lock();
+    crate::arch::serial::write_bytes(bytes);
+}
+
 /// Write raw formatted output, without a trailing newline.
 pub fn _print(args: fmt::Arguments<'_>) {
     let mut serial = SERIAL.lock();
