@@ -839,8 +839,7 @@ fn map_tmpfs_page(client: &Client, path: &str) -> Result<(Handle, Handle), &'sta
     ]));
     let flags = map::pack((prot::READ | prot::WRITE) as usize, map::FIXED);
     let _ = unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE);
-    map_memory(Handle::SELF_PROC, object, 0, MAP_SCRATCH, PAGE, flags)
-        .map_err(|_| "map object")?;
+    map_memory(Handle::SELF_PROC, object, 0, MAP_SCRATCH, PAGE, flags).map_err(|_| "map object")?;
     // Fault the page through vfsd's pager.
     let _ = unsafe { core::ptr::read_volatile(MAP_SCRATCH as *const u8) };
     unmap(Handle::SELF_PROC, MAP_SCRATCH, PAGE).map_err(|_| "unmap object")?;
@@ -899,7 +898,9 @@ fn pager_lifetime_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let _ = Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
     let request = CallRequest::new(Call::Truncate { size: 0 });
     let mut encoded = [0u8; 64];
-    let length = request.encode(&mut encoded).map_err(|_| "truncate encode")?;
+    let length = request
+        .encode(&mut encoded)
+        .map_err(|_| "truncate encode")?;
     let mut response = [0u8; 16];
     client
         .call(
