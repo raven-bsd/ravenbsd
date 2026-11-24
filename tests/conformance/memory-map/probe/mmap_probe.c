@@ -111,7 +111,7 @@ static void fixed_row(void) {
 }
 
 static void sigbus_row(void) {
-    const char *path = "mmap-eof-file";
+    const char *path = "/tmp/mmap-eof-file";
     int fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
     if (fd < 0) {
         char extra[32];
