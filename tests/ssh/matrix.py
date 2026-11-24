@@ -103,6 +103,14 @@ ECHO_PORT = 23097
 ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 SERIAL_LEASE = b"resolvd: lease eth0 10.0.2.15"
+# The current release image configures eth0 in netd and prints `netd: ready`; resolvd then prints
+# `lease eth0: no such file or directory`, so a resolvd-only readiness gate blocks every row.
+SERIAL_NET_READY = (
+    SERIAL_LEASE,
+    b"netd: interface eth0 10.0.2.15/24",
+    b"netd: ready",
+)
+NET_READY_LABEL = "netd eth0/ready or resolvd lease"
 
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S1-repeat", "S2", "S3", "S4", "S5", "S5-identity",
@@ -391,6 +399,24 @@ def serial_has(serial: Path | SerialConsole, needle: bytes, timeout_s: float = 6
     return False
 
 
+def net_ready(serial: Path | SerialConsole, timeout_s: float = 60) -> bool:
+    """Wait for netd's eth0/ready lines or the older resolvd lease line."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if isinstance(serial, SerialConsole):
+            serial.pump()
+            data = bytes(serial.buffer)
+        else:
+            try:
+                data = serial.read_bytes()
+            except FileNotFoundError:
+                data = b""
+        if any(marker in data for marker in SERIAL_NET_READY):
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def row_s0() -> None:
     if not ECHO_IMAGE.is_file():
         record("S0", "BLOCKED",
@@ -403,9 +429,9 @@ def row_s0() -> None:
     try:
         child, serial = boot(ECHO_IMAGE, b"ssh-echo: listening", "serial-echo.log", "vars-echo.fd",
                              ready_timeout=180)
-        if not serial_has(serial, SERIAL_LEASE, 60):
+        if not net_ready(serial, 60):
             record("S0", "FAIL",
-                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s; "
+                   f"guest network did not become ready ({NET_READY_LABEL}) within 60 s; "
                    f"serial-echo.log")
             attempt("S0", 1, "fresh", literal(ECHO_PAYLOAD), "no guest lease", 0, "FAIL",
                     "serial-echo.log")
@@ -1489,6 +1515,31 @@ def row_s5_s6() -> None:
                f"command session completed exit 0; fd4={fd_text}, peer_state={peer_text}")
 
 
+def row_s193() -> None:
+    """S193: a command session closes as soon as the child exits."""
+    cases = [
+        ("true", ["true"], [], 0, b""),
+        ("false", ["false"], [], 1, b""),
+        ("uname", ["uname"], [], 0, b"RavenBSD\n"),
+        ("true-pty", ["true"], ["-tt"], 0, b""),
+        ("false-pty", ["false"], ["-tt"], 1, b""),
+        ("uname-pty", ["uname"], ["-tt"], 0, b"RavenBSD\n"),
+    ]
+    for label, command, extra, expected_exit, expected_stdout in cases:
+        result = ssh_run(command, f"s193-{label}", extra=extra, timeout=20)
+        stdout = result["stdout"]
+        if "pty" in label:
+            stdout = stdout.replace(b"\r\n", b"\n")
+        elapsed = float(result["elapsed_ms"])
+        timed_out = bool(result["timed_out"])
+        ok = (not timed_out and result["returncode"] == expected_exit
+              and stdout == expected_stdout and elapsed <= 2000)
+        record("S193", "PASS" if ok else "FAIL",
+               f"{label}: exit {result['returncode']}, timed_out={timed_out}, "
+               f"elapsed_ms={elapsed:.0f} (bound 2000), stdout={stdout!r}, "
+               f"expected_exit={expected_exit}")
+
+
 def console_marker_count(console: SerialConsole) -> int:
     console.pump()
     return bytes(console.buffer).count(MARKER)
@@ -2284,12 +2335,12 @@ def main() -> int:
                 lease_ok = True
             elif socket_only:
                 console = handle  # type: ignore[assignment]
-                lease_ok = serial_has(console, SERIAL_LEASE, 60)
+                lease_ok = net_ready(console, 60)
             else:
-                lease_ok = serial_has(handle, SERIAL_LEASE, 60)  # type: ignore[arg-type]
+                lease_ok = net_ready(handle, 60)  # type: ignore[arg-type]
             if not lease_ok:
                 record(row_label, "BLOCKED",
-                       f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+                       f"guest network did not become ready ({NET_READY_LABEL}) within 60 s")
             elif not wait_tcp(22, 30):
                 record(row_label, "BLOCKED",
                        "guest listener did not accept a TCP connection after svcd: sshd up")
@@ -2327,6 +2378,8 @@ def main() -> int:
                     row_full(console)
                 elif only == "s5":
                     row_s5_s6()
+                elif only == "s193":
+                    row_s193()
                 else:
                     record(only, "BLOCKED", f"unknown RAVEN_MATRIX_ONLY={only}")
         except Exception as error:  # noqa: BLE001 - isolate the only-mode boot
