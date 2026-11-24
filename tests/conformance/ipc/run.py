@@ -52,6 +52,9 @@ def build_image() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     step("fixture-build", ["sh", "tests/conformance/ipc/build.sh"], 180)
     step("addon-build", ["sh", "addons/ssh/build.sh"], 300)
+    # The uutils staging cache can hold a crate built against another clone's toolchain; purge it
+    # so the initfs build uses this clone's libc/toolchain.
+    shutil.rmtree(ROOT / "build/cargo/uutils-x86_64", ignore_errors=True)
     step("initfs-build", ["cargo", "xtask", "initfs", "--arch", "x86_64", "--profile", "release"], 600)
     initfs = OUT / "ipc-initfs.img"
     step(
