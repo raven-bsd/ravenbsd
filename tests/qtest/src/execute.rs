@@ -261,7 +261,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     };
     let passed = exit_ok && report.unmatched.is_empty() && report.forbidden_hits.is_empty();
     let step_failure = run.step_failure;
-    let result = if step_failure.is_some() {
+    let result = if step_failure.is_some() || run.forbidden_failure {
         ResultKind::Fail
     } else if passed {
         ResultKind::Pass

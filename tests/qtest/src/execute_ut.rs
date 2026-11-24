@@ -7,7 +7,7 @@
 use super::*;
 use crate::testutil::TempDir;
 use std::process::Stdio;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 fn case(timeout: u64, expect_exit: &str, expects: &str) -> Case {
     let text = format!(
@@ -99,6 +99,24 @@ fn forbid_hit_fails() {
     let outcome = execute(&case, &runner("printf 'panic\\n'; exit 33"));
     assert_eq!(outcome.report.result, ResultKind::Fail);
     assert_eq!(outcome.report.forbidden_hits, vec!["panic"]);
+}
+
+#[test]
+fn failing_one_shot_service_records_fail_not_timeout() {
+    let case = case(
+        5,
+        "success",
+        "[[expect]]\nregex = \"^done$\"\n[[forbid]]\nregex = \"^signal: fail\"\n",
+    );
+    let started = Instant::now();
+    let outcome = execute(&case, &runner("printf 'signal: fail rows=2\\n'; sleep 30"));
+    assert_eq!(outcome.report.result, ResultKind::Fail);
+    assert_eq!(outcome.report.forbidden_hits, vec!["signal: fail rows=2"]);
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "the runner waited for the 5 s timeout instead of the fail row: {:?}",
+        started.elapsed()
+    );
 }
 
 #[test]
