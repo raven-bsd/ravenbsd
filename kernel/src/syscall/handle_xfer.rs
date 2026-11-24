@@ -191,9 +191,19 @@ pub fn clone_transferable(
         return Err(Errno::EBADF);
     }
     let object = match entry {
+        Object::MemObjectInitfs => Object::MemObjectInitfs,
         Object::Memory(object) => Object::Memory(Arc::clone(object)),
+        Object::Timer(object) => Object::Timer(Arc::clone(object)),
+        Object::UserEvent(object) => Object::UserEvent(Arc::clone(object)),
+        Object::RootDevice => Object::RootDevice,
+        Object::MmioRegion(object) => Object::MmioRegion(Arc::clone(object)),
+        Object::BootBlob(object) => Object::BootBlob(Arc::clone(object)),
+        Object::DmaBuffer(object) => Object::DmaBuffer(Arc::clone(object)),
+        Object::Irq(object) => Object::Irq(Arc::clone(object)),
         Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),
         Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
+        Object::Pipe(object) => Object::Pipe(Arc::clone(object)),
+        Object::Duplex(object) => Object::Duplex(Arc::clone(object)),
         _ => return Err(Errno::EBADF),
     };
     Ok((object, rights, node))
