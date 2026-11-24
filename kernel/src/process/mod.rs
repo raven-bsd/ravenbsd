@@ -75,6 +75,25 @@ const PAGE: u64 = 4096;
 /// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
 /// and headroom. The first process gets the same 256 KiB mapping.
 const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
+/// Fixed user VA of the kernel-installed sigcode page (the last page below `USER_END`).
+///
+/// C19 installs the return trampoline at exec, read-only+exec; every handler's frame return
+/// address points here, so a new image can never inherit an entry address from the old one.
+#[cfg(target_arch = "x86_64")]
+pub const SIGCODE_BASE: u64 = raven_abi::layout::x86_64::USER_END - PAGE;
+/// `mov eax, SIGRETURN; syscall; ud2`: the only job of the sigcode trampoline.
+#[cfg(target_arch = "x86_64")]
+pub const SIGCODE: [u8; 9] = [
+    0xB8,
+    raven_abi::signal::SIGRETURN as u8,
+    0,
+    0,
+    0,
+    0x0F,
+    0x05,
+    0x0F,
+    0x0B,
+];
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
 static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
@@ -387,6 +406,127 @@ pub struct PendingSignal {
     pub value: u64,
 }
 
+/// `sigaction` handler value: the default action (`SIG_DFL`).
+pub const SIG_DFL: u64 = 0;
+/// `sigaction` handler value: ignore the signal (`SIG_IGN`).
+pub const SIG_IGN: u64 = 1;
+
+/// `SA_NOCLDSTOP` (`bits/signum.h`, System V amd64).
+pub const SA_NOCLDSTOP: u32 = 1;
+/// `SA_NOCLDWAIT` (`bits/signum.h`).
+pub const SA_NOCLDWAIT: u32 = 2;
+/// `SA_SIGINFO` (`bits/signum.h`).
+pub const SA_SIGINFO: u32 = 4;
+/// `SA_ONSTACK` (`bits/signum.h`).
+pub const SA_ONSTACK: u32 = 0x0800_0000;
+/// `SA_RESTART` (`bits/signum.h`).
+pub const SA_RESTART: u32 = 0x1000_0000;
+/// `SA_NODEFER` (`bits/signum.h`).
+pub const SA_NODEFER: u32 = 0x4000_0000;
+/// `SA_RESETHAND` (`bits/signum.h`).
+pub const SA_RESETHAND: u32 = 0x8000_0000;
+/// The flags `sigaction` stores (the donor `kern_sigaction` accepted set).
+pub const SA_SUPPORTED: u32 =
+    SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO | SA_ONSTACK | SA_RESTART | SA_NODEFER | SA_RESETHAND;
+
+/// `SIG_BLOCK` (`sigprocmask`).
+pub const SIG_BLOCK: i32 = 0;
+/// `SIG_UNBLOCK` (`sigprocmask`).
+pub const SIG_UNBLOCK: i32 = 1;
+/// `SIG_SETMASK` (`sigprocmask`).
+pub const SIG_SETMASK: i32 = 2;
+
+/// `SS_ONSTACK`: the thread is currently on its alternate stack.
+pub const SS_ONSTACK: u32 = 1;
+/// `SS_DISABLE`: no alternate stack.
+pub const SS_DISABLE: u32 = 2;
+/// `SS_AUTODISARM`: accepted and stored as a plain flag.
+pub const SS_AUTODISARM: u32 = 0x8000_0000;
+/// Minimum alternate stack size (`MINSIGSTKSZ`, `bits/signum.h`).
+pub const MINSIGSTKSZ: u64 = 6144;
+
+/// One per-process signal disposition (the FreeBSD `struct sigacts` fields Raven models).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SigAction {
+    /// `SIG_DFL`, `SIG_IGN` or a user handler address.
+    pub handler: u64,
+    /// Signals blocked while this handler runs (signal 1 is bit 0).
+    pub mask: u64,
+    /// `SA_*` flags.
+    pub flags: u32,
+}
+
+impl SigAction {
+    /// The initial disposition: default action, no mask, no flags.
+    pub const fn default_action() -> Self {
+        Self {
+            handler: SIG_DFL,
+            mask: 0,
+            flags: 0,
+        }
+    }
+
+    /// True when a user handler catches the signal.
+    pub const fn is_caught(&self) -> bool {
+        self.handler > SIG_IGN
+    }
+}
+
+/// Mask bit for signal `signo` (signal 1 is bit 0).
+pub const fn signal_bit(signo: u32) -> u64 {
+    if signo == 0 || signo > status::SIG_MAX {
+        0
+    } else {
+        1u64 << (signo - 1)
+    }
+}
+
+/// Per-process signal dispositions (C19; FreeBSD `p_sigacts`).
+///
+/// The table is per process because a handler installed before `fork` is shared by the child,
+/// while `execsigs` resets caught handlers and keeps `SIG_IGN` (FreeBSD `execsigs`). Index zero
+/// is unused; signals are `1..=status::SIG_MAX`.
+pub struct SigActs {
+    actions: Vec<SigAction>,
+}
+
+impl SigActs {
+    /// A fresh table with every signal at `SIG_DFL`.
+    ///
+    /// The table lives on the heap: `Process` is built as a large stack temporary in the create
+    /// path, and a 65-entry inline array pushed that frame into the kernel stack guard during the
+    /// `signal-fault` child teardown.
+    pub fn new() -> Self {
+        Self {
+            actions: vec![SigAction::default_action(); status::SIG_MAX as usize + 1],
+        }
+    }
+
+    /// One disposition; an out-of-range signal reads as `SIG_DFL`.
+    pub fn get(&self, signo: u32) -> SigAction {
+        self.actions
+            .get(signo as usize)
+            .copied()
+            .unwrap_or_else(SigAction::default_action)
+    }
+
+    /// Store one disposition.
+    pub fn set(&mut self, signo: u32, action: SigAction) {
+        if let Some(slot) = self.actions.get_mut(signo as usize) {
+            *slot = action;
+        }
+    }
+
+    /// `execsigs`: caught handlers reset to `SIG_DFL`; `SIG_IGN` stays ignored.
+    pub fn exec_reset(&mut self) {
+        for action in self.actions.iter_mut().skip(1) {
+            if action.handler != SIG_IGN {
+                *action = SigAction::default_action();
+            }
+        }
+    }
+}
+
 impl ProcessIds {
     /// The kernel process identity.
     pub const fn kernel() -> Self {
@@ -537,6 +677,8 @@ pub struct Process {
     pub personality: Mutex<PersonalityState>,
     /// Signals queued for this process.
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
+    /// Per-process handler dispositions (C19 `sigaction`).
+    pub sigacts: Mutex<SigActs>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
     /// True once an exec has replaced this process image; a child then refuses `setpgid`.
@@ -817,6 +959,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -898,6 +1041,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -972,6 +1116,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1201,23 +1346,28 @@ impl Process {
             value,
         });
         self.signal_waiters.wake_all();
-        self.kick_threads();
+        self.kick_threads(signo);
     }
 
     /// Kick every live thread of this process with the signal-check bit.
-    fn kick_threads(&self) {
+    ///
+    /// A kick is meaningful when either libc registered the retired PG-7 entry or the process
+    /// has a kernel `sigaction` handler for `signo`; otherwise the record stays queued for
+    /// `PROC_SIGRECV` and no unrelated wait is disturbed.
+    fn kick_threads(&self, signo: u32) {
+        let kernel_handler = self.sigacts.lock().get(signo).is_caught();
         let mut threads = self.threads_live.lock();
         threads.retain(|weak| {
             let Some(thread) = weak.upgrade() else {
                 return false;
             };
-            // A kick is only meaningful after libc has registered the PG-7 entry. Without one
-            // the word would be consumed as a bare `EINTR` with no handler, so leave the signal
-            // in the process queue for `PROC_SIGRECV` and do not disturb an unrelated wait.
-            if thread.signal_entry.load(Ordering::Acquire) == 0 {
+            let legacy = thread.signal_entry.load(Ordering::Acquire) != 0;
+            if !legacy && !kernel_handler {
                 return true;
             }
-            thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            if legacy {
+                thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            }
             if thread.interruptible.load(Ordering::Acquire) {
                 let token = thread.block_token.load(Ordering::SeqCst);
                 let token = (token != 0).then_some(token);
@@ -1225,6 +1375,23 @@ impl Process {
             }
             true
         });
+    }
+
+    /// Pop the oldest signal that `blocked` does not mask and whose disposition is a user handler.
+    ///
+    /// FreeBSD `postsig` selects the action under `p_sigacts`; NetBSD `sigtd`/`sigismasked`
+    /// leaves a masked signal queued. A `SIG_IGN` record is dropped when `sigaction` installs the
+    /// ignore, so it is not selected here.
+    pub fn next_kernel_signal(&self, blocked: u64) -> Option<(PendingSignal, SigAction)> {
+        let sigacts = self.sigacts.lock();
+        let mut pending = self.pending_signals.lock();
+        let index = pending.iter().position(|signal| {
+            let action = sigacts.get(signal.signo);
+            action.is_caught() && blocked & signal_bit(signal.signo) == 0
+        })?;
+        let record = pending.remove(index)?;
+        let action = sigacts.get(record.signo);
+        Some((record, action))
     }
 
     /// Pop the oldest queued signal.
@@ -1398,6 +1565,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1872,7 +2040,48 @@ fn build_stack(
             .map_err(ProcessError::Map)?;
         page = page.saturating_add(1);
     }
+    #[cfg(target_arch = "x86_64")]
+    install_sigcode(address_space)?;
     Ok(sp0)
+}
+
+/// Install the C19 sigcode page at [`SIGCODE_BASE`] in `address_space`.
+///
+/// The page is read-only+exec and anonymous, so `release`/`free_user_frames` reclaim its frame.
+/// The handler's `sf_ra` points at the first byte; returning runs `mov eax, SIGRETURN; syscall`.
+#[cfg(target_arch = "x86_64")]
+fn install_sigcode(address_space: &mut UserAddressSpace) -> Result<(), ProcessError> {
+    address_space
+        .vmas_mut()
+        .insert(
+            SIGCODE_BASE,
+            PAGE,
+            (prot::READ | prot::EXEC) as u8,
+            Backing::Anonymous,
+        )
+        .map_err(|_| ProcessError::BadAddress)?;
+    let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
+    let virt = VirtAddr::new(SIGCODE_BASE).ok_or(ProcessError::BadAddress)?;
+    let physical = frame::alloc_zeroed_frame().ok_or(ProcessError::OutOfFrames)?;
+    let destination = frame::phys_to_virt(physical);
+    if destination.is_null() {
+        let _ = frame::free_frame(physical);
+        return Err(ProcessError::OutOfFrames);
+    }
+    // SAFETY: `destination` is a fresh zeroed frame mapped through the HHDM; `SIGCODE` is a
+    // static byte array no longer than the page.
+    unsafe {
+        core::ptr::copy_nonoverlapping(SIGCODE.as_ptr(), destination, SIGCODE.len());
+    }
+    mapper
+        .map(
+            virt,
+            PhysAddr(physical.0),
+            PageFlags::user_rx(),
+            PageSize::Size4K,
+        )
+        .map_err(ProcessError::Map)?;
+    Ok(())
 }
 
 /// Place one NUL-terminated string below `cursor` and return its user address.
