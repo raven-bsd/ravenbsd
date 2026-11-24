@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S176 clock conformance probe. The program exits 0 when every row passes; svcd propagates the
+# status through exit_when_exits so the qtest sees init exited (0) or (1).
+
+name = "clock-conf"
+exec = "/bin/clock-conf"
+args = ["/bin/clock-conf"]
+needs = ["scheme:tty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

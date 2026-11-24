@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "clocks-conformance-mutation"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/conformance/clocks/build.sh --mutation"]
+initfs = "build/conformance/clocks/initfs-mutation.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "failure"
+
+[[expect]]
+regex = '^clocks: fail sleep value=[0-9]+ errno=[0-9]+$'
+
+[[expect]]
+regex = '^clocks: fail rows=[0-9]+$'
+
+[[expect]]
+regex = '^init exited \(1\)$'
