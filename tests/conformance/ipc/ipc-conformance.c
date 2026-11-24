@@ -116,9 +116,9 @@ static void test_rights(int mutation) {
     }
     (void)write(wfd, "K180", 4);
     // The normal sender holds a read-only descriptor: the received descriptor must be read-only
-    // too. The mutation sends a genuinely writable descriptor and the received descriptor must be
-    // writable, so a kernel that ignored or dropped the sender's rights mask fails one of the two
-    // rows. The mutation reuses the writable seed fd: an O_RDWR reopen of the same /tmp file is a
+    // too. The mutation sends a genuinely writable descriptor while the row keeps the same
+    // read-only assertion, so a run that dropped (ignored) the rights mask turns the row red.
+    // The mutation reuses the writable seed fd: an O_RDWR reopen of the same /tmp file is a
     // separate VFS gap, not a rights-mask result.
     if (mutation) {
         sfd = wfd;
@@ -158,7 +158,10 @@ static void test_rights(int mutation) {
     int ok = sent == 1 && received == 0 && got == 4 && memcmp(buffer, "K180", 4) == 0;
     // The sender was closed before the read above: the received descriptor is independent.
     if (ok) {
-        ok = mutation ? wrote == 1 : wrote == -1;
+        // The normal sender is read-only; a writable descriptor reaching the receiver is the
+        // mutation shape. Both runs assert the receiver's rights are read-only, so the mutation
+        // row goes red while the normal row proves the mask is carried and enforced.
+        ok = wrote == -1;
     }
     snprintf(detail, sizeof detail,
              "sent=%d send_errno=%d recv=%d recv_errno=%d read=%zd read_errno=%d write=%zd "

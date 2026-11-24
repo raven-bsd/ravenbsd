@@ -4,7 +4,7 @@
 """S180 IPC conformance runner (test-only).
 
 Builds /bin/ipc-conformance, installs it in a release image, boots the image, and runs the probe
-over `ssh -tt`: the normal `--all` run must PASS every row, and the `--mutation-rights` run must
+over `ssh`: the normal `--all` run must PASS every row, and the `--mutation-rights` run must
 turn the SCM_RIGHTS rights row red. The mutation is test-only; no product code changes.
 """
 
@@ -80,7 +80,7 @@ def build_image() -> None:
 
 def run_probe(command: str, timeout: int = 60) -> tuple[int, str]:
     ssh = [
-        "ssh", "-tt", "-p", str(PORT),
+        "ssh", "-p", str(PORT),
         "-o", "StrictHostKeyChecking=no",
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "PreferredAuthentications=password",
