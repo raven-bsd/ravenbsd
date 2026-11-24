@@ -129,7 +129,19 @@ impl ObjectKind {
 pub const fn transferable(kind: ObjectKind) -> bool {
     matches!(
         kind,
-        ObjectKind::MemObject | ObjectKind::SchemeFile | ObjectKind::SchemeServer
+        ObjectKind::MemObject
+            | ObjectKind::MemObjectInitfs
+            | ObjectKind::SchemeFile
+            | ObjectKind::SchemeServer
+            | ObjectKind::RootDevice
+            | ObjectKind::MmioRegion
+            | ObjectKind::BootBlob
+            | ObjectKind::DmaBuffer
+            | ObjectKind::Irq
+            | ObjectKind::Pipe
+            | ObjectKind::Duplex
+            | ObjectKind::Timer
+            | ObjectKind::UserEvent
     )
 }
 
