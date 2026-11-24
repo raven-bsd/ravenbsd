@@ -13,6 +13,9 @@ Usage:
   python3 tests/conformance/credentials/stage.py --input build/x86_64/initfs.img \
       --probe build/conformance/credentials/cred-probe \
       --output build/conformance/credentials/initfs.img
+  python3 tests/conformance/credentials/stage.py --input ... --probe ... --output ... \
+      --add /etc/services.d/cred-umask.toml 0644 tests/conformance/credentials/cred-umask.service.toml \
+      --replace /etc/svcd.conf 0644 tests/conformance/credentials/cred.svcd.conf
   python3 tests/conformance/credentials/stage.py --selftest
   python3 tests/conformance/credentials/stage.py --roundtrip build/x86_64/initfs.img
 
@@ -130,6 +133,19 @@ def inject(image: bytes, path: str, data: bytes, mode: int = 0o755) -> bytes:
     return build(epoch, entries)
 
 
+def replace(image: bytes, path: str, data: bytes, mode: int = 0o644) -> bytes:
+    """Return ``image`` with an existing file's data and mode replaced."""
+    if not path.startswith("/") or path == "/" or "//" in path or path.endswith("/"):
+        raise InitfsError(f"invalid absolute path {path!r}")
+    epoch, entries = parse(image)
+    if not any(entry[0] == path for entry in entries):
+        raise InitfsError(f"initfs does not contain {path}")
+    updated = [
+        (entry[0], mode, entry[2], data) if entry[0] == path else entry for entry in entries
+    ]
+    return build(epoch, updated)
+
+
 def selftest() -> int:
     """Exercise the parser/builder/injector without a real image."""
     failures: list[str] = []
@@ -165,6 +181,19 @@ def selftest() -> int:
     else:
         failures.append("duplicate: injected twice")
 
+    replaced = replace(injected, "/etc/keep", b"replaced", 0o600)
+    _, entries = parse(replaced)
+    selected = next(entry for entry in entries if entry[0] == "/etc/keep")
+    check("replace-mode", selected[1], 0o600)
+    check("replace-data", selected[3], b"replaced")
+    check("replace-count", len(entries), len(files) + 1)
+    try:
+        replace(replaced, "/etc/missing", b"", 0o644)
+    except InitfsError as error:
+        check("replace-missing", str(error), "initfs does not contain /etc/missing")
+    else:
+        failures.append("replace: missing path accepted")
+
     if failures:
         for failure in failures:
             print(f"stage: selftest FAIL: {failure}", file=sys.stderr)
@@ -197,11 +226,33 @@ def roundtrip(path: Path) -> int:
     return 0
 
 
+def _staged_file(spec: list[str]) -> tuple[str, int, bytes]:
+    """Parse ``PATH MODE SOURCE`` from one ``--add``/``--replace`` triple."""
+    path, mode, source = spec
+    try:
+        parsed_mode = int(mode, 8)
+    except ValueError as error:
+        raise InitfsError(f"{path}: mode {mode!r} is not octal") from error
+    try:
+        data = Path(source).read_bytes()
+    except OSError as error:
+        raise InitfsError(f"{path}: {error}") from error
+    return path, parsed_mode, data
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path)
     parser.add_argument("--probe", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--add", nargs=3, action="append", default=[], metavar=("PATH", "MODE", "SOURCE"),
+        help="add a new initfs file (MODE is octal, e.g. 0644)",
+    )
+    parser.add_argument(
+        "--replace", nargs=3, action="append", default=[], metavar=("PATH", "MODE", "SOURCE"),
+        help="replace an existing initfs file (MODE is octal, e.g. 0644)",
+    )
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--roundtrip", type=Path)
     options = parser.parse_args(argv)
@@ -209,23 +260,34 @@ def main(argv: list[str]) -> int:
         return selftest()
     if options.roundtrip is not None:
         return roundtrip(options.roundtrip)
-    if options.input is None or options.probe is None or options.output is None:
-        print("stage: --input, --probe and --output are required", file=sys.stderr)
+    if options.input is None or options.output is None:
+        print("stage: --input and --output are required", file=sys.stderr)
+        return 2
+    if options.probe is None and not options.add and not options.replace:
+        print("stage: nothing to stage (give --probe, --add or --replace)", file=sys.stderr)
         return 2
     try:
         image = options.input.read_bytes()
-        probe = options.probe.read_bytes()
-        if not probe:
-            raise InitfsError(f"{options.probe} is empty")
-        staged = inject(image, "/bin/cred-probe", probe, 0o755)
+        if options.probe is not None:
+            probe = options.probe.read_bytes()
+            if not probe:
+                raise InitfsError(f"{options.probe} is empty")
+            image = inject(image, "/bin/cred-probe", probe, 0o755)
+        for spec in options.add:
+            path, mode, data = _staged_file(spec)
+            image = inject(image, path, data, mode)
+        for spec in options.replace:
+            path, mode, data = _staged_file(spec)
+            image = replace(image, path, data, mode)
     except (OSError, InitfsError) as error:
         print(f"stage: {error}", file=sys.stderr)
         return 1
     options.output.parent.mkdir(parents=True, exist_ok=True)
-    options.output.write_bytes(staged)
+    options.output.write_bytes(image)
     print(
-        f"stage: wrote {options.output} ({len(staged)} bytes, probe {len(probe)} bytes, "
-        f"mode 0755)"
+        f"stage: wrote {options.output} ({len(image)} bytes, "
+        f"probe {'yes' if options.probe is not None else 'no'}, "
+        f"added {len(options.add)}, replaced {len(options.replace)})"
     )
     return 0
 
