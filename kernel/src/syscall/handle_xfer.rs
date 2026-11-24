@@ -196,6 +196,8 @@ pub fn clone_transferable(
         Object::BootBlob(object) => Object::BootBlob(Arc::clone(object)),
         Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),
         Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
+        Object::Pipe(object) => Object::Pipe(Arc::clone(object)),
+        Object::Duplex(object) => Object::Duplex(Arc::clone(object)),
         _ => return Err(Errno::EBADF),
     };
     Ok((object, rights, node))
