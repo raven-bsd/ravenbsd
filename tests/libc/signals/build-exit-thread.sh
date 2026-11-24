@@ -31,4 +31,15 @@ cp "$target_dir/x86_64-unknown-ravenbsd/release/s194-exit-quiesce" "$out/libc-te
 : > "$out/ld-elf.so.1"
 printf 'exit-thread-quiesce\n' > "$out/stamp"
 sh "$root/tests/libc/target/shape-check.sh" "$out/libc-test"
-printf 's194-exit-quiesce: staged %s\n' "$out/libc-test"
+
+# Overlay the probe and the one-shot svcd policy on the libc-test initfs. The image lifetime is
+# the probe's: init exits with its status, which is the K445 init-exit contract at 4 vCPUs.
+base=$root/build/x86_64/initfs.img
+[ -f "$base" ] || cargo xtask initfs --arch x86_64 --profile libc-test
+fixture=$root/build/fixtures/exit-thread-quiesce
+mkdir -p "$fixture"
+cargo build -q -p raven-b70-overlay
+"$root/target/debug/raven-b70-overlay" "$base" "$fixture/initfs.img" \
+    "/bin/libc-test=$out/libc-test:0755" \
+    "/etc/svcd.conf=$root/tests/libc/signals/exit-thread-quiesce.svcd.conf:0644"
+printf 's194-exit-quiesce: staged %s and %s\n' "$out/libc-test" "$fixture/initfs.img"

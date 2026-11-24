@@ -182,6 +182,9 @@ pub fn quiesce_process(process: &Arc<Process>) {
         .filter(|thread| Arc::ptr_eq(&thread.process, process))
         .map(|thread| thread.id);
     let online = smp::online_cpus();
+    if crate::process::s194_trace() {
+        kprintln!("s194: quiesce enter pid={} cpu={}", process.id, this_cpu());
+    }
     let mut waited = false;
     loop {
         let mut running = false;
@@ -205,6 +208,9 @@ pub fn quiesce_process(process: &Arc<Process>) {
         if !running {
             if waited && crate::process::s194_trace() {
                 kprintln!("s194: quiesce waited pid={}", process.id);
+            }
+            if crate::process::s194_trace() {
+                kprintln!("s194: quiesce clear pid={} waited={waited}", process.id);
             }
             return;
         }
@@ -934,19 +940,32 @@ pub fn cancel_process_sleepers(process_id: u64) {
 /// bounded by the online CPU count and the queued sleeper count.
 fn cancel_thread_sleepers(thread_id: u64) {
     let _guard = sync::critical();
-    cancel_thread_sleepers_except(thread_id, usize::MAX);
+    for cpu in 0..smp::online_cpus() {
+        let mut slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_mut() {
+            let _ = state
+                .sleepers
+                .remove_where(|(thread, _, _)| thread.id == thread_id);
+        }
+    }
 }
 
 /// Remove `thread_id` from every CPU's sleeper list except `skip`.
 ///
-/// The caller either holds `skip`'s slot lock (the scheduler terminal filter removes that list
-/// directly before calling here) or passes `usize::MAX` with the scheduler critical section held.
+/// The caller holds `skip`'s slot lock (the scheduler terminal filter removes that list directly
+/// before calling here). It must never wait for another CPU's slot: two terminal filters holding
+/// their own slots and waiting for each other form a cross-CPU cycle (the S194 K445 hang), and the
+/// exiting process's own `cancel_process_sleepers` sweep is waiting on one of those slots. A busy
+/// CPU is skipped; its terminal filter removes the entry when it schedules, and the process sweep
+/// retries with the caller holding no slot.
 fn cancel_thread_sleepers_except(thread_id: u64, skip: usize) {
     for cpu in 0..smp::online_cpus() {
         if cpu == skip {
             continue;
         }
-        let mut slot = lock_cpu(cpu);
+        let Some(mut slot) = try_lock_cpu(cpu) else {
+            continue;
+        };
         if let Some(state) = slot.as_mut() {
             let _ = state
                 .sleepers
