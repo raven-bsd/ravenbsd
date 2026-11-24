@@ -460,14 +460,20 @@ pub struct Thread {
     pub signal_depth: AtomicU32,
     /// User signal mask restored by the last `SIGRESEND` (passed to the entry).
     pub signal_mask: AtomicU64,
-    /// Blocked signal mask for this thread (`sigprocmask`, C19); handlers stay per process.
-    pub sigmask: AtomicU64,
-    /// Alternate signal stack base (`sigaltstack`), zero when disabled.
-    pub altstack_sp: AtomicU64,
-    /// Alternate signal stack size.
-    pub altstack_size: AtomicU64,
+    /// Per-thread blocked mask for the kernel sigaction model (signal 1 is bit 0).
+    pub sig_blocked: AtomicU64,
+    /// True while a kernel-built sigframe handler is running.
+    pub sig_in_handler: AtomicBool,
+    /// User address of the kernel-built sigframe currently active.
+    pub sig_frame: AtomicU64,
+    /// Alternate signal stack base (`ss_sp`); zero while disabled.
+    pub sig_alt_sp: AtomicU64,
+    /// Alternate signal stack size (`ss_size`).
+    pub sig_alt_size: AtomicU64,
     /// Alternate signal stack flags (`SS_DISABLE`/`SS_ONSTACK`).
-    pub altstack_flags: AtomicU32,
+    pub sig_alt_flags: AtomicU32,
+    /// True while the handler runs on the alternate stack.
+    pub sig_on_altstack: AtomicBool,
     /// A `SIGRESEND` re-entry is waiting for the return-to-user path.
     pub resend: AtomicBool,
     /// Current cross-process trace id (`R-OBS-6`); zero means "not traced".
@@ -639,10 +645,13 @@ impl Thread {
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
-            sigmask: AtomicU64::new(0),
-            altstack_sp: AtomicU64::new(0),
-            altstack_size: AtomicU64::new(0),
-            altstack_flags: AtomicU32::new(0),
+            sig_blocked: AtomicU64::new(0),
+            sig_in_handler: AtomicBool::new(false),
+            sig_frame: AtomicU64::new(0),
+            sig_alt_sp: AtomicU64::new(0),
+            sig_alt_size: AtomicU64::new(0),
+            sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
+            sig_on_altstack: AtomicBool::new(false),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: slot,
@@ -747,10 +756,13 @@ impl Thread {
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
-            sigmask: AtomicU64::new(0),
-            altstack_sp: AtomicU64::new(0),
-            altstack_size: AtomicU64::new(0),
-            altstack_flags: AtomicU32::new(0),
+            sig_blocked: AtomicU64::new(0),
+            sig_in_handler: AtomicBool::new(false),
+            sig_frame: AtomicU64::new(0),
+            sig_alt_sp: AtomicU64::new(0),
+            sig_alt_size: AtomicU64::new(0),
+            sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
+            sig_on_altstack: AtomicBool::new(false),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
@@ -810,10 +822,13 @@ impl Thread {
             signal_active_ctx: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
-            sigmask: AtomicU64::new(0),
-            altstack_sp: AtomicU64::new(0),
-            altstack_size: AtomicU64::new(0),
-            altstack_flags: AtomicU32::new(0),
+            sig_blocked: AtomicU64::new(0),
+            sig_in_handler: AtomicBool::new(false),
+            sig_frame: AtomicU64::new(0),
+            sig_alt_sp: AtomicU64::new(0),
+            sig_alt_size: AtomicU64::new(0),
+            sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
+            sig_on_altstack: AtomicBool::new(false),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
