@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S197: the aarch64 exec-default row. `/init` installs a caught SIGUSR1 handler and execs
+# `/exec-child`; the new image must read the disposition back as SIG_DFL (exec clears caught
+# handlers) and must die by the default SIGUSR1 action. A survivor or a non-SIG_DFL read fails.
+
+name = "signal-aarch64-exec"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/conformance/aarch64/signal-exec/build.sh"]
+initfs = "build/conformance/aarch64/signal-exec/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "any"
+
+[[expect]]
+regex = '^signal: exec-default start$'
+
+[[expect]]
+regex = '^signal: exec-default armed$'
+
+[[expect]]
+regex = '^signal: exec-reset ok$'
+
+[[expect]]
+regex = '^init exited \(-10\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|signal: fail|survived'
