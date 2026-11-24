@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S174: one one-shot socket conformance probe on the network-config-test profile.
+name = "socket-conformance"
+exec = "/bin/socket-conformance"
+args = []
+needs = ["scheme:file", "scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

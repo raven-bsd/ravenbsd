@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S174 socket conformance, TCG control. The guest runs the one-shot probe on the
+# network-config-test profile; the host peer drives accept/getpeername, SO_ERROR,
+# shutdown(FIN then read), close/rebind, and the half-close row.
+name = "socket-conformance-tcg"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 180
+pre = [
+    "sh tests/conformance/sockets/build.sh",
+    "sh tests/conformance/sockets/start-host.sh",
+]
+initfs = "build/fixtures/socket-conformance/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23100-:23100",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance/qemu.pcap",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONFORM accept PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM soerror PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM rebound PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM half PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM SUMMARY PASS 6/6$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)CONFORM .* FAIL|CONFORM SUMMARY FAIL|panic|EXCEPTION'
