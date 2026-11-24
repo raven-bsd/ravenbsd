@@ -216,6 +216,19 @@ def check_rows(
     if _int(rows.get("kernel-rlimit-hard-raise"), "errno", failures,
             "kernel-rlimit-hard-raise") != 1:
         failures.append("kernel-rlimit-hard-raise: expected EPERM (1)")
+    raised_state = rows.get("kernel-rlimit-hard-raise-state")
+    if _int(raised_state, "errno", failures, "kernel-rlimit-hard-raise-state") != 0:
+        failures.append("kernel-rlimit-hard-raise-state: getrlimit failed")
+    raised_cur = _int(raised_state, "cur", failures, "kernel-rlimit-hard-raise-state")
+    raised_max = _int(raised_state, "max", failures, "kernel-rlimit-hard-raise-state")
+    if cur is not None and raised_cur is not None and raised_cur != cur:
+        failures.append(
+            f"kernel-rlimit-hard-raise: soft changed {cur} -> {raised_cur} after EPERM"
+        )
+    if hard is not None and raised_max is not None and raised_max != hard:
+        failures.append(
+            f"kernel-rlimit-hard-raise: hard changed {hard} -> {raised_max} after EPERM"
+        )
 
     if _int(rows.get("libc-getrlimit"), "ret", failures, "libc-getrlimit") != 0:
         failures.append("libc-getrlimit: expected 0")
@@ -295,6 +308,7 @@ def selftest() -> int:
             "cred: kernel-rlimit-roundtrip errno=0",
             "cred: kernel-rlimit-soft-raise errno=0",
             "cred: kernel-rlimit-hard-raise errno=1",
+            "cred: kernel-rlimit-hard-raise-state errno=0 cur=256 max=256",
             "cred: kernel-rlimit-restore errno=0",
             "cred: libc-getrlimit ret=0 errno=0 cur=1024 max=32768",
             "cred: libc-setrlimit ret=0 errno=0",
@@ -325,6 +339,18 @@ def selftest() -> int:
         "dirty-hard-raise",
         "kernel-rlimit-hard-raise: expected EPERM (1)"
         in check_rows(dirty, passwd, groups, umask_exec),
+        True,
+    )
+    dirty_state = clean.replace(
+        "cred: kernel-rlimit-hard-raise-state errno=0 cur=256 max=256",
+        "cred: kernel-rlimit-hard-raise-state errno=0 cur=256 max=257",
+    )
+    check(
+        "dirty-hard-raise-state",
+        any(
+            "hard changed" in failure
+            for failure in check_rows(dirty_state, passwd, groups, umask_exec)
+        ),
         True,
     )
     dirty_groups = clean.replace("cred: groups count=1 got=1 list=1000",

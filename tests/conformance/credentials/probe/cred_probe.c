@@ -174,6 +174,11 @@ static void row_kernel_rlimit(int mutation_ignore_hard_limit) {
         printf("cred: kernel-rlimit-hard-raise errno=%d\n", error);
     }
 
+    uint64_t after_raise[2] = {0, 0};
+    int state = raw_getrlimit(RLIMIT_NOFILE_INDEX, after_raise);
+    printf("cred: kernel-rlimit-hard-raise-state errno=%d cur=%llu max=%llu\n", state,
+           (unsigned long long)after_raise[0], (unsigned long long)after_raise[1]);
+
     error = raw_setrlimit(RLIMIT_NOFILE_INDEX, original[0], original[1]);
     printf("cred: kernel-rlimit-restore errno=%d\n", error);
 }
