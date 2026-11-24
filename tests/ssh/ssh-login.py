@@ -313,9 +313,21 @@ def serial_evidence(path: Path) -> list[str]:
     except FileNotFoundError:
         return []
     wanted = ("svcd: sshd up", "netd: interface eth0", "svcd: getty up",
-              "svcd: all services up", "virtio-net: queue1 tx size")
+              "svcd: all services up", "virtio-net: queue1 tx size",
+              # A guest child page fault during a session is the SSH blocker the
+              # gate must name: sshd forks per connection, and the fork child can
+              # fault before the session exists (S189 RIP0 handover).
+              "fault-regs", "killed by page fault")
     return [line.strip() for line in text.splitlines()
             if any(needle in line for needle in wanted)]
+
+
+def serial_fault(lines: list[str]) -> str | None:
+    """Return the first guest child fault line, if the session died in a child."""
+    for line in lines:
+        if "killed by page fault" in line or "fault-regs" in line:
+            return line
+    return None
 
 
 def classify(attempts: list[dict], interactive: dict, wrong: dict,
@@ -390,6 +402,9 @@ def main() -> int:
 
     serial_lines = serial_evidence(serial)
     klass, line = classify(attempts, interactive, wrong, probes)
+    fault = serial_fault(serial_lines)
+    if fault and klass != "pass":
+        line = f"{line}; guest child fault: {fault}"
     table = " ".join(f"{index + 1}:{result['kind']}" for index, result in enumerate(attempts))
     evidence = [f"raw {probe['source']}: {probe['summary']}" for probe in probes]
     for probe in probes:
@@ -398,6 +413,8 @@ def main() -> int:
     evidence.append(f"client (first attempt): {attempts[0]['evidence']}" if attempts
                     else "client: -")
     evidence.append(f"client (pty): {interactive['evidence']}")
+    if fault:
+        evidence.append(f"guest fault: {fault}")
     report = RUN / "classification.txt"
     with open(report, "w", encoding="utf-8") as out:
         out.write(f"result: {'PASS' if klass == 'pass' else 'FAIL'}\n")
