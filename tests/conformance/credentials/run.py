@@ -444,13 +444,21 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
     run_dir = ROOT / "build" / "conformance" / "credentials" / f"run-{stamp}"
     child, serial, port = boot(run_dir, image, accel)
     try:
-        code, passwd, error = ssh(port, "cat /etc/passwd", 30)
+        code, passwd, error = ssh(port, "/bin/cat /etc/passwd", 30)
         if code != 0:
-            print(f"cred-conformance: cat /etc/passwd failed: {error[-500:]!r}", file=sys.stderr)
+            print(
+                f"cred-conformance: /bin/cat /etc/passwd failed (exit {code}): "
+                f"stdout={passwd[-500:]!r} stderr={error[-500:]!r}",
+                file=sys.stderr,
+            )
             return 2
-        code, group, error = ssh(port, "cat /etc/group", 30)
+        code, group, error = ssh(port, "/bin/cat /etc/group", 30)
         if code != 0:
-            print(f"cred-conformance: cat /etc/group failed: {error[-500:]!r}", file=sys.stderr)
+            print(
+                f"cred-conformance: /bin/cat /etc/group failed (exit {code}): "
+                f"stdout={group[-500:]!r} stderr={error[-500:]!r}",
+                file=sys.stderr,
+            )
             return 2
         command = "/bin/cred-probe --mutation=ignore-hard-limit" if mutation else "/bin/cred-probe"
         code, stdout, stderr = ssh(port, command, 60)
