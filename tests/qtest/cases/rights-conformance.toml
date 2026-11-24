@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# C17 rights revocation and namespace grants: one conformance row per contract rule. The
+# `s16-rights` fixture drives `HANDLE_REVOKE` (0x53) and `PROC_NAMESPACE` (0x33) against the same
+# kernel image the `rights-namespace` case uses, and adds the per-rule mapping here:
+#
+#   R1  revoke removes every named right from the caller's handle       -> revoke same ok
+#   R2  revoke is transitive over HANDLE_DUP and HANDLE_TRANSFER, in     -> revoke same ok
+#       another process as well                                           revoke cross ok
+#   R3  the handle stays open with the remaining rights (DUP still works)-> revoke same ok
+#   R4  a later operation needing a revoked right is EPERM              -> revoke same ok
+#   R5  a right that was never granted is EACCES                        -> revoke same ok
+#   R6  a handle derived after the revoke gets only the remaining rights -> revoke same ok
+#   R7  revoke is idempotent and a closed parent is EBADF                -> revoke same ok
+#   R8  ADD/REMOVE/CLEAR prefix visibility, exact names unaffected       -> namespace rows
+#   R9  close drops the lineage node (handles=0 lineage=0 at exit)       -> exit /init row
+
+name = "rights-conformance"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/s16-rights/build.sh"]
+initfs = "build/fixtures/s16-rights/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s16-teardowncheck"
+qemu_extra = []
+expect_exit = "success"
+
+# R1-R7 same-process: parent MAP is revoked, the derived child loses MAP (EPERM), a leaf derived
+# after the revoke never had it (EACCES), the second revoke is a no-op, the stale one is EBADF.
+[[expect]]
+regex = '^s16: revoke same ok$'
+
+# R2 cross-process: the parent transfers a MemObject, revokes MAP before the child's first thread,
+# and the child sees EPERM for MAP but can still DUP its remaining rights.
+[[expect]]
+regex = '^s16: revoke cross ok$'
+
+# R8 namespace: the child is granted the s16a prefix, then the prefix is removed mid-run; exact
+# names are unaffected.
+[[expect]]
+regex = '^s16: server ready$'
+
+[[expect]]
+regex = '^s16: prefix open ok$'
+
+[[expect]]
+regex = '^s16: prefix denied$'
+
+[[expect]]
+regex = '^s16: prefix removed$'
+
+[[expect]]
+regex = '^s16: existing handle ok$'
+
+[[expect]]
+regex = '^s16: prefix case ok$'
+
+# R8 CLEAR removes every prefix: both schemes become unreachable for new opens, and the two file
+# handles opened before the clear keep working.
+[[expect]]
+regex = '^s16: clear first ok$'
+
+[[expect]]
+regex = '^s16: clear other ok$'
+
+[[expect]]
+regex = '^s16: clear all ok$'
+
+[[expect]]
+regex = '^s16: clear existing ok$'
+
+[[expect]]
+regex = '^s16: clear case ok$'
+
+[[expect]]
+regex = '^s16: exact name ok$'
+
+[[expect]]
+regex = '^s16: exact case ok$'
+
+# R9 10,000 dup/revoke/close cycles; the final process-exit row must have no handles or nodes left.
+[[expect]]
+regex = '^s16: churn done=10000$'
+
+[[expect]]
+regex = '^s16: rights ok$'
+
+[[expect]]
+regex = '^s16: namespace ok$'
+
+[[expect]]
+regex = '^s16: lifecycle ok$'
+
+[[expect]]
+regex = '^s16: exit /init handles=0 lineage=0$'
+
+[[forbid]]
+regex = '(?i)panic|s16: failed|EXCEPTION'
