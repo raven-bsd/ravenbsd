@@ -132,17 +132,6 @@ pub fn replace_image_from_user(
             .ok_or(Errno::ENOEXEC)?,
         None => main_entry,
     };
-    crate::kprintln!(
-        "s44exec: pid={} kind={} main=0x{:x} mainbias=0x{:x} interp={} interp_entry=0x{:x} interpbias=0x{:x} initial=0x{:x}",
-        caller.id,
-        kind,
-        main_entry,
-        main_bias,
-        if interpreter.is_some() { "yes" } else { "no" },
-        interpreter.as_ref().map_or(0, |interp| interp.entry()),
-        interpreter_bias,
-        initial_entry
-    );
     let phdr = elf
         .phdr_vaddr()
         .and_then(|value| value.checked_add(main_bias));
