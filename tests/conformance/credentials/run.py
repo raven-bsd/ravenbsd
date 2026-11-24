@@ -205,47 +205,61 @@ def check_rows(
     if mode is not None and mode != 0o600:
         failures.append(f"umask-file-077: {mode:04o}, expected 0600")
 
-    limit = rows.get("rlimit-nofile")
-    cur = _int(limit, "cur", failures, "rlimit-nofile")
-    hard = _int(limit, "max", failures, "rlimit-nofile")
+    kernel_limit = rows.get("kernel-rlimit-nofile")
+    cur = _int(kernel_limit, "cur", failures, "kernel-rlimit-nofile")
+    hard = _int(kernel_limit, "max", failures, "kernel-rlimit-nofile")
     if cur is not None and hard is not None and cur > hard:
-        failures.append(f"rlimit-nofile: cur={cur} > max={hard}")
-    if _int(rows.get("rlimit-roundtrip"), "errno", failures, "rlimit-roundtrip") != 0:
-        failures.append("rlimit-roundtrip: expected 0")
-    if _int(rows.get("rlimit-soft-raise"), "errno", failures, "rlimit-soft-raise") != 0:
-        failures.append("rlimit-soft-raise: expected 0")
-    if _int(rows.get("rlimit-hard-raise"), "errno", failures, "rlimit-hard-raise") != 1:
-        failures.append("rlimit-hard-raise: expected EPERM (1)")
-    if _int(rows.get("rlimit-restore"), "errno", failures, "rlimit-restore") != 0:
-        failures.append("rlimit-restore: expected 0")
+        failures.append(f"kernel-rlimit-nofile: cur={cur} > max={hard}")
+    for name in ("kernel-rlimit-roundtrip", "kernel-rlimit-soft-raise", "kernel-rlimit-restore"):
+        if _int(rows.get(name), "errno", failures, name) != 0:
+            failures.append(f"{name}: expected 0")
+    if _int(rows.get("kernel-rlimit-hard-raise"), "errno", failures,
+            "kernel-rlimit-hard-raise") != 1:
+        failures.append("kernel-rlimit-hard-raise: expected EPERM (1)")
+
+    if _int(rows.get("libc-getrlimit"), "ret", failures, "libc-getrlimit") != 0:
+        failures.append("libc-getrlimit: expected 0")
+    if _int(rows.get("libc-setrlimit"), "ret", failures, "libc-setrlimit") != 0:
+        failures.append("libc-setrlimit: expected 0")
+    if _int(rows.get("libc-hard-raise"), "ret", failures, "libc-hard-raise") != -1:
+        failures.append("libc-hard-raise: must fail")
+    if _int(rows.get("libc-hard-raise"), "errno", failures, "libc-hard-raise") != 1:
+        failures.append("libc-hard-raise: expected EPERM (1)")
 
     nofile = rows.get("nofile")
-    if nofile is not None:
-        if _int(nofile, "open-ok", failures, "nofile") != 3:
-            failures.append("nofile: expected exactly three opens below the raised soft limit")
-        if _int(nofile, "errno", failures, "nofile") != EMFILE:
-            failures.append("nofile: expected EMFILE (24)")
+    soft = _int(nofile, "soft", failures, "nofile")
+    base = _int(nofile, "base", failures, "nofile")
+    opened = _int(nofile, "open-ok", failures, "nofile")
+    if soft is not None and base is not None and opened is not None:
+        if opened != soft - base:
+            failures.append(
+                f"nofile: open-ok={opened}, expected soft-base={soft - base}"
+            )
+    if _int(nofile, "errno", failures, "nofile") != EMFILE:
+        failures.append("nofile: expected EMFILE (24)")
 
-    samples: list[tuple[int, int, int]] = []
-    for index in range(3):
-        row = rows.get(f"rusage{index}")
-        if row is None:
-            failures.append(f"rusage{index}: missing")
-            continue
-        if _int(row, "errno", failures, f"rusage{index}") != 0:
-            failures.append(f"rusage{index}: syscall failed")
-        user = _int(row, "user", failures, f"rusage{index}")
-        system = _int(row, "sys", failures, f"rusage{index}")
-        maxrss = _int(row, "maxrss", failures, f"rusage{index}")
-        if user is not None and system is not None and maxrss is not None:
-            samples.append((user, system, maxrss))
-    for index in range(1, len(samples)):
-        before = samples[index - 1][0] + samples[index - 1][1]
-        after = samples[index][0] + samples[index][1]
-        if after < before:
-            failures.append(f"rusage{index}: user+sys went backwards ({before} -> {after})")
-    if samples and samples[-1][2] < MAP_BYTES:
-        failures.append(f"rusage: maxrss={samples[-1][2]} < mapped {MAP_BYTES}")
+    for prefix in ("kernel-rusage", "libc-rusage"):
+        samples: list[tuple[int, int, int]] = []
+        for index in range(3):
+            name = f"{prefix}{index}"
+            row = rows.get(name)
+            if row is None:
+                failures.append(f"{name}: missing")
+                continue
+            if _int(row, "errno", failures, name) != 0:
+                failures.append(f"{name}: syscall failed")
+            user = _int(row, "user", failures, name)
+            system = _int(row, "sys", failures, name)
+            maxrss = _int(row, "maxrss", failures, name)
+            if user is not None and system is not None and maxrss is not None:
+                samples.append((user, system, maxrss))
+        for index in range(1, len(samples)):
+            before = samples[index - 1][0] + samples[index - 1][1]
+            after = samples[index][0] + samples[index][1]
+            if after < before:
+                failures.append(f"{prefix}{index}: user+sys went backwards ({before} -> {after})")
+        if samples and samples[-1][2] < MAP_BYTES:
+            failures.append(f"{prefix}: maxrss={samples[-1][2]} < mapped {MAP_BYTES}")
 
     if "umask-child" not in parse_rows(umask_exec_text):
         failures.append("umask-exec: no child row")
@@ -255,12 +269,9 @@ def check_rows(
         if mask is not None and mask != 0o027:
             failures.append(f"umask-exec: child mask={mask:04o}, expected 0027")
 
-    if "ok" not in rows:
-        failures.append("probe: missing `cred: ok`")
     if "FAIL" in rows:
         failures.append(f"probe: FAIL row={rows['FAIL']}")
     return failures
-
 
 def selftest() -> int:
     """Exercise the row parser and every assertion with a clean and a dirty fixture."""
@@ -280,16 +291,24 @@ def selftest() -> int:
             "cred: umask-file mode=0640",
             "cred: umask-return mask=0027",
             "cred: umask-file-077 mode=0600",
-            "cred: rlimit-nofile cur=256 max=256",
-            "cred: rlimit-roundtrip errno=0",
-            "cred: rlimit-soft-raise errno=0",
-            "cred: rlimit-hard-raise errno=1",
-            "cred: rlimit-restore errno=0",
-            "cred: nofile soft=6 open-ok=3 errno=24",
-            "cred: rusage0 errno=0 user=1 sys=2 maxrss=8388608",
-            "cred: rusage1 errno=0 user=2 sys=3 maxrss=8388608",
-            "cred: rusage2 errno=0 user=3 sys=4 maxrss=8388608",
-            "cred: rusage-mapped=4194304",
+            "cred: kernel-rlimit-nofile cur=256 max=256",
+            "cred: kernel-rlimit-roundtrip errno=0",
+            "cred: kernel-rlimit-soft-raise errno=0",
+            "cred: kernel-rlimit-hard-raise errno=1",
+            "cred: kernel-rlimit-restore errno=0",
+            "cred: libc-getrlimit ret=0 errno=0 cur=1024 max=32768",
+            "cred: libc-setrlimit ret=0 errno=0",
+            "cred: libc-hard-raise ret=-1 errno=1",
+            "cred: nofile soft=1024 base=3 open-ok=1021 errno=24",
+            "cred: libc-rusage0 ret=0 errno=0 user=1 sys=2 maxrss=8388608",
+            "cred: libc-rusage1 ret=0 errno=0 user=2 sys=3 maxrss=8388608",
+            "cred: libc-rusage2 ret=0 errno=0 user=3 sys=4 maxrss=8388608",
+            "cred: libc-rusage-mapped=4194304",
+            "cred: kernel-rusage0 errno=0 user=1 sys=2 maxrss=8388608",
+            "cred: kernel-rusage1 errno=0 user=2 sys=3 maxrss=8388608",
+            "cred: kernel-rusage2 errno=0 user=3 sys=4 maxrss=8388608",
+            "cred: kernel-rusage-mapped=4194304",
+            "cred: done failures=0",
             "cred: ok",
         ]
     )
@@ -300,10 +319,12 @@ def selftest() -> int:
             failures.append(f"{name}: got {got!r}, want {want!r}")
 
     check("clean", check_rows(clean, passwd, groups, umask_exec), [])
-    dirty = clean.replace("cred: rlimit-hard-raise errno=1", "cred: rlimit-hard-raise errno=0")
+    dirty = clean.replace("cred: kernel-rlimit-hard-raise errno=1",
+                          "cred: kernel-rlimit-hard-raise errno=0")
     check(
         "dirty-hard-raise",
-        "rlimit-hard-raise: expected EPERM (1)" in check_rows(dirty, passwd, groups, umask_exec),
+        "kernel-rlimit-hard-raise: expected EPERM (1)"
+        in check_rows(dirty, passwd, groups, umask_exec),
         True,
     )
     dirty_groups = clean.replace("cred: groups count=1 got=1 list=1000",
@@ -479,11 +500,20 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
                 "line (open gap, reported)"
             )
         if mutation:
-            if not failures:
-                print("cred-conformance: MUTATION DID NOT TURN A ROW RED", file=sys.stderr)
+            target = "kernel-rlimit-hard-raise: expected EPERM (1)"
+            if any(target in failure for failure in failures):
+                print(
+                    "cred-conformance: MUTATION RED: kernel-rlimit-hard-raise errno=0 "
+                    "(expected 1)"
+                )
+                print(f"cred-conformance: run={run_dir}")
                 return 1
-            print(f"cred-conformance: MUTATION RED: {failures[0]}")
-            print(f"cred-conformance: run={run_dir}")
+            print(
+                "cred-conformance: MUTATION DID NOT TURN THE KERNEL HARD-RAISE ROW RED",
+                file=sys.stderr,
+            )
+            for failure in failures:
+                print(f"cred-conformance: MUTATION context: {failure}", file=sys.stderr)
             return 1
         if failures:
             for failure in failures:

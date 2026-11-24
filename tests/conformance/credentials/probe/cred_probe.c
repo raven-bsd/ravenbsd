@@ -149,33 +149,63 @@ static void row_umask(void) {
     umask(original);
 }
 
-static void row_rlimit(int mutation_ignore_hard_limit) {
+static void row_kernel_rlimit(int mutation_ignore_hard_limit) {
     uint64_t original[2] = {0, 0};
     int error = raw_getrlimit(RLIMIT_NOFILE_INDEX, original);
     if (error != 0) {
-        failed("rlimit-get", "syscall");
+        failed("kernel-rlimit-get", "syscall");
         return;
     }
-    printf("cred: rlimit-nofile cur=%llu max=%llu\n", (unsigned long long)original[0],
-           (unsigned long long)original[1]);
+    printf("cred: kernel-rlimit-nofile cur=%llu max=%llu\n",
+           (unsigned long long)original[0], (unsigned long long)original[1]);
 
     error = raw_setrlimit(RLIMIT_NOFILE_INDEX, original[0], original[1]);
-    printf("cred: rlimit-roundtrip errno=%d\n", error);
+    printf("cred: kernel-rlimit-roundtrip errno=%d\n", error);
 
     error = raw_setrlimit(RLIMIT_NOFILE_INDEX, original[1], original[1]);
-    printf("cred: rlimit-soft-raise errno=%d\n", error);
+    printf("cred: kernel-rlimit-soft-raise errno=%d\n", error);
 
     uint64_t raised = original[1] == UINT64_MAX ? original[1] : original[1] + 1;
     error = raw_setrlimit(RLIMIT_NOFILE_INDEX, original[0], raised);
     if (mutation_ignore_hard_limit) {
         printf("cred: mutation=ignore-hard-limit\n");
-        printf("cred: rlimit-hard-raise errno=0\n");
+        printf("cred: kernel-rlimit-hard-raise errno=0\n");
     } else {
-        printf("cred: rlimit-hard-raise errno=%d\n", error);
+        printf("cred: kernel-rlimit-hard-raise errno=%d\n", error);
     }
 
     error = raw_setrlimit(RLIMIT_NOFILE_INDEX, original[0], original[1]);
-    printf("cred: rlimit-restore errno=%d\n", error);
+    printf("cred: kernel-rlimit-restore errno=%d\n", error);
+}
+
+static void row_libc_rlimit(void) {
+    struct rlimit original;
+    errno = 0;
+    int result = getrlimit(RLIMIT_NOFILE, &original);
+    printf("cred: libc-getrlimit ret=%d errno=%d cur=%llu max=%llu\n", result, errno,
+           (unsigned long long)original.rlim_cur, (unsigned long long)original.rlim_max);
+    if (result != 0) {
+        failed("libc-getrlimit", "getrlimit");
+        return;
+    }
+
+    struct rlimit same = original;
+    errno = 0;
+    result = setrlimit(RLIMIT_NOFILE, &same);
+    printf("cred: libc-setrlimit ret=%d errno=%d\n", result, errno);
+    if (result != 0) {
+        failed("libc-setrlimit", "roundtrip");
+    }
+
+    struct rlimit raised = original;
+    raised.rlim_max = original.rlim_max == RLIM_INFINITY ? original.rlim_max
+                                                         : original.rlim_max + 1;
+    errno = 0;
+    result = setrlimit(RLIMIT_NOFILE, &raised);
+    printf("cred: libc-hard-raise ret=%d errno=%d\n", result, errno);
+    if (result != -1 || errno != EXPECTED_EPERM) {
+        failed("libc-hard-raise", "expected EPERM");
+    }
 }
 
 static int count_open_fds(void) {
@@ -190,67 +220,96 @@ static int count_open_fds(void) {
 }
 
 static void row_nofile(void) {
-    struct rlimit current;
-    if (getrlimit(RLIMIT_NOFILE, &current) != 0) {
-        failed("nofile", "getrlimit");
+    long soft = sysconf(_SC_OPEN_MAX);
+    if (soft <= 0) {
+        failed("nofile", "sysconf");
         return;
     }
     int base = count_open_fds();
-    rlim_t soft = (rlim_t)base + 3;
-    if (soft > current.rlim_max) {
-        failed("nofile", "no room below hard limit");
+    int *fds = calloc((size_t)soft, sizeof(int));
+    if (fds == NULL) {
+        failed("nofile", "alloc");
         return;
     }
-    struct rlimit lowered = {soft, current.rlim_max};
-    if (setrlimit(RLIMIT_NOFILE, &lowered) != 0) {
-        failed("nofile", "setrlimit");
-        return;
-    }
-    int fds[8];
     int opened = 0;
     int error = 0;
-    for (int attempt = 0; attempt < 8; attempt++) {
+    for (long attempt = 0; attempt < soft + 8; attempt++) {
         int fd = open("/dev/null", O_RDONLY);
         if (fd < 0) {
             error = errno;
             break;
         }
-        fds[opened++] = fd;
+        if (opened < soft) {
+            fds[opened] = fd;
+        }
+        opened++;
     }
-    printf("cred: nofile soft=%llu open-ok=%d errno=%d\n", (unsigned long long)soft, opened,
-           error);
-    for (int index = 0; index < opened; index++) {
+    printf("cred: nofile soft=%ld base=%d open-ok=%d errno=%d\n", soft, base, opened, error);
+    for (int index = 0; index < opened && index < soft; index++) {
         close(fds[index]);
     }
-    setrlimit(RLIMIT_NOFILE, &current);
+    free(fds);
 }
 
-static void row_rusage(void) {
-    const size_t mapped_len = 4u * 1024u * 1024u;
-    unsigned char *mapped = mmap(NULL, mapped_len, PROT_READ | PROT_WRITE,
+static unsigned char *map_four_mib(size_t *length) {
+    *length = 4u * 1024u * 1024u;
+    unsigned char *mapped = mmap(NULL, *length, PROT_READ | PROT_WRITE,
                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (mapped == MAP_FAILED) {
-        failed("rusage", "mmap");
-        return;
+        return NULL;
     }
-    for (size_t offset = 0; offset < mapped_len; offset += 4096) {
+    for (size_t offset = 0; offset < *length; offset += 4096) {
         mapped[offset] = (unsigned char)(offset >> 12);
     }
+    return mapped;
+}
 
+static void row_libc_rusage(void) {
+    size_t mapped_len = 0;
+    unsigned char *mapped = map_four_mib(&mapped_len);
+    if (mapped == NULL) {
+        failed("libc-rusage", "mmap");
+        return;
+    }
+    for (int sample = 0; sample < 3; sample++) {
+        struct rusage usage;
+        errno = 0;
+        int result = getrusage(RUSAGE_SELF, &usage);
+        unsigned long long user = (unsigned long long)usage.ru_utime.tv_sec * 1000000000ULL
+                                  + (unsigned long long)usage.ru_utime.tv_usec * 1000ULL;
+        unsigned long long system = (unsigned long long)usage.ru_stime.tv_sec * 1000000000ULL
+                                    + (unsigned long long)usage.ru_stime.tv_usec * 1000ULL;
+        printf("cred: libc-rusage%d ret=%d errno=%d user=%llu sys=%llu maxrss=%lld\n", sample,
+               result, errno, user, system, (long long)usage.ru_maxrss);
+        for (volatile unsigned long spin = 0; spin < 8000000UL; spin++) {
+            __asm__ volatile("");
+        }
+    }
+    printf("cred: libc-rusage-mapped=%llu\n", (unsigned long long)mapped_len);
+    munmap(mapped, mapped_len);
+}
+
+static void row_kernel_rusage(void) {
+    size_t mapped_len = 0;
+    unsigned char *mapped = map_four_mib(&mapped_len);
+    if (mapped == NULL) {
+        failed("kernel-rusage", "mmap");
+        return;
+    }
     for (int sample = 0; sample < 3; sample++) {
         uint64_t usage[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         int error = raw_getrusage(0, usage);
-        printf("cred: rusage%d errno=%d user=%llu sys=%llu maxrss=%llu\n", sample, error,
+        printf("cred: kernel-rusage%d errno=%d user=%llu sys=%llu maxrss=%llu\n", sample, error,
                (unsigned long long)usage[0], (unsigned long long)usage[1],
                (unsigned long long)usage[2]);
         if (error != 0) {
-            failed("rusage", "getrusage");
+            failed("kernel-rusage", "getrusage");
         }
         for (volatile unsigned long spin = 0; spin < 8000000UL; spin++) {
             __asm__ volatile("");
         }
     }
-    printf("cred: rusage-mapped=%llu\n", (unsigned long long)mapped_len);
+    printf("cred: kernel-rusage-mapped=%llu\n", (unsigned long long)mapped_len);
     munmap(mapped, mapped_len);
 }
 
@@ -296,15 +355,17 @@ int main(int argc, char **argv) {
     row_setid("setgid-nonpermitted", result, errno);
 
     row_umask();
-    row_rlimit(mutation_ignore_hard_limit);
+    row_kernel_rlimit(mutation_ignore_hard_limit);
+    row_libc_rlimit();
     row_nofile();
-    row_rusage();
+    row_libc_rusage();
+    row_kernel_rusage();
 
+    printf("cred: done failures=%d\n", failures);
     if (mutation_ignore_hard_limit) {
         // Negative check only: the mutation reports the hard raise as accepted, and the harness
         // must turn the row red. The process itself still exits 0 so the harness, not the probe,
         // owns the verdict.
-        printf("cred: ok\n");
         return 0;
     }
     if (failures == 0) {
