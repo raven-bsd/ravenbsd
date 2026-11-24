@@ -66,7 +66,7 @@ SECTIONS {
 
     .tbss ALIGN(4096) (NOLOAD) : {
         *(.tbss .tbss.*)
-        /* S183: the init service spawn is Strict; keep the TLS mem tail page-rounded. */
+        /* S188: keep the TLS mem tail page-rounded for the Strict service spawn. */
         . = ALIGN(4096);
     } :bss :tls
 
@@ -76,8 +76,7 @@ SECTIONS {
     } :bss
 
     /DISCARD/ : {
-        /* S183: the std binary's unwind header is an orphan after .rodata; the Strict service
-         * spawn requires every file-backed segment to end on a page. The target is panic=abort. */
+        /* S188: orphan unwind metadata after .rodata breaks the Strict file-tail check. */
         *(.eh_frame*)
         *(.note*)
         *(.comment)
