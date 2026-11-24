@@ -13,15 +13,9 @@ const NANOS_PER_MICROSECOND: u64 = 1_000;
 
 /// Convert the kernel's nanosecond counter to a `struct timeval`.
 fn timeval_from_ns(nanoseconds: u64) -> Timeval {
-    let seconds = nanoseconds
-        .checked_div(NANOS_PER_SECOND)
-        .unwrap_or(0);
-    let remainder = nanoseconds
-        .checked_rem(NANOS_PER_SECOND)
-        .unwrap_or(0);
-    let microseconds = remainder
-        .checked_div(NANOS_PER_MICROSECOND)
-        .unwrap_or(0);
+    let seconds = nanoseconds.checked_div(NANOS_PER_SECOND).unwrap_or(0);
+    let remainder = nanoseconds.checked_rem(NANOS_PER_SECOND).unwrap_or(0);
+    let microseconds = remainder.checked_div(NANOS_PER_MICROSECOND).unwrap_or(0);
     Timeval {
         tv_sec: i64::try_from(seconds).unwrap_or(i64::MAX),
         tv_usec: i64::try_from(microseconds).unwrap_or(i64::MAX),
@@ -35,7 +29,16 @@ fn timeval_from_ns(nanoseconds: u64) -> Timeval {
 /// time in `timeval` and the maximum RSS; Raven's ABI carries the RSS in bytes (the probe and the
 /// kernel reference row both assert bytes).
 fn rusage_from_words(words: [u64; 8]) -> Rusage {
-    let [user_ns, system_ns, maxrss, minflt, majflt, nvcsw, nivcsw, _start] = words;
+    let [
+        user_ns,
+        system_ns,
+        maxrss,
+        minflt,
+        majflt,
+        nvcsw,
+        nivcsw,
+        _start,
+    ] = words;
     Rusage {
         ru_utime: timeval_from_ns(user_ns),
         ru_stime: timeval_from_ns(system_ns),
