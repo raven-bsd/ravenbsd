@@ -32,8 +32,13 @@ product tree is not changed.
 sh tests/conformance/memory-map/build.sh
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --iterations 100
+python3 tests/conformance/memory-map/run.py --image ... --iterations 100 --smp 1
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --mutation
 ```
+
+`--smp N` sets the CPU count (default 4). `--smp 1` isolates the kernel heap churn from the
+separate S195 R10 TLB-shootdown timeout, which is quoted as an S195 finding and does not gate the
+mapping rows.
 
 `build.sh` uses the release initfs and stages `/bin/mmap-probe`; no product file changes. The
 conformance image also stages three test-only helpers: `/bin/s198-hostkeys` (creates `/tmp/ssh` and
