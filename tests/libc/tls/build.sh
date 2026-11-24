@@ -2,53 +2,77 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# S183: build the static std TLS-teardown discriminator and an initfs that runs it as /init.
+# S188: build the pthread key destructor fixture into build/libc-test/libc-test. The libc-test
+# profile stages it as /bin/libc-test and runs it as the one-shot service.
 
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
-arch=${1:-x86_64}
-mode=${2:-normal}
+arch=${RAVEN_QT_ARCH:-${1:-x86_64}}
 if [ "$arch" != x86_64 ]; then
-    printf 'tls-teardown: only x86_64 is in this ticket\n' >&2
-    exit 2
+    printf 'tls-keys: skipped: arch %s is not this fixture\n' "$arch"
+    exit 77
 fi
 
-archive=$root/build/x86_64/libc.a
-if [ ! -f "$archive" ]; then
-    printf 'tls-teardown: missing %s; run cargo xtask libc-pack --arch x86_64\n' "$archive" >&2
-    exit 2
+sysroot=${RAVENLIBC_SYSROOT:-$root/build/$arch/sysroot}
+. "$root/tests/fixtures/libc-sysroot.sh"
+ensure_libc_sysroot "$root" "$arch" "$sysroot" tls-keys
+
+CC=${CC:-clang}
+if ! command -v "$CC" >/dev/null 2>&1; then
+    printf 'tls-keys: skipped: %s not found\n' "$CC" >&2
+    exit 77
+fi
+if ! command -v ld.lld >/dev/null 2>&1; then
+    host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p' || true)
+    if [ -n "$host" ]; then
+        lld_dir=$(rustc --print sysroot 2>/dev/null)/lib/rustlib/$host/bin/gcc-ld
+        if [ -x "$lld_dir/ld.lld" ]; then
+            PATH="$lld_dir:$PATH"
+            export PATH
+        fi
+    fi
+fi
+if ! command -v ld.lld >/dev/null 2>&1; then
+    printf 'tls-keys: skipped: ld.lld not found\n' >&2
+    exit 77
 fi
 
-# The libc-test profile stages /bin/libc-test as the one-shot service, which gives the std
-# program the console fds that /init does not have.
 out=$root/build/libc-test
-mkdir -p "$out"
+mkdir -p "$out/obj"
 
-case "$mode" in
-    normal) mode_flags= ;;
-    destructor) mode_flags="--cfg tls183_destructor_read" ;;
-    *) printf 'tls-teardown: unknown mode %s\n' "$mode" >&2; exit 2 ;;
-esac
+builtins=
+if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
+    builtins=1
+fi
 
-RUSTUP_TOOLCHAIN=ravenbsd rustc --target x86_64-unknown-ravenbsd --edition 2024 -O \
-    $mode_flags \
-    -C relocation-model=static -C code-model=small -C strip=symbols \
-    -C link-arg=-T"$root/tests/libc/tls/x86_64.ld" \
-    -C link-arg="$root/build/x86_64/crt1.o" \
-    -C link-arg="$root/build/x86_64/crti.o" \
-    -C link-arg="-L$root/build/x86_64" \
-    -C link-arg=-lc \
-    -C link-arg="$root/build/x86_64/crtn.o" \
-    "$root/tests/libc/tls/teardown.rs" -o "$out/libc-test"
+"$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+    -c "$root/tests/libc/tls/keys.c" -o "$out/obj/tls-keys.o"
+
+if [ -n "$builtins" ]; then
+    "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        -nostdlib -nostartfiles -static -T"$root/tests/libc/target/x86_64.ld" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/obj/tls-keys.o" \
+        -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+        "$sysroot/usr/lib/crtn.o" -o "$out/libc-test"
+else
+    "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        -nostdlib -nostartfiles -static -T"$root/tests/libc/target/x86_64.ld" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/obj/tls-keys.o" \
+        -L"$sysroot/usr/lib" -lc \
+        "$sysroot/usr/lib/crtn.o" -o "$out/libc-test"
+fi
 
 : > "$out/libc-child"
 : > "$out/libplug.so"
 : > "$out/libc.so.1"
 : > "$out/ld-elf.so.1"
-printf 'tls-teardown\n' > "$out/stamp"
-file "$out/libc-test"
-readelf -h "$out/libc-test" | sed -n '1,12p'
-printf 'tls-teardown: staged %s\n' "$out/libc-test"
+printf 'tls-keys\n' > "$out/stamp"
+sh "$root/tests/libc/target/shape-check.sh" "$out/libc-test"
+printf 'tls-keys: staged %s\n' "$out/libc-test"
