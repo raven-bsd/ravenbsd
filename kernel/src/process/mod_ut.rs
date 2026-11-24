@@ -33,3 +33,28 @@ fn invalid_utf8_falls_back_to_the_path() {
     let argv = vec![vec![0xff, 0xfe]];
     assert_eq!(command_from_argv(&argv, b"/bin/bad"), "/bin/bad");
 }
+
+#[test]
+fn exec_reset_resets_caught_handlers_and_keeps_ignored() {
+    let mut sigacts = SigActs::new();
+    sigacts.set(
+        status::SIGUSR1,
+        SigAction {
+            handler: 0x40_0000,
+            mask: 1,
+            flags: SA_SIGINFO,
+        },
+    );
+    sigacts.set(
+        12,
+        SigAction {
+            handler: SIG_IGN,
+            mask: 0,
+            flags: 0,
+        },
+    );
+    assert!(sigacts.get(status::SIGUSR1).is_caught());
+    sigacts.exec_reset();
+    assert_eq!(sigacts.get(status::SIGUSR1), SigAction::default_action());
+    assert_eq!(sigacts.get(12).handler, SIG_IGN);
+}
