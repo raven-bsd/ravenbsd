@@ -124,8 +124,13 @@ impl<S: SignalSink> Pty<S> {
         self.to_master.extend(output);
     }
 
-    /// Read bytes for the master side, or `EAGAIN` when no data is queued.
+    /// Read bytes for the master side, `EAGAIN` while the slave is open, or `EIO` after it is
+    /// gone. Queued master data drains first. Donor: FreeBSD `sys/kern/tty_pts.c:110 ptsdev_read`
+    /// returns `EIO` at `:223` when the slave side is finished.
     pub fn read_master(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
+        if self.eof && self.to_master.is_empty() {
+            return Err(Errno::EIO);
+        }
         take(&mut self.to_master, buffer, self.eof)
     }
 
