@@ -2285,6 +2285,11 @@ def main() -> int:
             elif socket_only:
                 console = handle  # type: ignore[assignment]
                 lease_ok = serial_has(console, SERIAL_LEASE, 60)
+            elif only == "s4":
+                # K514: the S4-only row proves the post-auth bytes. netd has already configured
+                # eth0 and sshd is up; the resolvd lease file is not part of the S4 contract, so
+                # readiness is the TCP listener below, not the lease line.
+                lease_ok = True
             else:
                 lease_ok = serial_has(handle, SERIAL_LEASE, 60)  # type: ignore[arg-type]
             if not lease_ok:
