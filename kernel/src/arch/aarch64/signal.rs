@@ -120,6 +120,103 @@ pub struct UContextLayout {
     pub uc_spare: [u32; 4],
 }
 
+/// The C19 `siginfo_t` (S160 0x50): signo, errno, code, pid, uid, status, addr, value, reason.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SiginfoLayout {
+    /// Signal number.
+    pub si_signo: i32,
+    /// Errno association.
+    pub si_errno: i32,
+    /// Signal code.
+    pub si_code: i32,
+    /// Sender pid.
+    pub si_pid: i32,
+    /// Sender uid.
+    pub si_uid: u32,
+    /// Exit status.
+    pub si_status: i32,
+    /// Fault address.
+    pub si_addr: u64,
+    /// Signal value.
+    pub si_value: u64,
+    /// Signal-specific reason.
+    pub reason: [u8; 0x28],
+}
+
+/// The C19 `sendsig` frame bytes: `siginfo_t` then `ucontext_t`.
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SigFrameLayout {
+    /// The `siginfo_t` at the frame base.
+    pub siginfo: SiginfoLayout,
+    /// The `ucontext_t` above it.
+    pub ucontext: UContextLayout,
+}
+
+impl FpregsetLayout {
+    /// Zero FP state.
+    pub const ZERO: Self = Self {
+        q: [[0; 16]; NFREG],
+        fpcr: 0,
+        fpsr: 0,
+    };
+}
+
+impl MContextLayout {
+    /// Zero machine context.
+    pub const ZERO: Self = Self {
+        gregs: [0; NGREG],
+        fregs: FpregsetLayout::ZERO,
+        spare: [0; 8],
+    };
+}
+
+impl StackLayout {
+    /// Zero alternate stack.
+    pub const ZERO: Self = Self {
+        ss_sp: 0,
+        ss_size: 0,
+        ss_flags: 0,
+        spare: 0,
+    };
+}
+
+impl UContextLayout {
+    /// Zero ucontext.
+    pub const ZERO: Self = Self {
+        uc_sigmask: [0; 4],
+        uc_mcontext: MContextLayout::ZERO,
+        uc_link: 0,
+        uc_stack: StackLayout::ZERO,
+        uc_flags: 0,
+        uc_spare: [0; 4],
+    };
+}
+
+impl SiginfoLayout {
+    /// Zero siginfo.
+    pub const ZERO: Self = Self {
+        si_signo: 0,
+        si_errno: 0,
+        si_code: 0,
+        si_pid: 0,
+        si_uid: 0,
+        si_status: 0,
+        si_addr: 0,
+        si_value: 0,
+        reason: [0; 0x28],
+    };
+}
+
+impl SigFrameLayout {
+    /// Zero frame.
+    pub const ZERO: Self = Self {
+        siginfo: SiginfoLayout::ZERO,
+        ucontext: UContextLayout::ZERO,
+    };
+}
+
 /// `sizeof(mcontext_t)`.
 pub const MCONTEXT_SIZE: usize = size_of::<MContextLayout>();
 /// `_Alignof(mcontext_t)`.
@@ -150,6 +247,10 @@ pub const UC_FLAGS_OFFSET: usize = offset_of!(UContextLayout, uc_flags);
 pub const SIGINFO_SIZE: usize = 0x50;
 /// `_Alignof(siginfo_t)` from the C19/S160 table.
 pub const SIGINFO_ALIGN: usize = 8;
+/// `sizeof(sigframe_t)`: `siginfo_t` + `ucontext_t`.
+pub const SIGFRAME_SIZE: usize = size_of::<SigFrameLayout>();
+/// `offsetof(sigframe_t, ucontext)`.
+pub const SIGFRAME_UCONTEXT_OFFSET: usize = offset_of!(SigFrameLayout, ucontext);
 /// Signal frames are 16-byte aligned on the user stack.
 pub const FRAME_ALIGN: u64 = 16;
 
@@ -170,6 +271,10 @@ const _: () = {
     assert!(UC_FLAGS_OFFSET == 0x3a0);
     assert!(SIGINFO_SIZE == 0x50);
     assert!(SIGINFO_ALIGN == 8);
+    assert!(size_of::<SiginfoLayout>() == 0x50);
+    assert!(align_of::<SiginfoLayout>() == 8);
+    assert!(SIGFRAME_SIZE == 0x410);
+    assert!(SIGFRAME_UCONTEXT_OFFSET == 0x50);
     assert!(SIGCODE_WORDS[0] == 0xD280_1048);
     assert!(SIGCODE_WORDS[1] == 0xD400_0001);
 };
