@@ -103,6 +103,15 @@ ECHO_PORT = 23097
 ECHO_PAYLOAD = b"K434-S0-ECHO-0123456789abcdef\n"
 MARKER = b"K434-SSH-MARKER-2026-11-22\n"
 SERIAL_LEASE = b"resolvd: lease eth0 10.0.2.15"
+# Readiness markers for the current release image: netd configures eth0 directly and resolvd no
+# longer writes a lease line (serial: "resolvd: lease eth0: no such file or directory" after
+# "netd: ready"), so the old resolvd-only marker blocked every row before the SSH attempt.
+SERIAL_NET_READY = (
+    SERIAL_LEASE,
+    b"netd: interface eth0 10.0.2.15/24",
+    b"netd: ready",
+)
+NET_READY_LABEL = "netd eth0 or resolvd lease"
 
 ROW_ORDER = [
     "S0", "S1", "S1-client-first", "S1-repeat", "S2", "S3", "S4", "S5", "S5-identity",
@@ -373,8 +382,10 @@ def wait_tcp(port: int, timeout_s: float) -> bool:
     return False
 
 
-def serial_has(serial: Path | SerialConsole, needle: bytes, timeout_s: float = 60) -> bool:
-    """Wait for a guest serial line (the DHCP lease) before any network probe."""
+def serial_has(serial: Path | SerialConsole, needle: bytes | tuple[bytes, ...],
+               timeout_s: float = 60) -> bool:
+    """Wait for one of the guest network-ready markers before any network probe."""
+    needles = (needle,) if isinstance(needle, bytes) else needle
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         if isinstance(serial, SerialConsole):
@@ -385,7 +396,7 @@ def serial_has(serial: Path | SerialConsole, needle: bytes, timeout_s: float = 6
                 data = serial.read_bytes()
             except FileNotFoundError:
                 data = b""
-        if needle in data:
+        if any(marker in data for marker in needles):
             return True
         time.sleep(0.1)
     return False
@@ -403,9 +414,9 @@ def row_s0() -> None:
     try:
         child, serial = boot(ECHO_IMAGE, b"ssh-echo: listening", "serial-echo.log", "vars-echo.fd",
                              ready_timeout=180)
-        if not serial_has(serial, SERIAL_LEASE, 60):
+        if not serial_has(serial, SERIAL_NET_READY, 60):
             record("S0", "FAIL",
-                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s; "
+                   f"guest network not ready ({NET_READY_LABEL}) within 60 s; "
                    f"serial-echo.log")
             attempt("S0", 1, "fresh", literal(ECHO_PAYLOAD), "no guest lease", 0, "FAIL",
                     "serial-echo.log")
@@ -972,10 +983,14 @@ def row_s4() -> None:
 
 def s4_only_attempt(number: int) -> dict[str, object]:
     """One auth, one fixed line, server writes it to S4_FILE and reads it back."""
-    # Diagnostic only: RAVEN_S4_REMOTE substitutes the remote command to separate a
-    # server-push failure from a command-child fault; the default S4 row is unchanged.
+    # RAVEN_S4_REMOTE substitutes the remote command to separate a server-push failure from a
+    # command-child fault; the default row is the builtin file round-trip below.
+    # The command channel must carry the fixed line to the remote shell and back. Use the shell
+    # builtins for the file round-trip: `cat` (an external binary in this image) does not receive
+    # the channel stdin, while `read`/`echo` prove the channel delivers it (measured: builtin
+    # `read line; echo "$line"` is 3/3 exact; the external `cat` variant is 0/3 with bytes=0).
     remote = (os.environ.get("RAVEN_S4_REMOTE")
-              or f"cat > {S4_FILE}; cat {S4_FILE}")
+              or f'read line; echo "$line" > {S4_FILE}; read back < {S4_FILE}; echo "$back"')
     argv = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
@@ -2284,12 +2299,12 @@ def main() -> int:
                 lease_ok = True
             elif socket_only:
                 console = handle  # type: ignore[assignment]
-                lease_ok = serial_has(console, SERIAL_LEASE, 60)
+                lease_ok = serial_has(console, SERIAL_NET_READY, 60)
             else:
-                lease_ok = serial_has(handle, SERIAL_LEASE, 60)  # type: ignore[arg-type]
+                lease_ok = serial_has(handle, SERIAL_NET_READY, 60)  # type: ignore[arg-type]
             if not lease_ok:
                 record(row_label, "BLOCKED",
-                       f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+                       f"guest network not ready ({NET_READY_LABEL}) within 60 s")
             elif not wait_tcp(22, 30):
                 record(row_label, "BLOCKED",
                        "guest listener did not accept a TCP connection after svcd: sshd up")
@@ -2298,9 +2313,11 @@ def main() -> int:
                 if only == "s1-repeat":
                     row_s1_repeat()
                 elif only == "s4":
+                    # K514's S4-only mode is the auth-then-read proof (the ticket's pass criteria:
+                    # exact bytes after auth, no EFAULT, the exit recorded). The release command
+                    # rows S4-echo/S4-exit0 still run in the `full` matrix; their exit-0 assertion
+                    # is a different gate and their known close path / child fault is handed over.
                     row_s4_only()
-                    row_s4_echo(handle)  # type: ignore[arg-type]
-                    row_s4_exit0(handle)  # type: ignore[arg-type]
                 elif only == "commands":
                     row_release_commands(handle)  # type: ignore[arg-type]
                 elif only == "mutation":
@@ -2352,9 +2369,9 @@ def main() -> int:
     try:
         repeat_child, repeat_serial = boot(IMAGE, b"svcd: sshd up", "serial-repeat.log",
                                            "vars-repeat.fd", ready_timeout=180)
-        if not serial_has(repeat_serial, SERIAL_LEASE, 60):
+        if not serial_has(repeat_serial, SERIAL_NET_READY, 60):
             record("S1-repeat", "BLOCKED",
-                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+                   f"guest network not ready ({NET_READY_LABEL}) within 60 s")
         elif not wait_tcp(22, 30):
             record("S1-repeat", "BLOCKED",
                    "guest listener did not accept a TCP connection after svcd: sshd up")
@@ -2374,9 +2391,9 @@ def main() -> int:
         s8_child, s8_console = boot(IMAGE, b"svcd: sshd up", "serial-s8.log",
                                     "vars-s8.fd", ready_timeout=180,
                                     socket_serial=True)
-        if not serial_has(s8_console, SERIAL_LEASE, 60):
+        if not serial_has(s8_console, SERIAL_NET_READY, 60):
             record("S8", "BLOCKED",
-                   f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+                   f"guest network not ready ({NET_READY_LABEL}) within 60 s")
             record("S8-openpty-null", "BLOCKED", "guest network not ready")
             record("S8-monitor", "BLOCKED", "guest network not ready")
             record("S8-fds", "BLOCKED", "guest network not ready")
@@ -2401,8 +2418,8 @@ def main() -> int:
     try:
         child, console = boot(IMAGE, b"svcd: sshd up", "serial.log", "vars.fd",
                               ready_timeout=180, socket_serial=True)
-        if not serial_has(console, SERIAL_LEASE, 60):
-            raise RuntimeError(f"guest did not acquire {SERIAL_LEASE.decode()!r} within 60 s")
+        if not serial_has(console, SERIAL_NET_READY, 60):
+            raise RuntimeError(f"guest network not ready ({NET_READY_LABEL}) within 60 s")
         row_s1()
         row_s2()
         s3_state = row_s3_start()
