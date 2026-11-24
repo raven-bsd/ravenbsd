@@ -147,6 +147,7 @@ pub fn replace_image_from_user(
     let ids = *caller.ids.lock();
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let mut new_space = UserAddressSpace::new(address_space);
+    super::install_sigcode(&mut new_space)?;
     if let (Some(interp), Some(data)) = (&interpreter, interpreter_data) {
         super::load_segments(&mut new_space, interp, data, interpreter_bias)
             .map_err(process_errno)?;
@@ -157,7 +158,6 @@ pub fn replace_image_from_user(
     let envp_refs: Vec<&[u8]> = envp.iter().map(Vec::as_slice).collect();
     let stack = super::build_stack(&mut new_space, path, &argv_refs, &envp_refs, &ids, aux)
         .map_err(process_errno)?;
-
     // Collect the handle exits before the switch: the image and stack are now fully built, so a
     // close failure can no longer abort the exec.
     let mut to_close: Vec<Handle> = Vec::new();
@@ -213,11 +213,13 @@ pub fn replace_image_from_user(
     // the alternate signal stack reset. The legacy per-thread SIG_SETUP entry and its context
     // are part of the old image; no entry from it may survive into the new image.
     caller.sigacts.lock().exec_reset();
+    caller.sigcode_addr.store(stack.sigcode, Ordering::Release);
     thread.signal_entry.store(0, Ordering::Release);
     thread.signal_ctx_offset.store(0, Ordering::Release);
     thread.signal_ctx_abs.store(0, Ordering::Release);
     thread.signal_flags.store(0, Ordering::Release);
     thread.signal_active_ctx.store(0, Ordering::Release);
+    thread.signal_frame_uc.store(0, Ordering::Release);
     thread.signal_depth.store(0, Ordering::Release);
     thread.signal_mask.store(0, Ordering::Release);
     thread.resend.store(false, Ordering::Release);
@@ -230,7 +232,7 @@ pub fn replace_image_from_user(
     *caller.command.lock() = command;
     caller.pending_exec.lock().replace(ExecContext {
         entry: initial_entry,
-        stack,
+        stack: stack.sp,
     });
     Ok(())
 }

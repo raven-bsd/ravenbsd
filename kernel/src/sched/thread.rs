@@ -456,6 +456,8 @@ pub struct Thread {
     pub signal_flags: AtomicU32,
     /// Resolved user context area of the signal currently being handled.
     pub signal_active_ctx: AtomicU64,
+    /// User `ucontext_t` of the C19 frame currently being handled; zero outside a C19 signal.
+    pub signal_frame_uc: AtomicU64,
     /// Signal-handler nesting depth; zero outside a signal.
     pub signal_depth: AtomicU32,
     /// User signal mask restored by the last `SIGRESEND` (passed to the entry).
@@ -637,6 +639,7 @@ impl Thread {
             signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
+            signal_frame_uc: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sigmask: AtomicU64::new(0),
@@ -745,6 +748,7 @@ impl Thread {
             signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
+            signal_frame_uc: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sigmask: AtomicU64::new(0),
@@ -808,6 +812,7 @@ impl Thread {
             signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
+            signal_frame_uc: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sigmask: AtomicU64::new(0),

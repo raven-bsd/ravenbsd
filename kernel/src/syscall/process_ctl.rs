@@ -1278,6 +1278,7 @@ fn signal_one_info(
         return terminate_by_signal(caller, target, SIGKILL, false);
     }
     if !target.has_signal_entry()
+        && !target.c19_armed()
         && let Some(action) = default_action(signo)
     {
         match action {

@@ -340,6 +340,8 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
         let mut table = caller.sigacts.lock();
         previous = table.get(signo).ok_or(Errno::EINVAL)?;
         table.install(signo, action)?;
+        drop(table);
+        caller.arm_c19();
     }
     if frame.rdx != 0 {
         // SAFETY: the source is a live SigAction value; the byte view is exact and immutable for

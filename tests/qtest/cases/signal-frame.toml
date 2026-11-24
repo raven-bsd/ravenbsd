@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S44 C19 kernel frame: raw SIGACTION + PROC_SIGNAL, handler args, ucontext, SIGRETURN, default
+# action and exec default. The fixture is PID 1 so its rows reach the serial console; S185 remains
+# the user-facing acceptance and its rows are not changed here.
+
+name = "signal-frame"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/signal/frame/build.sh"]
+initfs = "build/signal-frame/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal-frame: start$'
+
+[[expect]]
+regex = '^signal-frame: handler ok sig=10$'
+
+[[expect]]
+regex = '^signal-frame: ucontext ok rip=0x[0-9a-f]+ rsp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^signal-frame: return ok$'
+
+[[expect]]
+regex = '^signal-frame: default ok signal=10$'
+
+[[expect]]
+regex = '^signal-frame: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|signal-frame: fail|signal-frame: exec-child survived|EXCEPTION'

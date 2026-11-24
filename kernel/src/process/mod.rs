@@ -645,6 +645,15 @@ pub struct Process {
     /// Boxed so the 2.6 KiB `SigActs` table stays off the bounded kernel stack in
     /// `new_empty_process` (the S185/S192 `PROC_CREATE` double fault).
     pub sigacts: Mutex<Box<SigActs>>,
+    /// True once this process installed a C19 action through `SIGACTION`.
+    ///
+    /// A process that never used the kernel disposition table keeps the legacy `PROC_SIGRECV`
+    /// transport; a C19 process gets kernel frame delivery and kernel default actions. The bit is
+    /// inherited by fork and survives exec: the new image still expects C19 signal semantics even
+    /// though `execsigs` reset its handlers.
+    pub sigacts_armed: AtomicBool,
+    /// User address of the kernel-installed sigcode trampoline; zero before the first image.
+    pub sigcode_addr: AtomicU64,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
     /// True once an exec has replaced this process image; a child then refuses `setpgid`.
@@ -926,6 +935,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(SigActs::new())),
+        sigacts_armed: AtomicBool::new(false),
+        sigcode_addr: AtomicU64::new(0),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -959,6 +970,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let mut user_address_space = UserAddressSpace::new(address_space);
+    install_sigcode(&mut user_address_space)?;
     let (namespace, root, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         let root = parent.root.lock().clone();
@@ -986,7 +999,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
-        address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
+        address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
@@ -1008,6 +1021,8 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(SigActs::new())),
+        sigacts_armed: AtomicBool::new(false),
+        sigcode_addr: AtomicU64::new(SIGCODE_ADDRESS),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1083,6 +1098,8 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(**source.sigacts.lock())),
+        sigacts_armed: AtomicBool::new(source.sigacts_armed.load(Ordering::Acquire)),
+        sigcode_addr: AtomicU64::new(source.sigcode_addr.load(Ordering::Acquire)),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1289,6 +1306,28 @@ impl Process {
             .any(|thread| thread.signal_entry.load(Ordering::Acquire) != 0)
     }
 
+    /// True once the process installed a C19 action through `SIGACTION`.
+    pub fn c19_armed(&self) -> bool {
+        self.sigacts_armed.load(Ordering::Acquire)
+    }
+
+    /// Mark the process as a C19 signal consumer.
+    pub fn arm_c19(&self) {
+        self.sigacts_armed.store(true, Ordering::Release);
+    }
+
+    /// Remove the oldest queued signal whose bit is clear in `mask`.
+    ///
+    /// A blocked signal stays queued, matching the masked-queue contract. C19 delivery calls this
+    /// only for an armed process; legacy `PROC_SIGRECV` processes never lose their queue here.
+    pub fn take_deliverable_signal(&self, mask: u64) -> Option<PendingSignal> {
+        let mut pending = self.pending_signals.lock();
+        let index = pending.iter().position(|signal| {
+            mask & 1u64.wrapping_shl(signal.signo.saturating_sub(1) & 63) == 0
+        })?;
+        pending.remove(index)
+    }
+
     /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
     ///
     /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
@@ -1312,20 +1351,39 @@ impl Process {
             value,
         });
         self.signal_waiters.wake_all();
-        self.kick_threads();
+        self.kick_threads(signo);
     }
 
     /// Kick every live thread of this process with the signal-check bit.
-    fn kick_threads(&self) {
+    ///
+    /// A C19 signal whose disposition is ignored (or whose default is ignore/continue) is still
+    /// queued for the return-to-user drain, but it must not turn an unrelated blocking wait into
+    /// `EINTR`: POSIX does not interrupt a wait for a discarded signal.
+    fn kick_threads(&self, signo: u32) {
+        let silent = self.sigacts_armed.load(Ordering::Acquire) && {
+            let action = self.sigacts.lock().get(signo).unwrap_or(SigAction::DEFAULT);
+            action.handler == SIG_IGN
+                || (action.handler == SIG_DFL
+                    && matches!(
+                        status::default_action(signo),
+                        Some(status::DefaultAction::Ignore | status::DefaultAction::Continue)
+                    ))
+        };
+        if silent {
+            return;
+        }
         let mut threads = self.threads_live.lock();
         threads.retain(|weak| {
             let Some(thread) = weak.upgrade() else {
                 return false;
             };
-            // A kick is only meaningful after libc has registered the PG-7 entry. Without one
-            // the word would be consumed as a bare `EINTR` with no handler, so leave the signal
-            // in the process queue for `PROC_SIGRECV` and do not disturb an unrelated wait.
-            if thread.signal_entry.load(Ordering::Acquire) == 0 {
+            // A kick is only meaningful after libc has registered the PG-7 entry or the process has
+            // installed a C19 action. Without either, the word would be consumed as a bare `EINTR`
+            // with no handler, so leave the signal in the process queue for `PROC_SIGRECV` and do
+            // not disturb an unrelated wait.
+            if thread.signal_entry.load(Ordering::Acquire) == 0
+                && !self.sigacts_armed.load(Ordering::Acquire)
+            {
                 return true;
             }
             thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
@@ -1530,6 +1588,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     };
     let address_space = AddressSpace::new().map_err(ProcessError::Map)?;
     let mut user_address_space = UserAddressSpace::new(address_space);
+    install_sigcode(&mut user_address_space).map_err(|_| ProcessError::OutOfFrames)?;
     load_segments(&mut user_address_space, &elf, data, 0)?;
     let path_bytes = path.as_bytes();
     let argv: [&[u8]; 1] = [path_bytes];
@@ -1571,6 +1630,8 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(Box::new(SigActs::new())),
+        sigacts_armed: AtomicBool::new(false),
+        sigcode_addr: AtomicU64::new(user_stack.sigcode),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1603,7 +1664,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         .map_err(ProcessError::Handle)?;
     register_pid(&process);
     crate::sched::init().map_err(ProcessError::Sched)?;
-    let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack, user_stack)
+    let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack.sp, user_stack.sp)
         .map_err(ProcessError::Sched)?;
     arch_syscall::init();
 
@@ -1611,7 +1672,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     kprintln!(
         "process: {path} entry={:#x} sp={:#x}",
         elf.entry(),
-        user_stack
+        user_stack.sp
     );
 
     crate::sched::start_user(thread)
@@ -1831,6 +1892,77 @@ pub(crate) struct StackAuxv {
     pub(crate) phnum: u64,
 }
 
+/// The initial user stack and the kernel-installed sigcode address.
+pub(crate) struct StackImage {
+    /// Initial user stack pointer (the C8 argv/envp/auxv block).
+    pub(crate) sp: u64,
+    /// Address of the sigcode bytes, or zero on an architecture without one.
+    pub(crate) sigcode: u64,
+}
+
+/// Kernel sigcode page in every user address space.
+///
+/// 48 TiB sits between the interpreter window (32 TiB + 1 GiB) and the anonymous-mmap window
+/// (80 TiB + 1 GiB), so it cannot collide with an image, interpreter, heap or stack. Raven maps
+/// this one read/execute page instead of FreeBSD's `VM_PROT_ALL` stack because the COW helper
+/// has no RWX leaf; the divergence is recorded in the report.
+#[cfg(target_arch = "x86_64")]
+pub(crate) const SIGCODE_ADDRESS: u64 = 0x0000_3000_0000_0000;
+/// No kernel sigcode on an architecture whose frame path is a later ticket.
+#[cfg(not(target_arch = "x86_64"))]
+pub(crate) const SIGCODE_ADDRESS: u64 = 0;
+
+/// Address of the kernel sigcode page in a user address space.
+pub(crate) const fn sigcode_address() -> u64 {
+    SIGCODE_ADDRESS
+}
+
+/// Map and fill the kernel sigcode page in a fresh user address space.
+fn install_sigcode(space: &mut UserAddressSpace) -> Result<(), Errno> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        space
+            .vmas_mut()
+            .insert(
+                SIGCODE_ADDRESS,
+                PAGE,
+                (prot::READ | prot::EXEC) as u8,
+                Backing::Anonymous,
+            )
+            .map_err(|_| Errno::ENOMEM)?;
+        let physical = frame::alloc_zeroed_frame().ok_or(Errno::ENOMEM)?;
+        let destination = frame::phys_to_virt(physical);
+        if destination.is_null() {
+            let _ = frame::free_frame(physical);
+            return Err(Errno::ENOMEM);
+        }
+        // SAFETY: `destination` is a fresh zeroed frame mapped through the HHDM and the sigcode
+        // image is a static array of exactly `SIGCODE_SIZE` bytes.
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                crate::arch::x86_64::syscall::SIGCODE.as_ptr(),
+                destination,
+                crate::arch::x86_64::syscall::SIGCODE_SIZE,
+            );
+        }
+        let mut mapper = space.mapper().map_err(|_| Errno::ENOMEM)?;
+        let virtual_address = VirtAddr::new(SIGCODE_ADDRESS).ok_or(Errno::ENOMEM)?;
+        mapper
+            .map(
+                virtual_address,
+                PhysAddr(physical.0),
+                PageFlags::user_rx(),
+                PageSize::Size4K,
+            )
+            .map_err(|_| Errno::ENOMEM)?;
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let _ = space;
+    }
+    Ok(())
+}
+
 fn build_stack(
     address_space: &mut UserAddressSpace,
     path: &[u8],
@@ -1838,7 +1970,7 @@ fn build_stack(
     envp: &[&[u8]],
     ids: &ProcessIds,
     aux: StackAuxv,
-) -> Result<u64, ProcessError> {
+) -> Result<StackImage, ProcessError> {
     // PG-50: `rsp == sp0`, 16-byte aligned, with the C8 argv/envp/auxv block at `sp0`.
     const AT_PHDR: u64 = 3;
     const AT_PHENT: u64 = 4;
@@ -2045,7 +2177,10 @@ fn build_stack(
             .map_err(ProcessError::Map)?;
         page = page.saturating_add(1);
     }
-    Ok(sp0)
+    Ok(StackImage {
+        sp: sp0,
+        sigcode: sigcode_address(),
+    })
 }
 
 /// Place one NUL-terminated string below `cursor` and return its user address.

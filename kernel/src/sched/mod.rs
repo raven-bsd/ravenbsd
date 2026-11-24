@@ -929,7 +929,9 @@ fn kick_pending(thread: &Thread) -> bool {
     if thread.kick_bits.load(Ordering::Acquire) == 0 {
         return false;
     }
-    if thread.signal_entry.load(Ordering::Acquire) == 0 {
+    if thread.signal_entry.load(Ordering::Acquire) == 0
+        && !thread.process.sigacts_armed.load(Ordering::Acquire)
+    {
         thread.kick_bits.swap(0, Ordering::AcqRel);
         return false;
     }
@@ -1076,12 +1078,14 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
     let _block = lock_block(&thread);
     // A kick without a registered handler cannot run user code, so it is a plain wake, not an
     // EINTR. Keep the interrupt for a thread with a real SIG_SETUP entry.
-    let status =
-        if status == Errno::EINTR.to_ret() && thread.signal_entry.load(Ordering::Acquire) == 0 {
-            0
-        } else {
-            status
-        };
+    let status = if status == Errno::EINTR.to_ret()
+        && thread.signal_entry.load(Ordering::Acquire) == 0
+        && !thread.process.sigacts_armed.load(Ordering::Acquire)
+    {
+        0
+    } else {
+        status
+    };
     if let Some(token) = token
         && thread.block_token.load(Ordering::SeqCst) != token
     {
