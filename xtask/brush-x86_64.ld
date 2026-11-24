@@ -32,6 +32,8 @@ SECTIONS {
     /* The R LOAD file part must be a page multiple: spawn(Strict) rejects a partial tail. */
     .rodata ALIGN(4096) : {
         *(.rodata .rodata.*)
+        /* K571 diag: keep unwind metadata for the panic backtrace. */
+        *(.eh_frame .eh_frame.* .eh_frame_hdr)
         . = ALIGN(4096);
     } :rodata
 
@@ -110,7 +112,6 @@ SECTIONS {
     } :bss
 
     /DISCARD/ : {
-        *(.eh_frame*)
         *(.comment)
         *(.note*)
         *(.plt*)
