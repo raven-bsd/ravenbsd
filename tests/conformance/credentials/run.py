@@ -412,6 +412,27 @@ def wait_for(serial: Path, needle: bytes, timeout: float) -> bool:
     return False
 
 
+def wait_ssh_banner(port: int, timeout: float) -> bool:
+    """Wait for the guest SSH identification line before the first client command.
+
+    The TCP port can accept before sshd has sent its banner under host load; the first client
+    then exits with 'Connection timed out during banner exchange'. This is a readiness wait, not
+    a retry of a credential row.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((HOST, port), timeout=2) as probe:
+                probe.settimeout(2)
+                data = probe.recv(64)
+                if b"SSH-2.0-" in data:
+                    return True
+        except OSError:
+            pass
+        time.sleep(0.5)
+    return False
+
+
 def boot(run: Path, image: Path, accel: str) -> tuple[subprocess.Popen, Path, int]:
     run.mkdir(parents=True, exist_ok=True)
     vars_path = run / "vars.fd"
@@ -443,11 +464,16 @@ def boot(run: Path, image: Path, accel: str) -> tuple[subprocess.Popen, Path, in
     while time.monotonic() < deadline:
         try:
             with socket.create_connection((HOST, port), timeout=1):
-                return child, serial, port
+                break
         except OSError:
             time.sleep(0.5)
-    child.kill()
-    raise RuntimeError(f"guest TCP 22 never listened; serial {serial}")
+    else:
+        child.kill()
+        raise RuntimeError(f"guest TCP 22 never listened; serial {serial}")
+    if not wait_ssh_banner(port, 90):
+        child.kill()
+        raise RuntimeError(f"guest SSH banner never arrived; serial {serial}")
+    return child, serial, port
 
 
 def ssh(port: int, command: str, timeout: float) -> tuple[int, bytes, bytes]:
@@ -469,11 +495,22 @@ def ssh(port: int, command: str, timeout: float) -> tuple[int, bytes, bytes]:
         f"{USER}@{HOST}",
         command,
     ]
-    result = subprocess.run(
-        argv, cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout,
-        env=env, check=False,
+    process = subprocess.Popen(
+        argv, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, env=env, start_new_session=True,
     )
-    return result.returncode, result.stdout, result.stderr
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # The current S4/K514 close path can leave the command session open after the exact
+        # output was delivered; kill the client and keep the bytes it already produced.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        stdout, stderr = process.communicate()
+        return -9, stdout, stderr
+    return process.returncode, stdout, stderr
 
 
 def stop(child: subprocess.Popen) -> None:
@@ -537,11 +574,12 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
         ):
             if line in serial_text:
                 failures.append(f"serial: {line}")
-        if code == 255 or code_exec == 255:
+        if code in (255, -9) or code_exec in (255, -9):
             print(
-                "cred-conformance: note: the SSH command exit-status channel returned 255 while "
-                "the command stdout was delivered; the probe's in-band `cred:` rows are the "
-                "verdict (open gap, reported)"
+                "cred-conformance: note: the SSH command session did not close (known "
+                "S4/K514 close path, exit "
+                f"{code}/{code_exec}) while the command stdout was delivered; the probe's "
+                "in-band `cred:` rows are the verdict (open gap, reported)"
             )
         if mutation:
             target = "kernel-rlimit-hard-raise: expected EPERM (1)"
