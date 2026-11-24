@@ -490,7 +490,14 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
             group.decode("utf-8", "replace"),
             umask_exec.decode("utf-8", "replace"),
         )
-        for line in ("KERNEL PANIC", "EXCEPTION", "SegmentOutsideUserRange", "bad ELF"):
+        for line in (
+            "KERNEL PANIC",
+            "EXCEPTION",
+            "SegmentOutsideUserRange",
+            "bad ELF",
+            "killed by page fault",
+            "tlb shootdown timeout",
+        ):
             if line in serial_text:
                 failures.append(f"serial: {line}")
         if code == 255 or code_exec == 255:
