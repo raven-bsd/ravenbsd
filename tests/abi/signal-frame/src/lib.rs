@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Canonical FreeBSD amd64 signal-frame model pinned by S160 / CONTRACTS C19.
+//! Canonical FreeBSD amd64 and aarch64 signal-frame model pinned by S160 / CONTRACTS C19.
 //!
 //! The donor definitions are FreeBSD `sys/x86/include/sigframe.h`,
 //! `sys/x86/include/ucontext.h`, `sys/sys/_ucontext.h`, `sys/sys/_sigset.h`,
-//! `sys/sys/_sigaltstack.h`, `sys/sys/signal.h` and NetBSD
-//! `sys/arch/amd64/include/mcontext.h` + `frame_regs.h`. The checked-in
+//! `sys/sys/_sigaltstack.h`, `sys/sys/signal.h`, NetBSD
+//! `sys/arch/amd64/include/mcontext.h` + `frame_regs.h`, and NetBSD
+//! `sys/arch/arm/include/mcontext.h` (`__gregs[35]`, `__fregs`, `__spare[8]`) for the
+//! aarch64 half inside the C19/S160 ucontext order. The checked-in
 //! `donor-layout.txt` is produced by `donor-layout.c`; `lib_ut.rs` compares every
 //! row to these Rust definitions.
 
@@ -353,6 +355,59 @@ pub const NB_GREG_RFLAGS: usize = 23;
 pub const NB_GREG_RSP: usize = 24;
 /// NetBSD `_REG_SS`.
 pub const NB_GREG_SS: usize = 25;
+
+/// aarch64 `__fregset_t`: 32 128-bit SIMD registers, FPCR and FPSR.
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Aarch64Fregset {
+    /// `__qregs[32]`, 16 bytes each.
+    pub qregs: [[u8; 16]; 32],
+    /// Floating-point control register.
+    pub fpcr: u32,
+    /// Floating-point status register.
+    pub fpsr: u32,
+}
+
+/// aarch64 `mcontext_t`: `__gregs`, `__fregs`, `__spare[8]`.
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Aarch64Mcontext {
+    /// `__gregs`: x0-x30, SP, ELR, SPSR, TPIDR.
+    pub __gregs: [u64; 35],
+    /// `__fregs`.
+    pub __fregs: Aarch64Fregset,
+    /// `__spare[8]`.
+    pub __spare: [u64; 8],
+}
+
+/// aarch64 `ucontext_t` in the C19/S160 order.
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Aarch64Ucontext {
+    /// Blocked signal mask.
+    pub uc_sigmask: Sigset,
+    /// Machine context.
+    pub uc_mcontext: Aarch64Mcontext,
+    /// Continuation context.
+    pub uc_link: *mut Aarch64Ucontext,
+    /// Alternate stack.
+    pub uc_stack: Stack,
+    /// Context flags.
+    pub uc_flags: i32,
+    /// Reserved.
+    pub __spare__: [i32; 4],
+}
+
+/// aarch64 `_NGREG`.
+pub const AARCH64_NGREG: usize = 35;
+/// aarch64 `_REG_SP`.
+pub const AARCH64_REG_SP: usize = 31;
+/// aarch64 `_REG_ELR`.
+pub const AARCH64_REG_ELR: usize = 32;
+/// aarch64 `_REG_SPSR`.
+pub const AARCH64_REG_SPSR: usize = 33;
+/// aarch64 `_REG_TPIDR`.
+pub const AARCH64_REG_TPIDR: usize = 34;
 
 #[cfg(test)]
 #[path = "lib_ut.rs"]
