@@ -642,6 +642,8 @@ pub struct Process {
     /// Signals queued for this process.
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
     /// Per-process C19 signal dispositions (handlers are per process; the mask is per thread).
+    /// Boxed so the 2.6 KiB `SigActs` table stays off the bounded kernel stack in
+    /// `new_empty_process` (the S185/S192 `PROC_CREATE` double fault).
     pub sigacts: Mutex<Box<SigActs>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
