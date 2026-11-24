@@ -358,3 +358,21 @@ fn a_stored_readiness_mask_is_not_a_poll_verdict() {
     assert_eq!(poll(&platform, &mut fds, 1), Ok(0));
     assert_eq!(fds[0].revents, 0);
 }
+
+#[test]
+fn a_failed_registration_marks_pollnval_not_the_whole_call() {
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    fake.fail_evq_registration();
+    let platform = Platform::new(fake);
+    let fd = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("open tty");
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLNVAL);
+}

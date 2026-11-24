@@ -167,17 +167,29 @@ pub fn poll<B: SysBackend, L: Lock>(
         first_wait = false;
         let queue = platform.event_queue()?;
         for (position, registration) in registrations.iter().enumerate() {
-            if let Err(error) = backend.evq_ctl(
-                queue,
-                EVQ_ADD,
-                registration.reference.poll_handle(),
-                registration.events,
-                u64::try_from(position).unwrap_or(0),
-            ) {
+            if backend
+                .evq_ctl(
+                    queue,
+                    EVQ_ADD,
+                    registration.reference.poll_handle(),
+                    registration.events,
+                    u64::try_from(position).unwrap_or(0),
+                )
+                .is_err()
+            {
+                // POSIX: one unbacked/bad descriptor is POLLNVAL for that entry, never a
+                // failure of the whole call. Remove the registrations added so far.
                 for added in registrations.iter().take(position) {
                     let _ = backend.evq_ctl(queue, EVQ_DEL, added.reference.poll_handle(), 0, 0);
                 }
-                return Err(error);
+                let mut invalid = 0usize;
+                for &index in &registration.entries {
+                    if let Some(entry) = fds.get_mut(index) {
+                        entry.revents = POLLNVAL as i16;
+                        invalid = invalid.saturating_add(1);
+                    }
+                }
+                return Ok(invalid);
             }
         }
         let waited = backend.evq_wait(queue, &mut events, timeout_ns);

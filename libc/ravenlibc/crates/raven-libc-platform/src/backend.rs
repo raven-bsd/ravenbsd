@@ -358,6 +358,8 @@ struct FakeWorld {
     record_lock_error: Option<Errno>,
     /// Handle returned for the caller's controlling terminal (`/dev/tty`), if any.
     ctty_handle: Option<Handle>,
+    /// Force every `EVQ_ADD` to fail with `EBADF` (unbacked source tests).
+    fail_evq: bool,
 }
 
 /// Deterministic in-memory backend for host tests.
@@ -406,8 +408,15 @@ impl FakeSys {
                 },
                 record_lock_error: None,
                 ctty_handle: None,
+                fail_evq: false,
             }),
         }
+    }
+
+    /// Make every `EVQ_ADD` fail with `EBADF` (an unbacked poll source).
+    pub fn fail_evq_registration(&self) -> &Self {
+        self.world.borrow_mut().fail_evq = true;
+        self
     }
 
     /// Publish the handle returned for `/dev/tty` (the fake's controlling terminal).
@@ -1130,8 +1139,11 @@ impl SysBackend for FakeSys {
     ) -> Result<(), Errno> {
         self.record(0x4556_5143_0001);
         let mut world = self.world.borrow_mut();
-        let registrations = world.queues.get_mut(&queue.0).ok_or(Errno::EBADF)?;
         const ADD: u32 = 1;
+        if op == ADD && world.fail_evq {
+            return Err(Errno::EBADF);
+        }
+        let registrations = world.queues.get_mut(&queue.0).ok_or(Errno::EBADF)?;
         const MOD: u32 = 2;
         const DEL: u32 = 3;
         match op {
