@@ -74,3 +74,87 @@ fn greg_indices_match_the_netbsd_donor() {
     assert_eq!(ARG_UCONTEXT_CALLEE, 28);
     assert_eq!(REG_LR, 30);
 }
+
+#[test]
+fn donor_table_is_byte_for_byte() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("donor-layout-aarch64.txt");
+    let table = std::fs::read_to_string(path).expect("aarch64 donor table");
+    let mut seen = 0usize;
+    for line in table.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("sizeof(") {
+            let (name, rest) = rest.split_once(")=").expect("sizeof row");
+            let (size, align) = rest.split_once(" align=").expect("sizeof align");
+            let size = parse_hex(size);
+            let align: usize = align.parse().expect("decimal align");
+            match name {
+                "aarch64_sigset_t" => {
+                    assert_eq!(size_of::<[u32; 4]>(), size);
+                    assert_eq!(align_of::<[u32; 4]>(), align);
+                }
+                "aarch64_fregset_t" => {
+                    assert_eq!(size_of::<FpregsetLayout>(), size);
+                    assert_eq!(align_of::<FpregsetLayout>(), align);
+                }
+                "aarch64_mcontext_t" => {
+                    assert_eq!(size_of::<MContextLayout>(), size);
+                    assert_eq!(align_of::<MContextLayout>(), align);
+                }
+                "aarch64_stack_t" => {
+                    assert_eq!(size_of::<StackLayout>(), size);
+                    assert_eq!(align_of::<StackLayout>(), align);
+                }
+                "aarch64_siginfo_t" => {
+                    assert_eq!(SIGINFO_SIZE, size);
+                    assert_eq!(SIGINFO_ALIGN, align);
+                }
+                "aarch64_ucontext_t" => {
+                    assert_eq!(size_of::<UContextLayout>(), size);
+                    assert_eq!(align_of::<UContextLayout>(), align);
+                }
+                other => panic!("unknown sizeof row {other}"),
+            }
+            seen += 1;
+            continue;
+        }
+        let (name, value) = line.split_once('=').expect("field row");
+        let value = parse_hex(value);
+        match name {
+            "aarch64_fregset_t.__qregs" => assert_eq!(offset_of!(FpregsetLayout, q), value),
+            "aarch64_fregset_t.__fpcr" => assert_eq!(offset_of!(FpregsetLayout, fpcr), value),
+            "aarch64_fregset_t.__fpsr" => assert_eq!(offset_of!(FpregsetLayout, fpsr), value),
+            "aarch64_mcontext_t.__gregs" => assert_eq!(offset_of!(MContextLayout, gregs), value),
+            "aarch64_mcontext_t.__fregs" => assert_eq!(offset_of!(MContextLayout, fregs), value),
+            "aarch64_mcontext_t.__spare" => assert_eq!(offset_of!(MContextLayout, spare), value),
+            "aarch64_stack_t.ss_sp" => assert_eq!(offset_of!(StackLayout, ss_sp), value),
+            "aarch64_stack_t.ss_size" => assert_eq!(offset_of!(StackLayout, ss_size), value),
+            "aarch64_stack_t.ss_flags" => assert_eq!(offset_of!(StackLayout, ss_flags), value),
+            "aarch64_ucontext_t.uc_sigmask" => {
+                assert_eq!(offset_of!(UContextLayout, uc_sigmask), value);
+            }
+            "aarch64_ucontext_t.uc_mcontext" => {
+                assert_eq!(offset_of!(UContextLayout, uc_mcontext), value);
+            }
+            "aarch64_ucontext_t.uc_link" => assert_eq!(offset_of!(UContextLayout, uc_link), value),
+            "aarch64_ucontext_t.uc_stack" => {
+                assert_eq!(offset_of!(UContextLayout, uc_stack), value)
+            }
+            "aarch64_ucontext_t.uc_flags" => {
+                assert_eq!(offset_of!(UContextLayout, uc_flags), value)
+            }
+            "aarch64_ucontext_t.__spare__" => {
+                assert_eq!(offset_of!(UContextLayout, uc_spare), value);
+            }
+            other => panic!("unknown field row {other}"),
+        }
+        seen += 1;
+    }
+    assert_eq!(seen, 21, "aarch64 donor table row count");
+}
+
+fn parse_hex(text: &str) -> usize {
+    usize::from_str_radix(text.trim_start_matches("0x"), 16).expect("hex")
+}
