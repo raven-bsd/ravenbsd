@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S173: polling conformance rows. The C fixture runs as /bin/libc-test under the libc-test
+# profile and asserts the exact poll/select readiness result for each row; the case forbids a
+# failure line. S172's shared harness is not on master, so this suite is self-contained.
+
+name = "polling"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/conformance/polling/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^polling: pipe-before ok$'
+
+[[expect]]
+regex = '^polling: pipe-after ok$'
+
+[[expect]]
+regex = '^polling: select-pipe ok$'
+
+[[expect]]
+regex = '^polling: pipe-hup ok$'
+
+[[expect]]
+regex = '^polling: timeout ok$'
+
+[[expect]]
+regex = '^polling: eintr ok$'
+
+[[expect]]
+regex = '^polling: socket-err ok$'
+
+[[expect]]
+regex = '^polling: eventfd ok$'
+
+[[expect]]
+regex = '^polling: timerfd ok$'
+
+[[expect]]
+regex = '^polling: ok$'
+
+[[forbid]]
+regex = '(?i)polling: fail|panic|EXCEPTION'
