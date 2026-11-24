@@ -86,7 +86,12 @@ KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 # iteration must cross these tolerances.
 CLASS1536_TOLERANCE = 32
 CLASS3072_TOLERANCE = 16
-HEAP_TOLERANCE = 1024 * 1024
+# The size-class allocator caches freed slabs and never returns them to the arena, so heap_used
+# and frames_alloc settle above the pre-loop value by roughly the peak slab set, not by the live
+# objects. The class in_use counters are the exact leak measure; these two bounds only reject a
+# large unbounded growth.
+HEAP_TOLERANCE = 16 * 1024 * 1024
+FRAME_TOLERANCE = 32 * 1024 * 1024
 PROC_TOLERANCE = 8
 THREAD_TOLERANCE = 8
 CHURN_MIN_ITERATIONS = 10
@@ -160,20 +165,28 @@ def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) 
     failures: list[str] = []
     if iterations < CHURN_MIN_ITERATIONS:
         return failures
-    fields = ("class1536_in_use", "class3072_in_use", "heap_used", "procs", "threads")
+    fields = (
+        "class1536_in_use",
+        "class3072_in_use",
+        "heap_used",
+        "frames_alloc",
+        "procs",
+        "threads",
+    )
     missing = [field for field in fields if field not in base or field not in end]
     if missing:
         return [f"churn: metrics missing {', '.join(missing)}"]
     c15_0, c15_1 = int(base["class1536_in_use"]), int(end["class1536_in_use"])
     c30_0, c30_1 = int(base["class3072_in_use"]), int(end["class3072_in_use"])
     h0, h1 = int(base["heap_used"]), int(end["heap_used"])
+    f0, f1 = int(base["frames_alloc"]), int(end["frames_alloc"])
     p0, p1 = int(base["procs"]), int(end["procs"])
     t0, t1 = int(base["threads"]), int(end["threads"])
     print(
         "memory-map: footprint class1536={c15_0}->{c15_1} class3072={c30_0}->{c30_1} "
-        "heap={h0}->{h1} procs={p0}->{p1} threads={t0}->{t1}".format(
+        "heap={h0}->{h1} frames={f0}->{f1} procs={p0}->{p1} threads={t0}->{t1}".format(
             c15_0=c15_0, c15_1=c15_1, c30_0=c30_0, c30_1=c30_1,
-            h0=h0, h1=h1, p0=p0, p1=p1, t0=t0, t1=t1,
+            h0=h0, h1=h1, f0=f0, f1=f1, p0=p0, p1=p1, t0=t0, t1=t1,
         )
     )
     if c15_1 > c15_0 + CLASS1536_TOLERANCE:
@@ -182,6 +195,8 @@ def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) 
         failures.append(f"churn: class3072_in_use {c30_0}->{c30_1} above {CLASS3072_TOLERANCE}")
     if h1 > h0 + HEAP_TOLERANCE:
         failures.append(f"churn: heap_used {h0}->{h1} above {HEAP_TOLERANCE}")
+    if f1 > f0 + FRAME_TOLERANCE:
+        failures.append(f"churn: frames_alloc {f0}->{f1} above {FRAME_TOLERANCE}")
     if p1 > p0 + PROC_TOLERANCE:
         failures.append(f"churn: procs {p0}->{p1} above {PROC_TOLERANCE}")
     if t1 > t0 + THREAD_TOLERANCE:
@@ -213,6 +228,7 @@ def selftest() -> int:
         "class1536_in_use": "4",
         "class3072_in_use": "7",
         "heap_used": "1000000",
+        "frames_alloc": "2000000",
         "procs": "9",
         "threads": "40",
     }
@@ -353,7 +369,7 @@ def run(
         # first sample can lag the sshd-up marker; wait for it rather than comparing with nothing.
         base, base_graphs = wait_metrics(
             serial,
-            ("class1536_in_use", "class3072_in_use", "heap_used", "procs", "threads"),
+            ("class1536_in_use", "class3072_in_use", "heap_used", "frames_alloc", "procs", "threads"),
             1,
             20,
         )
@@ -374,9 +390,9 @@ def run(
         # children are reflected, then take the last sample as the post-loop footprint.
         end, _ = wait_metrics(
             serial,
-            ("class1536_in_use", "class3072_in_use", "heap_used", "procs", "threads"),
-            base_graphs + 2,
-            10,
+            ("class1536_in_use", "class3072_in_use", "heap_used", "frames_alloc", "procs", "threads"),
+            base_graphs + 4,
+            20,
         )
         serial_text = serial.read_text(encoding="utf-8", errors="replace")
         rows = parse_rows(probe_text)
