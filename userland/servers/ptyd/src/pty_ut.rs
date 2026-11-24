@@ -94,11 +94,13 @@ fn echo_off_and_flush_drop_the_expected_bytes() {
 }
 
 #[test]
-fn hangup_makes_empty_reads_return_eof() {
+fn hangup_makes_master_reads_eio_and_slave_reads_eof() {
+    // FreeBSD sys/kern/tty_pts.c:223 returns EIO for the master once the slave side is
+    // finished; the slave keeps the EOF (0) contract.
     let mut pty = pty();
     pty.hangup();
     assert!(pty.is_eof());
-    assert_eq!(pty.read_master(&mut [0u8; 4]), Ok(0));
+    assert_eq!(pty.read_master(&mut [0u8; 4]), Err(Errno::EIO));
     assert_eq!(pty.read_slave(&mut [0u8; 4]), Ok(0));
 }
 
@@ -240,4 +242,16 @@ fn a_custom_verase_byte_edits_the_line() {
     pty.set_termios(want);
     pty.write_master(b"ab\x18c\n");
     assert_eq!(read_slave(&mut pty), b"ac\n");
+}
+
+#[test]
+fn master_read_drains_then_returns_eio_after_hangup() {
+    // FreeBSD sys/kern/tty_pts.c:110 ptsdev_read returns EIO at :223 once the slave side is
+    // finished; queued master data drains first. The slave reader keeps the EOF (0) contract.
+    let mut pty = pty();
+    pty.write_slave(b"last");
+    pty.hangup();
+    assert_eq!(read_master(&mut pty), b"last");
+    assert_eq!(pty.read_master(&mut [0u8; 4]), Err(Errno::EIO));
+    assert_eq!(pty.read_slave(&mut [0u8; 4]), Ok(0));
 }

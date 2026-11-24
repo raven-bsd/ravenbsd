@@ -901,11 +901,28 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             return Ok(12);
         }
         if level == SOL_SOCKET && name == SO_ERROR {
-            let mut value = rec.so_error;
+            // The pending error lives in netd/`raven-tcpip`; read it once and let the server
+            // clear it (`FreeBSD sogetopt`). The cached value is the blocking-connect result and
+            // must not mask a deferred refusal with a zero default.
+            let value = match rec.sock {
+                Some(sock) => {
+                    match self.backend.call(
+                        sock,
+                        Call::GetSockOpt {
+                            opt: SockOpt::Error,
+                        },
+                    )? {
+                        CallReply::Value(value) => value,
+                        _ => return Err(Errno::EPROTO),
+                    }
+                }
+                None => 0,
+            };
             rec.so_error = 0;
-            if rec.state == SocketState::Connecting {
+            if value != 0 {
+                rec.state = SocketState::Open;
+            } else if rec.state == SocketState::Connecting {
                 rec.state = SocketState::Connected;
-                value = 0;
             }
             return opts::write_i32(out, value);
         }
