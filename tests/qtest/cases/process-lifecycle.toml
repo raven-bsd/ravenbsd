@@ -103,6 +103,34 @@ regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=[0-9]+$'
 [[expect]]
 regex = '^s36: mapcheck ok$'
 
+# C18 lifetime 1: the owning process exits with the pager file still open; the pager count must
+# be zero, not just under the frame tolerance.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=0$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
+[[expect]]
+regex = '^s36: pager exit done$'
+
+# C18 lifetime 2: shrinking truncate while the controller still holds the open file. Without the
+# vfsd truncate retire the pager key remains and this `pager=0` line is not printed.
+[[expect]]
+regex = '^s36: mapcheck base allocated=[0-9]+ pager=[0-9]+$'
+
+[[expect]]
+regex = '^s36: mapcheck delta=[0-9]+ allocated=[0-9]+ pager=0$'
+
+[[expect]]
+regex = '^s36: mapcheck ok$'
+
+[[expect]]
+regex = '^s36: pager truncate done$'
+
 [[expect]]
 regex = '^s36: lifecycle ok$'
 
