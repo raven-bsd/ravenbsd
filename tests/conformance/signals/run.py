@@ -41,7 +41,6 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 OVMF_CODE = Path(os.environ.get("RAVEN_OVMF_CODE", "/usr/share/OVMF/OVMF_CODE_4M.fd"))
 OVMF_VARS = Path(os.environ.get("RAVEN_OVMF_VARS", "/usr/share/OVMF/OVMF_VARS_4M.fd"))
-PROBE = "/bin/sigact-guard"
 
 KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 

@@ -31,10 +31,10 @@ The probe prints `sigact:` rows and exits 0 only when every row checks.
 ## Run
 
 ```sh
-timeout 600 /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/scripts/build-slot.sh s199-image -- \
+timeout 420 /home/bo/work/ravenos-workspace/ravenbsd-prjmgmt/scripts/build-slot.sh s199-image -- \
     sh tests/conformance/signals/build.sh
 timeout 60 python3 tests/conformance/signals/run.py --selftest
-timeout 240 python3 tests/conformance/signals/run.py --image build/conformance/signals/signals.img
+timeout 60 python3 tests/conformance/signals/run.py --image build/conformance/signals/signals.img
 ```
 
 The build produces `build/conformance/signals/signals.img`; the run boots it under OVMF/QEMU and
