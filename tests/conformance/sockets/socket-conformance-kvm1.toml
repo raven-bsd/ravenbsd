@@ -16,8 +16,9 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-enable-kvm", "-cpu", "host", "-smp", "1",
     "-nic", "none",
-    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23100-:23100",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23100",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/socket-conformance/monitor.sock,server=on,wait=off",
     "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance/qemu-kvm1.pcap",
 ]
 expect_exit = "success"

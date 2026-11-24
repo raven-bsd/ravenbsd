@@ -11,9 +11,9 @@ cd "$root"
 
 out=${SOCKET_CONFORMANCE_OUT:-build/fixtures/socket-conformance}
 mkdir -p "$out"
-rm -f "$out/host.result" "$out/host.log" "$out/host.stdout"
+rm -f "$out/host.result" "$out/host.log" "$out/host.stdout" "$out/monitor.sock"
 pkill -f "$root/tests/conformance/sockets/host.py" 2>/dev/null || true
 python3 "$root/tests/conformance/sockets/host.py" \
-    --host 127.0.0.1 --port 23100 \
+    --host 127.0.0.1 --monitor "$out/monitor.sock" \
     --result "$out/host.result" --log "$out/host.log" \
     > "$out/host.stdout" 2>&1 &

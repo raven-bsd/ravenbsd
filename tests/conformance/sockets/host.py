@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import socket
 import struct
 import sys
@@ -14,6 +15,53 @@ import time
 
 def log(message: str) -> None:
     print(f"socket-conformance: {message}", flush=True)
+
+
+def parse_usernet(text: str) -> dict[int, int]:
+    """Map guest port 23100 to the ephemeral host port QEMU chose."""
+    ports: dict[int, int] = {}
+    pattern = re.compile(
+        r"TCP\[HOST_FORWARD\]\s+\d+\s+\S+\s+(\d+)\s+\S+\s+(\d+)"
+    )
+    for line in text.splitlines():
+        match = pattern.search(line)
+        if match is None:
+            continue
+        host_port = int(match.group(1))
+        guest_port = int(match.group(2))
+        if guest_port == 23100:
+            ports[guest_port] = host_port
+    return ports
+
+
+def discover_ports(path: str, deadline: float) -> dict[int, int]:
+    """Read QEMU's `info usernet` until the 23100 forward is known."""
+    last = "monitor socket did not appear"
+    while time.monotonic() < deadline:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as monitor:
+                remaining = max(0.1, deadline - time.monotonic())
+                monitor.settimeout(min(2.0, remaining))
+                monitor.connect(path)
+                monitor.sendall(b"info usernet\n")
+                data = b""
+                read_deadline = min(deadline, time.monotonic() + 2.0)
+                while time.monotonic() < read_deadline:
+                    try:
+                        chunk = monitor.recv(4096)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    data += chunk
+                    ports = parse_usernet(data.decode(errors="replace"))
+                    if 23100 in ports:
+                        return ports
+            last = f"incomplete forwarding table: {parse_usernet(data.decode(errors='replace'))!r}"
+        except OSError as error:
+            last = str(error)
+        time.sleep(0.1)
+    raise RuntimeError(f"QEMU monitor {path}: {last}")
 
 
 def connect(host: str, port: int) -> socket.socket:
@@ -39,11 +87,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=23100)
+    parser.add_argument("--monitor", default="")
     parser.add_argument("--result", required=True)
     parser.add_argument("--log", default="")
     args = parser.parse_args()
     rows: list[str] = []
     try:
+        if args.monitor:
+            args.port = discover_ports(
+                args.monitor, time.monotonic() + 30.0
+            )[23100]
         # The one-shot guest service starts before netd finishes the 10.0.2.15 lease;
         # wait for the boot to settle so the first hostfwd connection reaches the listener.
         time.sleep(8.0)

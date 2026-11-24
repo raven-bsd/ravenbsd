@@ -267,13 +267,14 @@ int main(void)
     row_accept(listen_fd);
     row_soerror();
     row_shutdown(listen_fd);
+    /* The half-close row uses the original listener before the close/rebind row. */
+    row_half(listen_fd);
     close(listen_fd);
     listen_fd = listener();
     if (listen_fd < 0)
         fail("rebound", "listener rebind");
     else
         pass("rebound", "same port after close");
-    row_half(listen_fd);
     if (listen_fd >= 0)
         close(listen_fd);
     if (failures == 0) {
