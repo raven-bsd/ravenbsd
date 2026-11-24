@@ -496,8 +496,8 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
         if code == 255 or code_exec == 255:
             print(
                 "cred-conformance: note: the SSH command exit-status channel returned 255 while "
-                "the command stdout was delivered; the probe verdict is the in-band `cred: ok` "
-                "line (open gap, reported)"
+                "the command stdout was delivered; the probe's in-band `cred:` rows are the "
+                "verdict (open gap, reported)"
             )
         if mutation:
             target = "kernel-rlimit-hard-raise: expected EPERM (1)"
