@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S174 socket conformance on the release image (shipped dynamic userland and netd), not the
+# network-config-test profile. The same one-shot probe drives the host peer over an ephemeral
+# hostfwd; the half-close pcap is captured for the release row.
+name = "socket-conformance-release-tcg"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = [
+    "SOCKET_CONFORMANCE_OUT=build/fixtures/socket-conformance-release sh tests/conformance/sockets/build-release.sh",
+    "SOCKET_CONFORMANCE_OUT=build/fixtures/socket-conformance-release sh tests/conformance/sockets/start-host.sh",
+]
+initfs = "build/fixtures/socket-conformance-release/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-accel", "tcg", "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23100",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/socket-conformance-release/monitor.sock,server=on,wait=off",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance-release/qemu-release-tcg.pcap",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONFORM layout PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM reuseaddr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM accept PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM soerror PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM rebound PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM half PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutrd PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutrdwr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM SUMMARY PASS 10/10$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+# A row-level FAIL must not abort the remaining rows (S186 stops at the first forbidden line);
+# the expects above already require every row PASS and SUMMARY 10/10. Only a crash is forbidden.
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
