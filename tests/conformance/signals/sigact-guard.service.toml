@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S199 SIGACTION guarded-buffer probe. The program exits 0 only when every `sigact:` row checks;
+# svcd propagates the status through exit_when_exits so the image lifetime ends with the probe.
+
+name = "sigact-guard"
+exec = "/bin/sigact-guard"
+args = ["/bin/sigact-guard"]
+needs = ["scheme:tty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
