@@ -17,19 +17,7 @@
 #include <unistd.h>
 
 #define RAW_DEBUG_WRITE 0x03L
-#define RAW_SIGACTION 0x87L
 #define RAW_PROC_SIGNAL 0x4AL
-#define RAW_SA_SIGINFO 4U
-
-struct kernel_sigaction {
-    void *handler;
-    unsigned long mask[2];
-    unsigned int flags;
-    unsigned int pad;
-    void *restorer;
-};
-
-_Static_assert(sizeof(struct kernel_sigaction) == 40, "kernel SIGACTION is 40 bytes");
 
 static volatile sig_atomic_t handler_count;
 static volatile int handler_sig;
@@ -66,15 +54,6 @@ static void sayf(const char *format, ...) {
         return;
     }
     say_text(buffer);
-}
-
-static int raw_sigaction(int signo, struct kernel_sigaction *action) {
-    long result = raw3(RAW_SIGACTION, signo, (long)action, 0);
-    if (result < 0) {
-        errno = (int)-result;
-        return -1;
-    }
-    return 0;
 }
 
 static int raw_proc_signal(int pid, int signo) {
@@ -139,15 +118,16 @@ static int check_ucontext(void) {
 }
 
 static int default_action_row(void) {
-    struct kernel_sigaction action;
+    struct sigaction action;
     pid_t child;
     int status = 0;
 
     memset(&action, 0, sizeof(action));
-    action.handler = SIG_DFL;
+    action.sa_handler = SIG_DFL;
+    sigemptyset(&action.sa_mask);
     child = fork();
     if (child == 0) {
-        if (raw_sigaction(SIGUSR1, &action) != 0) {
+        if (sigaction(SIGUSR1, &action, NULL) != 0) {
             _exit(3);
         }
         if (raw_proc_signal(getpid(), SIGUSR1) != 0) {
@@ -169,7 +149,7 @@ static int default_action_row(void) {
 }
 
 int main(int argc, char **argv) {
-    struct kernel_sigaction action;
+    struct sigaction action;
     uintptr_t marker = 0;
     int failures = 0;
 
@@ -177,9 +157,10 @@ int main(int argc, char **argv) {
     (void)argv;
     sayf("signal-frame: start\n");
     memset(&action, 0, sizeof(action));
-    action.handler = (void *)handler;
-    action.flags = RAW_SA_SIGINFO;
-    if (raw_sigaction(SIGUSR1, &action) != 0) {
+    action.sa_sigaction = handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_SIGINFO;
+    if (sigaction(SIGUSR1, &action, NULL) != 0) {
         return fail_row("sigaction", 0, errno);
     }
 

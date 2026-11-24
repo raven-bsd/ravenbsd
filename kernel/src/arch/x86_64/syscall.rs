@@ -438,6 +438,12 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     }
     let blocked = thread.sig_blocked.load(Ordering::Acquire);
     let Some((record, action)) = process.next_kernel_signal(blocked) else {
+        if thread.signal_entry.load(Ordering::Acquire) == 0 {
+            thread.sig_kernel_pending.store(false, Ordering::Release);
+            thread
+                .kick_bits
+                .fetch_and(!signal::KICK_CHECK, Ordering::AcqRel);
+        }
         return false;
     };
     let mut context = SIGNAL_CONTEXT.lock();
@@ -452,6 +458,14 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     thread
         .sig_blocked
         .store(new_mask & !unblockable, Ordering::Release);
+    if thread.signal_entry.load(Ordering::Acquire) == 0
+        && !process.has_deliverable_kernel_signal(new_mask & !unblockable)
+    {
+        thread.sig_kernel_pending.store(false, Ordering::Release);
+        thread
+            .kick_bits
+            .fetch_and(!signal::KICK_CHECK, Ordering::AcqRel);
+    }
     let alt_sp = thread.sig_alt_sp.load(Ordering::Acquire);
     let alt_size = thread.sig_alt_size.load(Ordering::Acquire);
     let alt_flags = thread.sig_alt_flags.load(Ordering::Acquire);

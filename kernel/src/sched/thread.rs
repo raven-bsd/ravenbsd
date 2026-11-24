@@ -456,8 +456,6 @@ pub struct Thread {
     pub signal_flags: AtomicU32,
     /// Resolved user context area of the signal currently being handled.
     pub signal_active_ctx: AtomicU64,
-    /// User `ucontext_t` of the C19 frame currently being handled; zero outside a C19 signal.
-    pub signal_frame_uc: AtomicU64,
     /// Signal-handler nesting depth; zero outside a signal.
     pub signal_depth: AtomicU32,
     /// User signal mask restored by the last `SIGRESEND` (passed to the entry).
@@ -476,6 +474,12 @@ pub struct Thread {
     pub sig_alt_flags: AtomicU32,
     /// True while the handler runs on the alternate stack.
     pub sig_on_altstack: AtomicBool,
+    /// A caught kernel `sigaction` signal is pending for this thread.
+    ///
+    /// The bit closes the queue/block race: a signal queued before the thread reaches
+    /// `begin_block_interruptible` is still observed by `take_kick`, and a signal queued after it
+    /// is preserved by `sched::wake` instead of being downgraded to a plain wake.
+    pub sig_kernel_pending: AtomicBool,
     /// A `SIGRESEND` re-entry is waiting for the return-to-user path.
     pub resend: AtomicBool,
     /// Current cross-process trace id (`R-OBS-6`); zero means "not traced".
@@ -645,7 +649,6 @@ impl Thread {
             signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
-            signal_frame_uc: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sig_blocked: AtomicU64::new(0),
@@ -655,6 +658,7 @@ impl Thread {
             sig_alt_size: AtomicU64::new(0),
             sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
             sig_on_altstack: AtomicBool::new(false),
+            sig_kernel_pending: AtomicBool::new(false),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: slot,
@@ -757,7 +761,6 @@ impl Thread {
             signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
-            signal_frame_uc: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sig_blocked: AtomicU64::new(0),
@@ -767,6 +770,7 @@ impl Thread {
             sig_alt_size: AtomicU64::new(0),
             sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
             sig_on_altstack: AtomicBool::new(false),
+            sig_kernel_pending: AtomicBool::new(false),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),
@@ -824,7 +828,6 @@ impl Thread {
             signal_ctx_abs: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
-            signal_frame_uc: AtomicU64::new(0),
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sig_blocked: AtomicU64::new(0),
@@ -834,6 +837,7 @@ impl Thread {
             sig_alt_size: AtomicU64::new(0),
             sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
             sig_on_altstack: AtomicBool::new(false),
+            sig_kernel_pending: AtomicBool::new(false),
             resend: AtomicBool::new(false),
             trace_id: AtomicU64::new(0),
             _thread_slot: ThreadSlot::idle(),

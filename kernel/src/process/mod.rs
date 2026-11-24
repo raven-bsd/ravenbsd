@@ -75,12 +75,14 @@ const PAGE: u64 = 4096;
 /// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
 /// and headroom. The first process gets the same 256 KiB mapping.
 const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
-/// Fixed user VA of the kernel-installed sigcode page (the last page below `USER_END`).
+/// Fixed user VA of the kernel-installed sigcode page.
 ///
-/// C19 installs the return trampoline at exec, read-only+exec; every handler's frame return
-/// address points here, so a new image can never inherit an entry address from the old one.
+/// C19 installs the return trampoline at exec and for every `PROC_CREATE` image, read-only+exec;
+/// every handler's frame return address points here, so a new image can never inherit an entry
+/// address from the old one. 48 TiB is between the interpreter window (32 TiB + 1 GiB) and the
+/// anonymous-mmap window (80 TiB + 1 GiB); it is the recorded divergence from FreeBSD's RWX stack.
 #[cfg(target_arch = "x86_64")]
-pub const SIGCODE_BASE: u64 = raven_abi::layout::x86_64::USER_END - PAGE;
+pub const SIGCODE_BASE: u64 = 0x0000_3000_0000_0000;
 /// `mov eax, SIGRETURN; syscall; ud2`: the only job of the sigcode trampoline.
 #[cfg(target_arch = "x86_64")]
 pub const SIGCODE: [u8; 9] = [
@@ -999,6 +1001,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let mut user_address_space = UserAddressSpace::new(address_space);
+    install_sigcode(&mut user_address_space).map_err(|_| Errno::ENOMEM)?;
     let (namespace, root, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         let root = parent.root.lock().clone();
@@ -1026,7 +1030,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
-        address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
+        address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
@@ -1362,16 +1366,26 @@ impl Process {
     /// `PROC_SIGRECV` and no unrelated wait is disturbed.
     fn kick_threads(&self, signo: u32) {
         let kernel_handler = self.sigacts.lock().get(signo).is_caught();
+        let kernel_bit = signal_bit(signo);
         let mut threads = self.threads_live.lock();
         threads.retain(|weak| {
             let Some(thread) = weak.upgrade() else {
                 return false;
             };
             let legacy = thread.signal_entry.load(Ordering::Acquire) != 0;
-            if !legacy && !kernel_handler {
+            let kernel_here =
+                kernel_handler && thread.sig_blocked.load(Ordering::Acquire) & kernel_bit == 0;
+            if !legacy && !kernel_here {
                 return true;
             }
             if legacy {
+                thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            }
+            if kernel_here {
+                // Close both races: the signal may arrive before the target reaches its block
+                // (the sticky bit is seen by `take_kick`), or after it (the flag is seen by
+                // `sched::wake`, which preserves EINTR for a caught kernel action).
+                thread.sig_kernel_pending.store(true, Ordering::Release);
                 thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
             }
             if thread.interruptible.load(Ordering::Acquire) {
@@ -1381,6 +1395,14 @@ impl Process {
             }
             true
         });
+    }
+
+    /// True when a caught, unmasked kernel signal is still queued for the process.
+    pub fn has_deliverable_kernel_signal(&self, blocked: u64) -> bool {
+        let sigacts = self.sigacts.lock();
+        self.pending_signals.lock().iter().any(|signal| {
+            sigacts.get(signal.signo).is_caught() && blocked & signal_bit(signal.signo) == 0
+        })
     }
 
     /// Pop the oldest signal that `blocked` does not mask and whose disposition is a user handler.
@@ -1505,8 +1527,51 @@ pub fn init_available(cmdline: &CmdLine) -> bool {
     initfs::lookup(path).is_some()
 }
 
+/// S44 first-increment kernel test: the per-process disposition table, install/read/clear and the
+/// exec reset (`SIG_DFL` for handlers, `SIG_IGN` retained). Runs before PID 1 and exits QEMU.
+fn sigacts_selftest() -> ! {
+    fn fail(message: &str) -> ! {
+        kprintln!("s44: sigacts failed {message}");
+        crate::boot::exit_qemu(0x11);
+    }
+    let mut table = SigActs::new();
+    let handler = SigAction {
+        handler: 0x1234,
+        mask: 0,
+        flags: 0,
+    };
+    table.set(status::SIGUSR1, handler);
+    if table.get(status::SIGUSR1).handler != 0x1234 {
+        fail("readback");
+    }
+    table.set(status::SIGUSR1, SigAction::default_action());
+    if table.get(status::SIGUSR1).handler != SIG_DFL {
+        fail("clear readback");
+    }
+    table.set(status::SIGUSR1, handler);
+    table.set(
+        status::SIGTERM,
+        SigAction {
+            handler: SIG_IGN,
+            mask: 0,
+            flags: 0,
+        },
+    );
+    table.exec_reset();
+    if table.get(status::SIGUSR1).handler != SIG_DFL
+        || table.get(status::SIGTERM).handler != SIG_IGN
+    {
+        fail("exec reset");
+    }
+    kprintln!("s44: sigacts table ok");
+    crate::boot::exit_qemu(0x10);
+}
+
 /// Create PID 1 from the initfs and enter ring 3. On success this never returns.
 pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
+    if cmdline.get("s44-sigactscheck").is_some() {
+        sigacts_selftest();
+    }
     let path = cmdline.get("init").unwrap_or("/init");
     let entry = initfs::lookup(path).ok_or(ProcessError::NoInit)?;
     let data = entry.data;

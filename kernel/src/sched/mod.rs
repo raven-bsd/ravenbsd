@@ -61,6 +61,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+use raven_abi::signal::KICK_CHECK;
 use spin::{Mutex as SpinMutex, MutexGuard as SpinMutexGuard};
 
 use crate::kprintln;
@@ -929,13 +930,15 @@ fn kick_pending(thread: &Thread) -> bool {
     if thread.kick_bits.load(Ordering::Acquire) == 0 {
         return false;
     }
-    if thread.signal_entry.load(Ordering::Acquire) == 0
-        && !thread.process.sigacts_armed.load(Ordering::Acquire)
-    {
-        thread.kick_bits.swap(0, Ordering::AcqRel);
-        return false;
+    if thread.signal_entry.load(Ordering::Acquire) != 0 {
+        return true;
     }
-    true
+    if thread.sig_kernel_pending.swap(false, Ordering::AcqRel) {
+        thread.kick_bits.fetch_and(!KICK_CHECK, Ordering::AcqRel);
+        return true;
+    }
+    thread.kick_bits.swap(0, Ordering::AcqRel);
+    false
 }
 
 /// Register a timeout for the current blocking operation with its wake status.
@@ -1076,11 +1079,11 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
     // and `schedule_locked`. Holding the thread's block lock makes "read state" and "publish
     // the wake" atomic with the waiter's "set Blocked, re-check pending" sequence.
     let _block = lock_block(&thread);
-    // A kick without a registered handler cannot run user code, so it is a plain wake, not an
-    // EINTR. Keep the interrupt for a thread with a real SIG_SETUP entry.
+    // A kick without a registered handler or a caught kernel signal cannot run user code, so it
+    // is a plain wake, not an EINTR. Keep the interrupt for either real delivery path.
     let status = if status == Errno::EINTR.to_ret()
         && thread.signal_entry.load(Ordering::Acquire) == 0
-        && !thread.process.sigacts_armed.load(Ordering::Acquire)
+        && !thread.sig_kernel_pending.load(Ordering::Acquire)
     {
         0
     } else {
