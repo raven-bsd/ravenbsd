@@ -26,6 +26,14 @@ collide), and leaves every expectation unchanged. A table that cannot meet this 
 with a `TableError`; record the divergence in `divergences/<topic>.md` and the ticket that fixes
 it.
 
+## Self-contained rows
+
+A `tests/conformance/<topic>/` directory with `run.py`/`build.sh` and no `.toml` is a
+self-contained row rather than a shared qtest table. It must provide an aarch64 entry point with
+the same assertions, or a `divergences/<topic>.md` record. The runner reports the row as a
+divergence and exits 1; it never silently skips it. The first such row is `credentials`
+(S179/S187), an x86-64-only runner; its record is `divergences/credentials.md`.
+
 ## Usage
 
 Heavy work must run through the host build slot, with a measured outer timeout:
@@ -42,7 +50,7 @@ budget; one table is normally under 5 minutes on a cached profile.
 Readiness and execution checks:
 
 ```sh
-python3 tests/conformance/aarch64/run.py --allow-empty      # 0 tables, runner ready
+python3 tests/conformance/aarch64/run.py --allow-empty      # 0 tables and 0 self-contained rows
 python3 tests/conformance/aarch64/run.py --plan             # translate only, no QEMU
 python3 tests/conformance/aarch64/run.py --self-test        # aarch64 virt boot selftest
 python3 tests/conformance/aarch64/run.py --table tests/conformance/aarch64/selftest/negative-skip.toml
@@ -52,8 +60,9 @@ Options: `--include-mutations` also runs `*mutation*.toml` tables; `--table <pat
 file; `--self-test` runs the bundled aarch64 boot row; `--plan` translates and reports without
 QEMU; `--allow-empty` accepts the current zero-table state.
 
-Exit codes: `0` all selected tables passed (or the allowed-empty readiness check); `1` a table
-failed or declared a skip; `2` no tables without `--allow-empty`, or a usage error.
+Exit codes: `0` all selected tables passed with no self-contained divergence (or the allowed-empty
+readiness check); `1` a table failed or declared a skip, or a self-contained row is a divergence;
+`2` no tables or self-contained rows without `--allow-empty`, or a usage error.
 
 The selftest is `selftest/boot-uname-aarch64.toml`; `selftest/negative-skip.toml` is the
 negative check that proves a declared skip is rejected.

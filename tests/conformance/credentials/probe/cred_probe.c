@@ -225,32 +225,39 @@ static int count_open_fds(void) {
 }
 
 static void row_nofile(void) {
-    long soft = sysconf(_SC_OPEN_MAX);
-    if (soft <= 0) {
-        failed("nofile", "sysconf");
+    // The kernel's RLIMIT_NOFILE soft value is the authoritative per-process bound. The libc
+    // sysconf cache is a separate S190 defect; using it here would open past the kernel's own
+    // limit and stress the 1536 class, which is S170/S192, not the file-server budget.
+    uint64_t kernel_nofile[2] = {0, 0};
+    int error = raw_getrlimit(RLIMIT_NOFILE_INDEX, kernel_nofile);
+    if (error != 0) {
+        failed("nofile", "kernel getrlimit");
         return;
     }
+    long soft = (long)kernel_nofile[0];
     int base = count_open_fds();
-    int *fds = calloc((size_t)soft, sizeof(int));
+    long target = soft - base;
+    if (target <= 0) {
+        failed("nofile", "soft limit below the open base");
+        return;
+    }
+    int *fds = calloc((size_t)target, sizeof(int));
     if (fds == NULL) {
         failed("nofile", "alloc");
         return;
     }
     int opened = 0;
-    int error = 0;
-    for (long attempt = 0; attempt < soft + 8; attempt++) {
+    error = 0;
+    for (long attempt = 0; attempt < target; attempt++) {
         int fd = open("/dev/null", O_RDONLY);
         if (fd < 0) {
             error = errno;
             break;
         }
-        if (opened < soft) {
-            fds[opened] = fd;
-        }
-        opened++;
+        fds[opened++] = fd;
     }
     printf("cred: nofile soft=%ld base=%d open-ok=%d errno=%d\n", soft, base, opened, error);
-    for (int index = 0; index < opened && index < soft; index++) {
+    for (int index = 0; index < opened; index++) {
         close(fds[index]);
     }
     free(fds);
