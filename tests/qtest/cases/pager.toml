@@ -29,7 +29,7 @@ regex = '^s17: private cow ok$'
 regex = '^s17: fault-client fault pager:error$'
 
 [[expect]]
-regex = '^process: child killed by page fault at 0x[0-9a-f]+$'
+regex = '^.*process: child pid=[0-9]+ ppid=[0-9]+ killed by page fault at 0x[0-9a-f]+ rip=0x[0-9a-f]+ sig_entry=0x[0-9a-f]+$'
 
 [[expect]]
 regex = '^s17: short supply pagein=\d+ short=\d+ ok$'
@@ -39,7 +39,7 @@ regex = '^s17: short supply pagein=\d+ short=\d+ ok$'
 regex = '^s17: fault-client fault pager:error$'
 
 [[expect]]
-regex = '^process: child killed by page fault at 0x[0-9a-f]+$'
+regex = '^.*process: child pid=[0-9]+ ppid=[0-9]+ killed by page fault at 0x[0-9a-f]+ rip=0x[0-9a-f]+ sig_entry=0x[0-9a-f]+$'
 
 [[expect]]
 regex = '^s17: page eio ok$'
@@ -52,7 +52,7 @@ regex = '^s17: fault-client fault pager:death$'
 regex = '^s17: server pager death object=\d+$'
 
 [[expect]]
-regex = '^process: child killed by page fault at 0x[0-9a-f]+$'
+regex = '^.*process: child pid=[0-9]+ ppid=[0-9]+ killed by page fault at 0x[0-9a-f]+ rip=0x[0-9a-f]+ sig_entry=0x[0-9a-f]+$'
 
 [[expect]]
 regex = '^s17: pager death client=-11 server=0 ok$'
