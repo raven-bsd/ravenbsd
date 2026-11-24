@@ -97,7 +97,7 @@ pub fn profile_env(profile: &Profile, user: &str, home: &str, shell: &str) -> Ve
     env.push(format!("SHELL={shell}"));
     env.push(String::from("PWD=/"));
     // K571/S188 diagnostic: name the frames of the teardown panic; remove before release.
-    env.push(String::from("RUST_BACKTRACE=1"));
+    env.push(String::from("RUST_BACKTRACE=full"));
     env
 }
 
