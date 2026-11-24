@@ -806,6 +806,23 @@ fn a_static_nic_is_published_without_dhcp() {
 }
 
 #[test]
+fn a_qemu_fixed_nic_publishes_a_lease_for_resolvd() {
+    // QEMU user-mode configures 10.0.2.15/24 immediately but is not NicAddressing::Static.
+    // resolvd asks netd for a DHCP lease; this configuration must still answer with the
+    // synthetic lease and the slirp DNS, not ENOENT.
+    let mut netd = new_netd();
+    netd.attach_nic(Loopback::new(NIC_MAC), NicConfig::qemu(NIC_MAC, 1500), 0);
+    let lease = netd
+        .dhcp_lease()
+        .expect("QEMU fixed-address mode must publish a synthetic lease");
+    assert_eq!(lease.address.octets(), [10, 0, 2, 15]);
+    assert_eq!(lease.prefix_len, 24);
+    assert_eq!(lease.router.unwrap().octets(), [10, 0, 2, 2]);
+    assert_eq!(lease.dns[0].octets(), [10, 0, 2, 3]);
+    assert!(lease.renew_at_ms.is_none());
+}
+
+#[test]
 fn a_late_static_config_replaces_the_published_address() {
     let mut netd = new_netd_with_nic();
     netd.apply_static(&StaticConfig {

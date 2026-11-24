@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S167 C18 pager lifetime: one one-shot service that samples the s36-mapcheck pager/frame gate
+# after owner exit and after a shrinking truncate.
+name = "pager-lifetime"
+exec = "/bin/pager-lifetime"
+args = []
+needs = ["scheme:file"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
