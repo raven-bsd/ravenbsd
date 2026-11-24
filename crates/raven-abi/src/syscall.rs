@@ -272,6 +272,27 @@ pub const PROC_SIGQUEUE: usize = 0x86;
 /// `PROC_SIGRECV_EX` flag: select only a signal whose bit is in the deliverable mask.
 pub const PROC_SIGRECV_DELIVERABLE: u32 = 2;
 
+/// `sigaction(signo: i32, act: *const SigAction, old: *mut SigAction) -> 0` (raw 0x87).
+///
+/// Installs, replaces or reads the per-process handler for one signal. `act` is null to read
+/// without changing; `old` is null to ignore the previous value. The structure layout is the
+/// System V amd64 `struct sigaction` (see `tickets/CONTRACTS.md` C19 and the S160 offset table),
+/// not the retired `SIG_SETUP` model. Raw constant, not a `Syscall` variant.
+pub const SIGACTION: usize = 0x87;
+
+/// `sigprocmask(how: i32, set: *const u64, old: *mut u64) -> 0` (raw 0x88).
+///
+/// POSIX `SIG_BLOCK`/`SIG_UNBLOCK`/`SIG_SETMASK` on the calling thread's mask. The mask is
+/// per-thread; handlers are per-process. A signal that becomes unblocked and is pending is
+/// delivered before the call returns to user mode. Raw constant.
+pub const SIGPROCMASK: usize = 0x88;
+
+/// `sigaltstack(ss: *const Stack, old: *mut Stack) -> 0` (raw 0x89).
+///
+/// Installs or reads the per-thread alternate signal stack (`SS_ONSTACK`/`SS_DISABLE`
+/// semantics). Raw constant.
+pub const SIGALTSTACK: usize = 0x89;
+
 /// `thread_self() -> tid`.
 ///
 /// Returns the calling thread's stable 30-bit, nonzero tid. A raw constant,
