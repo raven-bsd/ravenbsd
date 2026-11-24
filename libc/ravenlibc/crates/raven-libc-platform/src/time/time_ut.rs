@@ -49,11 +49,11 @@ fn nanosleep_advances_the_clock() {
 }
 
 #[test]
-fn interrupted_nanosleep_returns_the_full_request_until_pg_17() {
+fn interrupted_nanosleep_is_eintr() {
     let fake = FakeSys::new();
     fake.fail_next(Fault::Nanosleep, Errno::EINTR);
     let platform = Platform::new(fake);
-    assert_eq!(nanosleep(&platform, 5_000_000), Ok(5_000_000));
+    assert_eq!(nanosleep(&platform, 5_000_000), Err(Errno::EINTR));
 }
 
 #[test]
