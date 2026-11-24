@@ -12,6 +12,7 @@ qemu_extra = [
     "-nic", "none",
     "-netdev", "user,id=n0",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-smp", "2",
 ]
 expect_exit = "failure"
 

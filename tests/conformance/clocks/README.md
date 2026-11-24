@@ -12,6 +12,10 @@ runs it under QEMU. No product source is changed.
 - `clocks: ids ok` - `CLOCK_REALTIME=0`, `CLOCK_MONOTONIC=1`.
 - `clocks: getres ok` - non-zero, consistent `clock_getres` for realtime and monotonic.
 - `clocks: monotonic ok` - 10,000 samples are non-decreasing and never zero.
+- `clocks: monotonic_smp ok threads=2` - two pthreads sample `CLOCK_MONOTONIC` on the `-smp 2`
+  image; every sample across both threads is non-decreasing and non-zero. The qtest also asserts
+  the kernel serial lines `smp: 2 cpus online` and `sched: running (2 cpus, slice ...)`; the libc
+  `sysconf`/`sched_getcpu` stubs report 1/0, so CPU identity comes from the kernel lines.
 - `clocks: sleep ok elapsed_ns=N` - `nanosleep` takes at least the 100 ms request.
 - `clocks: eintr ok remaining_ns=N` - a handled SIGUSR1 interrupts a 1 s `nanosleep` with a
   positive unslept remainder and `EINTR`.

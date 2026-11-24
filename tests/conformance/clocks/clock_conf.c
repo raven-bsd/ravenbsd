@@ -5,6 +5,7 @@
 // clock contract on the release image and never changes product behaviour.
 
 #include <errno.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -81,6 +82,49 @@ static int monotonic_row(void) {
         return fail("monotonic", last, 0);
     }
     printf("clocks: monotonic ok\n");
+    return 0;
+}
+
+static void *smp_monotonic_worker(void *argument) {
+    int *failures = (int *)argument;
+    struct timespec current = {0, 0};
+    struct timespec previous = {0, 0};
+    if (clock_gettime(CLOCK_MONOTONIC, &previous) != 0) {
+        *failures = 1;
+        return NULL;
+    }
+    if (ns_of(&previous) <= 0) {
+        *failures = 1;
+        return NULL;
+    }
+    for (int sample = 0; sample < 10000; sample += 1) {
+        if (clock_gettime(CLOCK_MONOTONIC, &current) != 0 ||
+            ns_of(&current) < ns_of(&previous) || ns_of(&current) <= 0) {
+            *failures = 1;
+            return NULL;
+        }
+        previous = current;
+    }
+    return NULL;
+}
+
+static int smp_monotonic_row(void) {
+    pthread_t first;
+    pthread_t second;
+    int first_failures = 0;
+    int second_failures = 0;
+    if (pthread_create(&first, NULL, smp_monotonic_worker, &first_failures) != 0 ||
+        pthread_create(&second, NULL, smp_monotonic_worker, &second_failures) != 0) {
+        return fail("monotonic_smp create", 0, errno);
+    }
+    (void)pthread_join(first, NULL);
+    (void)pthread_join(second, NULL);
+    if (first_failures != 0 || second_failures != 0) {
+        return fail("monotonic_smp", first_failures + second_failures, 0);
+    }
+    // The libc sysconf/sched_getcpu stubs report 1/0; the qtest asserts the kernel's
+    // "smp: 2 cpus online" and "sched: running (2 cpus" lines for the SMP evidence.
+    printf("clocks: monotonic_smp ok threads=2\n");
     return 0;
 }
 
@@ -197,6 +241,7 @@ int main(void) {
     failures += ids_row();
     failures += res_row();
     failures += monotonic_row();
+    failures += smp_monotonic_row();
     failures += sleep_row();
     failures += eintr_row();
     failures += gettimeofday_row();
