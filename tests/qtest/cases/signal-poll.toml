@@ -10,7 +10,7 @@ profile = "base"
 timeout_secs = 120
 pre = ["sh tests/fixtures/signal/poll/build.sh"]
 initfs = "build/signal-poll/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1"
+boot_cmdline = "console=ttyS0 test-exit=1 init=/bin/signal-poll"
 qemu_extra = [
     "-nic", "none",
     "-netdev", "user,id=n0",
