@@ -24,6 +24,9 @@ sh tests/conformance/memory-map/probe/build.sh
 echo "mmap-image: release initfs"
 cargo xtask initfs --arch "$arch" --profile release
 
+echo "mmap-image: ssh addon against the current libc"
+sh addons/ssh/build.sh
+
 echo "mmap-image: inject probe"
 cargo build -q -p raven-b70-overlay
 overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
