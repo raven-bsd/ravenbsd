@@ -39,7 +39,10 @@ pub fn service(process: &Arc<Process>, fault: PagerFault) -> FaultOutcome {
             let result = crate::ipc::router::pager_call(process, &object, page, PAGE_IN);
             match result {
                 Ok(0) if object.page_ready(page) => fault_map(process, fault.cr2),
-                Ok(status) if status == -i32::from(Errno::ENXIO.0) => {
+                Ok(status)
+                    if status == -i32::from(Errno::ENXIO.0)
+                        || status == i32::from(Errno::ENXIO.0) =>
+                {
                     object.fail_page(page);
                     FaultOutcome::Bus
                 }
