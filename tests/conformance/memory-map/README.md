@@ -31,10 +31,16 @@ product tree is not changed.
 ```text
 sh tests/conformance/memory-map/build.sh
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img
+python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --iterations 100
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --mutation
 ```
 
-`build.sh` uses the release initfs and stages only `/bin/mmap-probe`; no product file changes.
+`build.sh` uses the release initfs and stages `/bin/mmap-probe` plus a test-only
+`/bin/s177-shell` login shell and its `/etc/passwd` row. The release `brush` login shell currently
+null-writes at `rip=0x4e5bbf` (K514 handover), so the wrapper runs the probe directly as the
+unprivileged `raven` user and stops on the first failed probe. The probe's SIGBUS file is
+`/home/raven/mmap-eof-file`, inside the raven home. `--iterations=N` runs the probe N times in one
+boot (S195 uses 100); the default is one. The rows and the product under test are unchanged.
 
 ## Donor map
 

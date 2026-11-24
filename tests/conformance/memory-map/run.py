@@ -226,7 +226,7 @@ def stop(child: subprocess.Popen) -> None:
             pass
 
 
-def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
+def run(image: Path, accel: str, mutation: bool, keep: bool, iterations: int) -> int:
     if not image.is_file():
         print(f"memory-map: image {image} is missing", file=sys.stderr)
         return 2
@@ -234,8 +234,11 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
     run_dir = ROOT / "build" / "conformance" / "memory-map" / f"run-{stamp}"
     child, serial, port = boot(run_dir, image, accel)
     try:
-        command = f"{PROBE} --mutation=private-shared" if mutation else PROBE
-        code, stdout, stderr = ssh(port, command, 120)
+        if mutation:
+            command = f"{PROBE} --mutation=private-shared"
+        else:
+            command = f"{PROBE} --iterations={iterations}"
+        code, stdout, stderr = ssh(port, command, 600 if iterations > 1 else 120)
         probe_text = stdout.decode("utf-8", "replace")
         (run_dir / "probe.out").write_text(probe_text, encoding="utf-8")
         (run_dir / "probe.err").write_text(stderr.decode("utf-8", "replace"), encoding="utf-8")
@@ -245,6 +248,8 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
         for line in (
             "KERNEL PANIC",
             "EXCEPTION",
+            "tlb shootdown timeout",
+            "nmi with no pending shootdown",
             "SegmentOutsideUserRange",
             "bad ELF",
             "double fault",
@@ -290,6 +295,7 @@ def main() -> int:
     parser.add_argument("--image", type=Path)
     parser.add_argument("--accel", choices=("tcg", "kvm"), default="tcg")
     parser.add_argument("--mutation", action="store_true")
+    parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
@@ -297,7 +303,7 @@ def main() -> int:
         return selftest()
     if args.image is None:
         parser.error("--image is required")
-    return run(args.image, args.accel, args.mutation, args.keep)
+    return run(args.image, args.accel, args.mutation, args.keep, args.iterations)
 
 
 if __name__ == "__main__":

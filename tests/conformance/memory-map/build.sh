@@ -28,7 +28,9 @@ echo "mmap-image: inject probe"
 cargo build -q -p raven-b70-overlay
 overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
 "$overlay" "build/$arch/initfs.img" "$out/initfs.img" \
-    "/bin/mmap-probe=$out/mmap-probe:0755"
+    "/bin/mmap-probe=$out/mmap-probe:0755" \
+    "/bin/s177-shell=$out/s177-shell:0755" \
+    "/etc/passwd=$root/tests/conformance/memory-map/probe/passwd:0644"
 
 echo "mmap-image: release image"
 cargo xtask image --arch "$arch" --profile release \

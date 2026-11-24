@@ -59,4 +59,15 @@ fi
     -L"$sysroot/usr/lib" -lc $builtins_arg \
     "$sysroot/usr/lib/crtn.o" -o "$out/mmap-probe"
 
-echo "mmap-probe: built $out/mmap-probe"
+"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+    -c tests/conformance/memory-map/probe/s177_shell.c -o "$out/s177-shell.o"
+"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+    -nostdlib -nostartfiles -static -T tests/libc/target/x86_64.ld \
+    -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+    "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/s177-shell.o" \
+    -L"$sysroot/usr/lib" -lc $builtins_arg \
+    "$sysroot/usr/lib/crtn.o" -o "$out/s177-shell"
+
+echo "mmap-probe: built $out/mmap-probe and $out/s177-shell"
