@@ -94,6 +94,12 @@ pub const SIGCODE: [u8; 9] = [
     0x0F,
     0x0B,
 ];
+/// Fixed user VA of the aarch64 sigcode page (the last page below `USER_END`).
+#[cfg(target_arch = "aarch64")]
+pub const SIGCODE_BASE: u64 = USER_END - PAGE;
+/// `mov x8, #SIGRETURN; svc #0`: the aarch64 sigcode trampoline.
+#[cfg(target_arch = "aarch64")]
+pub const SIGCODE: [u8; 8] = crate::arch::aarch64::signal::SIGCODE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
 static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
@@ -2040,7 +2046,7 @@ fn build_stack(
             .map_err(ProcessError::Map)?;
         page = page.saturating_add(1);
     }
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
     install_sigcode(address_space)?;
     Ok(sp0)
 }
@@ -2049,7 +2055,7 @@ fn build_stack(
 ///
 /// The page is read-only+exec and anonymous, so `release`/`free_user_frames` reclaim its frame.
 /// The handler's `sf_ra` points at the first byte; returning runs `mov eax, SIGRETURN; syscall`.
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn install_sigcode(address_space: &mut UserAddressSpace) -> Result<(), ProcessError> {
     address_space
         .vmas_mut()

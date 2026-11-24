@@ -16,6 +16,10 @@ case "$arch" in
         target=x86_64-unknown-none
         rustflags="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld"
         ;;
+    aarch64)
+        target=aarch64-unknown-none-softfloat
+        rustflags="-C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/aarch64.ld"
+        ;;
     *)
         echo "signal fixture: unsupported architecture $arch" >&2
         exit 1

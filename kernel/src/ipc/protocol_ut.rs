@@ -406,8 +406,10 @@ fn transfer_rights_are_source_and_mask_and_zero_removes_all() {
 
 #[test]
 fn four_attachments_roundtrip_in_the_tail() {
-    let mut packet = SchemePacket::default();
-    packet.attach_count = MAX_ATTACHMENTS as u32;
+    let mut packet = SchemePacket {
+        attach_count: MAX_ATTACHMENTS as u32,
+        ..Default::default()
+    };
     for (index, slot) in packet.attach.iter_mut().enumerate() {
         *slot = Attachment {
             handle: 10 + index as u32,
