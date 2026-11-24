@@ -20,7 +20,13 @@ use raven_ramfs_core::{Limits, ROOT_INO, Ramfs, SpecialKind};
 use raven_scheme::{CallReply, Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened};
 
 /// Aggregate open-file-description budget.
-pub const MAX_OPEN_FILES: usize = 256;
+///
+/// The caller's `RLIMIT_NOFILE` soft limit is the per-process bound; this aggregate budget must
+/// not be lower than the maximum any process may set. The kernel handle table is 65,536
+/// (`raven-handles::MAX_HANDLES`), the same shape as FreeBSD `maxfilesperproc`, NetBSD
+/// `maxfiles` and Linux `sysctl_nr_open`; the old 256 constant refused valid opens before the
+/// caller's limit.
+pub const MAX_OPEN_FILES: usize = 65_536;
 
 fn head(bytes: &[u8]) -> [u8; 8] {
     let mut prefix = [0u8; 8];

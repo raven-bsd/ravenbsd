@@ -6,8 +6,8 @@ exact echo and send the acknowledgement that makes the guest print `CONTRACT K6 
 
 import argparse
 import re
+import select
 import socket
-import struct
 import sys
 import time
 
@@ -201,6 +201,7 @@ def own_shutdown(host, port, deadline):
 
 
 def half_close(host, port, deadline):
+    """Guest-initiated half-close: FIN after HALFACK drains, peer EOF/HUP, no RST."""
     while time.monotonic() < deadline:
         try:
             with socket.create_connection((host, port), timeout=5.0) as stream:
@@ -218,11 +219,26 @@ def half_close(host, port, deadline):
                     ack += chunk
                 if ack != b"HALFACK":
                     raise OSError(f"half ack {ack!r}")
-                # Full close with RST: the peer has closed its read side, so the guest's next
-                # write must observe EPIPE and POLLHUP rather than a graceful half-close.
-                stream.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                                  struct.pack("ii", 1, 0))
+                # The guest now sends its FIN after the queued HALFACK drains. A graceful FIN
+                # reads as EOF; a RST raises ConnectionResetError and fails the row. The host
+                # has shut down its write side, so both directions are closed: poll must report
+                # HUP. No SO_LINGER is set, so the close after this block cannot inject a RST.
+                try:
+                    tail = stream.recv(1)
+                except ConnectionResetError:
+                    return False
+                if tail != b"":
+                    raise OSError(f"half tail {tail!r}")
+                poller = select.poll()
+                poller.register(stream, select.POLLIN | select.POLLHUP)
+                events = poller.poll(5000)
+                if not events or not (events[0][1] & select.POLLHUP):
+                    return False
                 return True
+        except ConnectionResetError:
+            return False
+        except socket.timeout:
+            return False
         except OSError:
             time.sleep(0.2)
     return False

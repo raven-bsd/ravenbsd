@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# C19 kernel sigaction model: a caught signal is delivered by `sendsig` as a `sigframe` below the
+# AMD64 red zone, the handler sees `rdi=sig`, `rsi=&siginfo`, `rdx=&ucontext`, the frame's
+# `mcontext` holds the interrupted rip/rsp, the sigcode returns through `SIGRETURN`, and an
+# `SA_ONSTACK` handler runs on the alternate stack.
+
+name = "signal-action"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/signal/build.sh"]
+initfs = "build/fixtures/signal/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal-action: start$'
+
+[[expect]]
+regex = '^signal-action: sigaction ok$'
+
+[[expect]]
+regex = '^signal-action: frame ok$'
+
+[[expect]]
+regex = '^signal-action: resume ok$'
+
+[[expect]]
+regex = '^signal-action: altstack ok$'
+
+[[expect]]
+regex = '^signal-action: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|signal-action: .*failed|signal-action: .*wrong|signal-action: context mismatch|signal-action: .*not on altstack'

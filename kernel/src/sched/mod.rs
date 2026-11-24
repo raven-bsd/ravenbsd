@@ -124,6 +124,11 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static USER_SMP: AtomicBool = AtomicBool::new(true);
 /// `smp-user-trace`: print the first user thread on each CPU and cross-CPU wakeups.
 static USER_TRACE: AtomicBool = AtomicBool::new(false);
+/// `smp-user-first`: print only the per-CPU first-user marker (quiet soak evidence).
+///
+/// The cross-CPU wake line is high-volume; on a shared 115200-baud console it can starve the
+/// login prompt. The soak uses this flag to observe user threads on every CPU without the flood.
+static USER_FIRST: AtomicBool = AtomicBool::new(false);
 /// One-shot per-CPU marker for the first user thread (trace evidence only).
 static USER_RAN: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
 
@@ -137,6 +142,8 @@ fn read_user_smp_flags() {
             USER_SMP.store(false, Ordering::Release);
         } else if token == "smp-user-trace" {
             USER_TRACE.store(true, Ordering::Release);
+        } else if token == "smp-user-first" {
+            USER_FIRST.store(true, Ordering::Release);
         }
     }
 }
@@ -146,9 +153,70 @@ pub fn user_smp_enabled() -> bool {
     USER_SMP.load(Ordering::Acquire)
 }
 
-/// True when the S75 evidence trace is enabled.
-fn user_trace() -> bool {
+/// True when the per-CPU first-user marker is enabled (`smp-user-trace` or `smp-user-first`).
+fn user_first_trace() -> bool {
+    USER_TRACE.load(Ordering::Acquire) || USER_FIRST.load(Ordering::Acquire)
+}
+
+/// True when the cross-CPU wake trace is enabled (`smp-user-trace` only).
+fn user_wake_trace() -> bool {
     USER_TRACE.load(Ordering::Acquire)
+}
+
+/// Wait until every thread of `process` except the calling thread is off-CPU.
+///
+/// FreeBSD `exit1` calls `thread_single(p, SINGLE_EXIT)` and waits for `p_exitthreads == 0`
+/// (`sys/kern/kern_exit.c:331`, `sys/kern/kern_thread.c:1223`); NetBSD `exit_lwps` waits for
+/// `p_nlwps == 1` before `uvm_proc_exit` (`sys/kern/kern_exit.c:231`, `:619`); Illumos
+/// `proc_exit` calls `exitlwps(0)` first (`usr/src/uts/common/os/exit.c:491`). Raven retires a
+/// terminal-process thread in `schedule_locked`: the thread is current until it takes the
+/// reschedule IPI or timer tick, then the terminal filter marks it `Dead`.
+///
+/// The caller must have published `process.exiting` before calling this. The per-CPU slot lock
+/// serialises the terminal check and the `current` publish, so once this loop sees no sibling
+/// current, no CPU can switch one in. The loop holds no scheduler lock while spinning and does
+/// not yield: yielding would enqueue the exiting thread for the terminal filter to reap before
+/// `teardown` runs.
+pub fn quiesce_process(process: &Arc<Process>) {
+    let caller_id = current_thread()
+        .filter(|thread| Arc::ptr_eq(&thread.process, process))
+        .map(|thread| thread.id);
+    let online = smp::online_cpus();
+    if crate::process::s194_trace() {
+        kprintln!("s194: quiesce enter pid={} cpu={}", process.id, this_cpu());
+    }
+    let mut waited = false;
+    loop {
+        let mut running = false;
+        for cpu in 0..online {
+            let Some(slot) = try_lock_cpu(cpu) else {
+                running = true;
+                continue;
+            };
+            let Some(state) = slot.as_ref() else {
+                continue;
+            };
+            let Some(current) = state.current.as_ref() else {
+                continue;
+            };
+            if !Arc::ptr_eq(&current.process, process) || caller_id == Some(current.id) {
+                continue;
+            }
+            running = true;
+            break;
+        }
+        if !running {
+            if waited && crate::process::s194_trace() {
+                kprintln!("s194: quiesce waited pid={}", process.id);
+            }
+            if crate::process::s194_trace() {
+                kprintln!("s194: quiesce clear pid={} waited={waited}", process.id);
+            }
+            return;
+        }
+        waited = true;
+        core::hint::spin_loop();
+    }
 }
 
 /// Ask every online CPU except `excluding` to reschedule.
@@ -175,6 +243,10 @@ pub fn init() -> Result<(), Errno> {
         return Ok(());
     }
     read_user_smp_flags();
+    kprintln!(
+        "sched: user SMP {} (smp_user=off disables)",
+        if user_smp_enabled() { "on" } else { "off" }
+    );
     if !context::init_fpu() {
         return Err(Errno::EINVAL);
     }
@@ -447,6 +519,45 @@ pub fn start() -> ! {
     idle::run()
 }
 
+/// Reap a runnable thread of a terminal process before it is switched in.
+///
+/// Called under the per-CPU slot lock from both `schedule_locked` and `exit_thread`. It performs
+/// the parts of `exit_thread` that the abandoned sibling would otherwise never run: state, process
+/// thread accounting, timeout/futex/donation registration and the deferred stack reap. Returns the
+/// next runnable thread (possibly the idle thread).
+fn retire_terminal(mut next: Arc<Thread>, state: &mut CpuSched, cpu: usize) -> Arc<Thread> {
+    loop {
+        if next.idle || !next.process.exiting.load(Ordering::Acquire) {
+            return next;
+        }
+        next.set_state(ThreadState::Dead);
+        // The woken terminal-process thread never runs its own exit path, so remove its timeout
+        // sleeper entry here as well as in `exit_thread`; otherwise the entry keeps an
+        // `Arc<Thread>` until its deadline. The current CPU's list is under this slot; the other
+        // CPUs are scanned without reacquiring it. The global futex queues are also not
+        // process-owned: a wait entry enqueued after the process-exit sweep would otherwise keep
+        // the dead Thread.
+        let _ = state
+            .sleepers
+            .remove_where(|(thread, _, _)| thread.id == next.id);
+        cancel_thread_sleepers_except(next.id, cpu);
+        crate::syscall::futex::remove_thread(next.id);
+        // The donation graph and the thread-exit decrement are the parts of `exit_thread` a
+        // filtered sibling would otherwise never run. Do not touch `Process::threads_live` here:
+        // the signal path (`Process::kick_threads`) holds that lock across `sched::wake`, which
+        // takes this slot lock, so slot -> threads_live would invert the order and deadlock.
+        // The weak live-list entry is dropped with the Process on reap and skipped by
+        // `kick_threads` once the Thread is gone.
+        crate::sync::unregister_thread(next.tid);
+        let _ = next.process.thread_exited();
+        push_reap(Arc::into_raw(next) as usize);
+        next = match state.runqueue.pop_front() {
+            Some(next) => next,
+            None => Arc::clone(&state.idle),
+        };
+    }
+}
+
 /// Pick the next thread on this CPU and switch to it.
 ///
 /// Must be called inside a critical section. The per-CPU slot lock is released before the switch;
@@ -481,36 +592,11 @@ fn schedule_locked() {
         state.need_resched = false;
         // A terminal process must never run user code again: drop every runnable thread that
         // belongs to one before picking the next thread.
-        let mut next = match state.runqueue.pop_front() {
+        let next = match state.runqueue.pop_front() {
             Some(next) => next,
             None => Arc::clone(&state.idle),
         };
-        loop {
-            if next.idle || !next.process.exiting.load(Ordering::Acquire) {
-                break;
-            }
-            next.set_state(ThreadState::Dead);
-            // The woken terminal-process thread never runs its own exit path, so remove its
-            // timeout sleeper entry here as well as in `exit_thread`; otherwise the entry keeps
-            // an `Arc<Thread>` until its deadline. The current CPU's list is under this slot;
-            // the other CPUs are scanned without reacquiring it. The global futex queues are
-            // also not process-owned: a wait entry enqueued after the process-exit sweep would
-            // otherwise keep the dead Thread.
-            let _ = state
-                .sleepers
-                .remove_where(|(thread, _, _)| thread.id == next.id);
-            cancel_thread_sleepers_except(next.id, cpu);
-            crate::syscall::futex::remove_thread(next.id);
-            // This filter reaps a runnable terminal-process thread without running `exit_thread`,
-            // so it must perform the same donation-graph teardown here. Without it the session's
-            // remaining threads stay registered and the 3072-byte class still fills.
-            crate::sync::unregister_thread(next.tid);
-            push_reap(Arc::into_raw(next) as usize);
-            next = match state.runqueue.pop_front() {
-                Some(next) => next,
-                None => Arc::clone(&state.idle),
-            };
-        }
+        let next = retire_terminal(next, state, cpu);
         if Arc::ptr_eq(&next, &current) {
             current.set_state(ThreadState::Running);
             return;
@@ -520,7 +606,7 @@ fn schedule_locked() {
         next.last_cpu
             .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
         let first_run = next.user
-            && user_trace()
+            && user_first_trace()
             && USER_RAN
                 .get(cpu)
                 .is_some_and(|flag| !flag.swap(true, Ordering::AcqRel));
@@ -854,19 +940,32 @@ pub fn cancel_process_sleepers(process_id: u64) {
 /// bounded by the online CPU count and the queued sleeper count.
 fn cancel_thread_sleepers(thread_id: u64) {
     let _guard = sync::critical();
-    cancel_thread_sleepers_except(thread_id, usize::MAX);
+    for cpu in 0..smp::online_cpus() {
+        let mut slot = lock_cpu(cpu);
+        if let Some(state) = slot.as_mut() {
+            let _ = state
+                .sleepers
+                .remove_where(|(thread, _, _)| thread.id == thread_id);
+        }
+    }
 }
 
 /// Remove `thread_id` from every CPU's sleeper list except `skip`.
 ///
-/// The caller either holds `skip`'s slot lock (the scheduler terminal filter removes that list
-/// directly before calling here) or passes `usize::MAX` with the scheduler critical section held.
+/// The caller holds `skip`'s slot lock (the scheduler terminal filter removes that list directly
+/// before calling here). It must never wait for another CPU's slot: two terminal filters holding
+/// their own slots and waiting for each other form a cross-CPU cycle (the S194 K445 hang), and the
+/// exiting process's own `cancel_process_sleepers` sweep is waiting on one of those slots. A busy
+/// CPU is skipped; its terminal filter removes the entry when it schedules, and the process sweep
+/// retries with the caller holding no slot.
 fn cancel_thread_sleepers_except(thread_id: u64, skip: usize) {
     for cpu in 0..smp::online_cpus() {
         if cpu == skip {
             continue;
         }
-        let mut slot = lock_cpu(cpu);
+        let Some(mut slot) = try_lock_cpu(cpu) else {
+            continue;
+        };
         if let Some(state) = slot.as_mut() {
             let _ = state
                 .sleepers
@@ -1136,7 +1235,7 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
             state.need_resched = true;
             drop(slot);
             if cpu != this_cpu() {
-                if thread.user && user_trace() {
+                if thread.user && user_wake_trace() {
                     kprintln!("smp-user: wake tid {} -> cpu {}", thread.tid, cpu);
                 }
                 smp::bringup::send_reschedule(cpu);
@@ -1311,19 +1410,22 @@ pub fn exit_thread(code: i32) -> ! {
     push_reap(raw as usize);
     let _guard = sync::critical();
     let cpu = this_cpu();
+    // SAFETY: the raw reference is owned by the reap queue until a later scheduling point; this
+    // switch is the only reader and happens before the queue is drained.
+    let dead = unsafe { &*raw };
     let to = {
         let mut slot = lock_cpu(cpu);
         let Some(state) = slot.as_mut() else {
             crate::arch::halt();
         };
-        // SAFETY: the raw reference is owned by the reap queue until a later scheduling point;
-        // this switch is the only reader and happens before the queue is drained.
-        let dead = unsafe { &*raw };
         dead.set_state(ThreadState::Dead);
         let next = match state.runqueue.pop_front() {
             Some(next) => next,
             None => Arc::clone(&state.idle),
         };
+        // The dying thread must not switch into a runnable sibling of its own terminal process:
+        // the address space is gone and the sibling would resume user code on freed page tables.
+        let next = retire_terminal(next, state, cpu);
         next.set_state(ThreadState::Running);
         next.slice_ticks.store(SLICE_TICKS, Ordering::Relaxed);
         next.last_cpu
@@ -1333,6 +1435,13 @@ pub fn exit_thread(code: i32) -> ! {
         state.current = Some(next);
         to
     };
+    if crate::process::s194_trace() && dead.process.threads.load(Ordering::Acquire) == 0 {
+        kprintln!(
+            "s194: last-exit pid={} code={}",
+            dead.process.id,
+            dead.exit_code.load(Ordering::Acquire)
+        );
+    }
     // SAFETY: the critical section stays live on the dead thread's stack forever; the stack is
     // freed later by `reap_dead` from another thread's context. `to` is kept alive by
     // `state.current`; the dead stack owns no Arc to it.

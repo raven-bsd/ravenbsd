@@ -254,7 +254,15 @@ mod program {
         }
 
         /// Complete every blocked read for a pair (hangup/close), leaving no capture dangling.
-        fn complete_all(&mut self, pair: u64, result: Result<usize, Errno>) {
+        ///
+        /// A master reader gets `EIO` once the slave side is gone (FreeBSD
+        /// `sys/kern/tty_pts.c:223 ptsdev_read`); a slave reader keeps the `0` EOF contract.
+        fn complete_all(
+            &mut self,
+            pair: u64,
+            master: Result<usize, Errno>,
+            slave: Result<usize, Errno>,
+        ) {
             let jobs = {
                 let mut map = self.deferred.lock();
                 map.remove(&pair)
@@ -264,6 +272,10 @@ mod program {
             };
             let has_vtime = jobs.iter().any(|job| job.vtime_ns != 0);
             for job in jobs {
+                let result = match job.role {
+                    Role::Master => master,
+                    Role::Slave | Role::Root => slave,
+                };
                 let _ = job.completer.complete(job.token, result);
             }
             if has_vtime {
@@ -601,7 +613,7 @@ mod program {
                 }
             };
             if hangup {
-                self.complete_all(entry.pair, Ok(0));
+                self.complete_all(entry.pair, Err(Errno::EIO), Ok(0));
             }
             result
         }
@@ -646,8 +658,9 @@ mod program {
                 return Ok(());
             }
             // The kernel delivers CLOSE once the last duplicate of the slave is gone; from
-            // then on the master sees EOF instead of an empty read. Any deferred slave read
-            // is completed with 0 as well, so a hanging reader cannot outlive its pair.
+            // then on the master sees EIO (FreeBSD tty_pts.c:223) after any queued data. A
+            // deferred slave read is completed with 0, so a hanging reader cannot outlive its
+            // pair.
             let last_slave = entry.role == Role::Slave
                 && !self
                     .files
@@ -657,12 +670,12 @@ mod program {
                 if let Some(pty) = self.pairs.get_mut(entry.pair) {
                     pty.hangup();
                 }
-                self.complete_all(entry.pair, Ok(0));
+                self.complete_all(entry.pair, Err(Errno::EIO), Ok(0));
             }
             // The donor releases the pty unit when its last endpoint closes; a pair that
             // survives every close is a leak that only shows up after many SSH sessions.
             if !self.files.values().any(|other| other.pair == entry.pair) {
-                self.complete_all(entry.pair, Ok(0));
+                self.complete_all(entry.pair, Err(Errno::EIO), Ok(0));
                 self.pairs.remove(entry.pair);
                 if self.files.is_empty() {
                     let (user, system) = cpu_times();

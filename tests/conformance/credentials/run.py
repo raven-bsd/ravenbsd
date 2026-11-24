@@ -11,7 +11,8 @@ Boots the release image once, logs in as the unprivileged `raven` account over S
   * a non-permitted `setuid`/`setgid` fails with EPERM;
   * `umask(027)` makes a 0666 create 0640 and `umask(077)` makes it 0600;
   * `getrlimit`/`setrlimit` round-trip and an unprivileged hard-limit raise fails with EPERM;
-  * `RLIMIT_NOFILE` returns EMFILE at the soft limit;
+  * every valid open below the kernel `RLIMIT_NOFILE` soft limit succeeds (the server budget is not
+    lower than the caller's bound);
   * `getrusage(RUSAGE_SELF)` grows over three samples and `ru_maxrss` is at least the mapped size.
 
 `--mutation` runs the probe with `--mutation=ignore-hard-limit`: the probe reports the hard raise
@@ -21,7 +22,12 @@ is not changed.
 Usage:
   python3 tests/conformance/credentials/run.py --image build/conformance/credentials/credentials.img
   python3 tests/conformance/credentials/run.py --image ... --mutation
+  python3 tests/conformance/credentials/run.py --image ... --service
   python3 tests/conformance/credentials/run.py --selftest
+
+`--service` reads the umask rows from a staged one-shot svcd service image
+(`build-service.sh`) instead of the SSH path; it is the S189 path while the brush
+external-command route is unavailable.
 
 Exit: 0 all rows green, 1 a row/style check failed, 2 setup error.
 """
@@ -48,7 +54,7 @@ USER = os.environ.get("RAVEN_SSH_USER", "raven")
 PASSWORD = os.environ.get("RAVEN_CONFORMANCE_PASSWORD", "raven")
 HOST = "127.0.0.1"
 MAP_BYTES = 4 * 1024 * 1024
-EMFILE = 24
+
 
 KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 
@@ -248,8 +254,8 @@ def check_rows(
             failures.append(
                 f"nofile: open-ok={opened}, expected soft-base={soft - base}"
             )
-    if _int(nofile, "errno", failures, "nofile") != EMFILE:
-        failures.append("nofile: expected EMFILE (24)")
+    if _int(nofile, "errno", failures, "nofile") != 0:
+        failures.append("nofile: a valid open failed below the kernel soft limit")
 
     for prefix in ("kernel-rusage", "libc-rusage"):
         samples: list[tuple[int, int, int]] = []
@@ -286,6 +292,36 @@ def check_rows(
         failures.append(f"probe: FAIL row={rows['FAIL']}")
     return failures
 
+def check_umask_rows(rows: dict[str, dict[str, str]]) -> list[str]:
+    """The S189 rows only: the created mode and the mask across exec."""
+    failures: list[str] = []
+    old = _octal(rows.get("umask-old"), "mask", failures, "umask-old")
+    if old is not None and old != 0o022:
+        failures.append(f"umask-old: {old:04o}, expected 0022")
+    mode = _octal(rows.get("umask-file"), "mode", failures, "umask-file")
+    if mode is not None and mode != 0o640:
+        failures.append(f"umask-file: {mode:04o}, expected 0640")
+    returned = _octal(rows.get("umask-return"), "mask", failures, "umask-return")
+    if returned is not None and returned != 0o027:
+        failures.append(f"umask-return: {returned:04o}, expected 0027")
+    mode = _octal(rows.get("umask-file-077"), "mode", failures, "umask-file-077")
+    if mode is not None and mode != 0o600:
+        failures.append(f"umask-file-077: {mode:04o}, expected 0600")
+    parent = _octal(rows.get("umask-exec-parent"), "mask", failures, "umask-exec-parent")
+    if parent is not None and parent != 0o027:
+        failures.append(f"umask-exec-parent: {parent:04o}, expected 0027")
+    child_row = rows.get("umask-child")
+    if child_row is None:
+        failures.append("umask-exec: no child row")
+    else:
+        mask = _octal(child_row, "mask", failures, "umask-child")
+        if mask is not None and mask != 0o027:
+            failures.append(f"umask-exec: child mask={mask:04o}, expected 0027")
+    if "FAIL" in rows:
+        failures.append(f"probe: FAIL row={rows['FAIL']}")
+    return failures
+
+
 def selftest() -> int:
     """Exercise the row parser and every assertion with a clean and a dirty fixture."""
     failures: list[str] = []
@@ -304,6 +340,7 @@ def selftest() -> int:
             "cred: umask-file mode=0640",
             "cred: umask-return mask=0027",
             "cred: umask-file-077 mode=0600",
+            "cred: umask-exec-parent mask=0027",
             "cred: kernel-rlimit-nofile cur=256 max=256",
             "cred: kernel-rlimit-roundtrip errno=0",
             "cred: kernel-rlimit-soft-raise errno=0",
@@ -313,7 +350,7 @@ def selftest() -> int:
             "cred: libc-getrlimit ret=0 errno=0 cur=1024 max=32768",
             "cred: libc-setrlimit ret=0 errno=0",
             "cred: libc-hard-raise ret=-1 errno=1",
-            "cred: nofile soft=1024 base=3 open-ok=1021 errno=24",
+            "cred: nofile soft=256 base=3 open-ok=253 errno=0",
             "cred: libc-rusage0 ret=0 errno=0 user=1 sys=2 maxrss=8388608",
             "cred: libc-rusage1 ret=0 errno=0 user=2 sys=3 maxrss=8388608",
             "cred: libc-rusage2 ret=0 errno=0 user=3 sys=4 maxrss=8388608",
@@ -353,6 +390,16 @@ def selftest() -> int:
         ),
         True,
     )
+    dirty_nofile = clean.replace(
+        "cred: nofile soft=256 base=3 open-ok=253 errno=0",
+        "cred: nofile soft=256 base=3 open-ok=246 errno=24",
+    )
+    check(
+        "dirty-nofile",
+        any("nofile:" in failure for failure in check_rows(dirty_nofile, passwd, groups,
+                                                          umask_exec)),
+        True,
+    )
     dirty_groups = clean.replace("cred: groups count=1 got=1 list=1000",
                                  "cred: groups count=2 got=2 list=1000,1000")
     check(
@@ -365,6 +412,13 @@ def selftest() -> int:
     check(
         "dirty-umask-exec",
         any("umask-exec" in failure for failure in check_rows(clean, passwd, groups, dirty_exec)),
+        True,
+    )
+    check("umask-service-clean", check_umask_rows(parse_rows(clean + "\n" + umask_exec)), [])
+    dirty_service = clean.replace("cred: umask-file mode=0640", "cred: umask-file mode=0644")
+    check(
+        "umask-service-dirty",
+        any("umask-file" in failure for failure in check_umask_rows(parse_rows(dirty_service))),
         True,
     )
     if failures:
@@ -476,6 +530,83 @@ def stop(child: subprocess.Popen) -> None:
             pass
 
 
+def boot_service(run: Path, image: Path, accel: str) -> tuple[subprocess.Popen, Path]:
+    """Boot the image without SSH; the staged one-shot service owns the lifetime."""
+    run.mkdir(parents=True, exist_ok=True)
+    vars_path = run / "vars.fd"
+    shutil.copyfile(OVMF_VARS, vars_path)
+    serial = run / "serial.log"
+    serial.write_bytes(b"")
+    argv = [
+        "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
+        *accel_args(accel),
+        "-serial", f"file:{serial}", "-display", "none", "-monitor", "none", "-no-reboot",
+        "-snapshot",
+        "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
+        "-drive", f"if=pflash,format=raw,file={vars_path}",
+        "-drive", f"format=raw,file={image}",
+        "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+        "-netdev", "user,id=n0",
+        "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    ]
+    with open(run / "qemu.err", "wb") as error_file:
+        child = subprocess.Popen(
+            argv, cwd=ROOT, start_new_session=True,
+            stdout=subprocess.DEVNULL, stderr=error_file,
+        )
+    return child, serial
+
+
+def run_service(image: Path, accel: str, keep: bool) -> int:
+    """Run the staged one-shot probe service and check the S189 rows from the serial."""
+    if not image.is_file():
+        print(f"cred-conformance: image {image} is missing", file=sys.stderr)
+        return 2
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    run_dir = ROOT / "build" / "conformance" / "credentials" / f"service-{stamp}"
+    child, serial = boot_service(run_dir, image, accel)
+    try:
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline:
+            try:
+                text = serial.read_text(encoding="utf-8", errors="replace")
+            except FileNotFoundError:
+                text = ""
+            if ("init exited (" in text or "cred: umask-child" in text
+                    or child.poll() is not None):
+                break
+            time.sleep(0.2)
+        serial_text = serial.read_text(encoding="utf-8", errors="replace")
+        (run_dir / "serial.out").write_text(serial_text, encoding="utf-8")
+        rows = parse_rows(serial_text)
+        failures = check_umask_rows(rows)
+        for line in (
+            "KERNEL PANIC",
+            "EXCEPTION",
+            "SegmentOutsideUserRange",
+            "bad ELF",
+            "killed by page fault",
+            "tlb shootdown timeout",
+        ):
+            if line in serial_text:
+                failures.append(f"serial: {line}")
+        if "init exited (0)" not in serial_text and "cred: umask-child" not in serial_text:
+            failures.append("serial: the probe did not reach the exec child row")
+        if failures:
+            for failure in failures:
+                print(f"cred-conformance: FAIL: {failure}")
+            print(f"cred-conformance: run={run_dir}")
+            return 1
+        print("cred-conformance: PASS umask-old umask-file umask-return umask-file-077 "
+              "umask-exec")
+        print(f"cred-conformance: run={run_dir}")
+        return 0
+    finally:
+        stop(child)
+        if not keep:
+            (run_dir / "vars.fd").unlink(missing_ok=True)
+
+
 def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
     if not image.is_file():
         print(f"cred-conformance: image {image} is missing", file=sys.stderr)
@@ -567,6 +698,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--image", type=Path)
     parser.add_argument("--accel", choices=("tcg", "kvm"), default="tcg")
     parser.add_argument("--mutation", action="store_true")
+    parser.add_argument("--service", action="store_true",
+                        help="read the umask rows from a staged one-shot svcd service")
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     options = parser.parse_args(argv)
@@ -576,6 +709,8 @@ def main(argv: list[str]) -> int:
         print("cred-conformance: --image is required (or --selftest)", file=sys.stderr)
         return 2
     image = options.image if options.image.is_absolute() else ROOT / options.image
+    if options.service:
+        return run_service(image, options.accel, options.keep)
     return run(image, options.accel, options.mutation, options.keep)
 
 

@@ -138,6 +138,8 @@ struct FakeState {
     fail: Option<(FakeOp, Errno)>,
     max_read: Option<usize>,
     route_fail: bool,
+    /// The next TCP `CONNECT` completes with a pending `ECONNREFUSED` (`SO_ERROR` row).
+    refuse_connect: bool,
     mptcp_requests: Vec<Vec<u8>>,
     mptcp_reply: Vec<u8>,
     inherited: Vec<InheritedSocket>,
@@ -273,6 +275,14 @@ impl FakeNetd {
     /// Make every UDP `CONNECT` fail with `ENETUNREACH` (PG-41 route script).
     pub fn fail_routes(&self) {
         self.state.borrow_mut().route_fail = true;
+    }
+
+    /// Make the next TCP `CONNECT` complete with a pending `ECONNREFUSED`.
+    ///
+    /// A real non-blocking connect reports `EINPROGRESS` and the error through `SO_ERROR`; the
+    /// fake keeps that shape instead of failing the call synchronously.
+    pub fn refuse_next_connect(&self) {
+        self.state.borrow_mut().refuse_connect = true;
     }
 
     /// Limit one `READ` to `count` bytes to exercise `MSG_WAITALL`.
@@ -711,8 +721,14 @@ impl NetBackend for FakeNetd {
                 if state.route_fail {
                     return Err(Errno::ENETUNREACH);
                 }
+                let refuse = core::mem::take(&mut state.refuse_connect);
                 let sock = state.socks.get_mut(&s.0).ok_or(Errno::EBADF)?;
                 sock.peer = Some(endpoint);
+                if refuse {
+                    sock.connected = false;
+                    sock.so_error = i32::from(Errno::ECONNREFUSED.0);
+                    return Ok(CallReply::Ok);
+                }
                 sock.connected = true;
                 Ok(CallReply::Ok)
             }
@@ -752,9 +768,12 @@ impl NetBackend for FakeNetd {
                 Ok(CallReply::Ok)
             }
             Call::GetSockOpt { opt } => {
-                let sock = state.socks.get(&s.0).ok_or(Errno::EBADF)?;
+                let sock = state.socks.get_mut(&s.0).ok_or(Errno::EBADF)?;
                 if opt == SockOpt::Error {
-                    return Ok(CallReply::Value(sock.so_error));
+                    // `SO_ERROR` is read once and cleared on the server.
+                    let value = sock.so_error;
+                    sock.so_error = 0;
+                    return Ok(CallReply::Value(value));
                 }
                 Ok(CallReply::Value(
                     sock.opts.get(&opt.code()).copied().unwrap_or(0),
