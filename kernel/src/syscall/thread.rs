@@ -411,21 +411,25 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
-/// The System V amd64 `struct sigaction` (152 bytes; `sigset_t` is 128 bytes).
+/// The Raven `SIGACTION` request layout (40 bytes), the one libc builds in
+/// `raven-libc-signal/src/sigaction_abi.rs` and the only one the kernel may copy.
+///
+/// The C-visible `struct sigaction` (152 bytes, FreeBSD-shaped) stays inside libc, which
+/// converts it to this request; the kernel never sees the C layout.
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct UserSigAction {
     handler: u64,
-    mask: [u64; 16],
-    flags: i32,
-    _pad: i32,
+    mask: [u64; 2],
+    flags: u32,
+    _pad: u32,
     restorer: u64,
 }
 
-const _: () = assert!(size_of::<UserSigAction>() == 152);
+const _: () = assert!(size_of::<UserSigAction>() == 40);
 const _: () = assert!(core::mem::offset_of!(UserSigAction, mask) == 8);
-const _: () = assert!(core::mem::offset_of!(UserSigAction, flags) == 136);
-const _: () = assert!(core::mem::offset_of!(UserSigAction, restorer) == 144);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, flags) == 24);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, restorer) == 32);
 
 /// The System V amd64 `stack_t` (24 bytes).
 #[repr(C)]
@@ -443,7 +447,7 @@ const _: () = assert!(core::mem::offset_of!(UserStack, ss_size) == 16);
 
 const ZERO_SIGACTION: UserSigAction = UserSigAction {
     handler: 0,
-    mask: [0; 16],
+    mask: [0; 2],
     flags: 0,
     _pad: 0,
     restorer: 0,
@@ -470,7 +474,7 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
         let mut out = ZERO_SIGACTION;
         out.handler = previous.handler;
         out.mask[0] = previous.mask;
-        out.flags = previous.flags as i32;
+        out.flags = previous.flags;
         let destination = UserSlice::new(old as u64, size_of::<UserSigAction>() as u64)?;
         let bytes = unsafe {
             // SAFETY: `out` is a live, fully initialised user-structure mirror; the byte view

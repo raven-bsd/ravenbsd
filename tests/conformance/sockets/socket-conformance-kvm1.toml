@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S174 socket conformance, KVM1. The half-close row pins the K574/K9 contract:
+# guest FIN after HALFACK, peer EOF/HUP, no RST; the other rows must pass.
+name = "socket-conformance-kvm1"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 180
+pre = [
+    "sh tests/conformance/sockets/build.sh",
+    "sh tests/conformance/sockets/start-host.sh",
+]
+initfs = "build/fixtures/socket-conformance/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-enable-kvm", "-cpu", "host", "-smp", "1",
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23100",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/socket-conformance/monitor.sock,server=on,wait=off",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance/qemu-kvm1.pcap",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONFORM layout PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM reuseaddr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM accept PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM soerror PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM half PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutrd PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutrdwr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM rebound PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM SUMMARY PASS 10/10$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+# S186 stops a case at the first forbidden line. A row-level FAIL must not abort the run before
+# the remaining rows print; the expects above already require every row PASS and SUMMARY 10/10.
+# Only a crash is forbidden here.
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

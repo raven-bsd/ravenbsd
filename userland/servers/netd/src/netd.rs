@@ -37,6 +37,8 @@ pub const SOCKET_FILE: u32 = S_IFSOCK | 0o666;
 const LOOPBACK_NAME: &str = "lo";
 const LOOPBACK_MTU: u16 = 65_535;
 const NIC_NAME: &str = "eth0";
+/// QEMU user-mode (slirp) DNS server; the fixed address is `10.0.2.15/24`, gateway `10.0.2.2`.
+const QEMU_USER_DNS: [u8; 4] = [10, 0, 2, 3];
 /// NIC frame rings are drained at least this often even when no stack timer is armed.
 const NIC_POLL_MS: u64 = 10;
 const MAX_OPEN_FILES: usize = 256;
@@ -182,7 +184,12 @@ trait SocketCore {
     fn icmp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno>;
     fn poll(&mut self, now_ms: i64) -> Vec<Event>;
     fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64>;
-    fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno>;
+    fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno>;
     fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno>;
     fn tcp_connect(
         &mut self,
@@ -209,6 +216,7 @@ trait SocketCore {
     fn peer_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)>;
     fn set_socket_option(&mut self, s: SocketId, option: u32, value: i32) -> Result<(), Errno>;
     fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno>;
+    fn take_socket_error(&mut self, s: SocketId) -> Result<i32, Errno>;
 }
 
 impl<D: Device> SocketCore for NetCore<D> {
@@ -271,8 +279,13 @@ impl<D: Device> SocketCore for NetCore<D> {
         NetCore::next_poll_delay_ms(self, now_ms)
     }
 
-    fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
-        NetCore::tcp_listen(self, port, backlog)
+    fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
+        NetCore::tcp_listen_reuse(self, port, backlog, reuse_addr)
     }
 
     fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno> {
@@ -338,6 +351,10 @@ impl<D: Device> SocketCore for NetCore<D> {
 
     fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno> {
         NetCore::get_socket_option(self, s, option)
+    }
+
+    fn take_socket_error(&mut self, s: SocketId) -> Result<i32, Errno> {
+        NetCore::take_socket_error(self, s)
     }
 }
 
@@ -574,9 +591,18 @@ impl<D: Device> Netd<D> {
             gateway: config.gateway,
             up: true,
         });
+        if config.is_qemu_user() {
+            // QEMU user-mode has an immediate fixed address but is not `Static`; resolvd still
+            // asks for `net:`'s DHCP lease. Publish the synthetic lease with slirp's DNS so the
+            // resolver starts instead of reporting ENOENT for a configured interface.
+            let mut dns = Vec::new();
+            dns.push(QEMU_USER_DNS);
+            self.set_nic_dns(dns);
+        }
     }
 
-    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static mode.
+    /// Keep the configured DNS list for resolvd and publish a synthetic lease in static or
+    /// QEMU fixed-address mode.
     pub fn set_nic_dns(&mut self, dns: Vec<[u8; 4]>) {
         self.nic_dns = dns;
         self.nic_lease = self.static_lease();
@@ -647,7 +673,10 @@ impl<D: Device> Netd<D> {
 
     fn static_lease(&self) -> Option<DhcpLease> {
         let config = self.nic_config?;
-        if !matches!(config.addressing, NicAddressing::Static) {
+        if !matches!(
+            config.addressing,
+            NicAddressing::Static | NicAddressing::QemuUser
+        ) {
             return None;
         }
         let control = self.nic_control.as_ref()?;
@@ -1321,7 +1350,7 @@ impl<D: Device> Netd<D> {
     }
 
     fn listen(&mut self, file: u64, backlog: u16) -> Result<Response, Errno> {
-        let (interface, transport, port, has_socket, wildcard) =
+        let (interface, transport, port, has_socket, wildcard, reuse_addr) =
             match self.files.get(&file).ok_or(Errno::EBADF)? {
                 File::Control => return Err(Errno::EINVAL),
                 File::Socket(socket) => (
@@ -1330,6 +1359,7 @@ impl<D: Device> Netd<D> {
                     socket.port_for_listen(),
                     socket.socket.is_some(),
                     socket.local.ip == [0, 0, 0, 0],
+                    socket.reuse_addr,
                 ),
             };
         if has_socket {
@@ -1355,7 +1385,7 @@ impl<D: Device> Netd<D> {
         for core_interface in interfaces {
             match self
                 .core_mut(core_interface)
-                .tcp_listen(port, backlog as usize)
+                .tcp_listen_reuse(port, backlog as usize, reuse_addr)
             {
                 Ok(id) => created.push((core_interface, id)),
                 Err(error) => {
@@ -1621,18 +1651,31 @@ impl<D: Device> Netd<D> {
     }
 
     fn get_option(&mut self, file: u64, opt: SockOpt) -> Result<Response, Errno> {
+        let (interface, id) = match self.files.get(&file).ok_or(Errno::EBADF)? {
+            File::Control => return Err(Errno::EINVAL),
+            File::Socket(socket) => (socket.interface, socket.socket),
+        };
+        // `SO_ERROR` is read-once and cleared (FreeBSD `sogetopt`). The core owns the pending
+        // error; netd must not answer from a zero default.
+        if opt == SockOpt::Error {
+            return match id {
+                Some(id) => self
+                    .core_mut(interface)
+                    .take_socket_error(id)
+                    .map(Response::Value),
+                None => Ok(Response::Value(0)),
+            };
+        }
+        if let Some(id) = id {
+            return self
+                .core_ref(interface)
+                .get_socket_option(id, u32::from(opt.code()))
+                .map(Response::Value);
+        }
         let socket = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => socket,
         };
-        if let Some(id) = socket.socket
-            && opt != SockOpt::Error
-        {
-            return self
-                .core_ref(socket.interface)
-                .get_socket_option(id, u32::from(opt.code()))
-                .map(Response::Value);
-        }
         let value = match opt {
             SockOpt::ReuseAddr => i32::from(socket.reuse_addr),
             SockOpt::RcvBuf => socket.rcvbuf,

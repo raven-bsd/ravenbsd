@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
-// S177/S195 test-only ssh-hostkeys helper. The release service runs `/bin/rsh -c "mkdir ...;
-// ssh-keygen ..."`, but the current rsh crashes with a page fault at rip=0 (K514/S44 signal
-// handover) and the key directory is never created. This helper creates /tmp/ssh directly and
-// execs the staged static ssh-keygen; it does not change the SSH binaries or the product.
+// S198 test-only ssh-hostkeys helper. The release service runs
+// `/bin/rsh -c "mkdir -p /tmp/ssh; ssh-keygen ..."`, but the command child faults at rip=0 on
+// this base and `/tmp/ssh` is never created, so sshd exits for lack of host keys. This helper
+// creates the directory and execs the staged static ssh-keygen directly. It changes only the
+// test image's host-key step; sshd, the probe and the product are unchanged.
 
 #include <errno.h>
 #include <sys/stat.h>

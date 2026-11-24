@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# S177/S195 test-only ssh-hostkeys service: the product service uses /bin/rsh, which currently
-# crashes at rip=0 under the C19 signal model. The helper creates /tmp/ssh and execs /bin/ssh-keygen.
+# S198 test-only override of the release ssh-hostkeys one-shot. The product service runs the
+# command through /bin/rsh, whose child faults at rip=0 on this base before /tmp/ssh exists; this
+# image uses the direct helper with the same key path. The sshd service and the product manifest
+# are unchanged; only the conformance image stages this file.
 
 name = "ssh-hostkeys"
-exec = "/bin/s177-hostkeys"
-args = ["/bin/s177-hostkeys"]
+exec = "/bin/s198-hostkeys"
+args = ["/bin/s198-hostkeys"]
 needs = ["vfsd"]
 readiness = "exit"
 restart = "never"

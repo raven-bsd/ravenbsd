@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -111,7 +112,7 @@ static void fixed_row(void) {
 }
 
 static void sigbus_row(void) {
-    const char *path = "/home/raven/mmap-eof-file";
+    const char *path = "/tmp/mmap-eof-file";
     int fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
     if (fd < 0) {
         char extra[32];
@@ -187,13 +188,9 @@ static void bad_len_row(void) {
     row("bad-len", error == EINVAL, extra);
 }
 
-int main(int argc, char **argv) {
-    if (argc > 1 && strcmp(argv[1], "--mutation=private-shared") == 0) {
-        mutation_private_shared = 1;
-    }
-    int expected_zero = 0;
-    (void)expected_zero;
-
+// Run every contract row once. The S198 churn gate calls this N times in one process so the
+// kernel heap can be sampled across repeated map/unmap and fork/exit cycles.
+static void run_rows(void) {
     char *zero = mmap(NULL, PAGE, PROT_READ | PROT_WRITE,
                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     int zeroed = zero != MAP_FAILED;
@@ -217,5 +214,27 @@ int main(int argc, char **argv) {
     bad_len_row();
 
     printf("mmap: summary mutation=%d\n", mutation_private_shared);
+    fflush(stdout);
+}
+
+int main(int argc, char **argv) {
+    int iterations = 1;
+    for (int index = 1; index < argc; index++) {
+        if (strcmp(argv[index], "--mutation=private-shared") == 0) {
+            mutation_private_shared = 1;
+        } else if (strncmp(argv[index], "--iterations=", 13) == 0) {
+            iterations = atoi(argv[index] + 13);
+        }
+    }
+    if (iterations < 1) {
+        iterations = 1;
+    }
+    for (int index = 0; index < iterations; index++) {
+        if (iterations > 1) {
+            printf("mmap: iteration %d/%d\n", index + 1, iterations);
+            fflush(stdout);
+        }
+        run_rows();
+    }
     return 0;
 }

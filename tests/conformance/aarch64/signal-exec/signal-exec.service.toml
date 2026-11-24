@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S197 aarch64 exec-default row. The service owns the image lifetime and reports the post-exec
+# signal death through svcd's exit code; the kernel prints `init exited (-10)`.
+
+name = "signal-exec-aarch64"
+exec = "/bin/signal-init"
+args = ["/bin/signal-init"]
+needs = ["scheme:tty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

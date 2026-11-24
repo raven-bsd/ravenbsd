@@ -59,26 +59,18 @@ fi
     -L"$sysroot/usr/lib" -lc $builtins_arg \
     "$sysroot/usr/lib/crtn.o" -o "$out/mmap-probe"
 
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
-    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
-    -c tests/conformance/memory-map/probe/s177_shell.c -o "$out/s177-shell.o"
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-    -nostdlib -nostartfiles -static -T tests/libc/target/x86_64.ld \
-    -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-    "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/s177-shell.o" \
-    -L"$sysroot/usr/lib" -lc $builtins_arg \
-    "$sysroot/usr/lib/crtn.o" -o "$out/s177-shell"
+for helper in s198-hostkeys s198-shell; do
+    source=$(echo "$helper" | tr '-' '_')
+    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+        -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+        -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+        -c "tests/conformance/memory-map/probe/$source.c" -o "$out/$helper.o"
+    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+        -nostdlib -nostartfiles -static -T tests/libc/target/x86_64.ld \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/$helper.o" \
+        -L"$sysroot/usr/lib" -lc $builtins_arg \
+        "$sysroot/usr/lib/crtn.o" -o "$out/$helper"
+done
 
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
-    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
-    -c tests/conformance/memory-map/probe/s177_hostkeys.c -o "$out/s177-hostkeys.o"
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-    -nostdlib -nostartfiles -static -T tests/libc/target/x86_64.ld \
-    -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-    "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/s177-hostkeys.o" \
-    -L"$sysroot/usr/lib" -lc $builtins_arg \
-    "$sysroot/usr/lib/crtn.o" -o "$out/s177-hostkeys"
-
-echo "mmap-probe: built $out/mmap-probe, $out/s177-shell and $out/s177-hostkeys"
+echo "mmap-probe: built $out/mmap-probe, $out/s198-hostkeys and $out/s198-shell"

@@ -444,6 +444,26 @@ fn nonblocking_connect_reports_einprogress_then_error_zero() {
     assert_eq!(i32::from_le_bytes(value), 0);
 }
 
+/// S174: a non-blocking connect that fails must read `ECONNREFUSED` from `SO_ERROR` once, then 0.
+#[test]
+fn so_error_reads_the_deferred_refusal_once() {
+    let fake = FakeNetd::with_caps(Caps::default());
+    let net = Net::new(fake.clone(), fake.clone(), fake.clone());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)
+        .expect("socket");
+    fake.refuse_next_connect();
+    assert_eq!(
+        net.connect(fd, &addr([10, 0, 0, 2], 80)),
+        Err(Errno::EINPROGRESS)
+    );
+    let mut value = [0xffu8; 4];
+    assert_eq!(net.getsockopt(fd, SOL_SOCKET, SO_ERROR, &mut value), Ok(4));
+    assert_eq!(i32::from_le_bytes(value), i32::from(Errno::ECONNREFUSED.0));
+    assert_eq!(net.getsockopt(fd, SOL_SOCKET, SO_ERROR, &mut value), Ok(4));
+    assert_eq!(i32::from_le_bytes(value), 0);
+}
+
 #[test]
 fn udp_sendto_two_destinations_one_open() {
     let net = net_without_unix(Caps::default());
