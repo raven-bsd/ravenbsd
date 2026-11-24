@@ -41,6 +41,13 @@ static void row(const char *name, int ok, const char *detail) {
     }
 }
 
+// A failed setup step records the exact errno so the release-image finding names the defect.
+static void fail_row(const char *name, const char *what, int error) {
+    char detail[192];
+    snprintf(detail, sizeof detail, "%s errno=%d", what, error);
+    row(name, 0, detail);
+}
+
 static int send_fd(int sock, int fd) {
     struct msghdr message;
     struct iovec iov;
@@ -94,31 +101,57 @@ static void test_rights(int mutation) {
     int rfd = -1;
     char path[64];
     char buffer[8];
-    char detail[160];
+    char detail[256];
     snprintf(path, sizeof path, "/tmp/s180-rights-%d", (int)getpid());
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
-        row("rights", 0, "socketpair failed");
+        fail_row("rights", "socketpair failed", errno);
         return;
     }
     wfd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
     if (wfd < 0) {
-        row("rights", 0, "open seed failed");
+        fail_row("rights", "open seed failed", errno);
+        close(sv[0]);
+        close(sv[1]);
         return;
     }
     (void)write(wfd, "K180", 4);
-    close(wfd);
-    // The normal sender holds a read-only handle; the mutation drops the rights mask by using a
-    // writable handle and the received descriptor writes (the expected read-only row must go red).
-    sfd = open(path, mutation ? O_RDWR : O_RDONLY);
+    // The normal sender holds a read-only descriptor: the received descriptor must be read-only
+    // too. The mutation sends a genuinely writable descriptor and the received descriptor must be
+    // writable, so a kernel that ignored or dropped the sender's rights mask fails one of the two
+    // rows. The mutation reuses the writable seed fd: an O_RDWR reopen of the same /tmp file is a
+    // separate VFS gap, not a rights-mask result.
+    if (mutation) {
+        sfd = wfd;
+        if (lseek(sfd, 0, SEEK_SET) < 0) {
+            fail_row("rights", "mutation lseek failed", errno);
+            close(wfd);
+            close(sv[0]);
+            close(sv[1]);
+            unlink(path);
+            return;
+        }
+    } else {
+        close(wfd);
+        sfd = open(path, O_RDONLY);
+    }
     if (sfd < 0) {
-        row("rights", 0, "open sender failed");
+        fail_row("rights", "open sender failed", errno);
+        close(sv[0]);
+        close(sv[1]);
+        unlink(path);
         return;
     }
+    errno = 0;
     int sent = send_fd(sv[0], sfd);
+    int send_errno = errno;
     close(sfd);
-    int received = recv_fd(sv[1], 0, &rfd);
+    errno = 0;
+    int received = sent == 1 ? recv_fd(sv[1], 0, &rfd) : -1;
+    int recv_errno = errno;
     memset(buffer, 0, sizeof buffer);
+    errno = 0;
     ssize_t got = rfd >= 0 ? read(rfd, buffer, 4) : -1;
+    int read_errno = errno;
     errno = 0;
     ssize_t wrote = rfd >= 0 ? write(rfd, "Y", 1) : -1;
     int write_errno = errno;
@@ -127,8 +160,11 @@ static void test_rights(int mutation) {
     if (ok) {
         ok = mutation ? wrote == 1 : wrote == -1;
     }
-    snprintf(detail, sizeof detail, "sent=%d recv=%d read=%zd write=%zd errno=%d mutation=%d",
-             sent, received, got, wrote, write_errno, mutation);
+    snprintf(detail, sizeof detail,
+             "sent=%d send_errno=%d recv=%d recv_errno=%d read=%zd read_errno=%d write=%zd "
+             "write_errno=%d mutation=%d",
+             sent, send_errno, received, recv_errno, got, read_errno, wrote, write_errno,
+             mutation);
     row("rights", ok, detail);
     if (rfd >= 0) {
         close(rfd);
@@ -144,14 +180,16 @@ static void test_credentials(void) {
     socklen_t length = sizeof cred;
     char detail[128];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
-        row("credentials", 0, "socketpair failed");
+        fail_row("credentials", "socketpair failed", errno);
         return;
     }
     memset(&cred, 0, sizeof cred);
+    errno = 0;
     int result = getsockopt(sv[1], SOL_SOCKET, SO_PEERCRED, &cred, &length);
+    int result_errno = errno;
     int ok = result == 0 && cred.pid == getpid() && cred.uid == getuid() && cred.gid == getgid();
-    snprintf(detail, sizeof detail, "rc=%d pid=%d/%d uid=%u/%u gid=%u/%u", result, (int)cred.pid,
-             (int)getpid(), cred.uid, getuid(), cred.gid, getgid());
+    snprintf(detail, sizeof detail, "rc=%d errno=%d pid=%d/%d uid=%u/%u gid=%u/%u", result,
+             result_errno, (int)cred.pid, (int)getpid(), cred.uid, getuid(), cred.gid, getgid());
     row("credentials", ok, detail);
     close(sv[0]);
     close(sv[1]);
@@ -166,15 +204,30 @@ static void test_cloexec(const char *program) {
     char detail[160];
     snprintf(path, sizeof path, "/tmp/s180-cloexec-%d", (int)getpid());
     sfd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
-    if (sfd < 0 || socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
-        row("cloexec", 0, "setup failed");
+    if (sfd < 0) {
+        fail_row("cloexec", "open seed failed", errno);
+        return;
+    }
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
+        fail_row("cloexec", "socketpair failed", errno);
+        close(sfd);
         return;
     }
     close(sfd);
     sfd = open(path, O_RDONLY);
-    (void)send_fd(sv[0], sfd);
+    if (sfd < 0) {
+        fail_row("cloexec", "open sender failed", errno);
+        close(sv[0]);
+        close(sv[1]);
+        return;
+    }
+    errno = 0;
+    int sent = send_fd(sv[0], sfd);
+    int send_errno = errno;
     close(sfd);
-    int received = recv_fd(sv[1], MSG_CMSG_CLOEXEC, &rfd);
+    errno = 0;
+    int received = sent == 1 ? recv_fd(sv[1], MSG_CMSG_CLOEXEC, &rfd) : -1;
+    int recv_errno = errno;
     int fd_flags = rfd >= 0 ? fcntl(rfd, F_GETFD) : -1;
     int cloexec = fd_flags >= 0 && (fd_flags & FD_CLOEXEC) != 0;
     snprintf(fd_text, sizeof fd_text, "%d", rfd);
@@ -188,8 +241,9 @@ static void test_cloexec(const char *program) {
         (void)waitpid(child, &status, 0);
     }
     int ok = received == 0 && cloexec && WIFEXITED(status) && WEXITSTATUS(status) == 0;
-    snprintf(detail, sizeof detail, "recv=%d fd=%d flags=0x%x cloexec=%d child=%d", received, rfd,
-             fd_flags, cloexec, status);
+    snprintf(detail, sizeof detail,
+             "sent=%d send_errno=%d recv=%d recv_errno=%d fd=%d flags=0x%x cloexec=%d child=%d",
+             sent, send_errno, received, recv_errno, rfd, fd_flags, cloexec, status);
     row("cloexec", ok, detail);
     if (rfd >= 0) {
         close(rfd);
@@ -206,7 +260,7 @@ static void test_fifo(void) {
     snprintf(path, sizeof path, "/tmp/s180-fifo-%d", (int)getpid());
     unlink(path);
     if (mkfifo(path, 0600) < 0) {
-        row("fifo", 0, "mkfifo failed");
+        fail_row("fifo", "mkfifo failed", errno);
         return;
     }
     int rfd = open(path, O_RDONLY | O_NONBLOCK);
@@ -267,7 +321,7 @@ static void test_seqpacket(void) {
     memset(first, 0, sizeof first);
     memset(second, 0, sizeof second);
     if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv) < 0) {
-        row("seqpacket", 0, "socketpair SOCK_SEQPACKET failed");
+        fail_row("seqpacket", "socketpair SOCK_SEQPACKET failed", errno);
         return;
     }
     (void)send(sv[0], "A", 1, 0);
@@ -287,7 +341,7 @@ static void test_stream(void) {
     char detail[128];
     memset(buffer, 0, sizeof buffer);
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
-        row("stream", 0, "socketpair SOCK_STREAM failed");
+        fail_row("stream", "socketpair SOCK_STREAM failed", errno);
         return;
     }
     (void)send(sv[0], "A", 1, 0);
@@ -299,8 +353,6 @@ static void test_stream(void) {
     close(sv[0]);
     close(sv[1]);
 }
-
-static void test_stream(void);
 
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "--all";
