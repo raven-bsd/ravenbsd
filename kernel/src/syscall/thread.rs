@@ -112,6 +112,16 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
 
     let thread = sched::new_user_thread(&target, entry, stack_top, frame.r10)?;
+    // POSIX `pthread_create` inherits the creating thread's signal mask (NetBSD
+    // `pthread_create.3:131`; FreeBSD `kern_thread.c` `thread_alloc`). A first thread created in
+    // a different process (`raven-spawn`) starts with an empty mask, so only the same-process
+    // case inherits. The thread is not enqueued yet; `sched::enqueue` publishes the write under
+    // the run-queue lock.
+    if target.id == caller.id
+        && let Some(creator) = sched::current_thread()
+    {
+        thread.inherit_signal_mask(&creator);
+    }
     if let Some(extended) = extended {
         if extended.tp != 0 {
             thread.set_tls_base(extended.tp as u64);

@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s166-mask"
+version = "0.1.0"
+description = "S166 fixture: per-thread signal mask, pending-until-unblock and SIGRETURN restore."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-s166-mask"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true
