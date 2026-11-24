@@ -36,5 +36,8 @@ fn rusage_maps_all_kernel_words() {
 
 #[test]
 fn zero_words_are_the_zero_record() {
-    assert_eq!(rusage_from_words([0; 8]), raven_libc_abi::structs::Rusage::ZERO);
+    assert_eq!(
+        rusage_from_words([0; 8]),
+        raven_libc_abi::structs::Rusage::ZERO
+    );
 }
