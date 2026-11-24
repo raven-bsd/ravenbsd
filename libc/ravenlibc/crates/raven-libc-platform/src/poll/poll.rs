@@ -65,7 +65,12 @@ pub fn poll<B: SysBackend, L: Lock>(
                     ready = ready.saturating_add(1);
                 }
             }
-            OfdKind::Tty | OfdKind::Pipe | OfdKind::Socket | OfdKind::Unknown => {
+            OfdKind::Tty
+            | OfdKind::Pipe
+            | OfdKind::Socket
+            | OfdKind::EventFd
+            | OfdKind::Timer
+            | OfdKind::Unknown => {
                 let mut wanted = 0u32;
                 if events & (POLLIN | POLLPRI) != 0 {
                     wanted |= EV_READABLE;
@@ -78,9 +83,12 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if wanted == 0 {
                     continue;
                 }
-                if reference.poll_signaled() {
-                    // A scheme-backed socket reports through its attached notification event,
-                    // not through the data handle's level.
+                if reference.poll_signaled()
+                    || matches!(reference.kind(), OfdKind::EventFd | OfdKind::Timer)
+                {
+                    // A scheme-backed socket reports through its attached notification event;
+                    // an eventfd/timerfd reports through its kernel event handle, whose
+                    // readiness bit is EV_SIGNALED.
                     wanted |= EV_SIGNALED;
                 }
                 let handle = reference.poll_handle();
@@ -100,7 +108,7 @@ pub fn poll<B: SysBackend, L: Lock>(
                     });
                 }
             }
-            OfdKind::Epoll | OfdKind::Timer | OfdKind::EventFd | OfdKind::ProcessFd => {
+            OfdKind::Epoll | OfdKind::ProcessFd => {
                 entry.revents = POLLNVAL as i16;
                 ready = ready.saturating_add(1);
             }
