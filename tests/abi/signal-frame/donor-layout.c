@@ -124,6 +124,71 @@ typedef struct {
     nb_fpregset_t __fpregs;
 } nb_mcontext_t;
 
+/*
+ * aarch64 half (S182/S160): NetBSD sys/arch/arm/include/mcontext.h (`__gregs[35]`,
+ * `__fregs`, `__spare[8]`) inside the C19/S160 ucontext field order, with the S160
+ * siginfo_t. The 32 qregs are 16-byte aligned and the struct sizes follow the C ABI.
+ */
+typedef struct {
+    u32 __bits[4];
+} aarch64_sigset_t;
+
+typedef union {
+    unsigned char __b8[16];
+    unsigned __int128 __q128;
+} aarch64_qreg_t;
+
+typedef struct {
+    aarch64_qreg_t __qregs[32] __attribute__((aligned(16)));
+    u32 __fpcr;
+    u32 __fpsr;
+} aarch64_fregset_t;
+
+typedef struct {
+    u64 __gregs[35];
+    aarch64_fregset_t __fregs;
+    u64 __spare[8];
+} aarch64_mcontext_t;
+
+typedef struct {
+    void *ss_sp;
+    u64 ss_size;
+    int ss_flags;
+} aarch64_stack_t;
+
+typedef struct __aarch64_ucontext {
+    aarch64_sigset_t uc_sigmask;
+    aarch64_mcontext_t uc_mcontext;
+    struct __aarch64_ucontext *uc_link;
+    aarch64_stack_t uc_stack;
+    int uc_flags;
+    int __spare__[4];
+} aarch64_ucontext_t;
+
+typedef union {
+    int sival_int;
+    void *sival_ptr;
+} aarch64_sigval_t;
+
+typedef struct {
+    int si_signo;
+    int si_errno;
+    int si_code;
+    int si_pid;
+    u32 si_uid;
+    int si_status;
+    void *si_addr;
+    aarch64_sigval_t si_value;
+    union {
+        struct { int _trapno; } _fault;
+        struct { int _timerid; int _overrun; } _timer;
+        struct { int _mqd; } _mesgq;
+        struct { long _band; } _poll;
+        struct { int _syscall; } _capsicum;
+        struct { long __spare1__; int __spare2__[7]; } __spare__;
+    } _reason;
+} aarch64_siginfo_t;
+
 #define P(type, field) printf("%s.%s=0x%zx\n", #type, #field, offsetof(type, field))
 #define S(type) printf("sizeof(%s)=0x%zx align=%zu\n", #type, sizeof(type), _Alignof(type))
 
@@ -203,5 +268,63 @@ int main(void) {
     NB_GREG(RSP, 24);
     NB_GREG(SS, 25);
 #undef NB_GREG
+    S(aarch64_sigset_t);
+    S(aarch64_fregset_t);
+    P(aarch64_fregset_t, __qregs);
+    P(aarch64_fregset_t, __fpcr);
+    P(aarch64_fregset_t, __fpsr);
+    S(aarch64_mcontext_t);
+    P(aarch64_mcontext_t, __gregs);
+    P(aarch64_mcontext_t, __fregs);
+    P(aarch64_mcontext_t, __spare);
+    S(aarch64_stack_t);
+    P(aarch64_stack_t, ss_sp);
+    P(aarch64_stack_t, ss_size);
+    P(aarch64_stack_t, ss_flags);
+    S(aarch64_siginfo_t);
+    S(aarch64_ucontext_t);
+    P(aarch64_ucontext_t, uc_sigmask);
+    P(aarch64_ucontext_t, uc_mcontext);
+    P(aarch64_ucontext_t, uc_link);
+    P(aarch64_ucontext_t, uc_stack);
+    P(aarch64_ucontext_t, uc_flags);
+    P(aarch64_ucontext_t, __spare__);
+#define AARCH64_REG(name, idx) printf("aarch64_reg_%s=%d\n", #name, idx)
+    AARCH64_REG(X0, 0);
+    AARCH64_REG(X1, 1);
+    AARCH64_REG(X2, 2);
+    AARCH64_REG(X3, 3);
+    AARCH64_REG(X4, 4);
+    AARCH64_REG(X5, 5);
+    AARCH64_REG(X6, 6);
+    AARCH64_REG(X7, 7);
+    AARCH64_REG(X8, 8);
+    AARCH64_REG(X9, 9);
+    AARCH64_REG(X10, 10);
+    AARCH64_REG(X11, 11);
+    AARCH64_REG(X12, 12);
+    AARCH64_REG(X13, 13);
+    AARCH64_REG(X14, 14);
+    AARCH64_REG(X15, 15);
+    AARCH64_REG(X16, 16);
+    AARCH64_REG(X17, 17);
+    AARCH64_REG(X18, 18);
+    AARCH64_REG(X19, 19);
+    AARCH64_REG(X20, 20);
+    AARCH64_REG(X21, 21);
+    AARCH64_REG(X22, 22);
+    AARCH64_REG(X23, 23);
+    AARCH64_REG(X24, 24);
+    AARCH64_REG(X25, 25);
+    AARCH64_REG(X26, 26);
+    AARCH64_REG(X27, 27);
+    AARCH64_REG(X28, 28);
+    AARCH64_REG(X29, 29);
+    AARCH64_REG(X30, 30);
+    AARCH64_REG(SP, 31);
+    AARCH64_REG(ELR, 32);
+    AARCH64_REG(SPSR, 33);
+    AARCH64_REG(TPIDR, 34);
+#undef AARCH64_REG
     return 0;
 }

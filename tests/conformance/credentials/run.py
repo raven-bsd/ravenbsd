@@ -11,7 +11,8 @@ Boots the release image once, logs in as the unprivileged `raven` account over S
   * a non-permitted `setuid`/`setgid` fails with EPERM;
   * `umask(027)` makes a 0666 create 0640 and `umask(077)` makes it 0600;
   * `getrlimit`/`setrlimit` round-trip and an unprivileged hard-limit raise fails with EPERM;
-  * `RLIMIT_NOFILE` returns EMFILE at the soft limit;
+  * every valid open below the kernel `RLIMIT_NOFILE` soft limit succeeds (the server budget is not
+    lower than the caller's bound);
   * `getrusage(RUSAGE_SELF)` grows over three samples and `ru_maxrss` is at least the mapped size.
 
 `--mutation` runs the probe with `--mutation=ignore-hard-limit`: the probe reports the hard raise
@@ -48,7 +49,7 @@ USER = os.environ.get("RAVEN_SSH_USER", "raven")
 PASSWORD = os.environ.get("RAVEN_CONFORMANCE_PASSWORD", "raven")
 HOST = "127.0.0.1"
 MAP_BYTES = 4 * 1024 * 1024
-EMFILE = 24
+
 
 KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 
@@ -248,8 +249,8 @@ def check_rows(
             failures.append(
                 f"nofile: open-ok={opened}, expected soft-base={soft - base}"
             )
-    if _int(nofile, "errno", failures, "nofile") != EMFILE:
-        failures.append("nofile: expected EMFILE (24)")
+    if _int(nofile, "errno", failures, "nofile") != 0:
+        failures.append("nofile: a valid open failed below the kernel soft limit")
 
     for prefix in ("kernel-rusage", "libc-rusage"):
         samples: list[tuple[int, int, int]] = []
@@ -313,7 +314,7 @@ def selftest() -> int:
             "cred: libc-getrlimit ret=0 errno=0 cur=1024 max=32768",
             "cred: libc-setrlimit ret=0 errno=0",
             "cred: libc-hard-raise ret=-1 errno=1",
-            "cred: nofile soft=1024 base=3 open-ok=1021 errno=24",
+            "cred: nofile soft=256 base=3 open-ok=253 errno=0",
             "cred: libc-rusage0 ret=0 errno=0 user=1 sys=2 maxrss=8388608",
             "cred: libc-rusage1 ret=0 errno=0 user=2 sys=3 maxrss=8388608",
             "cred: libc-rusage2 ret=0 errno=0 user=3 sys=4 maxrss=8388608",
@@ -351,6 +352,16 @@ def selftest() -> int:
             "hard changed" in failure
             for failure in check_rows(dirty_state, passwd, groups, umask_exec)
         ),
+        True,
+    )
+    dirty_nofile = clean.replace(
+        "cred: nofile soft=256 base=3 open-ok=253 errno=0",
+        "cred: nofile soft=256 base=3 open-ok=246 errno=24",
+    )
+    check(
+        "dirty-nofile",
+        any("nofile:" in failure for failure in check_rows(dirty_nofile, passwd, groups,
+                                                          umask_exec)),
         True,
     )
     dirty_groups = clean.replace("cred: groups count=1 got=1 list=1000",
