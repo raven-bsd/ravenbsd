@@ -56,5 +56,8 @@ regex = '^.*CONFORM SUMMARY PASS 10/10$'
 [[expect]]
 regex = '^init exited \(0\)$'
 
+# S186 stops a case at the first forbidden line. A row-level FAIL must not abort the run before
+# the remaining rows print; the expects above already require every row PASS and SUMMARY 10/10.
+# Only a crash is forbidden here.
 [[forbid]]
-regex = '(?i)CONFORM .* FAIL|CONFORM SUMMARY FAIL|panic|EXCEPTION'
+regex = '(?i)panic|EXCEPTION'
