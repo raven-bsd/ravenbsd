@@ -374,6 +374,11 @@ fn apply_exec_context(
     frame: &mut crate::arch::x86_64::trapframe::TrapFrame,
     context: crate::process::exec::ExecContext,
 ) {
+    crate::kprintln!(
+        "s44apply: rip=0x{:x} rsp=0x{:x}",
+        context.entry,
+        context.stack
+    );
     frame.rip = context.entry;
     frame.rsp = context.stack;
     frame.rflags = 0x202;

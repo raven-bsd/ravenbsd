@@ -465,6 +465,13 @@ pub fn new_user_thread(
         .as_ref()
         .map(|address_space| address_space.root().0)
         .ok_or(Errno::EINVAL)?;
+    crate::kprintln!(
+        "s44dbg: spawn pid={} entry=0x{:x} stack=0x{:x} arg=0x{:x}",
+        process.id,
+        entry,
+        stack_top,
+        arg
+    );
     let name = format!("{}-thread", process.id);
     let priority = crate::process::priority::nice_to_priority(process.nice());
     let thread = Thread::new_user(
