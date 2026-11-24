@@ -1281,6 +1281,20 @@ impl UserAddressSpace {
 
     /// Free every data frame owned by this address space and clear the VMA tree.
     pub fn free_user_frames(&mut self) {
+        if paging::cmdline()
+            .split_ascii_whitespace()
+            .any(|token| token == "s198-uspacetrack")
+        {
+            crate::kprintln!(
+                "s198: uspace release vmas={} inherit={}/{} objects={} mmio={} dma={}",
+                self.vmas.len(),
+                self.inherit.len(),
+                self.inherit.capacity(),
+                self.objects.len(),
+                self.mmio.len(),
+                self.dma.len()
+            );
+        }
         let vmas: Vec<Vma> = self.vmas.iter().copied().collect();
         let objects = self.objects.clone();
         let mmio = self.mmio.clone();
