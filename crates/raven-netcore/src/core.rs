@@ -116,6 +116,16 @@ impl<B: StackBackend> Core<B> {
         self.backend.tcp_listen(port, backlog)
     }
 
+    /// Listen for TCP connections with the caller's `SO_REUSEADDR` policy.
+    pub fn tcp_listen_reuse(
+        &mut self,
+        port: u16,
+        backlog: usize,
+        reuse_addr: bool,
+    ) -> Result<SocketId, Errno> {
+        self.backend.tcp_listen_reuse(port, backlog, reuse_addr)
+    }
+
     /// Accept one completed connection.
     pub fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno> {
         self.backend.tcp_accept(listener)
@@ -207,6 +217,11 @@ impl<B: StackBackend> Core<B> {
     /// Read one protocol socket option (`1..=5`).
     pub fn get_socket_option(&self, socket: SocketId, option: u32) -> Result<i32, Errno> {
         self.backend.get_socket_option(socket, option)
+    }
+
+    /// Read and clear the pending socket error.
+    pub fn take_socket_error(&mut self, socket: SocketId) -> Result<i32, Errno> {
+        self.backend.take_socket_error(socket)
     }
 }
 

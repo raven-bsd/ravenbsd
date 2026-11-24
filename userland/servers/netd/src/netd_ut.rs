@@ -597,6 +597,106 @@ fn a_fresh_server_can_rebind_after_drop() {
     );
 }
 
+/// S174: a server that closed first leaves 127.0.0.1:7000 in TIME_WAIT. The port must not be
+/// reusable by a plain socket, and must be reusable with `SO_REUSEADDR`, in that order.
+#[test]
+fn a_time_wait_port_rebinds_only_with_so_reuseaddr() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let listener = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    // The server closes first, so its local port 7000 enters TIME_WAIT.
+    netd.close(accepted).unwrap();
+    netd.close(client).unwrap();
+    for _ in 0..20 {
+        poll(&mut netd, &mut now);
+    }
+    netd.close(listener).unwrap();
+
+    let plain = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, plain, Call::Bind(SERVER)),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, plain, Call::Listen { backlog: 4 }),
+        Response::Err(Errno::EADDRINUSE)
+    );
+    netd.close(plain).unwrap();
+
+    let reuse = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            reuse,
+            Call::SetSockOpt {
+                opt: SockOpt::ReuseAddr,
+                value: 1
+            }
+        ),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, reuse, Call::Bind(SERVER)),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, reuse, Call::Listen { backlog: 4 }),
+        Response::Ok
+    );
+    netd.close(reuse).unwrap();
+}
+
+/// S174: `SO_ERROR` reports the pending `ECONNREFUSED` once, then 0.
+#[test]
+fn so_error_reports_connection_refused_once_then_zero() {
+    let mut netd = new_netd();
+    let mut now = 0i64;
+    let client = netd.open("net:tcp/127.0.0.1:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(SERVER)),
+        Response::Ok
+    );
+    let refused = i32::try_from(-Errno::ECONNREFUSED.to_ret()).unwrap_or(0);
+    let mut first = Response::Value(0);
+    for _ in 0..100 {
+        poll(&mut netd, &mut now);
+        first = call_socket(
+            &mut netd,
+            client,
+            Call::GetSockOpt {
+                opt: SockOpt::Error,
+            },
+        );
+        if first != Response::Value(0) {
+            break;
+        }
+    }
+    assert_eq!(first, Response::Value(refused));
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::GetSockOpt {
+                opt: SockOpt::Error,
+            },
+        ),
+        Response::Value(0)
+    );
+    netd.close(client).unwrap();
+}
+
 fn test_lease(address: Ipv4Addr, prefix: u8, router: Option<Ipv4Addr>, dns: Ipv4Addr) -> DhcpLease {
     DhcpLease {
         address,
@@ -798,6 +898,23 @@ fn a_static_nic_is_published_without_dhcp() {
     assert_eq!(config.prefix, 24);
     assert_eq!(config.gateway, Some([10, 0, 2, 2]));
     let lease = netd.dhcp_lease().unwrap();
+    assert_eq!(lease.address.octets(), [10, 0, 2, 15]);
+    assert_eq!(lease.prefix_len, 24);
+    assert_eq!(lease.router.unwrap().octets(), [10, 0, 2, 2]);
+    assert_eq!(lease.dns[0].octets(), [10, 0, 2, 3]);
+    assert!(lease.renew_at_ms.is_none());
+}
+
+#[test]
+fn a_qemu_fixed_nic_publishes_a_lease_for_resolvd() {
+    // QEMU user-mode configures 10.0.2.15/24 immediately but is not NicAddressing::Static.
+    // resolvd asks netd for a DHCP lease; this configuration must still answer with the
+    // synthetic lease and the slirp DNS, not ENOENT.
+    let mut netd = new_netd();
+    netd.attach_nic(Loopback::new(NIC_MAC), NicConfig::qemu(NIC_MAC, 1500), 0);
+    let lease = netd
+        .dhcp_lease()
+        .expect("QEMU fixed-address mode must publish a synthetic lease");
     assert_eq!(lease.address.octets(), [10, 0, 2, 15]);
     assert_eq!(lease.prefix_len, 24);
     assert_eq!(lease.router.unwrap().octets(), [10, 0, 2, 2]);
