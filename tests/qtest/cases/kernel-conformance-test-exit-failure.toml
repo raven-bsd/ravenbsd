@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# CONTRACTS C5 failure path: the guest writes 0x11 to port 0xf4 on a failed test-exit run. QEMU
+# maps `(0x11 << 1) | 1` to status 35, which the harness reads as `expect_exit = "failure"`.
+# `selftest=div0` reaches the kernel exception handler, whose test-exit path calls
+# `exit_qemu(0x11)`. The PID 1 non-zero exit-code mapping itself is asserted from source by
+# tests/host/kernel-conformance/src/lib.rs (`if code == 0 { 0x10 } else { 0x11 }`).
+
+name = "kernel-conformance-test-exit-failure"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=div0"
+qemu_extra = []
+expect_exit = "failure"
+
+[[expect]]
+regex = 'EXCEPTION: divide error'
+
+[[expect]]
+regex = 'rip='
+
+[[expect]]
+regex = '^bt\[0\]'
