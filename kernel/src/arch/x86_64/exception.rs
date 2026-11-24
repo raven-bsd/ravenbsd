@@ -209,44 +209,44 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
                     terminate_fault(signal::FAULT_MISALIGN);
                 }
                 crate::process::FaultOutcome::Segv => {
-            let kind = if frame.error_code & 1 == 0 {
-                signal::FAULT_PAGE_NOMAP
-            } else {
-                signal::FAULT_PAGE_PERM
-            };
-            if deliver_fault(frame, kind, cr2) {
-                return;
-            }
-            // K495 rev181: the fault RIP alone cannot identify the null/data source. Print the
-            // general registers next to the fault line so the owner can map the instruction.
-            let pid = crate::process::current().map_or(0, |process| process.id);
-            crate::kprintln!(
-                "process: fault-regs pid={} rip=0x{:x} rsp=0x{:x} rax=0x{:x} rbx=0x{:x} \
+                    let kind = if frame.error_code & 1 == 0 {
+                        signal::FAULT_PAGE_NOMAP
+                    } else {
+                        signal::FAULT_PAGE_PERM
+                    };
+                    if deliver_fault(frame, kind, cr2) {
+                        return;
+                    }
+                    // K495 rev181: the fault RIP alone cannot identify the null/data source. Print the
+                    // general registers next to the fault line so the owner can map the instruction.
+                    let pid = crate::process::current().map_or(0, |process| process.id);
+                    crate::kprintln!(
+                        "process: fault-regs pid={} rip=0x{:x} rsp=0x{:x} rax=0x{:x} rbx=0x{:x} \
                  rcx=0x{:x} rdx=0x{:x} rsi=0x{:x} rdi=0x{:x} rbp=0x{:x} r8=0x{:x} \
                  r9=0x{:x} r10=0x{:x} r11=0x{:x} r12=0x{:x} r13=0x{:x} r14=0x{:x} \
                  r15=0x{:x} cr2=0x{:x} err=0x{:x}",
-                pid,
-                frame.rip,
-                frame.rsp,
-                frame.rax,
-                frame.rbx,
-                frame.rcx,
-                frame.rdx,
-                frame.rsi,
-                frame.rdi,
-                frame.rbp,
-                frame.r8,
-                frame.r9,
-                frame.r10,
-                frame.r11,
-                frame.r12,
-                frame.r13,
-                frame.r14,
-                frame.r15,
-                cr2,
-                frame.error_code
-            );
-            crate::process::page_fault(cr2, frame.rip);
+                        pid,
+                        frame.rip,
+                        frame.rsp,
+                        frame.rax,
+                        frame.rbx,
+                        frame.rcx,
+                        frame.rdx,
+                        frame.rsi,
+                        frame.rdi,
+                        frame.rbp,
+                        frame.r8,
+                        frame.r9,
+                        frame.r10,
+                        frame.r11,
+                        frame.r12,
+                        frame.r13,
+                        frame.r14,
+                        frame.r15,
+                        cr2,
+                        frame.error_code
+                    );
+                    crate::process::page_fault(cr2, frame.rip);
                 }
             }
         }
