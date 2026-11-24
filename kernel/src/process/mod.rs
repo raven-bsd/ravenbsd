@@ -1477,10 +1477,7 @@ fn sigacts_selftest() -> ! {
         fail("exec setup");
     }
     table.exec_reset();
-    match (
-        table.get(status::SIGUSR1),
-        table.get(status::SIGTERM),
-    ) {
+    match (table.get(status::SIGUSR1), table.get(status::SIGTERM)) {
         (Some(handler_action), Some(ignore_action))
             if handler_action.handler == SIG_DFL && ignore_action.handler == SIG_IGN => {}
         _ => fail("exec reset"),

@@ -17,9 +17,7 @@ use raven_usercopy::{UserSlice, is_user_address};
 use crate::cmdline::CmdLine;
 use crate::kprintln;
 use crate::memory::paging;
-use crate::process::{
-    self, Process, ProcessState, SIG_MAX, SS_DISABLE, SigAction, handle::Object,
-};
+use crate::process::{self, Process, ProcessState, SIG_MAX, SS_DISABLE, SigAction, handle::Object};
 use crate::sched;
 use crate::sched::thread::ThreadState;
 use crate::syscall::SyscallFrame;
@@ -377,15 +375,18 @@ pub fn sigprocmask(frame: &SyscallFrame) -> Result<usize, Errno> {
         let bytes = unsafe {
             core::slice::from_raw_parts_mut(&mut set as *mut u64 as *mut u8, size_of::<u64>())
         };
-        copy_from_user(bytes, UserSlice::new(frame.rsi as u64, size_of::<u64>() as u64)?)?;
+        copy_from_user(
+            bytes,
+            UserSlice::new(frame.rsi as u64, size_of::<u64>() as u64)?,
+        )?;
         let mut next = match how {
             0 => old | set,
             1 => old & !set,
             _ => set,
         };
         // `SIGKILL` and `SIGSTOP` are not blockable.
-        next &= !((1u64 << (process::status::SIGKILL - 1))
-            | (1u64 << (process::status::SIGSTOP - 1)));
+        next &=
+            !((1u64 << (process::status::SIGKILL - 1)) | (1u64 << (process::status::SIGSTOP - 1)));
         thread.sigmask.store(next, Ordering::Release);
     }
     if frame.rdx != 0 {
@@ -421,10 +422,7 @@ pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
         // SAFETY: `stack` is a live Stack; the mutable byte view covers exactly it.
         let bytes = unsafe {
-            core::slice::from_raw_parts_mut(
-                &mut stack as *mut Stack as *mut u8,
-                size_of::<Stack>(),
-            )
+            core::slice::from_raw_parts_mut(&mut stack as *mut Stack as *mut u8, size_of::<Stack>())
         };
         copy_from_user(
             bytes,
@@ -443,7 +441,9 @@ pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
                 return Err(Errno::EINVAL);
             }
             thread.altstack_sp.store(stack.sp as u64, Ordering::Release);
-            thread.altstack_size.store(stack.size as u64, Ordering::Release);
+            thread
+                .altstack_size
+                .store(stack.size as u64, Ordering::Release);
             thread.altstack_flags.store(0, Ordering::Release);
         }
     }
@@ -461,10 +461,7 @@ pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
         // SAFETY: `stack` is a live Stack; the immutable byte view covers exactly it.
         let bytes = unsafe {
-            core::slice::from_raw_parts(
-                &stack as *const Stack as *const u8,
-                size_of::<Stack>(),
-            )
+            core::slice::from_raw_parts(&stack as *const Stack as *const u8, size_of::<Stack>())
         };
         copy_to_user(
             UserSlice::new(frame.rdx as u64, size_of::<Stack>() as u64)?,
