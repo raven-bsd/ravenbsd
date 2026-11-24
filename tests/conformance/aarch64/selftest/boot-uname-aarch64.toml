@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S182 runner selftest: the aarch64 QEMU virt boot/uname row, with the same expected values as
+# the standing gate's boot-uname-aarch64. It proves the conformance runner can discover and
+# execute a real aarch64 table before the shared S172-S181 tables land.
+
+name = "conformance-aarch64-selftest"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(aarch64\)'
+
+[[expect]]
+regex = '^init: starting$'
+
+[[expect]]
+regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ aarch64$'
+
+[[expect]]
+regex = '^init: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
