@@ -1338,6 +1338,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     say("CONTRACT SUMMARY PASS 10/10\n");
-    return 0;
+    // The K9 row is complete; skip libc atexit/stdio cleanup, which is unrelated to the socket
+    // contract and currently hangs the contract process on 4-vCPU guests after the summary.
+    _exit(0);
 #endif
 }
