@@ -393,7 +393,11 @@ fn map_initfs_image() -> Result<&'static [u8], Errno> {
 
 /// Spawn this binary with `argv[1] = role` (a child with the ELF mapped and one running thread).
 fn spawn_role(initfs: &Initfs<'_>, role: &str) -> Result<Handle, Errno> {
-    let entry = initfs.get("/bin/s36-lifecycle").ok_or(Errno::ENOENT)?;
+    spawn_role_at(initfs, "/bin/s36-lifecycle", role)
+}
+
+fn spawn_role_at(initfs: &Initfs<'_>, program: &str, role: &str) -> Result<Handle, Errno> {
+    let entry = initfs.get(program).ok_or(Errno::ENOENT)?;
     let elf =
         Elf::parse(entry.data, Machine::X86_64, USER_MIN..USER_END).map_err(|_| Errno::EINVAL)?;
     let child = proc_create()?;
@@ -788,27 +792,49 @@ fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
 
 /// Create a writable tmpfs file, map/fault one vfsd pager page and return the still-open file
 /// and the client's object handle (the caller closes the object).
-fn map_tmpfs_page(client: &Client, path: &str) -> Result<(Handle, Handle), &'static str> {
-    let flags = OpenFlags::from_wire(WIRE_OPEN_READ | WIRE_OPEN_WRITE | WIRE_OPEN_CREATE)
+fn map_tmpfs_page(
+    client: &Client,
+    mount_path: &str,
+    scheme_path: &str,
+) -> Result<(Handle, Handle), &'static str> {
+    let data = [0x5au8; PAGE];
+    // Seed the file through the tmpfs scheme directly. The mount-path O_CREAT open currently
+    // returns EINVAL before vfsd's open_with (recorded S167 defect); the pager still opens the
+    // mounted path below, read-write.
+    let create_flags = OpenFlags::from_wire(WIRE_OPEN_READ | WIRE_OPEN_WRITE | WIRE_OPEN_CREATE)
         .map_err(|_| "tmpfs flags")?;
-    let file = match client.open_flags(path, flags) {
+    let creator = Client::new();
+    let created = match creator.open_flags(scheme_path, create_flags) {
+        Ok(file) => file,
+        Err(error) => {
+            println!("s36: tmpfs create err {:?}", error);
+            return Err("tmpfs create");
+        }
+    };
+    let mut written = 0usize;
+    while written < PAGE {
+        match creator.write(created, written as u64, &data[written..]) {
+            Ok(0) => {
+                let _ = creator.close(created);
+                return Err("tmpfs short write");
+            }
+            Ok(count) => written += count,
+            Err(error) => {
+                println!("s36: tmpfs seed err {:?}", error);
+                let _ = creator.close(created);
+                return Err("tmpfs write");
+            }
+        }
+    }
+    let _ = creator.close(created);
+
+    let file = match client.open_flags(mount_path, OpenFlags::READ_WRITE) {
         Ok(file) => file,
         Err(error) => {
             println!("s36: tmpfs open err {:?}", error);
             return Err("tmpfs open");
         }
     };
-    let data = [0x5au8; PAGE];
-    let written = match client.write(file, 0, &data) {
-        Ok(written) => written,
-        Err(error) => {
-            println!("s36: tmpfs write err {:?}", error);
-            return Err("tmpfs write");
-        }
-    };
-    if written != PAGE {
-        return Err("tmpfs short write");
-    }
     let request = CallRequest::new(Call::Mmap {
         offset: 0,
         len: PAGE as u64,
@@ -850,7 +876,7 @@ fn map_tmpfs_page(client: &Client, path: &str) -> Result<(Handle, Handle), &'sta
 /// teardown closes the scheme file; vfsd must retire the pager key and release the frames.
 fn pager_exit_child() -> i32 {
     let client = Client::new();
-    match map_tmpfs_page(&client, "/tmp/pager-exit") {
+    match map_tmpfs_page(&client, "file:/tmp/pager-exit", "tmpfs:/pager-exit") {
         Ok((_file, object)) => {
             let _ = Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
             0
@@ -865,36 +891,54 @@ fn pager_exit_child() -> i32 {
 /// C18 lifetime row: pager frames return to the base when (1) the owning process exits and
 /// (2) the file is truncated while the controller still holds the open file. The kernel
 /// `s36-mapcheck` gate prints the pager count and frame delta on the 88/89 markers.
-fn pager_lifetime_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+fn pager_lifetime_part(initfs: &Initfs<'_>, program: &str) -> Result<(), &'static str> {
+    // Let the boot services (getty/login) settle so their frame allocations are not inside the
+    // base/check delta, and warm the kernel stack cache with the same 64 KiB spawn stack.
+    nanosleep(3_000_000_000);
+    let warm = spawn_role_at(initfs, program, "marker").map_err(|_| "exit warm spawn")?;
+    if proc_wait(warm).unwrap_or(-1) != 0 {
+        return Err("exit warm wait");
+    }
+    handle_close(warm);
+
     // (1) owning process exits with the file still open.
-    let base = spawn_role(initfs, "mapbase").map_err(|_| "exit base spawn")?;
+    let base = spawn_role_at(initfs, program, "mapbase").map_err(|_| "exit base spawn")?;
     if proc_wait(base).unwrap_or(-1) != 88 {
         return Err("exit base wait");
     }
     handle_close(base);
-    let child = spawn_role(initfs, "pager-exit").map_err(|_| "pager exit spawn")?;
+    let child = spawn_role_at(initfs, program, "pager-exit").map_err(|_| "pager exit spawn")?;
     if proc_wait(child).unwrap_or(-1) != 0 {
         return Err("pager exit wait");
     }
     handle_close(child);
-    // The scheme close is fire-and-forget; let vfsd process the exit close.
-    nanosleep(1_000_000_000);
-    let top = spawn_role(initfs, "maptop").map_err(|_| "exit top spawn")?;
+    // The scheme close is fire-and-forget; let vfsd process the exit close and drain the
+    // child's final page-outs. The loaded host sampled 20 pages at 1 s.
+    nanosleep(2_000_000_000);
+    let top = spawn_role_at(initfs, program, "maptop").map_err(|_| "exit top spawn")?;
     if proc_wait(top).unwrap_or(-1) != 89 {
         return Err("exit top wait");
     }
     handle_close(top);
+    // The exit-89 gate print is in the child's teardown; let the console drain it before the
+    // row marker, so the serial order is gate then marker on an SMP host.
+    nanosleep(100_000_000);
     println!("s36: pager exit done");
 
     // (2) file truncation. The controller keeps the file open across the 89 marker, so only the
     // truncate retire can release the pager key and the object's frames.
-    let base = spawn_role(initfs, "mapbase").map_err(|_| "trunc base spawn")?;
+    let warm = spawn_role_at(initfs, program, "marker").map_err(|_| "trunc warm spawn")?;
+    if proc_wait(warm).unwrap_or(-1) != 0 {
+        return Err("trunc warm wait");
+    }
+    handle_close(warm);
+    let base = spawn_role_at(initfs, program, "mapbase").map_err(|_| "trunc base spawn")?;
     if proc_wait(base).unwrap_or(-1) != 88 {
         return Err("trunc base wait");
     }
     handle_close(base);
     let client = Client::new();
-    let (file, object) = map_tmpfs_page(&client, "/tmp/pager-trunc")?;
+    let (file, object) = map_tmpfs_page(&client, "file:/tmp/pager-trunc", "tmpfs:/pager-trunc")?;
     let _ = Errno::from_ret(syscall1(Syscall::HANDLE_CLOSE as usize, object.0 as usize));
     let request = CallRequest::new(Call::Truncate { size: 0 });
     let mut encoded = [0u8; 64];
@@ -909,12 +953,13 @@ fn pager_lifetime_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
             &mut response,
         )
         .map_err(|_| "truncate call")?;
-    nanosleep(1_000_000_000);
-    let top = spawn_role(initfs, "maptop").map_err(|_| "trunc top spawn")?;
+    nanosleep(2_000_000_000);
+    let top = spawn_role_at(initfs, program, "maptop").map_err(|_| "trunc top spawn")?;
     if proc_wait(top).unwrap_or(-1) != 89 {
         return Err("trunc top wait");
     }
     handle_close(top);
+    nanosleep(100_000_000);
     println!("s36: pager truncate done");
     client.close(file).map_err(|_| "tmpfs close")?;
     Ok(())
@@ -1355,6 +1400,15 @@ fn main(args: raven_rt::Args) -> i32 {
         return 0;
     }
 
+    // The pager-lifetime initfs stages the same binary as `/bin/pager-lifetime`; run only the
+    // C18 rows there so the dedicated case does not depend on the other lifecycle rows.
+    if initfs.get("/bin/pager-lifetime").is_some() {
+        if let Err(message) = pager_lifetime_part(&initfs, "/bin/pager-lifetime") {
+            fail(message);
+        }
+        return 0;
+    }
+
     #[cfg(feature = "s36-churn-only")]
     {
         if let Err(message) = churn_only(&initfs) {
@@ -1421,7 +1475,7 @@ fn main(args: raven_rt::Args) -> i32 {
         fail(message);
     }
     // C18 lifetime row: pager frames release on owning-process exit and on file truncation.
-    if let Err(message) = pager_lifetime_part(&initfs) {
+    if let Err(message) = pager_lifetime_part(&initfs, "/bin/s36-lifecycle") {
         fail(message);
     }
 
