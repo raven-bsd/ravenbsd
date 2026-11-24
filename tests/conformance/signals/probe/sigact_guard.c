@@ -64,9 +64,14 @@ static void guard_init(struct guarded *guard) {
     memset(guard->tail, 0, sizeof(guard->tail));
 }
 
-// Return the number of damaged canary words; print the exact word and values for each one.
-static int guard_check(const struct guarded *guard, const char *side) {
-    int bad = 0;
+// Return the damaged canary words on each side; print the exact word and values for each one.
+struct guard_damage {
+    int before;
+    int after;
+};
+
+static struct guard_damage guard_check(const struct guarded *guard, const char *side) {
+    struct guard_damage damage = {0, 0};
     size_t index;
     for (index = 0; index < CANARY_WORDS; index++) {
         uint64_t want = canary_word(index);
@@ -74,7 +79,7 @@ static int guard_check(const struct guarded *guard, const char *side) {
             printf("sigact: canary-bad side=%s-before word=%zu expected=0x%llx got=0x%llx\n",
                    side, index, (unsigned long long)want,
                    (unsigned long long)guard->before[index]);
-            bad++;
+            damage.before++;
         }
     }
     for (index = 0; index < CANARY_WORDS; index++) {
@@ -83,10 +88,10 @@ static int guard_check(const struct guarded *guard, const char *side) {
             printf("sigact: canary-bad side=%s-after word=%zu expected=0x%llx got=0x%llx\n",
                    side, index, (unsigned long long)want,
                    (unsigned long long)guard->after[index]);
-            bad++;
+            damage.after++;
         }
     }
-    return bad;
+    return damage;
 }
 
 static const char *verdict(int ok) {
@@ -135,10 +140,10 @@ int main(void) {
     new_guard.act.flags = SA_RESTART;
     result = raw_sigaction(SIGUSR1, &new_guard.act, NULL);
     {
-        int bad = guard_check(&new_guard, "install");
+        struct guard_damage bad = guard_check(&new_guard, "install");
         printf("sigact: install ret=%ld new-before=%s new-after=%s\n", result,
-               verdict(bad == 0), verdict(bad == 0));
-        if (result != 0 || bad != 0) {
+               verdict(bad.before == 0), verdict(bad.after == 0));
+        if (result != 0 || bad.before != 0 || bad.after != 0) {
             failures++;
         }
     }
@@ -147,8 +152,8 @@ int main(void) {
     guard_init(&old_guard);
     result = raw_sigaction(SIGUSR1, &new_guard.act, &old_guard.act);
     {
-        int new_bad = guard_check(&new_guard, "query-new");
-        int old_bad = guard_check(&old_guard, "query-old");
+        struct guard_damage new_bad = guard_check(&new_guard, "query-new");
+        struct guard_damage old_bad = guard_check(&old_guard, "query-old");
         int handler_ok = old_guard.act.handler == handler_value;
         int mask_ok = old_guard.act.mask[0] == mask_value && old_guard.act.mask[1] == 0;
         int flags_ok = old_guard.act.flags == SA_RESTART;
@@ -156,9 +161,10 @@ int main(void) {
                "flags-value=0x%x new-before=%s new-after=%s old-before=%s old-after=%s\n",
                result, new_guard.act.handler == 0, old_guard.act.handler == 0,
                handler_ok, mask_ok, flags_ok, old_guard.act.flags,
-               verdict(new_bad == 0), verdict(new_bad == 0),
-               verdict(old_bad == 0), verdict(old_bad == 0));
-        if (result != 0 || new_bad != 0 || old_bad != 0 || !handler_ok || !mask_ok ||
+               verdict(new_bad.before == 0), verdict(new_bad.after == 0),
+               verdict(old_bad.before == 0), verdict(old_bad.after == 0));
+        if (result != 0 || new_bad.before != 0 || new_bad.after != 0 ||
+            old_bad.before != 0 || old_bad.after != 0 || !handler_ok || !mask_ok ||
             !flags_ok) {
             failures++;
         }
@@ -169,14 +175,16 @@ int main(void) {
     guard_init(&old_guard);
     result = raw_sigaction(SIGUSR1, &new_guard.act, &old_guard.act);
     {
-        int new_bad = guard_check(&new_guard, "restore-new");
-        int old_bad = guard_check(&old_guard, "restore-old");
+        struct guard_damage new_bad = guard_check(&new_guard, "restore-new");
+        struct guard_damage old_bad = guard_check(&old_guard, "restore-old");
         int old_handler_ok = old_guard.act.handler == handler_value;
         printf("sigact: restore ret=%ld old-handler=%d new-before=%s new-after=%s "
                "old-before=%s old-after=%s\n",
-               result, old_handler_ok, verdict(new_bad == 0), verdict(new_bad == 0),
-               verdict(old_bad == 0), verdict(old_bad == 0));
-        if (result != 0 || new_bad != 0 || old_bad != 0 || !old_handler_ok) {
+               result, old_handler_ok, verdict(new_bad.before == 0),
+               verdict(new_bad.after == 0), verdict(old_bad.before == 0),
+               verdict(old_bad.after == 0));
+        if (result != 0 || new_bad.before != 0 || new_bad.after != 0 ||
+            old_bad.before != 0 || old_bad.after != 0 || !old_handler_ok) {
             failures++;
         }
     }
@@ -185,11 +193,11 @@ int main(void) {
     guard_init(&old_guard);
     result = raw_sigaction(SIGUSR1, NULL, &old_guard.act);
     {
-        int old_bad = guard_check(&old_guard, "default");
+        struct guard_damage old_bad = guard_check(&old_guard, "default");
         int handler_ok = old_guard.act.handler == SIG_DFL;
         printf("sigact: default ret=%ld handler=%d old-before=%s old-after=%s\n", result,
-               handler_ok, verdict(old_bad == 0), verdict(old_bad == 0));
-        if (result != 0 || old_bad != 0 || !handler_ok) {
+               handler_ok, verdict(old_bad.before == 0), verdict(old_bad.after == 0));
+        if (result != 0 || old_bad.before != 0 || old_bad.after != 0 || !handler_ok) {
             failures++;
         }
     }
