@@ -49,6 +49,7 @@ pub mod backend;
 pub mod compat;
 pub mod conf;
 pub mod dir;
+pub mod exec_umask;
 pub mod fcntl;
 pub mod fd;
 pub mod intr;

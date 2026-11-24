@@ -56,6 +56,11 @@ pub(crate) fn run(
         envp.retain(|row| !row.starts_with(prefix));
         envp.push(fdmap);
     }
+    // The mask is process state (the kernel keeps none), so the new image gets it through the
+    // same exec metadata channel. It is removed again by the platform startup.
+    let umask_name = raven_libc_platform::exec_umask::ENV_NAME;
+    envp.retain(|row| !row.starts_with(umask_name));
+    envp.push(raven_libc_platform::exec_umask::encode(platform.umask()));
     if !search {
         let value = crate::ffi::map_proc::exec(&backend, &cwd, path, &argv, &envp, fd);
         return crate::ffi::ret::int(Err(crate::ffi::map_proc::error(value)));
