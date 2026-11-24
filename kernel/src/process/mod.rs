@@ -19,6 +19,7 @@ pub mod tty;
 use core::fmt;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -641,7 +642,9 @@ pub struct Process {
     /// Signals queued for this process.
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
     /// Per-process C19 signal dispositions (handlers are per process; the mask is per thread).
-    pub sigacts: Mutex<SigActs>,
+    /// Boxed so the 2.6 KiB `SigActs` table stays off the bounded kernel stack in
+    /// `new_empty_process` (the S185 `PROC_CREATE` double fault).
+    pub sigacts: Mutex<Box<SigActs>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
     /// True once an exec has replaced this process image; a child then refuses `setpgid`.
@@ -922,7 +925,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
-        sigacts: Mutex::new(SigActs::new()),
+        sigacts: Mutex::new(Box::new(SigActs::new())),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1004,7 +1007,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
-        sigacts: Mutex::new(SigActs::new()),
+        sigacts: Mutex::new(Box::new(SigActs::new())),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1079,7 +1082,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
-        sigacts: Mutex::new(*source.sigacts.lock()),
+        sigacts: Mutex::new(Box::new(**source.sigacts.lock())),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1555,7 +1558,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
-        sigacts: Mutex::new(SigActs::new()),
+        sigacts: Mutex::new(Box::new(SigActs::new())),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
