@@ -57,7 +57,7 @@ fn c4_entry_keeps_bootinfo_in_rdi() {
 }
 
 #[test]
-fn c4_boot_stack_is_64_kib() {
+fn c4_boot_stack_is_8_mib() {
     let source = read("kernel/src/arch/x86_64/start.rs");
     let skip_at = source.find(".skip ").expect("C4 boot stack .skip");
     let number: u64 = source[skip_at + ".skip ".len()..]
@@ -66,14 +66,14 @@ fn c4_boot_stack_is_64_kib() {
         .expect("boot stack size")
         .parse()
         .expect("boot stack number");
-    // CONTRACTS C4: `_start` switches to a 64 KiB static boot stack in .bss.
+    // CONTRACTS C4: `_start` switches to an 8 MiB static boot stack in .bss (amended 2026-11-24).
     assert_eq!(
         number,
-        64 * 1024,
-        "CONTRACTS C4 says a 64 KiB boot stack, but kernel/src/arch/x86_64/start.rs reserves \
+        8 * 1024 * 1024,
+        "CONTRACTS C4 says an 8 MiB boot stack, but kernel/src/arch/x86_64/start.rs reserves \
          {number} bytes ({})",
-        if number == 8 * 1024 * 1024 {
-            "8 MiB"
+        if number == 64 * 1024 {
+            "64 KiB"
         } else {
             "different"
         }
