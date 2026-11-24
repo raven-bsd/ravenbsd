@@ -1277,8 +1277,9 @@ fn signal_one_info(
     if signo == SIGKILL {
         return terminate_by_signal(caller, target, SIGKILL, false);
     }
+    let kernel_handler = target.sigacts.lock().get(signo).is_caught();
     if !target.has_signal_entry()
-        && !target.c19_armed()
+        && !kernel_handler
         && let Some(action) = default_action(signo)
     {
         match action {

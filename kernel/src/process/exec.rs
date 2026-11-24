@@ -23,7 +23,7 @@ use raven_abi::types::Handle;
 use raven_elf::Elf;
 
 use super::handle::Object;
-use super::{AddressSpace, Process, ProcessError, ProcessState, SS_DISABLE, UserAddressSpace};
+use super::{AddressSpace, Process, ProcessError, ProcessState, UserAddressSpace};
 
 /// Largest exec image accepted from the caller.
 ///
@@ -147,7 +147,6 @@ pub fn replace_image_from_user(
     let ids = *caller.ids.lock();
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let mut new_space = UserAddressSpace::new(address_space);
-    super::install_sigcode(&mut new_space)?;
     if let (Some(interp), Some(data)) = (&interpreter, interpreter_data) {
         super::load_segments(&mut new_space, interp, data, interpreter_bias)
             .map_err(process_errno)?;
@@ -158,6 +157,7 @@ pub fn replace_image_from_user(
     let envp_refs: Vec<&[u8]> = envp.iter().map(Vec::as_slice).collect();
     let stack = super::build_stack(&mut new_space, path, &argv_refs, &envp_refs, &ids, aux)
         .map_err(process_errno)?;
+
     // Collect the handle exits before the switch: the image and stack are now fully built, so a
     // close failure can no longer abort the exec.
     let mut to_close: Vec<Handle> = Vec::new();
@@ -209,30 +209,35 @@ pub fn replace_image_from_user(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
-    // C19 `execsigs`: handlers reset to SIG_DFL (SIG_IGN stays ignored), pending cleared and
-    // the alternate signal stack reset. The legacy per-thread SIG_SETUP entry and its context
-    // are part of the old image; no entry from it may survive into the new image.
+    // C19/FreeBSD `execsigs`: caught handlers reset to SIG_DFL (ignored stay ignored), the
+    // alternate stack is disabled, and no handler/entry from the old image survives. The signal
+    // mask is preserved across exec (FreeBSD keeps `td_sigmask`).
     caller.sigacts.lock().exec_reset();
-    caller.sigcode_addr.store(stack.sigcode, Ordering::Release);
-    thread.signal_entry.store(0, Ordering::Release);
-    thread.signal_ctx_offset.store(0, Ordering::Release);
-    thread.signal_ctx_abs.store(0, Ordering::Release);
-    thread.signal_flags.store(0, Ordering::Release);
-    thread.signal_active_ctx.store(0, Ordering::Release);
-    thread.signal_frame_uc.store(0, Ordering::Release);
-    thread.signal_depth.store(0, Ordering::Release);
-    thread.signal_mask.store(0, Ordering::Release);
-    thread.resend.store(false, Ordering::Release);
-    thread.kick_bits.store(0, Ordering::Release);
-    thread.altstack_sp.store(0, Ordering::Release);
-    thread.altstack_size.store(0, Ordering::Release);
-    thread.altstack_flags.store(SS_DISABLE, Ordering::Release);
+    if let Some(thread) = crate::sched::current_thread() {
+        thread.signal_entry.store(0, Ordering::Release);
+        thread.signal_ctx_offset.store(0, Ordering::Release);
+        thread.signal_ctx_abs.store(0, Ordering::Release);
+        thread.signal_flags.store(0, Ordering::Release);
+        thread.signal_active_ctx.store(0, Ordering::Release);
+        thread.signal_depth.store(0, Ordering::Release);
+        thread.signal_mask.store(0, Ordering::Release);
+        thread.resend.store(false, Ordering::Release);
+        thread.kick_bits.store(0, Ordering::Release);
+        thread.sig_in_handler.store(false, Ordering::Release);
+        thread.sig_frame.store(0, Ordering::Release);
+        thread.sig_alt_sp.store(0, Ordering::Release);
+        thread.sig_alt_size.store(0, Ordering::Release);
+        thread
+            .sig_alt_flags
+            .store(crate::process::SS_DISABLE, Ordering::Release);
+        thread.sig_on_altstack.store(false, Ordering::Release);
+    }
     caller.exec_done.store(true, Ordering::Release);
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;
     caller.pending_exec.lock().replace(ExecContext {
         entry: initial_entry,
-        stack: stack.sp,
+        stack,
     });
     Ok(())
 }

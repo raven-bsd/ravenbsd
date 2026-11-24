@@ -63,7 +63,13 @@ mod program {
     const PROXY_CHUNK: usize = 64 * 1024;
     const PAGE: usize = 4096;
     /// Budget for proxy open-file descriptions.
-    const MAX_OPEN_FILES: usize = 256;
+    ///
+    /// The caller's `RLIMIT_NOFILE` soft limit is the per-process bound; this aggregate budget must
+    /// not be lower than the maximum any process may set. The kernel handle table is 65,536
+    /// (`raven-handles::MAX_HANDLES`), the same shape as FreeBSD `maxfilesperproc`, NetBSD
+    /// `maxfiles` and Linux `sysctl_nr_open`; the old 256 constant refused valid opens before the
+    /// caller's limit.
+    const MAX_OPEN_FILES: usize = 65_536;
 
     /// S11 `Opcode::Open` wire value.
     const OPEN_OPCODE: u16 = 1;
@@ -1313,21 +1319,9 @@ mod program {
             if let Some(proxy) = self.opens.close(file)? {
                 let target = proxy.target;
                 let _ = Client::new().close(target);
-                // The target is the last duplicate of this open. Any pager objects created from
-                // it can no longer supply a page (the target handle is gone), so return the
-                // pager handles now: the client's mappings keep the object alive, and when the
-                // client unmaps/closes it the frames are freed. Without this the server's pager
-                // key holds every mapped page for the life of vfsd (Lance S36 rev103 red row).
-                let objects: Vec<Handle> = self
-                    .pagers
-                    .iter()
-                    .filter(|(_, region)| region.file == file || region.target == target)
-                    .map(|(_, region)| region.object)
-                    .collect();
-                for object in objects {
-                    self.pagers.remove(&object.0);
-                    let _ = raven_rt::sys::handle_close(object);
-                }
+                // The target is the last duplicate of this open, so no page can be supplied
+                // through it anymore; return the pager handles now.
+                self.retire_pagers(file, target);
             }
             Ok(())
         }
@@ -1370,6 +1364,24 @@ mod program {
     }
 
     impl VfsHandler {
+        /// Drop the pager keys created from `file`/`target`.
+        ///
+        /// The client's mappings keep the object alive, and when the client unmaps/closes it the
+        /// frames are freed; without this the server's pager key holds every mapped page for the
+        /// life of vfsd (the S36 rev103 red row and C18 truncate lifetime).
+        fn retire_pagers(&mut self, file: u64, target: Handle) {
+            let objects: Vec<Handle> = self
+                .pagers
+                .iter()
+                .filter(|(_, region)| region.file == file || region.target == target)
+                .map(|(_, region)| region.object)
+                .collect();
+            for object in objects {
+                self.pagers.remove(&object.0);
+                let _ = raven_rt::sys::handle_close(object);
+            }
+        }
+
         fn call_checked(
             &mut self,
             file: u64,
@@ -1465,20 +1477,26 @@ mod program {
                     }
                     Err(error) => Err(error.into()),
                 },
-                Call::Truncate { .. } | Call::Fchown { .. } => {
+                Call::Truncate { size } => {
                     let stat = Client::new().fstat(target)?;
-                    if matches!(decoded.call, Call::Truncate { .. })
-                        && !creds.permitted(
-                            (stat.mode & 0o7777) as u16,
-                            stat.uid,
-                            stat.gid,
-                            ACCESS_WRITE,
-                        )
-                    {
+                    if !creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        ACCESS_WRITE,
+                    ) {
                         return Err(Errno::EACCES.into());
                     }
-                    Ok(proxy_call(&Client::new(), target, &decoded, response)?)
+                    let result = proxy_call(&Client::new(), target, &decoded, response)?;
+                    // A shrink invalidates the pages past the new length. Retire the pager keys
+                    // created from this open; the client's mappings keep the object alive until
+                    // it unmaps/closes it. A grow or same-size truncate keeps the keys.
+                    if size < stat.size {
+                        self.retire_pagers(file, target);
+                    }
+                    Ok(result)
                 }
+                Call::Fchown { .. } => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Statvfs => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Link { path, target } => {
                     let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;

@@ -3,8 +3,7 @@
 
 //! `syscall` MSR setup and the assembly entry stub.
 
-use core::mem::size_of;
-
+use core::sync::atomic::Ordering;
 use raven_abi::errno::Errno;
 use raven_abi::signal::{self, ENTRY_SP, FaultRecord, MContext};
 use raven_usercopy::{UserSlice, is_user_address};
@@ -12,7 +11,7 @@ use raven_usercopy::{UserSlice, is_user_address};
 use crate::arch::x86_64::gdt::{KERNEL_CS, KERNEL_SS, STAR_USER_BASE, USER_CS, USER_SS};
 use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::arch::x86_64::usermode::{percpu_address, percpu_init};
-use crate::process::{self, PendingSignal, SIG_DFL, SIG_IGN, SigAction};
+use crate::process;
 use crate::syscall::thread;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
@@ -187,186 +186,110 @@ const USER_RFLAGS_MASK: u64 = 0x0000_0000_0024_0fd7;
 /// RFLAGS value forced on return to user mode (bit 1 and IF).
 const USER_RFLAGS_SET: u64 = 0x202;
 
-/// `SA_ONSTACK`: run the handler on the thread's alternate signal stack.
-const SA_ONSTACK: u32 = 0x0800_0000;
-/// `SA_NODEFER`: do not add the delivered signal to the handler mask.
-const SA_NODEFER: u32 = 0x4000_0000;
-/// `SA_RESETHAND`: reset the action to `SIG_DFL` before the handler runs.
-const SA_RESETHAND: u32 = 0x8000_0000;
-/// POSIX `SIGILL` (the ABI carries it as a fault kind, not a process constant).
-const SIGILL: u32 = 4;
-
-/// `mov $SIGRETURN, %eax; syscall; ud2`.
-///
-/// The return address in every C19 frame points here. The kernel maps these bytes in a fixed
-/// read/execute page in every user address space at exec, init and spawn; no userland code
-/// registers a trampoline. The immediate comes from the ABI constant, never a literal.
-pub const SIGCODE_SIZE: usize = 9;
-/// The kernel-installed sigcode image.
-pub const SIGCODE: [u8; SIGCODE_SIZE] = {
-    let number = (raven_abi::signal::SIGRETURN as u32).to_le_bytes();
-    [
-        0xb8, number[0], number[1], number[2], number[3], 0x0f, 0x05, 0x0f, 0x0b,
-    ]
-};
-
-/// C `ucontext_t` size on x86-64 (`raven-libc-abi::structs::UcontextT`).
-const UCONTEXT_SIZE: usize = 936;
-/// C `siginfo_t` size (`raven-libc-abi::structs::SiginfoT`).
-const SIGINFO_SIZE: usize = 128;
-/// `sf_ra` at the frame base; the handler's `ret` lands on the sigcode.
-const SIGFRAME_RA_OFFSET: usize = 0;
-/// `sf_si` follows the return address.
-const SIGFRAME_SI_OFFSET: usize = SIGFRAME_RA_OFFSET + 8;
-/// `sf_uc` follows the siginfo.
-const SIGFRAME_UC_OFFSET: usize = SIGFRAME_SI_OFFSET + SIGINFO_SIZE;
-/// Whole frame written below `sp - 128`.
-const SIGFRAME_SIZE: usize = SIGFRAME_UC_OFFSET + UCONTEXT_SIZE;
-/// `ucontext_t.uc_link`.
-const UC_LINK_OFFSET: usize = 8;
-/// `ucontext_t.uc_stack`.
-const UC_STACK_OFFSET: usize = 16;
-/// `ucontext_t.uc_mcontext`.
-const UC_MCONTEXT_OFFSET: usize = 40;
-/// `ucontext_t.uc_sigmask` (word 37 of the x86-64 C layout).
-const UC_SIGMASK_OFFSET: usize = 37 * 8;
-
-const _: () = {
-    assert!(SIGFRAME_SIZE == 1072);
-    assert!(SIGFRAME_UC_OFFSET == 136);
-    assert!(UC_MCONTEXT_OFFSET + core::mem::size_of::<MContext>() <= UC_SIGMASK_OFFSET);
-    assert!(UC_SIGMASK_OFFSET + 8 * 16 + 8 * 64 == UCONTEXT_SIZE);
-};
-
-/// One queued C19 record rendered into the C `siginfo_t` layout.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FrameInfo {
-    /// Signal number.
-    pub signo: u32,
-    /// `si_code`.
-    pub code: u32,
-    /// Sender pid (`si_pid`).
-    pub sender: u64,
-    /// Sender uid (`si_uid`).
-    pub uid: u32,
-    /// Queued `sigval` (`si_value`).
-    pub value: u64,
-}
-
-/// User addresses of the frame pieces handed to the handler.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FrameLayout {
-    /// Frame base; the handler's `rsp` and `[rsp]` is the sigcode return address.
-    pub base: u64,
-    /// `&siginfo_t` (`rsi`).
-    pub siginfo: u64,
-    /// `&ucontext_t` (`rdx`).
-    pub ucontext: u64,
-}
-
-/// Scratch buffer for one frame; a static keeps the 1 KiB image off the bounded kernel stack.
-static SIGNAL_FRAME: spin::Mutex<[u8; SIGFRAME_SIZE]> = spin::Mutex::new([0u8; SIGFRAME_SIZE]);
-
-fn put_u32(buffer: &mut [u8], offset: usize, value: u32) -> Result<(), Errno> {
-    let slot = buffer
-        .get_mut(offset..offset.saturating_add(4))
-        .ok_or(Errno::EFAULT)?;
-    slot.copy_from_slice(&value.to_le_bytes());
-    Ok(())
-}
-
-fn put_u64(buffer: &mut [u8], offset: usize, value: u64) -> Result<(), Errno> {
-    let slot = buffer
-        .get_mut(offset..offset.saturating_add(8))
-        .ok_or(Errno::EFAULT)?;
-    slot.copy_from_slice(&value.to_le_bytes());
-    Ok(())
-}
-
-/// Frame base for a handler entered as if by a `call`: `rsp` is 8 mod 16 and `[rsp]` is the
-/// return address. `top` is `sp - 128` on the normal stack or the top of the alternate stack.
-#[must_use]
-pub fn frame_base(top: u64) -> Option<u64> {
-    let bottom = top.checked_sub(SIGFRAME_SIZE as u64)?;
-    if bottom & 0xf == 8 {
-        Some(bottom)
-    } else {
-        (bottom & !0xf).checked_sub(8)
-    }
-}
-
-/// Render one C19 frame into `buffer`.
-///
-/// The layout is the NetBSD `sigframe_siginfo` order (`sf_ra`, `sf_si`, `sf_uc`) with the C36
-/// `mcontext_t` and the libc x86-64 `ucontext_t` field offsets. All addresses in the frame are
-/// absolute user addresses.
-#[allow(clippy::too_many_arguments)] // one frame has eight independent ABI inputs
-pub fn build_sigframe(
-    buffer: &mut [u8],
-    base: u64,
-    sigcode: u64,
-    context: &MContext,
-    mask: u64,
-    info: FrameInfo,
-    uc_link: u64,
-    altstack: (u64, u64, u32),
-) -> Result<FrameLayout, Errno> {
-    buffer.fill(0);
-    put_u64(buffer, SIGFRAME_RA_OFFSET, sigcode)?;
-    put_u32(buffer, SIGFRAME_SI_OFFSET, info.signo)?;
-    put_u32(buffer, SIGFRAME_SI_OFFSET + 8, info.code)?;
-    put_u64(
-        buffer,
-        SIGFRAME_SI_OFFSET + 16,
-        (info.sender & 0xffff_ffff) | (u64::from(info.uid) << 32),
-    )?;
-    put_u64(buffer, SIGFRAME_SI_OFFSET + 24, info.value)?;
-
-    put_u64(buffer, SIGFRAME_UC_OFFSET + UC_LINK_OFFSET, uc_link)?;
-    put_u64(buffer, SIGFRAME_UC_OFFSET + UC_STACK_OFFSET, altstack.0)?;
-    put_u64(
-        buffer,
-        SIGFRAME_UC_OFFSET + UC_STACK_OFFSET + 8,
-        u64::from(altstack.2),
-    )?;
-    put_u64(
-        buffer,
-        SIGFRAME_UC_OFFSET + UC_STACK_OFFSET + 16,
-        altstack.1,
-    )?;
-    put_u64(buffer, SIGFRAME_UC_OFFSET + UC_SIGMASK_OFFSET, mask)?;
-    // SAFETY: `context` is a live, fully initialised `MContext`; the byte view covers exactly
-    // `size_of::<MContext>()` bytes and is only read for the copy into the frame buffer.
-    let source = unsafe {
-        core::slice::from_raw_parts(
-            context as *const MContext as *const u8,
-            core::mem::size_of::<MContext>(),
-        )
-    };
-    let destination = buffer
-        .get_mut(
-            SIGFRAME_UC_OFFSET.saturating_add(UC_MCONTEXT_OFFSET)
-                ..SIGFRAME_UC_OFFSET
-                    .saturating_add(UC_MCONTEXT_OFFSET)
-                    .saturating_add(core::mem::size_of::<MContext>()),
-        )
-        .ok_or(Errno::EFAULT)?;
-    destination.copy_from_slice(source);
-
-    Ok(FrameLayout {
-        base,
-        siginfo: base
-            .checked_add(SIGFRAME_SI_OFFSET as u64)
-            .ok_or(Errno::EFAULT)?,
-        ucontext: base
-            .checked_add(SIGFRAME_UC_OFFSET as u64)
-            .ok_or(Errno::EFAULT)?,
-    })
-}
-
 /// Scratch context for one delivery; serialised because the copy is short and must not enlarge
 /// the 20 KiB kernel stack by a 256-byte frame per call.
 static SIGNAL_CONTEXT: spin::Mutex<MContext> = spin::Mutex::new(MContext::zero());
+
+/// System V amd64 `stack_t` (24 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserStack {
+    ss_sp: u64,
+    ss_flags: i32,
+    _pad: i32,
+    ss_size: u64,
+}
+
+/// System V amd64 `ucontext_t` (936 bytes; `uc_mcontext` is the C36 256-byte `MContext`).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserUContext {
+    uc_flags: u64,
+    uc_link: u64,
+    uc_stack: UserStack,
+    uc_mcontext: MContext,
+    uc_sigmask: [u64; 16],
+    uc_fpregs: [u64; 64],
+}
+
+/// System V amd64 `siginfo_t` (128 bytes).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserSigInfo {
+    si_signo: i32,
+    si_errno: i32,
+    si_code: i32,
+    _pad: i32,
+    fields: [u8; 112],
+}
+
+/// NetBSD amd64 `struct sigframe_siginfo`: return address, `siginfo_t`, `ucontext_t`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SigFrame {
+    sf_ra: u64,
+    sf_si: UserSigInfo,
+    sf_uc: UserUContext,
+}
+
+const _: () = assert!(core::mem::size_of::<UserStack>() == 24);
+const _: () = assert!(core::mem::size_of::<UserUContext>() == 936);
+const _: () = assert!(core::mem::offset_of!(UserUContext, uc_stack) == 16);
+const _: () = assert!(core::mem::offset_of!(UserUContext, uc_mcontext) == 40);
+const _: () = assert!(core::mem::offset_of!(UserUContext, uc_sigmask) == 296);
+const _: () = assert!(core::mem::size_of::<UserSigInfo>() == 128);
+const _: () = assert!(core::mem::size_of::<SigFrame>() == 1072);
+const _: () = assert!(core::mem::offset_of!(SigFrame, sf_si) == 8);
+const _: () = assert!(core::mem::offset_of!(SigFrame, sf_uc) == 136);
+
+const ZERO_UCONTEXT: UserUContext = UserUContext {
+    uc_flags: 0,
+    uc_link: 0,
+    uc_stack: UserStack {
+        ss_sp: 0,
+        ss_flags: 0,
+        _pad: 0,
+        ss_size: 0,
+    },
+    uc_mcontext: MContext::zero(),
+    uc_sigmask: [0; 16],
+    uc_fpregs: [0; 64],
+};
+
+const ZERO_SIGINFO: UserSigInfo = UserSigInfo {
+    si_signo: 0,
+    si_errno: 0,
+    si_code: 0,
+    _pad: 0,
+    fields: [0; 112],
+};
+
+impl UserSigInfo {
+    /// Store one `u32` field in the `siginfo_t` union area.
+    fn set_u32(&mut self, offset: usize, value: u32) {
+        if let Some(slot) = self.fields.get_mut(offset..offset.saturating_add(4)) {
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+    }
+
+    /// Store one `u64` field in the `siginfo_t` union area.
+    fn set_u64(&mut self, offset: usize, value: u64) {
+        if let Some(slot) = self.fields.get_mut(offset..offset.saturating_add(8)) {
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+    }
+}
+
+const ZERO_FRAME: SigFrame = SigFrame {
+    sf_ra: 0,
+    sf_si: ZERO_SIGINFO,
+    sf_uc: ZERO_UCONTEXT,
+};
+
+/// Scratch frame for one delivery/return: keeping the 1072-byte `sigframe` off the kernel stack
+/// follows the S44 archive's `MContext` scratch decision (the fault path already runs near the
+/// stack guard). Delivery and `SIGRETURN` are short and serialised per CPU.
+static SIGNAL_FRAME: spin::Mutex<SigFrame> = spin::Mutex::new(ZERO_FRAME);
 
 /// Snapshot the interrupted user state in the C36 `mcontext_t` layout.
 #[allow(clippy::indexing_slicing)] // Register indices are compile-time constants within `gregs`.
@@ -425,87 +348,180 @@ pub fn restore_signal_context(frame: &mut TrapFrame, context: &MContext) {
     frame.vector = 0;
 }
 
-/// Restore a `SIGRETURN` context from the active C19 frame or the legacy registered area.
+/// Restore a `SIGRETURN` frame.
+///
+/// A kernel-built handler returns through the sigcode to this syscall with `rsp = sf_ra + 8`
+/// (the handler `ret` popped the return address), so the `sigframe` is at `rsp - 8` and the
+/// `ucontext_t` starts at `fp + 136`. The retired `SIG_SETUP` model keeps its own fallback until
+/// the crate removes it (C19 removes the registration).
 pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
-    let current = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
-    let user_context = current
-        .signal_frame_uc
-        .load(core::sync::atomic::Ordering::Acquire);
-    if user_context != 0 {
-        if current
-            .signal_depth
-            .load(core::sync::atomic::Ordering::Acquire)
-            == 0
-        {
-            return Err(Errno::EINVAL);
-        }
-        let mut context = SIGNAL_CONTEXT.lock();
-        // SAFETY: `context` is a live `MContext`; the mutable byte view is exact and is not
-        // aliased while `copy_from_user` runs.
-        let destination = unsafe {
-            core::slice::from_raw_parts_mut(
-                &mut *context as *mut MContext as *mut u8,
-                core::mem::size_of::<MContext>(),
-            )
-        };
-        let source = UserSlice::new(
-            user_context
-                .checked_add(UC_MCONTEXT_OFFSET as u64)
-                .ok_or(Errno::EINVAL)?,
-            core::mem::size_of::<MContext>() as u64,
-        )?;
-        copy_from_user(destination, source)?;
-        let mut mask = 0u64;
-        // SAFETY: `mask` is a live local; the mutable byte view covers exactly eight bytes.
-        let destination = unsafe {
-            core::slice::from_raw_parts_mut(&mut mask as *mut u64 as *mut u8, size_of::<u64>())
-        };
-        copy_from_user(
-            destination,
-            UserSlice::new(
-                user_context
-                    .checked_add(UC_SIGMASK_OFFSET as u64)
-                    .ok_or(Errno::EINVAL)?,
-                8,
-            )?,
-        )?;
-        let mut link = 0u64;
-        // SAFETY: `link` is a live local; the mutable byte view covers exactly eight bytes.
-        let destination = unsafe {
-            core::slice::from_raw_parts_mut(&mut link as *mut u64 as *mut u8, size_of::<u64>())
-        };
-        copy_from_user(
-            destination,
-            UserSlice::new(
-                user_context
-                    .checked_add(UC_LINK_OFFSET as u64)
-                    .ok_or(Errno::EINVAL)?,
-                8,
-            )?,
-        )?;
-        restore_signal_context(frame, &context);
-        current.sigmask.store(
-            mask & !((1u64 << (process::status::SIGKILL - 1))
-                | (1u64 << (process::status::SIGSTOP - 1))),
-            core::sync::atomic::Ordering::Release,
-        );
-        current.signal_frame_uc.store(
-            if link == 0 || is_user_address(link) {
-                link
-            } else {
-                0
-            },
-            core::sync::atomic::Ordering::Release,
-        );
-        current
-            .signal_depth
-            .fetch_sub(1, core::sync::atomic::Ordering::AcqRel);
-        return Ok(());
+    if crate::sched::current_thread()
+        .is_some_and(|thread| thread.sig_in_handler.load(Ordering::Acquire))
+    {
+        return sigreturn_kernel_frame(frame);
     }
     let mut context = SIGNAL_CONTEXT.lock();
     thread::sigreturn(&mut context)?;
     restore_signal_context(frame, &context);
     Ok(())
+}
+
+/// Read the C19 `ucontext_t` back from the active kernel `sigframe` and restore it.
+fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
+    let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
+    let fp = thread.sig_frame.load(Ordering::Acquire);
+    if fp == 0 || !is_user_address(fp) {
+        return Err(Errno::EFAULT);
+    }
+    if frame.rsp != fp.checked_add(8).ok_or(Errno::EFAULT)? {
+        return Err(Errno::EINVAL);
+    }
+    let address = fp
+        .checked_add(core::mem::offset_of!(SigFrame, sf_uc) as u64)
+        .ok_or(Errno::EFAULT)?;
+    let mut scratch = SIGNAL_FRAME.lock();
+    scratch.sf_uc = ZERO_UCONTEXT;
+    let bytes = unsafe {
+        // SAFETY: the scratch `ucontext_t` is a live POD mirror; the mutable byte view covers
+        // exactly its size and the copy fills it before it is read.
+        core::slice::from_raw_parts_mut(
+            &mut scratch.sf_uc as *mut UserUContext as *mut u8,
+            core::mem::size_of::<UserUContext>(),
+        )
+    };
+    copy_from_user(
+        bytes,
+        UserSlice::new(address, core::mem::size_of::<UserUContext>() as u64)?,
+    )?;
+    let unblockable = process::signal_bit(crate::process::status::SIGKILL)
+        | process::signal_bit(crate::process::status::SIGSTOP);
+    thread.sig_blocked.store(
+        scratch.sf_uc.uc_sigmask.first().copied().unwrap_or(0) & !unblockable,
+        Ordering::Release,
+    );
+    thread.sig_in_handler.store(false, Ordering::Release);
+    thread.sig_frame.store(0, Ordering::Release);
+    thread.sig_on_altstack.store(false, Ordering::Release);
+    restore_signal_context(frame, &scratch.sf_uc.uc_mcontext);
+    Ok(())
+}
+
+/// Address of a `sigframe` below the AMD64 128-byte red zone, 8 modulo 16 as if after a `call`.
+fn frame_address(stack_top: u64) -> Option<u64> {
+    let below = stack_top.checked_sub(128)?;
+    let base = below.checked_sub(core::mem::size_of::<SigFrame>() as u64)?;
+    let fp = if base & 0xf == 8 {
+        base
+    } else {
+        (base & !0xf).checked_sub(8)?
+    };
+    let end = fp.checked_add(core::mem::size_of::<SigFrame>() as u64 - 1)?;
+    if fp & 0xf != 8 || end >= below || !is_user_address(fp) || !is_user_address(end) {
+        return None;
+    }
+    Some(fp)
+}
+
+/// Build and enter a C19 `sigframe` for the oldest deliverable kernel signal.
+///
+/// Returns false when no kernel `sigaction` handler is pending, so the caller can fall back to
+/// the retired `SIG_SETUP` entry while libc still registers it.
+fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
+    let Some(process) = process::current() else {
+        return false;
+    };
+    let Some(thread) = crate::sched::current_thread() else {
+        return false;
+    };
+    if !thread.user || thread.sig_in_handler.load(Ordering::Acquire) {
+        return false;
+    }
+    let blocked = thread.sig_blocked.load(Ordering::Acquire);
+    let Some((record, action)) = process.next_kernel_signal(blocked) else {
+        return false;
+    };
+    let mut context = SIGNAL_CONTEXT.lock();
+    context_from_frame(frame, &mut context);
+    let old_mask = blocked;
+    let mut new_mask = old_mask | action.mask;
+    if action.flags & process::SA_NODEFER == 0 {
+        new_mask |= process::signal_bit(record.signo);
+    }
+    let unblockable = process::signal_bit(crate::process::status::SIGKILL)
+        | process::signal_bit(crate::process::status::SIGSTOP);
+    thread
+        .sig_blocked
+        .store(new_mask & !unblockable, Ordering::Release);
+    let alt_sp = thread.sig_alt_sp.load(Ordering::Acquire);
+    let alt_size = thread.sig_alt_size.load(Ordering::Acquire);
+    let alt_flags = thread.sig_alt_flags.load(Ordering::Acquire);
+    let on_altstack = action.flags & process::SA_ONSTACK != 0
+        && alt_flags & crate::process::SS_DISABLE == 0
+        && alt_sp != 0
+        && !thread.sig_on_altstack.load(Ordering::Acquire);
+    let stack_top = if on_altstack {
+        match alt_sp.checked_add(alt_size) {
+            Some(top) => top,
+            None => process::exit_process(Errno::EFAULT.to_ret() as i32),
+        }
+    } else {
+        frame.rsp
+    };
+    let Some(fp) = frame_address(stack_top) else {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    };
+    let mut sigframe = SIGNAL_FRAME.lock();
+    sigframe.sf_ra = crate::process::SIGCODE_BASE;
+    sigframe.sf_si = ZERO_SIGINFO;
+    sigframe.sf_uc = ZERO_UCONTEXT;
+    sigframe.sf_si.si_signo = record.signo as i32;
+    sigframe.sf_si.si_code = record.code as i32;
+    sigframe.sf_si.set_u32(0, record.sender as u32);
+    sigframe.sf_si.set_u32(4, record.uid);
+    if record.code == process::SI_QUEUE_CODE {
+        sigframe.sf_si.set_u64(8, record.value);
+    }
+    sigframe.sf_uc.uc_stack = UserStack {
+        ss_sp: if on_altstack { alt_sp } else { 0 },
+        ss_flags: if on_altstack {
+            crate::process::SS_ONSTACK as i32
+        } else {
+            0
+        },
+        _pad: 0,
+        ss_size: alt_size,
+    };
+    sigframe.sf_uc.uc_mcontext = *context;
+    sigframe.sf_uc.uc_sigmask[0] = old_mask;
+    let size = core::mem::size_of::<SigFrame>();
+    let bytes = unsafe {
+        // SAFETY: the scratch frame is a live, fully initialised POD frame; the byte view covers
+        // exactly its size and is only read for the copy.
+        core::slice::from_raw_parts(&*sigframe as *const SigFrame as *const u8, size)
+    };
+    let Ok(destination) = UserSlice::new(fp, size as u64) else {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    };
+    if copy_to_user(destination, bytes).is_err() {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    }
+    drop(sigframe);
+    drop(context);
+    if action.flags & process::SA_RESETHAND != 0 {
+        process
+            .sigacts
+            .lock()
+            .set(record.signo, process::SigAction::default_action());
+    }
+    thread.sig_in_handler.store(true, Ordering::Release);
+    thread.sig_frame.store(fp, Ordering::Release);
+    thread.sig_on_altstack.store(on_altstack, Ordering::Release);
+    frame.rdi = u64::from(record.signo);
+    frame.rsi = fp + core::mem::offset_of!(SigFrame, sf_si) as u64;
+    frame.rdx = fp + core::mem::offset_of!(SigFrame, sf_uc) as u64;
+    frame.rip = action.handler;
+    frame.rsp = fp;
+    true
 }
 
 /// Enter the registered entry with `bits` in `rdi`, the optional fault record
@@ -535,190 +551,12 @@ fn enter_signal(
     frame.rsp = stack;
 }
 
-/// Apply a C19 default action. Ignore/continue are consumed without a frame; terminate/core end
-/// the process with the POSIX signal status.
-fn apply_c19_default(signal: PendingSignal) {
-    use process::status::{DefaultAction, signal_status};
-
-    match process::status::default_action(signal.signo) {
-        Some(DefaultAction::Terminate) => {
-            process::exit_process(0i32.saturating_sub(signal.signo as i32))
-        }
-        Some(DefaultAction::Core) => {
-            process::exit_process(0i32.saturating_sub(signal_status(signal.signo, true)))
-        }
-        _ => {}
-    }
-}
-
-/// Build and enter one C19 frame for `signal`.
-fn enter_c19_signal(
-    frame: &mut TrapFrame,
-    caller: &alloc::sync::Arc<process::Process>,
-    current: &alloc::sync::Arc<crate::sched::thread::Thread>,
-    signal: PendingSignal,
-    action: SigAction,
-) -> bool {
-    use core::sync::atomic::Ordering;
-
-    let handler = action.handler;
-    if handler == SIG_DFL || handler == SIG_IGN || !is_user_address(handler as u64) {
-        process::exit_process(0i32.saturating_sub(SIGILL as i32));
-    }
-    let old_mask = current.sigmask.load(Ordering::Acquire);
-    let alt_sp = current.altstack_sp.load(Ordering::Acquire);
-    let alt_size = current.altstack_size.load(Ordering::Acquire);
-    let alt_flags = current.altstack_flags.load(Ordering::Acquire);
-    let on_altstack = action.flags & SA_ONSTACK != 0
-        && alt_size != 0
-        && alt_flags & process::SS_DISABLE == 0
-        && !(frame.rsp >= alt_sp && frame.rsp < alt_sp.saturating_add(alt_size));
-    let top = if on_altstack {
-        alt_sp.saturating_add(alt_size)
-    } else {
-        match frame.rsp.checked_sub(128) {
-            Some(top) => top,
-            None => process::exit_process(Errno::EFAULT.to_ret() as i32),
-        }
-    };
-    let Some(base) = frame_base(top) else {
-        process::exit_process(Errno::EFAULT.to_ret() as i32);
-    };
-    if UserSlice::new(base, SIGFRAME_SIZE as u64).is_err() {
-        process::exit_process(Errno::EFAULT.to_ret() as i32);
-    }
-    let sigcode = caller.sigcode_addr.load(Ordering::Acquire);
-    if sigcode == 0 || !is_user_address(sigcode) {
-        process::exit_process(Errno::EFAULT.to_ret() as i32);
-    }
-
-    let old_context = current.signal_frame_uc.load(Ordering::Acquire);
-    let info = FrameInfo {
-        signo: signal.signo,
-        code: signal.code,
-        sender: signal.sender,
-        uid: signal.uid,
-        value: signal.value,
-    };
-    let layout = {
-        let context = {
-            let mut context = SIGNAL_CONTEXT.lock();
-            context_from_frame(frame, &mut context);
-            *context
-        };
-        let mut buffer = SIGNAL_FRAME.lock();
-        let layout = match build_sigframe(
-            &mut buffer[..],
-            base,
-            sigcode,
-            &context,
-            old_mask,
-            info,
-            old_context,
-            (alt_sp, alt_size, alt_flags),
-        ) {
-            Ok(layout) => layout,
-            Err(_) => process::exit_process(Errno::EFAULT.to_ret() as i32),
-        };
-        if copy_to_user(
-            match UserSlice::new(base, SIGFRAME_SIZE as u64) {
-                Ok(destination) => destination,
-                Err(_) => process::exit_process(Errno::EFAULT.to_ret() as i32),
-            },
-            &buffer[..],
-        )
-        .is_err()
-        {
-            process::exit_process(Errno::EFAULT.to_ret() as i32);
-        }
-        layout
-    };
-
-    let bit = 1u64.wrapping_shl(signal.signo.saturating_sub(1) & 63);
-    let mut next_mask = old_mask | action.mask.first().copied().unwrap_or(0);
-    if action.flags & SA_NODEFER == 0 {
-        next_mask |= bit;
-    }
-    next_mask &=
-        !((1u64 << (process::status::SIGKILL - 1)) | (1u64 << (process::status::SIGSTOP - 1)));
-    current.sigmask.store(next_mask, Ordering::Release);
-    current
-        .signal_frame_uc
-        .store(layout.ucontext, Ordering::Release);
-    current.signal_depth.fetch_add(1, Ordering::AcqRel);
-    if action.flags & SA_RESETHAND != 0 {
-        let _ = caller
-            .sigacts
-            .lock()
-            .install(signal.signo, SigAction::DEFAULT);
-    }
-
-    frame.rdi = u64::from(signal.signo);
-    frame.rsi = layout.siginfo;
-    frame.rdx = layout.ucontext;
-    frame.rip = handler as u64;
-    frame.rsp = layout.base;
-    frame.rflags = (frame.rflags & USER_RFLAGS_MASK) | USER_RFLAGS_SET;
-    frame.cs = u64::from(USER_CS);
-    frame.ss = u64::from(USER_SS);
-    frame.error_code = 0;
-    frame.vector = 0;
-    true
-}
-
-/// Deliver the oldest unmasked C19 process signal. Returns true when a signal was consumed (a
-/// handler was entered or the default/ignore action was applied).
-fn deliver_c19(frame: &mut TrapFrame) -> bool {
-    use core::sync::atomic::Ordering;
-
-    let Some(caller) = process::current() else {
-        return false;
-    };
-    if !caller.c19_armed() {
-        return false;
-    }
-    let Some(current) = crate::sched::current_thread() else {
-        return false;
-    };
-    let mask = current.sigmask.load(Ordering::Acquire);
-    let Some(signal) = caller.take_deliverable_signal(mask) else {
-        if current.signal_entry.load(Ordering::Acquire) == 0 {
-            current
-                .kick_bits
-                .fetch_and(!signal::KICK_CHECK, Ordering::AcqRel);
-        }
-        return false;
-    };
-    if current.signal_entry.load(Ordering::Acquire) == 0
-        && !caller.has_pending_signal_where(|pending| {
-            mask & 1u64.wrapping_shl(pending.signo.saturating_sub(1) & 63) == 0
-        })
-    {
-        current
-            .kick_bits
-            .fetch_and(!signal::KICK_CHECK, Ordering::AcqRel);
-    }
-    let action = caller
-        .sigacts
-        .lock()
-        .get(signal.signo)
-        .unwrap_or(SigAction::DEFAULT);
-    if action.handler == SIG_IGN {
-        return true;
-    }
-    if action.handler == SIG_DFL {
-        apply_c19_default(signal);
-        return true;
-    }
-    enter_c19_signal(frame, &caller, &current, signal, action)
-}
-
-/// Deliver a pending C19 signal, or the legacy `SIGRESEND`/kick entry.
+/// Deliver a pending `SIGRESEND` or kick to the registered user entry.
 ///
-/// Called after the syscall result is in the frame and before `sysretq`, so the saved context is
-/// exactly the interrupted user state.
+/// Called after the syscall result is in the frame and before `sysretq`, so
+/// the saved context is exactly the interrupted user state.
 pub fn deliver_signal(frame: &mut TrapFrame) {
-    if deliver_c19(frame) {
+    if deliver_kernel_signal(frame) {
         return;
     }
     if let Some(due) = thread::signal_resend_due() {
@@ -813,3 +651,7 @@ const _: () = {
     assert!(USER_SS == 0x1B);
     assert!(SYSCALL_FMASK & 0x200 != 0);
 };
+
+#[cfg(test)]
+#[path = "syscall_ut.rs"]
+mod tests;

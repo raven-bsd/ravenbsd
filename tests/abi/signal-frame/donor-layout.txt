@@ -71,3 +71,59 @@ nb_greg_CS=22
 nb_greg_RFLAGS=23
 nb_greg_RSP=24
 nb_greg_SS=25
+sizeof(aarch64_sigset_t)=0x10 align=4
+sizeof(aarch64_fregset_t)=0x210 align=16
+aarch64_fregset_t.__qregs=0x0
+aarch64_fregset_t.__fpcr=0x200
+aarch64_fregset_t.__fpsr=0x204
+sizeof(aarch64_mcontext_t)=0x370 align=16
+aarch64_mcontext_t.__gregs=0x0
+aarch64_mcontext_t.__fregs=0x120
+aarch64_mcontext_t.__spare=0x330
+sizeof(aarch64_stack_t)=0x18 align=8
+aarch64_stack_t.ss_sp=0x0
+aarch64_stack_t.ss_size=0x8
+aarch64_stack_t.ss_flags=0x10
+sizeof(aarch64_siginfo_t)=0x50 align=8
+sizeof(aarch64_ucontext_t)=0x3c0 align=16
+aarch64_ucontext_t.uc_sigmask=0x0
+aarch64_ucontext_t.uc_mcontext=0x10
+aarch64_ucontext_t.uc_link=0x380
+aarch64_ucontext_t.uc_stack=0x388
+aarch64_ucontext_t.uc_flags=0x3a0
+aarch64_ucontext_t.__spare__=0x3a4
+aarch64_reg_X0=0
+aarch64_reg_X1=1
+aarch64_reg_X2=2
+aarch64_reg_X3=3
+aarch64_reg_X4=4
+aarch64_reg_X5=5
+aarch64_reg_X6=6
+aarch64_reg_X7=7
+aarch64_reg_X8=8
+aarch64_reg_X9=9
+aarch64_reg_X10=10
+aarch64_reg_X11=11
+aarch64_reg_X12=12
+aarch64_reg_X13=13
+aarch64_reg_X14=14
+aarch64_reg_X15=15
+aarch64_reg_X16=16
+aarch64_reg_X17=17
+aarch64_reg_X18=18
+aarch64_reg_X19=19
+aarch64_reg_X20=20
+aarch64_reg_X21=21
+aarch64_reg_X22=22
+aarch64_reg_X23=23
+aarch64_reg_X24=24
+aarch64_reg_X25=25
+aarch64_reg_X26=26
+aarch64_reg_X27=27
+aarch64_reg_X28=28
+aarch64_reg_X29=29
+aarch64_reg_X30=30
+aarch64_reg_SP=31
+aarch64_reg_ELR=32
+aarch64_reg_SPSR=33
+aarch64_reg_TPIDR=34

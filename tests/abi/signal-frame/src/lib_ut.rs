@@ -23,6 +23,12 @@ fn size_align(name: &str) -> Option<(usize, usize)> {
         "fbsd_sigframe_t" => Some((size_of::<Sigframe>(), align_of::<Sigframe>())),
         "nb_fpregset_t" => Some((size_of::<Fpregset>(), align_of::<Fpregset>())),
         "nb_mcontext_t" => Some((size_of::<NbMcontext>(), align_of::<NbMcontext>())),
+        "aarch64_sigset_t" => Some((size_of::<Sigset>(), align_of::<Sigset>())),
+        "aarch64_fregset_t" => Some((size_of::<Aarch64Fregset>(), align_of::<Aarch64Fregset>())),
+        "aarch64_mcontext_t" => Some((size_of::<Aarch64Mcontext>(), align_of::<Aarch64Mcontext>())),
+        "aarch64_stack_t" => Some((size_of::<Stack>(), align_of::<Stack>())),
+        "aarch64_siginfo_t" => Some((size_of::<Siginfo>(), align_of::<Siginfo>())),
+        "aarch64_ucontext_t" => Some((size_of::<Aarch64Ucontext>(), align_of::<Aarch64Ucontext>())),
         _ => None,
     }
 }
@@ -68,6 +74,23 @@ fn offset(key: &str) -> Option<usize> {
         "nb_mcontext_t.__gregs" => Some(core::mem::offset_of!(NbMcontext, __gregs)),
         "nb_mcontext_t._mc_tlsbase" => Some(core::mem::offset_of!(NbMcontext, _mc_tlsbase)),
         "nb_mcontext_t.__fpregs" => Some(core::mem::offset_of!(NbMcontext, __fpregs)),
+        "aarch64_fregset_t.__qregs" => Some(core::mem::offset_of!(Aarch64Fregset, qregs)),
+        "aarch64_fregset_t.__fpcr" => Some(core::mem::offset_of!(Aarch64Fregset, fpcr)),
+        "aarch64_fregset_t.__fpsr" => Some(core::mem::offset_of!(Aarch64Fregset, fpsr)),
+        "aarch64_mcontext_t.__gregs" => Some(core::mem::offset_of!(Aarch64Mcontext, __gregs)),
+        "aarch64_mcontext_t.__fregs" => Some(core::mem::offset_of!(Aarch64Mcontext, __fregs)),
+        "aarch64_mcontext_t.__spare" => Some(core::mem::offset_of!(Aarch64Mcontext, __spare)),
+        "aarch64_stack_t.ss_sp" => Some(core::mem::offset_of!(Stack, ss_sp)),
+        "aarch64_stack_t.ss_size" => Some(core::mem::offset_of!(Stack, ss_size)),
+        "aarch64_stack_t.ss_flags" => Some(core::mem::offset_of!(Stack, ss_flags)),
+        "aarch64_ucontext_t.uc_sigmask" => Some(core::mem::offset_of!(Aarch64Ucontext, uc_sigmask)),
+        "aarch64_ucontext_t.uc_mcontext" => {
+            Some(core::mem::offset_of!(Aarch64Ucontext, uc_mcontext))
+        }
+        "aarch64_ucontext_t.uc_link" => Some(core::mem::offset_of!(Aarch64Ucontext, uc_link)),
+        "aarch64_ucontext_t.uc_stack" => Some(core::mem::offset_of!(Aarch64Ucontext, uc_stack)),
+        "aarch64_ucontext_t.uc_flags" => Some(core::mem::offset_of!(Aarch64Ucontext, uc_flags)),
+        "aarch64_ucontext_t.__spare__" => Some(core::mem::offset_of!(Aarch64Ucontext, __spare__)),
         _ => None,
     }
 }
@@ -104,6 +127,22 @@ fn greg(name: &str) -> Option<usize> {
     }
 }
 
+fn aarch64_reg(name: &str) -> Option<usize> {
+    if let Some(index) = name
+        .strip_prefix('X')
+        .and_then(|text| text.parse::<usize>().ok())
+    {
+        return (index < AARCH64_NGREG - 4).then_some(index);
+    }
+    match name {
+        "SP" => Some(AARCH64_REG_SP),
+        "ELR" => Some(AARCH64_REG_ELR),
+        "SPSR" => Some(AARCH64_REG_SPSR),
+        "TPIDR" => Some(AARCH64_REG_TPIDR),
+        _ => None,
+    }
+}
+
 #[test]
 fn donor_table_matches_rust_model() {
     let mut rows = 0usize;
@@ -122,6 +161,13 @@ fn donor_table_matches_rust_model() {
             assert_eq!(
                 greg(name).unwrap_or_else(|| panic!("unknown greg {line}")),
                 value.parse::<usize>().expect("greg index"),
+                "{line}"
+            );
+        } else if let Some(rest) = line.strip_prefix("aarch64_reg_") {
+            let (name, value) = rest.split_once('=').unwrap_or_else(|| panic!("{line}"));
+            assert_eq!(
+                aarch64_reg(name).unwrap_or_else(|| panic!("unknown aarch64 reg {line}")),
+                value.parse::<usize>().expect("aarch64 reg index"),
                 "{line}"
             );
         } else {
@@ -144,4 +190,15 @@ fn union_and_greg_shapes_are_pinned() {
     assert_eq!(size_of::<Fpregset>(), 0x200);
     assert_eq!(align_of::<Fpregset>(), 8);
     assert_eq!(size_of::<[u64; 26]>(), 0xd0);
+    assert_eq!(size_of::<Aarch64Fregset>(), 0x210);
+    assert_eq!(align_of::<Aarch64Fregset>(), 16);
+    assert_eq!(size_of::<Aarch64Mcontext>(), 0x370);
+    assert_eq!(align_of::<Aarch64Mcontext>(), 16);
+    assert_eq!(size_of::<Aarch64Ucontext>(), 0x3c0);
+    assert_eq!(align_of::<Aarch64Ucontext>(), 16);
+    assert_eq!(size_of::<[u64; AARCH64_NGREG]>(), 0x118);
+    assert_eq!(AARCH64_REG_SP, 31);
+    assert_eq!(AARCH64_REG_ELR, 32);
+    assert_eq!(AARCH64_REG_SPSR, 33);
+    assert_eq!(AARCH64_REG_TPIDR, 34);
 }

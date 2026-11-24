@@ -13,7 +13,6 @@ use raven_abi::types::{Handle, Timespec, clock};
 use raven_abi::uname::Uname;
 use raven_usercopy::UserSlice;
 
-use crate::arch::serial;
 use crate::cmdline::CmdLine;
 use crate::process;
 use crate::syscall::SyscallFrame;
@@ -71,7 +70,7 @@ fn debug_write(pointer: u64, length: u64) -> Result<usize, Errno> {
     let destination = buffer.get_mut(..length).ok_or(Errno::EINVAL)?;
     copy_from_user(destination, source)?;
     let written = buffer.get(..length).ok_or(Errno::EINVAL)?;
-    serial::write_bytes(written);
+    crate::log::write_bytes(written);
     Ok(length)
 }
 
