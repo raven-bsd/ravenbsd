@@ -17,7 +17,7 @@
 
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 base=${RAVEN_SSH_IMAGE:-build/qtest/ssh-login.img}
 sysroot=${RAVEN_C19_SYSROOT:-build/ssh/x86_64/sysroot}
