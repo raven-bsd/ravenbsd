@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S194: one thread calls exit(0) while a sibling keeps reading a thread_local!. The address space
+# must not be torn down under the sibling; today that is the shell's std AccessError.
+
+name = "exit-thread-quiesce"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/libc/signals/build-exit-thread.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1 s194-trace=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^QUIESCE: worker ready$'
+
+[[expect]]
+regex = '^QUIESCE: main exit$'
+
+[[expect]]
+regex = '^s194: quiesce waited pid=[0-9]+$'
+
+[[expect]]
+regex = '^s194: last-exit pid=[0-9]+ code=0$'
+
+[[forbid]]
+regex = '(?i)AccessError|EXCEPTION|page fault|panic|QUIESCE: worker survived'

@@ -2134,10 +2134,9 @@ fn cleanup_evidence(process: &Process) -> bool {
 /// [`UserAddressSpace::release`], which switches CR3 to the kernel root: a foreign caller
 /// (terminating another process, reaping an unstarted child) must keep its own CR3, because it
 /// returns to user mode through `sysret`.  The cold path frees the target's frames and page
-/// tables without switching, which is safe because user threads run only on CPU 0 in a
-/// non-preemptible kernel: the caller is the only running user thread, so the target's root is
-/// not active anywhere, and none of its blocked or runnable threads can be switched to (the
-/// scheduler filter drops them).
+/// tables without switching, after [`crate::sched::quiesce_process`] has proved that no thread of
+/// the target is current on any CPU; the scheduler filter drops its runnable threads from the
+/// run queues.
 ///
 /// The per-exit evidence prints (`s24`/`s25`/`s21`/`s36` counters) belong to the dying
 /// thread's own exit path and run in that context only; a foreign caller skips them (an
@@ -2157,10 +2156,20 @@ fn cmdline_has(key: &str) -> bool {
     })
 }
 
+/// S194 teardown-stage trace, enabled by `s194-trace` on the kernel command line.
+pub(crate) fn s194_trace() -> bool {
+    cmdline_has("s194-trace")
+}
+
 fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
+    // FreeBSD `exit1`/NetBSD `exit_lwps`: every sibling stops before the vmspace is released.
+    // `terminate_once` has already published `exiting` and asked the other CPUs to reschedule;
+    // wait until none of them is still current, so no thread can execute user code (or read a
+    // TLS block) while the address space and its frames are freed.
+
     // The pid registry keeps a weak zombie entry until `PROC_WAIT_EX` reaps the status; a weak
     // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
@@ -2750,11 +2759,18 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // reschedule so it observes `exiting` at its next scheduling point instead of returning to
     // user mode. The local CPU handles its own threads through the normal exit path.
     crate::sched::request_reschedule_all(crate::sched::smp::percpu::this_cpu());
+    // `state` is no longer needed: the process is terminal and published. Drop it before the
+    // quiesce wait so a sibling in a syscall cannot block on a lock this thread holds.
+    drop(state);
+    // FreeBSD `exit1`/NetBSD `exit_lwps`: every sibling stops before the process releases its
+    // address space or signals its parent. The other CPUs have the reschedule request before this
+    // wait; the per-CPU slot lock makes the terminal check and `current` publish atomic, so no
+    // sibling can be switched in once the scan finds none.
+    crate::sched::quiesce_process(process);
     reparent_children(process);
     robust::walk_process(process);
     wake_process_waiters(process);
     let _ = process.waiters.wake_all();
-    drop(state);
     crate::process::tty::hangup_session_leader(process);
     notify_parent(process, true);
     crate::event::notify_source(Arc::as_ptr(process) as usize as u64);
@@ -2765,10 +2781,9 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
 
 /// Process-wide `EXIT`: terminate every thread, tear down once, then exit the caller.
 ///
-/// Other threads of the process never run user code again: the scheduler drops any runnable
-/// thread of a terminal process, and a woken thread re-checks the flag before returning to user
-/// mode.  Since user threads run only on the boot CPU inside a non-preemptible kernel, no other
-/// thread is executing while this syscall runs, so the address space can be released here.
+/// Other threads of the process never run user code again: `terminate_once` waits in
+/// [`crate::sched::quiesce_process`] until every sibling is off-CPU before any release, and a
+/// woken thread re-checks `exiting` before returning to user mode.
 pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
         let _ = robust::walk_thread();
