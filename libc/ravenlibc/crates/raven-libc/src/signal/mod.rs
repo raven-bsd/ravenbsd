@@ -8,10 +8,6 @@ use raven_libc_signal::DispTable;
 /// The process disposition table (C58 owns the state machine).
 pub(crate) static DISP: DispTable = DispTable::new();
 
-#[path = "entry.rs"]
-mod entry;
-pub(crate) use entry::ensure_entry;
-
 #[path = "kill.rs"]
 mod kill;
 #[path = "killpg.rs"]
@@ -56,6 +52,7 @@ mod sigpause;
 mod sigpending;
 #[path = "sigprocmask.rs"]
 mod sigprocmask;
+pub(crate) use sigprocmask::sigprocmask;
 #[path = "sigqueue.rs"]
 mod sigqueue;
 #[path = "sigrelse.rs"]

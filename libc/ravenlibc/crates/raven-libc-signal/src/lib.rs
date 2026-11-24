@@ -61,6 +61,7 @@ pub mod psignal;
 pub mod safe_list;
 pub mod send;
 pub mod sig2str;
+pub mod sigaction_abi;
 pub mod sigjmp;
 pub mod sigset;
 pub mod wait;
