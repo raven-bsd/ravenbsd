@@ -15,6 +15,9 @@ pre = [
 initfs = "build/fixtures/socket-conformance/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
+    # One vCPU: the 4-vCPU post-summary teardown hang (K574 open gap, process/fd) prevents
+    # `init exited`; the socket rows themselves are identical. K574 owns the TCG4 gate row.
+    "-accel", "tcg", "-smp", "1",
     "-nic", "none",
     "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23100",
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
@@ -39,9 +42,6 @@ regex = '^.*CONFORM soerror PASS .*$'
 regex = '^.*CONFORM shutdown PASS .*$'
 
 [[expect]]
-regex = '^.*CONFORM rebound PASS .*$'
-
-[[expect]]
 regex = '^.*CONFORM half PASS .*$'
 
 [[expect]]
@@ -49,6 +49,9 @@ regex = '^.*CONFORM shutrd PASS .*$'
 
 [[expect]]
 regex = '^.*CONFORM shutrdwr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM rebound PASS .*$'
 
 [[expect]]
 regex = '^.*CONFORM SUMMARY PASS 10/10$'

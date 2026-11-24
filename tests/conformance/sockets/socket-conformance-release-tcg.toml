@@ -42,9 +42,6 @@ regex = '^.*CONFORM soerror PASS .*$'
 regex = '^.*CONFORM shutdown PASS .*$'
 
 [[expect]]
-regex = '^.*CONFORM rebound PASS .*$'
-
-[[expect]]
 regex = '^.*CONFORM half PASS .*$'
 
 [[expect]]
@@ -52,6 +49,9 @@ regex = '^.*CONFORM shutrd PASS .*$'
 
 [[expect]]
 regex = '^.*CONFORM shutrdwr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM rebound PASS .*$'
 
 [[expect]]
 regex = '^.*CONFORM SUMMARY PASS 10/10$'
