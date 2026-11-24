@@ -33,6 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 IMAGE = Path(os.environ.get("S175_TERM_IMAGE", ROOT / "build/qtest/s175-terminal.img"))
 OUT = Path(os.environ.get("S175_TERM_OUT", ROOT / "build/conformance/terminal/run"))
+SERIAL = OUT / "serial.log"
 OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
 SERVICE = ROOT / "tests/conformance/terminal/terminal-conformance.service.toml"
