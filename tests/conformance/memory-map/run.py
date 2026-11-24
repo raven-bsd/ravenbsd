@@ -62,8 +62,7 @@ GATE_ROWS = [
     ("cow-shared", "child", "17"),
     ("mprotect-segv", "ok", "1"),
     ("mprotect-segv", "signal", str(SIGSEGV)),
-    ("fixed-collision", "ok", "1"),
-    ("fixed-collision", "errno", str(EEXIST)),
+    ("fixed-replace", "ok", "1"),
     ("sigbus-eof", "ok", "1"),
     ("sigbus-eof", "signal", str(SIGBUS)),
     ("munmap-partial", "ok", "1"),
@@ -108,7 +107,7 @@ def selftest() -> int:
         "mmap: cow-private child=0 expected=0 ok=1\n"
         "mmap: cow-shared child=17 expected=17 ok=1\n"
         "mmap: mprotect-segv signal=11 ok=1\n"
-        "mmap: fixed-collision errno=17 expected=17 ok=1\n"
+        "mmap: fixed-replace errno=0 replaced=1 ok=1\n"
         "mmap: sigbus-eof signal=7 expected=7 ok=1\n"
         "mmap: munmap-partial edges=2 middle=11 ok=1\n"
         "mmap: bad-len errno=22 expected=22 ok=1\n"

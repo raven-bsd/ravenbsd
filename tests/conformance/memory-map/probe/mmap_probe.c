@@ -89,20 +89,24 @@ static void mprotect_row(void) {
     (void)munmap(page, PAGE);
 }
 
+// POSIX/FreeBSD MAP_FIXED replaces the occupied range. The Raven syscall-level K4 contract is
+// EEXIST, and the libc documents the divergence (PG-13: unmap-then-map until map::REPLACE); the
+// application-level row asserts the POSIX replacement it currently provides.
 static void fixed_row(void) {
     char *page = mmap(NULL, 2 * PAGE, PROT_READ | PROT_WRITE,
                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (page == MAP_FAILED) {
-        row("fixed-collision", 0, "map=0 ");
+        row("fixed-replace", 0, "map=0 ");
         return;
     }
+    page[0] = 0x5a;
     errno = 0;
     void *again = mmap(page, PAGE, PROT_READ | PROT_WRITE,
                        MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    int error = (again == MAP_FAILED) ? errno : 0;
-    char extra[32];
-    (void)snprintf(extra, sizeof extra, "errno=%d expected=%d ", error, EEXIST);
-    row("fixed-collision", error == EEXIST, extra);
+    int ok = again != MAP_FAILED && ((unsigned char *)again)[0] == 0;
+    char extra[48];
+    (void)snprintf(extra, sizeof extra, "errno=%d replaced=%d ", ok ? 0 : errno, ok);
+    row("fixed-replace", ok, extra);
     (void)munmap(page, 2 * PAGE);
 }
 

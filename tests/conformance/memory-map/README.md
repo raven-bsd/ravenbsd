@@ -13,7 +13,7 @@ runner asserts them.
 | cow-private | MAP_PRIVATE across fork | child does not see the parent's post-fork write |
 | cow-shared | MAP_SHARED across fork | child sees the parent's post-fork write |
 | mprotect-segv | write through PROT_READ | child dies with SIGSEGV (11) |
-| fixed-collision | MAP_FIXED over an occupied range | MAP_FAILED, errno EEXIST (17) |
+| fixed-replace | MAP_FIXED over an occupied range | POSIX replacement; the Raven syscall-level K4 EEXIST is a recorded libc divergence (PG-13) |
 | sigbus-eof | fault past EOF of a file-backed mapping | child dies with SIGBUS (7), not SIGSEGV |
 | munmap-partial | munmap of the middle page | both edges stay mapped, middle faults SIGSEGV |
 | bad-len | mmap length 0 | MAP_FAILED, errno EINVAL (22) |
