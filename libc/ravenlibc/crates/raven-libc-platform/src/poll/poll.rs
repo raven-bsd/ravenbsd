@@ -125,7 +125,7 @@ pub fn poll<B: SysBackend, L: Lock>(
     if ready > 0 {
         return Ok(ready);
     }
-    if registrations.is_empty() || timeout_ms == 0 {
+    if registrations.is_empty() {
         return Ok(0);
     }
     let deadline = if timeout_ms < 0 {
@@ -138,17 +138,25 @@ pub fn poll<B: SysBackend, L: Lock>(
     };
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
     let mut attempt = 0usize;
+    // C14/POSIX: a zero timeout is a non-blocking level query, not "no readiness". Allow the
+    // first wait to run with a zero timeout so the current level is read; later iterations
+    // honor the deadline.
+    let mut first_wait = true;
     loop {
         let timeout_ns = match deadline {
             Some(deadline) => {
                 let remaining = deadline.saturating_sub(monotonic_ns(backend));
-                if remaining == 0 {
+                if remaining == 0 && !first_wait {
                     return Ok(0);
                 }
-                remaining
+                // EVQ_WAIT treats 0 as "wait forever". A zero-timeout poll/select is a
+                // non-blocking level query: probe with 1 ns; the kernel collects ready events
+                // before it sleeps, so a ready source returns immediately.
+                if remaining == 0 { 1 } else { remaining }
             }
             None => 0,
         };
+        first_wait = false;
         let queue = platform.event_queue()?;
         for (position, registration) in registrations.iter().enumerate() {
             if let Err(error) = backend.evq_ctl(
