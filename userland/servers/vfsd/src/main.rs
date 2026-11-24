@@ -83,17 +83,26 @@ mod program {
         prefix
     }
 
-    #[derive(Clone, Copy)]
     struct PagerRegion {
-        file: u64,
+        /// Mount that owns the file; together with `ino` this is the file identity.
+        mount_id: u32,
+        ino: u64,
+        /// A private duplicate of the open target. It keeps the backing file readable for the
+        /// pager after the client closes the descriptor that created the mapping.
         target: Handle,
         offset: u64,
+        len: u64,
         shared: bool,
         object: Handle,
+        /// Open descriptions that mapped this object. The object is released only when the last
+        /// one closes, so a second mapping keeps its page source alive.
+        owners: Vec<u64>,
     }
 
     struct Proxy {
         target: Handle,
+        /// Mount-table id captured at open time; the pager identity uses it with the inode.
+        mount_id: u32,
         path: String,
         /// The caller's process root captured at open time; path CALLs must stay under it.
         root: String,
@@ -435,9 +444,13 @@ mod program {
             len: u64,
             shared: bool,
         ) -> HandlerResult<CallReply> {
-            let (target, root) = {
+            let (target, root, mount_id) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
-                (entry.file.target, entry.file.root_listing)
+                (
+                    entry.file.target,
+                    entry.file.root_listing,
+                    entry.file.mount_id,
+                )
             };
             if root {
                 return Err(Errno::EISDIR.into());
@@ -449,17 +462,46 @@ mod program {
             if offset >= stat.size {
                 return Err(Errno::EINVAL.into());
             }
+            // NetBSD vfs_vnops.c:1063 selects `vp->v_uobj` for every file mmap, and DragonFly
+            // vnode_pager.c:102 `vnode_pager_alloc` reuses `vp->v_object`; one file has one page
+            // cache. Raven keys that object by mount+inode and the mapping window, and attaches
+            // the existing object for a second mapping instead of creating a private cache.
+            if let Some(object) = self.pager_for(mount_id, stat.ino, offset, len, shared) {
+                let mut reply = CallReply::new(0);
+                reply.attach(
+                    object,
+                    Rights::READ.union(Rights::WRITE).union(Rights::MAP).bits(),
+                )?;
+                if let Some(region) = self.pagers.get_mut(&object.0)
+                    && !region.owners.contains(&file)
+                {
+                    region.owners.push(file);
+                }
+                return Ok(reply);
+            }
             let object = raven_rt::sys::memobj_create_pager(
                 usize::try_from(len).map_err(|_| Errno::ENOMEM)?,
             )?;
+            // The pager keeps its own target so the page source survives the close of the open
+            // description that created the mapping.
+            let target = match raven_rt::sys::handle_dup(target, Rights::ALL) {
+                Ok(target) => target,
+                Err(error) => {
+                    let _ = raven_rt::sys::handle_close(object);
+                    return Err(error.into());
+                }
+            };
             self.pagers.insert(
                 object.0,
                 PagerRegion {
-                    file,
+                    mount_id,
+                    ino: stat.ino,
                     target,
                     offset,
+                    len,
                     shared,
                     object,
+                    owners: vec![file],
                 },
             );
             let mut reply = CallReply::new(0);
@@ -470,19 +512,43 @@ mod program {
             Ok(reply)
         }
 
+        /// Return the existing pager object for one file window, if a mapping created it.
+        fn pager_for(
+            &self,
+            mount_id: u32,
+            ino: u64,
+            offset: u64,
+            len: u64,
+            shared: bool,
+        ) -> Option<Handle> {
+            self.pagers
+                .values()
+                .find(|region| {
+                    region.mount_id == mount_id
+                        && region.ino == ino
+                        && region.offset == offset
+                        && region.len == len
+                        && region.shared == shared
+                })
+                .map(|region| region.object)
+        }
+
         fn pager_call(&mut self, packet: PagerPacket) -> HandlerResult<CallReply> {
-            let Some(region) = self.pagers.get(&packet.object).copied() else {
+            let Some((target, region_offset)) = self
+                .pagers
+                .get(&packet.object)
+                .map(|region| (region.target, region.offset))
+            else {
                 return Err(Errno::EIO.into());
             };
             if packet.len != PAGE as u64 {
                 return Err(Errno::EINVAL.into());
             }
             let page_offset = usize::try_from(packet.offset).map_err(|_| Errno::EINVAL)?;
-            let file_offset = region
-                .offset
+            let file_offset = region_offset
                 .checked_add(packet.offset)
                 .ok_or(Errno::EINVAL)?;
-            let stat = Client::new().fstat(region.target)?;
+            let stat = Client::new().fstat(target)?;
             match packet.kind {
                 PAGE_IN => {
                     if file_offset >= stat.size {
@@ -491,8 +557,7 @@ mod program {
                     let want = usize::try_from((stat.size - file_offset).min(PAGE as u64))
                         .map_err(|_| Errno::EINVAL)?;
                     let mut page = [0u8; PAGE];
-                    let read =
-                        Client::new().pread(region.target, file_offset, &mut page[..want])?;
+                    let read = Client::new().pread(target, file_offset, &mut page[..want])?;
                     if read < want {
                         return Err(Errno::EIO.into());
                     }
@@ -513,13 +578,11 @@ mod program {
                     if file_offset < stat.size {
                         let want = usize::try_from((stat.size - file_offset).min(PAGE as u64))
                             .map_err(|_| Errno::EINVAL)?;
-                        let written =
-                            Client::new().pwrite(region.target, file_offset, &page[..want])?;
+                        let written = Client::new().pwrite(target, file_offset, &page[..want])?;
                         if written < want {
                             return Err(Errno::EIO.into());
                         }
                     }
-                    let _ = region.shared;
                     Ok(CallReply::new(0))
                 }
                 _ => Err(Errno::EINVAL.into()),
@@ -1111,6 +1174,7 @@ mod program {
             let id = self.opens.insert(
                 Proxy {
                     target,
+                    mount_id,
                     root_listing: path == "/",
                     path,
                     root,
@@ -1319,20 +1383,24 @@ mod program {
             if let Some(proxy) = self.opens.close(file)? {
                 let target = proxy.target;
                 let _ = Client::new().close(target);
-                // The target is the last duplicate of this open. Any pager objects created from
-                // it can no longer supply a page (the target handle is gone), so return the
-                // pager handles now: the client's mappings keep the object alive, and when the
-                // client unmaps/closes it the frames are freed. Without this the server's pager
-                // key holds every mapped page for the life of vfsd (Lance S36 rev103 red row).
-                let objects: Vec<Handle> = self
-                    .pagers
-                    .iter()
-                    .filter(|(_, region)| region.file == file || region.target == target)
-                    .map(|(_, region)| region.object)
-                    .collect();
-                for object in objects {
-                    self.pagers.remove(&object.0);
-                    let _ = raven_rt::sys::handle_close(object);
+                // A pager object is shared by every open description that mapped the same file
+                // window. Drop only this owner; release the object and its private target when
+                // the last owner closes. The target is the last duplicate of this open, but the
+                // pager holds its own duplicate, so another owner's page source stays valid.
+                let mut release = Vec::new();
+                for (object, region) in self.pagers.iter_mut() {
+                    if let Some(index) = region.owners.iter().position(|owner| *owner == file) {
+                        region.owners.swap_remove(index);
+                    }
+                    if region.owners.is_empty() {
+                        release.push(*object);
+                    }
+                }
+                for object in release {
+                    if let Some(region) = self.pagers.remove(&object) {
+                        let _ = raven_rt::sys::handle_close(region.object);
+                        let _ = raven_rt::sys::handle_close(region.target);
+                    }
                 }
             }
             Ok(())
