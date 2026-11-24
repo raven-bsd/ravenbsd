@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S192: process-create double-fault regression. The signal-acceptance service is the measured
+# reproducer from Tim/S44; `s192-size=1` prints the Process/field sizes before the service create.
+
+name = "process-create"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/signals/build.sh"]
+initfs = "build/signals/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s192-size=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^s192: process=[0-9]+ sigacts=[0-9]+ capture=[0-9]+ waitq=[0-9]+ handle=[0-9]+ ids=[0-9]+ namespace=[0-9]+$'
+
+[[expect]]
+regex = '^signal: handler ok sig=10$'
+
+[[expect]]
+regex = '^signal: ucontext ok rip=0x[0-9a-f]+ rsp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^signal: return ok$'
+
+[[expect]]
+regex = '^signal: nested ok sig=12$'
+
+[[expect]]
+regex = '^signal: exec-default ok signal=10$'
+
+[[expect]]
+regex = '^signal: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|signal: fail|signal: exec-child survived'
