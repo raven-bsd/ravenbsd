@@ -406,14 +406,28 @@ int main(void)
     row_shutrd(listen_fd);
     row_shutrdwr(listen_fd);
     close(listen_fd);
-    listen_fd = listener();
-    if (listen_fd < 0) {
-        char detail[64];
-        (void)snprintf(detail, sizeof(detail), "%s errno=%d", listener_stage,
-                       listener_stage_errno);
-        fail("rebound", detail);
-    } else {
-        pass("rebound", "same port after close");
+    /* The last accepted connection was closed by the guest; its FIN exchange may still be
+     * completing in the kernel. Wait up to 1 s for the port to become reusable, then assert it. */
+    {
+        int attempts = 0;
+        do {
+            listen_fd = listener();
+            if (listen_fd >= 0)
+                break;
+            (void)poll(NULL, 0, 10);
+            attempts++;
+        } while (attempts < 100);
+        if (listen_fd < 0) {
+            char detail[80];
+            (void)snprintf(detail, sizeof(detail), "%s errno=%d after %d ms",
+                           listener_stage, listener_stage_errno, attempts * 10);
+            fail("rebound", detail);
+        } else {
+            char detail[64];
+            (void)snprintf(detail, sizeof(detail), "same port after close (%d ms)",
+                           attempts * 10);
+            pass("rebound", detail);
+        }
     }
     if (listen_fd >= 0)
         close(listen_fd);
