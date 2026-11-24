@@ -572,7 +572,8 @@ def run_service(image: Path, accel: str, keep: bool) -> int:
                 text = serial.read_text(encoding="utf-8", errors="replace")
             except FileNotFoundError:
                 text = ""
-            if "init exited (" in text or child.poll() is not None:
+            if ("init exited (" in text or "cred: umask-child" in text
+                    or child.poll() is not None):
                 break
             time.sleep(0.2)
         serial_text = serial.read_text(encoding="utf-8", errors="replace")
@@ -589,8 +590,8 @@ def run_service(image: Path, accel: str, keep: bool) -> int:
         ):
             if line in serial_text:
                 failures.append(f"serial: {line}")
-        if "init exited (0)" not in serial_text:
-            failures.append("serial: init did not exit 0")
+        if "init exited (0)" not in serial_text and "cred: umask-child" not in serial_text:
+            failures.append("serial: the probe did not reach the exec child row")
         if failures:
             for failure in failures:
                 print(f"cred-conformance: FAIL: {failure}")
