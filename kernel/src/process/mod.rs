@@ -2831,8 +2831,19 @@ pub fn exit_current(code: i32) -> ! {
 /// reach it for a write or for the only arch-specific COW resolution they support. The x86-64
 /// exception entry uses [`handle_page_fault_access`] so a read-only VMA write is rejected
 /// instead of paged in.
+/// Outcome of a user page-fault resolution.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FaultOutcome {
+    /// The faulting instruction can be retried.
+    Retry,
+    /// The fault has no mapping/permission or an anonymous pager failed: SIGSEGV.
+    Segv,
+    /// A file-backed pager page-in beyond EOF: POSIX SIGBUS.
+    Bus,
+}
+
 pub fn handle_page_fault(cr2: u64) -> bool {
-    resolve_page_fault(cr2, true, false)
+    resolve_page_fault(cr2, true, false) == FaultOutcome::Retry
 }
 
 /// Resolve a user page fault with the faulting access kind.
@@ -2840,7 +2851,7 @@ pub fn handle_page_fault(cr2: u64) -> bool {
 /// The address-space lock is released before a pager PageIn wait (C18); the pager service
 /// re-acquires it after the supply to map the page.
 #[cfg(target_arch = "x86_64")]
-pub fn handle_page_fault_access(cr2: u64, write: bool) -> bool {
+pub fn handle_page_fault_access(cr2: u64, write: bool) -> FaultOutcome {
     resolve_page_fault(cr2, write, true)
 }
 
@@ -2869,7 +2880,7 @@ impl Drop for PageFaultGuard {
     }
 }
 
-fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
+fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> FaultOutcome {
     let _ = interruptible;
     #[cfg(target_arch = "x86_64")]
     let _fault = if interruptible {
@@ -2880,7 +2891,7 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
     };
     crate::sched::smp::percpu::note_page_fault_phase(1);
     let Some(process) = current() else {
-        return false;
+        return FaultOutcome::Segv;
     };
     let outcome = {
         crate::sched::smp::percpu::note_page_fault_phase(2);
@@ -2898,7 +2909,7 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
             None => {
                 drop(guard);
                 drop(hold);
-                return false;
+                return FaultOutcome::Segv;
             }
         };
         drop(guard);
@@ -2907,7 +2918,7 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
     };
     crate::sched::smp::percpu::note_page_fault_phase(5);
     match outcome {
-        Ok(()) => true,
+        Ok(()) => FaultOutcome::Retry,
         #[cfg(target_arch = "x86_64")]
         Err(crate::memory::uspace::FaultError::Pager(fault)) => {
             crate::sched::smp::percpu::note_page_fault_phase(6);
@@ -2916,8 +2927,8 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
             resolved
         }
         #[cfg(not(target_arch = "x86_64"))]
-        Err(crate::memory::uspace::FaultError::Pager(_)) => false,
-        Err(crate::memory::uspace::FaultError::Errno(_)) => false,
+        Err(crate::memory::uspace::FaultError::Pager(_)) => FaultOutcome::Segv,
+        Err(crate::memory::uspace::FaultError::Errno(_)) => FaultOutcome::Segv,
     }
 }
 

@@ -15,34 +15,53 @@ use raven_abi::errno::Errno;
 use raven_pager::{PAGE_IN, PageIn, PageOut};
 
 use crate::memory::uspace::PagerFault;
+use crate::process::FaultOutcome;
 use crate::process::Process;
 use crate::process::handle::MemObject;
 use crate::sched;
 
-/// Resolve a pager fault; returns true when the faulting instruction can be retried.
-pub fn service(process: &Arc<Process>, fault: PagerFault) -> bool {
+/// Resolve a pager fault. `Bus` is a file-backed page-in beyond EOF: POSIX raises SIGBUS, while
+/// the pager error/death paths for an anonymous pager and a short supply stay SIGSEGV.
+pub fn service(process: &Arc<Process>, fault: PagerFault) -> FaultOutcome {
     let object = fault.object;
     let page = fault.page;
     match object.begin_page_in(page) {
-        PageIn::Present => map(process, fault.cr2),
-        PageIn::Failed => false,
+        PageIn::Present => fault_map(process, fault.cr2),
+        PageIn::Failed => FaultOutcome::Segv,
         PageIn::Wait => {
             if wait_page(&object, page) {
-                map(process, fault.cr2)
+                fault_map(process, fault.cr2)
             } else {
-                false
+                FaultOutcome::Segv
             }
         }
         PageIn::Send => {
             let result = crate::ipc::router::pager_call(process, &object, page, PAGE_IN);
             match result {
-                Ok(0) if object.page_ready(page) => map(process, fault.cr2),
+                Ok(0) if object.page_ready(page) => fault_map(process, fault.cr2),
+                Ok(status) if status == -i32::from(Errno::ENXIO.0) => {
+                    object.fail_page(page);
+                    FaultOutcome::Bus
+                }
+                Err(Errno::ENXIO) => {
+                    object.fail_page(page);
+                    FaultOutcome::Bus
+                }
                 _ => {
                     object.fail_page(page);
-                    false
+                    FaultOutcome::Segv
                 }
             }
         }
+    }
+}
+
+/// Map the supplied page and report the retry outcome.
+fn fault_map(process: &Arc<Process>, cr2: u64) -> FaultOutcome {
+    if map(process, cr2) {
+        FaultOutcome::Retry
+    } else {
+        FaultOutcome::Segv
     }
 }
 

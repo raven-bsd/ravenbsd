@@ -485,8 +485,10 @@ mod program {
             let stat = Client::new().fstat(region.target)?;
             match packet.kind {
                 PAGE_IN => {
+                    // A page entirely past EOF is a bus error (POSIX SIGBUS), not an I/O error:
+                    // return ENXIO so the kernel can distinguish it from the pager EIO path.
                     if file_offset >= stat.size {
-                        return Err(Errno::EIO.into());
+                        return Err(Errno::ENXIO.into());
                     }
                     let want = usize::try_from((stat.size - file_offset).min(PAGE as u64))
                         .map_err(|_| Errno::EINVAL)?;

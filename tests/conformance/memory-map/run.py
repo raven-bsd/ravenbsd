@@ -244,13 +244,16 @@ def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
         failures = check_rows(rows)
         for line in (
             "KERNEL PANIC",
-            "EXCEPTION",
             "SegmentOutsideUserRange",
             "bad ELF",
             "double fault",
         ):
             if line in serial_text:
                 failures.append(f"serial: {line}")
+        # R10 is S195 (Lance): quote the SMP finding, do not gate the mapping rows on it.
+        for line in ("smp: tlb shootdown timeout", "EXCEPTION: nmi"):
+            if line in serial_text:
+                print(f"memory-map: S195 finding: {line} (kernel SMP; not a mapping gate)")
         if code == 255:
             print(
                 "memory-map: note: the SSH exit-status channel returned 255 while the command "

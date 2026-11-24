@@ -198,9 +198,17 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             return;
         }
         if from_user {
-            if crate::process::handle_page_fault_access(cr2, frame.error_code & 2 != 0) {
-                return;
-            }
+            match crate::process::handle_page_fault_access(cr2, frame.error_code & 2 != 0) {
+                crate::process::FaultOutcome::Retry => return,
+                crate::process::FaultOutcome::Bus => {
+                    // File-backed page-in beyond EOF: POSIX SIGBUS. FAULT_MISALIGN carries the
+                    // SIGBUS default (-7); the existing kind avoids adding an ABI value.
+                    if deliver_fault(frame, signal::FAULT_MISALIGN, cr2) {
+                        return;
+                    }
+                    terminate_fault(signal::FAULT_MISALIGN);
+                }
+                crate::process::FaultOutcome::Segv => {
             let kind = if frame.error_code & 1 == 0 {
                 signal::FAULT_PAGE_NOMAP
             } else {
@@ -239,6 +247,8 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
                 frame.error_code
             );
             crate::process::page_fault(cr2, frame.rip);
+                }
+            }
         }
     }
     if vector >= 32 {
