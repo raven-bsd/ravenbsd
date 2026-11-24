@@ -212,5 +212,8 @@ pub const fn frame(interrupted_sp: u64) -> Option<SigFrame> {
 }
 
 #[cfg(test)]
+#[path = "sigframe_ut.rs"]
+mod sigframe_tests;
+#[cfg(test)]
 #[path = "signal_ut.rs"]
 mod tests;
