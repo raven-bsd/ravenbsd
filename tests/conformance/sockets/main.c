@@ -65,14 +65,22 @@ static int write_exact(int fd, const void *buffer, size_t length)
     return 0;
 }
 
+static int listener_stage_errno;
+static const char *listener_stage = "none";
+
 static int listener(void)
 {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in address;
     int one = 1;
-    if (fd < 0)
+    if (fd < 0) {
+        listener_stage = "socket";
+        listener_stage_errno = errno;
         return -1;
+    }
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0) {
+        listener_stage = "setsockopt";
+        listener_stage_errno = errno;
         close(fd);
         return -1;
     }
@@ -80,8 +88,15 @@ static int listener(void)
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
     address.sin_port = htons(LISTEN_PORT);
-    if (bind(fd, (struct sockaddr *)&address, sizeof(address)) != 0 ||
-        listen(fd, 8) != 0) {
+    if (bind(fd, (struct sockaddr *)&address, sizeof(address)) != 0) {
+        listener_stage = "bind";
+        listener_stage_errno = errno;
+        close(fd);
+        return -1;
+    }
+    if (listen(fd, 8) != 0) {
+        listener_stage = "listen";
+        listener_stage_errno = errno;
         close(fd);
         return -1;
     }
@@ -392,10 +407,14 @@ int main(void)
     row_shutrdwr(listen_fd);
     close(listen_fd);
     listen_fd = listener();
-    if (listen_fd < 0)
-        fail("rebound", "listener rebind");
-    else
+    if (listen_fd < 0) {
+        char detail[64];
+        (void)snprintf(detail, sizeof(detail), "%s errno=%d", listener_stage,
+                       listener_stage_errno);
+        fail("rebound", detail);
+    } else {
         pass("rebound", "same port after close");
+    }
     if (listen_fd >= 0)
         close(listen_fd);
     if (failures == 0) {
