@@ -960,6 +960,12 @@ fn child_main(role: &str) -> i32 {
         "sleep" => loop {
             nanosleep(60_000_000_000);
         },
+        "selfterm" => {
+            // C16: terminating self behaves like exit(code). The syscall must not return.
+            let _ = proc_terminate(Handle::SELF_PROC, 43);
+            println!("s36: failed self terminate returned");
+            1
+        }
         "delayed" => {
             nanosleep(100_000_000);
             42
@@ -1009,11 +1015,14 @@ fn two_thread_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
 /// Scenario 3: admission into a terminal process is refused, and stays refused.
 fn admission_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     let child = spawn_role(initfs, "sleep").map_err(|_| "admission spawn")?;
+    println!("s36: admission spawned");
     proc_terminate(child, 0).map_err(|_| "admission terminate")?;
+    println!("s36: admission terminated");
     match proc_wait(child) {
         Ok(0) => {}
         _ => return Err("admission wait"),
     }
+    println!("s36: admission waited");
     let helper: extern "C" fn(usize) -> ! = tw_helper;
     // SAFETY: only the static's address is taken; no thread is actually created (ESRCH first).
     let stack_top = helper_stack_top(core::ptr::addr_of_mut!(CYCLE_STACK));
@@ -1022,10 +1031,12 @@ fn admission_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         Err(_) => return Err("admission wrong errno"),
         Ok(_) => return Err("terminal process admitted a thread"),
     }
+    println!("s36: admission first refused");
     // Still terminal: a second attempt must fail the same way (no resurrection).
     if thread_create(child, helper as usize, stack_top, 0) != Err(Errno::ESRCH) {
         return Err("terminal process resurrected");
     }
+    println!("s36: admission second refused");
     handle_close(child);
     println!("s36: admission ok");
     Ok(())
@@ -1068,6 +1079,19 @@ fn terminate_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     handle_close(weak);
     handle_close(child);
     println!("s36: eperm ebadf esrch ok");
+    Ok(())
+}
+
+/// Scenario 9 (C16): self-terminate equals exit; the parent observes the exact code.
+fn self_terminate_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let child = spawn_role(initfs, "selfterm").map_err(|_| "selfterm spawn")?;
+    match proc_wait(child) {
+        Ok(43) => {}
+        Ok(_) => return Err("selfterm code"),
+        Err(_) => return Err("selfterm wait"),
+    }
+    handle_close(child);
+    println!("s36: self terminate ok");
     Ok(())
 }
 
@@ -1269,6 +1293,10 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     // Scenario 5: authorized termination and its errors.
     if let Err(message) = terminate_part(&initfs) {
+        fail(message);
+    }
+    // Scenario 9: self-terminate is exit(code).
+    if let Err(message) = self_terminate_part(&initfs) {
         fail(message);
     }
     // Scenario 6: scheme name released on exit.
