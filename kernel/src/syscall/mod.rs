@@ -243,6 +243,15 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::THREAD_SET_TLS {
         return thread::set_tls(frame);
     }
+    if number == raven_abi::syscall::SIGACTION {
+        return thread::sigaction(frame);
+    }
+    if number == raven_abi::syscall::SIGPROCMASK {
+        return thread::sigprocmask(frame);
+    }
+    if number == raven_abi::syscall::SIGALTSTACK {
+        return thread::sigaltstack(frame);
+    }
     if number == raven_abi::syscall::THREAD_KICK {
         return thread::kick(frame);
     }

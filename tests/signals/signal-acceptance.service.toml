@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S185 C19 signal acceptance fixture. The program exits 0 only when every row passes; svcd
+# propagates the status through exit_when_exits so the qtest sees init exited (0) or (1).
+
+name = "signal-acceptance"
+exec = "/bin/signal-acceptance"
+args = ["/bin/signal-acceptance"]
+needs = ["scheme:tty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

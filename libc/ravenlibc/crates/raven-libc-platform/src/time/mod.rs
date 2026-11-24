@@ -50,7 +50,7 @@ pub fn nanosleep<B: SysBackend, L: Lock>(
 ) -> Result<u64, Errno> {
     match platform.backend().nanosleep(request_ns) {
         Ok(()) => Ok(0),
-        Err(Errno::EINTR) => Ok(request_ns),
+        // POSIX: an interrupted sleep is an error; the caller writes the unslept remainder.
         Err(error) => Err(error),
     }
 }

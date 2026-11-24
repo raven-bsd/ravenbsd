@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S44 first increment: the per-process sigaction table install/read/clear path and the exec reset
+# (handlers back to SIG_DFL, SIG_IGN retained). The kernel test runs before PID 1 and exits QEMU.
+
+name = "signal-sigacts"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1 s44-sigactscheck=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^s44: sigacts table ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|s44: sigacts failed'

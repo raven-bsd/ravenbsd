@@ -23,7 +23,7 @@ use raven_abi::types::Handle;
 use raven_elf::Elf;
 
 use super::handle::Object;
-use super::{AddressSpace, Process, ProcessError, ProcessState, UserAddressSpace};
+use super::{AddressSpace, Process, ProcessError, ProcessState, SS_DISABLE, UserAddressSpace};
 
 /// Largest exec image accepted from the caller.
 ///
@@ -209,6 +209,12 @@ pub fn replace_image_from_user(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
+    // C19 `execsigs`: handlers reset to SIG_DFL (SIG_IGN stays ignored), pending cleared and
+    // the alternate signal stack reset. The per-thread mask is preserved by POSIX.
+    caller.sigacts.lock().exec_reset();
+    thread.altstack_sp.store(0, Ordering::Release);
+    thread.altstack_size.store(0, Ordering::Release);
+    thread.altstack_flags.store(SS_DISABLE, Ordering::Release);
     caller.exec_done.store(true, Ordering::Release);
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;
