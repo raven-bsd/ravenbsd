@@ -155,7 +155,7 @@ fn clone_for_copy(object: &Object) -> Result<Object, Errno> {
 const fn object_kind(object: &Object) -> ObjectKind {
     match object {
         Object::Process(_) => ObjectKind::Process,
-        Object::MemObjectInitfs => ObjectKind::MemObjectInitfs,
+        Object::MemObjectInitfs => ObjectKind::MemObject,
         Object::Memory(_) => ObjectKind::MemObject,
         Object::Namespace => ObjectKind::Namespace,
         Object::Thread(_) => ObjectKind::Thread,
@@ -164,7 +164,7 @@ const fn object_kind(object: &Object) -> ObjectKind {
         Object::UserEvent(_) => ObjectKind::UserEvent,
         Object::RootDevice => ObjectKind::RootDevice,
         Object::MmioRegion(_) => ObjectKind::MmioRegion,
-        Object::BootBlob(_) => ObjectKind::BootBlob,
+        Object::BootBlob(_) => ObjectKind::MemObject,
         Object::DmaBuffer(_) => ObjectKind::DmaBuffer,
         Object::Irq(_) => ObjectKind::Irq,
         Object::SchemeFile(_) => ObjectKind::SchemeFile,
@@ -191,7 +191,9 @@ pub fn clone_transferable(
         return Err(Errno::EBADF);
     }
     let object = match entry {
+        Object::MemObjectInitfs => Object::MemObjectInitfs,
         Object::Memory(object) => Object::Memory(Arc::clone(object)),
+        Object::BootBlob(object) => Object::BootBlob(Arc::clone(object)),
         Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),
         Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
         _ => return Err(Errno::EBADF),
