@@ -126,7 +126,12 @@ static ALL_PROCESSES: Mutex<Vec<Weak<Process>>> = Mutex::new(Vec::new());
 /// Remember a new process so the diagnostic can inspect leaked objects after the pid registry
 /// dropped them (S36b only).
 fn note_process_weak(process: &Arc<Process>) {
-    ALL_PROCESSES.lock().push(Arc::downgrade(process));
+    let mut registry = ALL_PROCESSES.lock();
+    // A Weak keeps the ArcInner allocation alive after the Process value is dropped. This
+    // diagnostic registry must not retain the block of every exited process: drop dead entries
+    // before adding the new one, so it tracks live processes only (the ALL_THREADS pattern).
+    registry.retain(|weak| weak.strong_count() > 0);
+    registry.push(Arc::downgrade(process));
 }
 
 /// Live scheme requests held by each process list, including leaked processes (S36b diagnostic).
