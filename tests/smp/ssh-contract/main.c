@@ -14,7 +14,7 @@
 //   K8 accepted+dup exec socket EOF: peer FIN -> readable, read 0, still writable
 //      (NetBSD `sowritable`/FreeBSD `sowriteable` keep POLLOUT after the peer's FIN)
 //   K8-shutdown: our own SHUT_WR -> the next write is EPIPE
-//   K9 half-close: peer SHUT_WR -> readable/EOF, write allowed, then EPIPE + POLLHUP
+//   K9 half-close: FIN after HALFACK drains, peer EOF/HUP and no RST, later write EPIPE
 //   K10 poll after EOF is level-correct (reports on the next call)
 
 #include <arpa/inet.h>
@@ -964,41 +964,30 @@ static int check_half_close(void) {
     if (wrote != 7) {
         return fail("half ack write");
     }
-    // The host closes after HALFACK. A first write after its close may be accepted locally and
-    // trigger the peer's RST; the next level/readiness query is the HUP, and the next write is
-    // the EPIPE the contract requires.
-    (void)poll(NULL, 0, 50);
-    wrote = write(conn, "X", 1);
-    {
-        ssize_t probe = wrote;
-        int probe_errno = wrote < 0 ? errno : 0;
-
-        revents = poll_one(conn, POLLIN | POLLHUP, 3000);
-        for (int attempt = 0; attempt < 50 && (revents & POLLHUP) == 0; attempt++) {
-            (void)poll(NULL, 0, 20);
-            revents = poll_one(conn, POLLIN | POLLHUP, 100);
-        }
-        if (revents < 0 || (revents & POLLHUP) == 0) {
-            int so_error = 0;
-            socklen_t so_len = sizeof(so_error);
-            int so_rc = getsockopt(conn, SOL_SOCKET, SO_ERROR, &so_error, &so_len);
-            char detail[192];
-
-            (void)snprintf(detail, sizeof(detail),
-                           "half hup revents=0x%x errno=%d x_write=%zd x_errno=%d "
-                           "so_rc=%d so_error=%d",
-                           (unsigned)revents, errno, probe, probe_errno, so_rc, so_error);
-            return fail(detail);
-        }
+    // Guest-initiated half-close: the queued HALFACK drains and SHUT_WR then emits the FIN.
+    // The peer must read HALFACK, then EOF and HUP, with no RST. The guest keeps reading EOF and
+    // rejects a later write with EPIPE.
+    if (shutdown(conn, SHUT_WR) != 0) {
+        return fail("half shutdown");
+    }
+    if (read(conn, data, 1) != 0) {
+        return fail("half eof after shutdown");
     }
     wrote = write(conn, "X", 1);
     if (wrote >= 0 || errno != EPIPE) {
         return fail("half write EPIPE");
     }
+    revents = poll_one(conn, POLLIN | POLLHUP, 5000);
+    if (revents < 0 || (revents & POLLIN) == 0) {
+        char detail[96];
+        (void)snprintf(detail, sizeof(detail), "half eof poll revents=0x%x errno=%d",
+                       (unsigned)revents, errno);
+        return fail(detail);
+    }
     (void)close(conn);
     (void)close(eof_listener);
     eof_listener = -1;
-    pass("half-close eof=0 writable then EPIPE|POLLHUP");
+    pass("half-close eof=0 fin=1 no-rst");
     return 0;
 }
 
