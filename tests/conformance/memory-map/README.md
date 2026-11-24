@@ -31,10 +31,22 @@ product tree is not changed.
 ```text
 sh tests/conformance/memory-map/build.sh
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img
+python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --iterations 100
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --mutation
 ```
 
 `build.sh` uses the release initfs and stages only `/bin/mmap-probe`; no product file changes.
+
+### Kernel heap churn (S198)
+
+`--iterations N` runs every row N times inside one probe process, so repeated map/unmap and
+fork/exit cycles exercise the kernel heap. The image command line also enables `k449-metrics=1`;
+the runner records the pre-loop and post-loop `K449-GRAPH`/`K449-METRICS` samples. The 1440-byte
+allocation in the S195 panic is served from the kernel 1536-byte size class, so the gate requires
+`class1536_in_use` (plus `heap_used`, `procs` and `threads`) to return to the pre-loop baseline
+within a small tolerance for `--iterations` of 10 or more. A leaking per-mapping or per-child
+object grows the class until its 512-object slab table is exhausted and the next 1440-byte
+allocation panics.
 
 ## Donor map
 

@@ -18,8 +18,14 @@ Boots the release image once, logs in as the unprivileged `raven` account over S
 parent's write and the row turns red. That is the negative check; the product tree is not changed.
 The mremap growth row is Partial (PG-13) and is recorded, not gated.
 
+`--iterations N` runs the rows N times inside one probe process (S198 kernel heap churn). The
+kernel command line also enables `k449-metrics=1`, so the runner compares the pre-loop
+`class1536_in_use` (the size class a 1440-byte allocation uses) and heap/process/thread counters
+with the post-loop sample. The churn gate is enforced for N >= 10.
+
 Usage:
   python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img
+  python3 tests/conformance/memory-map/run.py --image ... --iterations 100
   python3 tests/conformance/memory-map/run.py --image ... --mutation
   python3 tests/conformance/memory-map/run.py --selftest
 
@@ -72,6 +78,14 @@ GATE_ROWS = [
 
 KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 
+# S198 churn tolerances. A 1440-byte allocation is served from the 1536-byte class, whose kernel
+# table caps at 512 live objects; a leak of one child object per probe iteration must cross these.
+CLASS1536_TOLERANCE = 32
+HEAP_TOLERANCE = 256 * 1024
+PROC_TOLERANCE = 8
+THREAD_TOLERANCE = 8
+CHURN_MIN_ITERATIONS = 10
+
 
 def parse_rows(text: str) -> dict[str, dict[str, str]]:
     """Parse the probe's `mmap: <row> key=value ...` lines."""
@@ -101,6 +115,71 @@ def check_rows(rows: dict[str, dict[str, str]]) -> list[str]:
     return failures
 
 
+def parse_metrics(text: str) -> tuple[dict[str, str], int]:
+    """Return the last K449 sample and the number of K449-GRAPH lines."""
+    sample: dict[str, str] = {}
+    graph_lines = 0
+    for line in text.splitlines():
+        if line.startswith("K449-GRAPH "):
+            graph_lines += 1
+            sample.update({key: value for key, value in KV_RE.findall(line)})
+        elif line.startswith("K449-METRICS "):
+            sample.update({key: value for key, value in KV_RE.findall(line)})
+    return sample, graph_lines
+
+
+def read_metrics(serial: Path) -> tuple[dict[str, str], int]:
+    try:
+        text = serial.read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        return {}, 0
+    return parse_metrics(text)
+
+
+def wait_metrics(
+    serial: Path, required: tuple[str, ...], min_graphs: int, timeout: float
+) -> tuple[dict[str, str], int]:
+    """Wait until the serial has the requested counters and at least `min_graphs` samples."""
+    deadline = time.monotonic() + timeout
+    sample, graphs = read_metrics(serial)
+    while time.monotonic() < deadline:
+        if graphs >= min_graphs and all(key in sample for key in required):
+            return sample, graphs
+        time.sleep(0.2)
+        sample, graphs = read_metrics(serial)
+    return sample, graphs
+
+
+def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) -> list[str]:
+    """S198: the kernel heap/class/process footprint must return to the pre-loop baseline."""
+    failures: list[str] = []
+    if iterations < CHURN_MIN_ITERATIONS:
+        return failures
+    fields = ("class1536_in_use", "heap_used", "procs", "threads")
+    missing = [field for field in fields if field not in base or field not in end]
+    if missing:
+        return [f"churn: metrics missing {', '.join(missing)}"]
+    c0, c1 = int(base["class1536_in_use"]), int(end["class1536_in_use"])
+    h0, h1 = int(base["heap_used"]), int(end["heap_used"])
+    p0, p1 = int(base["procs"]), int(end["procs"])
+    t0, t1 = int(base["threads"]), int(end["threads"])
+    print(
+        "memory-map: footprint class1536={c0}->{c1} heap={h0}->{h1} "
+        "procs={p0}->{p1} threads={t0}->{t1}".format(
+            c0=c0, c1=c1, h0=h0, h1=h1, p0=p0, p1=p1, t0=t0, t1=t1
+        )
+    )
+    if c1 > c0 + CLASS1536_TOLERANCE:
+        failures.append(f"churn: class1536_in_use {c0}->{c1} above {CLASS1536_TOLERANCE}")
+    if h1 > h0 + HEAP_TOLERANCE:
+        failures.append(f"churn: heap_used {h0}->{h1} above {HEAP_TOLERANCE}")
+    if p1 > p0 + PROC_TOLERANCE:
+        failures.append(f"churn: procs {p0}->{p1} above {PROC_TOLERANCE}")
+    if t1 > t0 + THREAD_TOLERANCE:
+        failures.append(f"churn: threads {t0}->{t1} above {THREAD_TOLERANCE}")
+    return failures
+
+
 def selftest() -> int:
     good = (
         "mmap: anon-zero ok=1\n"
@@ -120,6 +199,24 @@ def selftest() -> int:
     dirty = good.replace("cow-private child=0 expected=0 ok=1", "cow-private child=17 expected=0 ok=1")
     if not any("cow-private" in failure for failure in check_rows(parse_rows(dirty))):
         print("memory-map: selftest FAIL: private mutation not detected", file=sys.stderr)
+        return 1
+    base = {
+        "class1536_in_use": "4",
+        "heap_used": "1000000",
+        "procs": "9",
+        "threads": "40",
+    }
+    flat = dict(base)
+    if check_footprint(base, flat, CHURN_MIN_ITERATIONS):
+        print("memory-map: selftest FAIL: flat footprint reported as a leak", file=sys.stderr)
+        return 1
+    leaked = dict(base, class1536_in_use="504", heap_used="1700000", procs="509")
+    detected = check_footprint(base, leaked, CHURN_MIN_ITERATIONS)
+    if not any("class1536_in_use" in failure for failure in detected):
+        print("memory-map: selftest FAIL: class1536 leak not detected", file=sys.stderr)
+        return 1
+    if not any("procs" in failure for failure in detected):
+        print("memory-map: selftest FAIL: process leak not detected", file=sys.stderr)
         return 1
     print("memory-map: selftest PASS")
     return 0
@@ -226,22 +323,50 @@ def stop(child: subprocess.Popen) -> None:
             pass
 
 
-def run(image: Path, accel: str, mutation: bool, keep: bool) -> int:
+def run(image: Path, accel: str, mutation: bool, keep: bool, iterations: int) -> int:
     if not image.is_file():
         print(f"memory-map: image {image} is missing", file=sys.stderr)
         return 2
+    iterations = max(1, iterations)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     run_dir = ROOT / "build" / "conformance" / "memory-map" / f"run-{stamp}"
     child, serial, port = boot(run_dir, image, accel)
     try:
-        command = f"{PROBE} --mutation=private-shared" if mutation else PROBE
-        code, stdout, stderr = ssh(port, command, 120)
+        # Baseline the S198 counters before the churn. The sampler prints every second, so the
+        # first sample can lag the sshd-up marker; wait for it rather than comparing with nothing.
+        base, base_graphs = wait_metrics(
+            serial,
+            ("class1536_in_use", "heap_used", "procs", "threads"),
+            1,
+            20,
+        )
+        if mutation:
+            command = f"{PROBE} --mutation=private-shared"
+        elif iterations > 1:
+            command = f"{PROBE} --iterations={iterations}"
+        else:
+            command = PROBE
+        # Expected loop time is seconds; keep a proportional margin for the SSH round trip.
+        ssh_timeout = 120 if iterations == 1 else min(600, 120 + 2 * iterations)
+        code, stdout, stderr = ssh(port, command, ssh_timeout)
         probe_text = stdout.decode("utf-8", "replace")
         (run_dir / "probe.out").write_text(probe_text, encoding="utf-8")
         (run_dir / "probe.err").write_text(stderr.decode("utf-8", "replace"), encoding="utf-8")
+        # Wait for at least two fresh one-second samples after the probe exited so the freed
+        # children are reflected, then take the last sample as the post-loop footprint.
+        end, _ = wait_metrics(
+            serial,
+            ("class1536_in_use", "heap_used", "procs", "threads"),
+            base_graphs + 2,
+            10,
+        )
         serial_text = serial.read_text(encoding="utf-8", errors="replace")
         rows = parse_rows(probe_text)
         failures = check_rows(rows)
+        markers = probe_text.count("mmap: iteration ")
+        if iterations > 1 and markers != iterations:
+            failures.append(f"churn: {markers} iteration markers, expected {iterations}")
+        failures.extend(check_footprint(base, end, iterations))
         for line in (
             "KERNEL PANIC",
             "EXCEPTION",
@@ -291,13 +416,14 @@ def main() -> int:
     parser.add_argument("--accel", choices=("tcg", "kvm"), default="tcg")
     parser.add_argument("--mutation", action="store_true")
     parser.add_argument("--keep", action="store_true")
+    parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
     if args.selftest:
         return selftest()
     if args.image is None:
         parser.error("--image is required")
-    return run(args.image, args.accel, args.mutation, args.keep)
+    return run(args.image, args.accel, args.mutation, args.keep, args.iterations)
 
 
 if __name__ == "__main__":
