@@ -481,6 +481,109 @@ pub fn command_from_argv(argv: &[alloc::vec::Vec<u8>], path: &[u8]) -> String {
 }
 
 /// A process.
+/// Signal numbers and the per-process disposition table (C19).
+///
+/// The kernel stores the System V amd64 `struct sigaction` layout used by the raw
+/// `SIGACTION 0x87` ABI: handler, 128-bit mask, flags and restorer. `SIG_DFL`/`SIG_IGN` are not
+/// kernel entry points; a real handler is delivered by the frame path in a later S44 increment.
+pub const NSIG: usize = 65;
+/// `SIG_DFL`: the default disposition.
+pub const SIG_DFL: usize = 0;
+/// `SIG_IGN`: ignore the signal.
+pub const SIG_IGN: usize = 1;
+/// Highest signal number carried by the ABI.
+pub const SIG_MAX: u32 = 64;
+/// `sigaltstack` flag: no alternate signal stack is installed.
+pub const SS_DISABLE: u32 = 2;
+
+/// One per-process signal action, matching the raw `SIGACTION` ABI layout.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SigAction {
+    /// Handler address, `SIG_DFL` or `SIG_IGN`.
+    pub handler: usize,
+    /// Signals blocked while the handler runs (System V `sigset_t`, 128 bits).
+    pub mask: [u64; 2],
+    /// `SA_*` flags.
+    pub flags: u32,
+    /// Reserved restorer field (zero on Raven).
+    pub restorer: usize,
+}
+
+impl SigAction {
+    /// The default action for every signal.
+    pub const DEFAULT: Self = Self {
+        handler: SIG_DFL,
+        mask: [0; 2],
+        flags: 0,
+        restorer: 0,
+    };
+
+    /// The ignore action.
+    pub const IGNORE: Self = Self {
+        handler: SIG_IGN,
+        mask: [0; 2],
+        flags: 0,
+        restorer: 0,
+    };
+}
+
+impl Default for SigAction {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Per-process disposition table. `SIGKILL` and `SIGSTOP` cannot be changed.
+#[derive(Clone, Copy)]
+pub struct SigActs {
+    actions: [SigAction; NSIG],
+}
+
+impl SigActs {
+    /// A table with every signal at `SIG_DFL`.
+    pub const fn new() -> Self {
+        Self {
+            actions: [SigAction::DEFAULT; NSIG],
+        }
+    }
+
+    /// The current action for `signo`.
+    pub fn get(&self, signo: u32) -> Option<SigAction> {
+        let index = usize::try_from(signo).ok()?;
+        self.actions.get(index).copied()
+    }
+
+    /// Install `action` for `signo`; `EINVAL` for a bad signal or the uncatchable pair.
+    pub fn install(&mut self, signo: u32, action: SigAction) -> Result<(), Errno> {
+        let index = usize::try_from(signo).map_err(|_| Errno::EINVAL)?;
+        if !(1..=SIG_MAX).contains(&signo)
+            || signo == crate::process::status::SIGKILL
+            || signo == crate::process::status::SIGSTOP
+        {
+            return Err(Errno::EINVAL);
+        }
+        let slot = self.actions.get_mut(index).ok_or(Errno::EINVAL)?;
+        *slot = action;
+        Ok(())
+    }
+
+    /// Reset every handler to `SIG_DFL` while retaining `SIG_IGN` (`execsigs`).
+    pub fn exec_reset(&mut self) {
+        for action in &mut self.actions {
+            if action.handler != SIG_IGN {
+                *action = SigAction::DEFAULT;
+            }
+        }
+    }
+}
+
+impl Default for SigActs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Process {
     /// Process id (PID 1 for the first process).
     pub id: u64,
@@ -537,6 +640,8 @@ pub struct Process {
     pub personality: Mutex<PersonalityState>,
     /// Signals queued for this process.
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
+    /// Per-process C19 signal dispositions (handlers are per process; the mask is per thread).
+    pub sigacts: Mutex<SigActs>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
     /// True once an exec has replaced this process image; a child then refuses `setpgid`.
@@ -817,6 +922,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -898,6 +1004,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -972,6 +1079,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(*source.sigacts.lock()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1332,8 +1440,57 @@ pub fn init_available(cmdline: &CmdLine) -> bool {
     initfs::lookup(path).is_some()
 }
 
+/// S44 first-increment kernel test: the per-process disposition table, install/read/clear and
+/// the exec reset (`SIG_DFL` for handlers, `SIG_IGN` retained). Runs before PID 1 and exits QEMU.
+fn sigacts_selftest() -> ! {
+    fn fail(message: &str) -> ! {
+        kprintln!("s44: sigacts failed {message}");
+        crate::boot::exit_qemu(0x11);
+    }
+    let mut table = SigActs::new();
+    let handler = SigAction {
+        handler: 0x1234,
+        mask: [0; 2],
+        flags: 0,
+        restorer: 0,
+    };
+    if table.install(status::SIGUSR1, handler).is_err() {
+        fail("install");
+    }
+    match table.get(status::SIGUSR1) {
+        Some(action) if action.handler == 0x1234 => {}
+        _ => fail("readback"),
+    }
+    if table.install(status::SIGKILL, handler).is_ok() {
+        fail("SIGKILL accepted");
+    }
+    if table.install(status::SIGUSR1, SigAction::DEFAULT).is_err() {
+        fail("clear");
+    }
+    match table.get(status::SIGUSR1) {
+        Some(action) if action.handler == SIG_DFL => {}
+        _ => fail("clear readback"),
+    }
+    if table.install(status::SIGTERM, SigAction::IGNORE).is_err()
+        || table.install(status::SIGUSR1, handler).is_err()
+    {
+        fail("exec setup");
+    }
+    table.exec_reset();
+    match (table.get(status::SIGUSR1), table.get(status::SIGTERM)) {
+        (Some(handler_action), Some(ignore_action))
+            if handler_action.handler == SIG_DFL && ignore_action.handler == SIG_IGN => {}
+        _ => fail("exec reset"),
+    }
+    kprintln!("s44: sigacts table ok");
+    crate::boot::exit_qemu(0x10);
+}
+
 /// Create PID 1 from the initfs and enter ring 3. On success this never returns.
 pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
+    if cmdline.get("s44-sigactscheck").is_some() {
+        sigacts_selftest();
+    }
     let path = cmdline.get("init").unwrap_or("/init");
     let entry = initfs::lookup(path).ok_or(ProcessError::NoInit)?;
     let data = entry.data;
@@ -1398,6 +1555,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
