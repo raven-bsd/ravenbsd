@@ -175,6 +175,15 @@ def evaluate(
                 reasons.append(f"mutation:{expected['name']}:{expected['row']}={status}")
             if section["done"] is None:
                 reasons.append(f"mutation:{expected['name']}:end=missing")
+            else:
+                failed_rows = sum(
+                    1 for value in section["rows"].values() if value == "FAIL"
+                )
+                if section["done"] != failed_rows:
+                    reasons.append(
+                        f"mutation:{expected['name']}:end={section['done']}"
+                        f"!=failures={failed_rows}"
+                    )
         return reasons
 
     expected = next((item for item in mutations if item["name"] == mutation), None)
@@ -189,6 +198,12 @@ def evaluate(
         reasons.append(f"mutation:{mutation}:{expected['row']}={status or 'missing'}")
     if section["done"] is None:
         reasons.append(f"mutation:{mutation}:end=missing")
+    else:
+        failed_rows = sum(1 for value in section["rows"].values() if value == "FAIL")
+        if section["done"] != failed_rows:
+            reasons.append(
+                f"mutation:{mutation}:end={section['done']}!=failures={failed_rows}"
+            )
     return reasons
 
 
@@ -360,7 +375,7 @@ def build_and_run(args: argparse.Namespace, topic_dir: Path, topic: str, rows: l
             infra = any(
                 marker in reason
                 for reason in reasons
-                for marker in ("missing-section", "unknown", "end=missing")
+                for marker in ("missing-section", "unknown", "end=missing", "!=failures=")
             )
             if infra:
                 return 2
