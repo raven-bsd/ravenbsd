@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S194 diagnostic: log in and stay at the prompt for five seconds without sending a command.
+# It separates a startup TLS failure from one triggered by command execution.
+
+name = "release-login-s194-idle"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/libc/signals/build-release-s194.sh x86_64"]
+initfs = "build/fixtures/s194-release/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s194-trace=1"
+qemu_extra = [
+    "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+wait = '^S194-NEVER-MATCHES$'
+timeout_secs = 5
