@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S85d detached-thread isolation probe under the qtest harness's fixed TCG -smp 4. The full
+# libc-threads case stops after `barrier ok` and never prints `detach ok`. This case separates
+# create+join, detached with a 256 KiB stack and detached with the default 8 MiB stack, and
+# prints a marker around every twenty-fifth create so the hanging call is visible in the serial
+# log. A partial run fails the expectations instead of skipping.
+
+name = "libc-threads-detach-probe"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/libc/target/build-detach-probe.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^detach-probe: start$'
+
+[[expect]]
+regex = '^detach-probe: phase1 done$'
+
+[[expect]]
+regex = '^detach-probe: phase2-small done$'
+
+[[expect]]
+regex = '^detach-probe: phase3-default done$'
+
+[[expect]]
+regex = '^detach-probe: all-done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|detach-probe: .*FAIL'

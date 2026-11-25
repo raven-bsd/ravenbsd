@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S85d detached-thread isolation probe under KVM -smp 4. The same probe that hangs in
+# phase3-default on TCG must complete here, which separates a TCG scheduling/mapping defect from
+# a broken fixture.
+
+name = "libc-threads-detach-probe-kvm4"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/libc/target/build-detach-probe.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^detach-probe: start$'
+
+[[expect]]
+regex = '^detach-probe: phase1 done$'
+
+[[expect]]
+regex = '^detach-probe: phase2-small done$'
+
+[[expect]]
+regex = '^detach-probe: phase3-default done$'
+
+[[expect]]
+regex = '^detach-probe: all-done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|detach-probe: .*FAIL'
