@@ -339,6 +339,19 @@ pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
 /// the reserved fields stay as the kernel left them for an EL0t return.
 const PSTATE_USER_MASK: u64 = 0xf000_0000_0000_03c0;
 
+/// ELR after the sigcode's `svc #0`: `mov x8, #SIGRETURN` (4 bytes) + `svc` (4 bytes).
+const SIGCODE_RETURN_ELR: u64 = crate::process::SIGCODE_BASE + 8;
+/// NetBSD `_UC_SETSTACK`: the interrupted context was already on the signal stack.
+const UC_SETSTACK: u32 = 0x0001_0000;
+/// NetBSD `_UC_CLRSTACK`: the interrupted context was not on the signal stack.
+const UC_CLRSTACK: u32 = 0x0002_0000;
+/// `Q0..Q31` bytes in the kernel's per-thread FP/SIMD area.
+const FPU_Q_BYTES: usize = 32 * 16;
+/// `FPSR` offset in the kernel's per-thread FP/SIMD area.
+const FPU_FPSR_OFFSET: usize = FPU_Q_BYTES;
+/// `FPCR` offset in the kernel's per-thread FP/SIMD area.
+const FPU_FPCR_OFFSET: usize = FPU_Q_BYTES + 8;
+
 /// Scratch context for one delivery; a 4384-byte local per call would overflow a 20 KiB kernel
 /// stack once the SVC and delivery frames are nested.
 static SIGNAL_CONTEXT: spin::Mutex<MContext> = spin::Mutex::new(MContext::zero());
@@ -369,11 +382,12 @@ pub fn restore_signal_context(frame: &mut TrapFrame, context: &MContext) {
 
 /// Restore a `SIGRETURN` frame.
 ///
-/// A kernel-built handler returns through the sigcode to this syscall; `x28` is the
-/// `ucontext_t` pointer the kernel passed and the frame base is the thread's `sig_frame`.
+/// A kernel-built handler returns through the sigcode to this syscall; ELR is the instruction
+/// after the sigcode's `svc` and `x30` still holds the sigcode base the kernel entered with. The
+/// frame is therefore derived and validated from the trap frame itself, so nested frames restore
+/// independently and a user-forged `SIGRETURN` from ordinary code keeps the legacy fallback.
 pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
-    if crate::sched::current_thread()
-        .is_some_and(|thread| thread.sig_in_handler.load(Ordering::Acquire))
+    if frame.elr == SIGCODE_RETURN_ELR && frame.x[sigframe::REG_LR] == crate::process::SIGCODE_BASE
     {
         return sigreturn_kernel_frame(frame);
     }
@@ -405,29 +419,36 @@ fn restore_kernel_context(frame: &mut TrapFrame, context: &sigframe::MContextLay
     frame.far = 0;
 }
 
-/// Read the C19 `ucontext_t` back from the active kernel frame and restore it.
+/// Read the C19 `ucontext_t` back from the frame the handler returned from and restore it.
 #[allow(clippy::indexing_slicing)]
 fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
-    let fp = thread.sig_frame.load(Ordering::Acquire);
-    if fp == 0 || !is_user_address(fp) {
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    // The handler was entered with SP at the frame base; validate the whole frame lies inside
+    // the user window before any byte is read.
+    let fp = frame.sp;
+    if fp & 0xf != 0 || !is_user_address(fp) {
         return Err(Errno::EFAULT);
     }
-    let expected = fp
+    let frame_size = sigframe::SIGFRAME_SIZE as u64;
+    let frame_end = fp.checked_add(frame_size).ok_or(Errno::EFAULT)?;
+    if !is_user_address(frame_end.saturating_sub(1)) {
+        return Err(Errno::EFAULT);
+    }
+    let uc = fp
         .checked_add(sigframe::SIGFRAME_UCONTEXT_OFFSET as u64)
         .ok_or(Errno::EFAULT)?;
-    let uc = frame.x[sigframe::ARG_UCONTEXT_CALLEE];
-    if uc != expected || !is_user_address(uc) {
+    if uc != frame.x[sigframe::ARG_UCONTEXT_CALLEE] || !is_user_address(uc) {
         return Err(Errno::EFAULT);
-    }
-    if frame.sp != fp {
-        return Err(Errno::EINVAL);
     }
     let mut scratch = SIGNAL_FRAME_LAYOUT.lock();
     scratch.ucontext = sigframe::UContextLayout::ZERO;
     let bytes = unsafe {
         // SAFETY: the scratch ucontext is a live POD mirror; the mutable byte view covers
-        // exactly its size and the copy fills it before it is read.
+        // exactly its size and the copy fills it before it is read. `UserSlice` bounds the user
+        // range and `copy_from_user` fails on an unmapped or read-protected page.
         core::slice::from_raw_parts_mut(
             &mut scratch.ucontext as *mut sigframe::UContextLayout as *mut u8,
             sigframe::UCONTEXT_SIZE,
@@ -441,11 +462,65 @@ fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     thread
         .sig_blocked
         .store(mask & !unblockable, Ordering::Release);
-    thread.sig_in_handler.store(false, Ordering::Release);
-    thread.sig_frame.store(0, Ordering::Release);
-    thread.sig_on_altstack.store(false, Ordering::Release);
+    // NetBSD `setucontext`: restore the altstack state the frame recorded before its delivery,
+    // so a nested normal-stack frame cannot clear an outer handler's `SS_ONSTACK`.
+    thread.sig_on_altstack.store(
+        scratch.ucontext.uc_flags & UC_SETSTACK != 0,
+        Ordering::Release,
+    );
+    restore_frame_fpu(&scratch.ucontext, &thread);
     restore_kernel_context(frame, &scratch.ucontext.uc_mcontext);
     Ok(())
+}
+
+/// Copy the frame's `__fregs` back into the thread's FP/SIMD area and load it.
+///
+/// The aarch64 kernel is soft-float and has no syscall parking path, so the live registers still
+/// hold the handler's values here; they must be replaced with the interrupted image before the
+/// vector returns to EL0.
+#[allow(clippy::indexing_slicing)]
+fn restore_frame_fpu(context: &sigframe::UContextLayout, thread: &crate::sched::thread::Thread) {
+    let area = thread.fpu_area_ptr();
+    // SAFETY: `area` is the live 528-byte thread save area and `context.fregs.q` is 512 bytes.
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            context.uc_mcontext.fregs.q.as_ptr() as *const u8,
+            area,
+            FPU_Q_BYTES,
+        );
+        let fpsr = u64::from(context.uc_mcontext.fregs.fpsr);
+        let fpcr = u64::from(context.uc_mcontext.fregs.fpcr);
+        core::ptr::copy_nonoverlapping(fpsr.to_le_bytes().as_ptr(), area.add(FPU_FPSR_OFFSET), 8);
+        core::ptr::copy_nonoverlapping(fpcr.to_le_bytes().as_ptr(), area.add(FPU_FPCR_OFFSET), 8);
+        crate::arch::aarch64::fpu::restore(thread.fpu_area_const_ptr());
+    }
+}
+
+/// Park the interrupted FP/SIMD state into the frame.
+#[allow(clippy::indexing_slicing)]
+fn save_frame_fpu(layout: &mut sigframe::SigFrameLayout, thread: &crate::sched::thread::Thread) {
+    // SAFETY: the delivery path runs on the current thread's CPU, no other context owns the
+    // FP/SIMD registers, and the thread's save area is live.
+    unsafe {
+        crate::arch::aarch64::fpu::save(thread.fpu_area_ptr());
+    }
+    let area = thread.fpu_area_const_ptr();
+    // SAFETY: `area` is the live 528-byte thread save area; the destination is the frame's
+    // 512-byte `__qregs` array and the offsets are the architectural layout.
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            area,
+            layout.ucontext.uc_mcontext.fregs.q.as_mut_ptr() as *mut u8,
+            FPU_Q_BYTES,
+        );
+        let mut word = [0u8; 8];
+        core::ptr::copy_nonoverlapping(area.add(FPU_FPSR_OFFSET), word.as_mut_ptr(), 8);
+        layout.ucontext.uc_mcontext.fregs.fpsr =
+            u32::from_le_bytes([word[0], word[1], word[2], word[3]]);
+        core::ptr::copy_nonoverlapping(area.add(FPU_FPCR_OFFSET), word.as_mut_ptr(), 8);
+        layout.ucontext.uc_mcontext.fregs.fpcr =
+            u32::from_le_bytes([word[0], word[1], word[2], word[3]]);
+    }
 }
 
 /// Build and enter a C19 aarch64 `sendsig` frame for the oldest deliverable kernel signal.
@@ -460,7 +535,7 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     let Some(thread) = crate::sched::current_thread() else {
         return false;
     };
-    if !thread.user || thread.sig_in_handler.load(Ordering::Acquire) {
+    if !thread.user {
         return false;
     }
     let blocked = thread.sig_blocked.load(Ordering::Acquire);
@@ -480,10 +555,11 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     let alt_sp = thread.sig_alt_sp.load(Ordering::Acquire);
     let alt_size = thread.sig_alt_size.load(Ordering::Acquire);
     let alt_flags = thread.sig_alt_flags.load(Ordering::Acquire);
+    let was_on_altstack = thread.sig_on_altstack.load(Ordering::Acquire);
     let on_altstack = action.flags & crate::process::SA_ONSTACK != 0
         && alt_flags & crate::process::SS_DISABLE == 0
         && alt_sp != 0
-        && !thread.sig_on_altstack.load(Ordering::Acquire);
+        && !was_on_altstack;
     let stack_top = if on_altstack {
         match alt_sp.checked_add(alt_size) {
             Some(top) => top,
@@ -497,6 +573,13 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     };
     let mut layout = SIGNAL_FRAME_LAYOUT.lock();
     *layout = sigframe::SigFrameLayout::ZERO;
+    // NetBSD `sendsig`: record the altstack state from before this delivery so `SIGRETURN`
+    // restores an outer frame's `SS_ONSTACK` after a nested normal-stack frame.
+    layout.ucontext.uc_flags = if was_on_altstack {
+        UC_SETSTACK
+    } else {
+        UC_CLRSTACK
+    };
     layout.siginfo.si_signo = record.signo as i32;
     layout.siginfo.si_code = record.code as i32;
     layout.siginfo.si_pid = record.sender as i32;
@@ -517,6 +600,7 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
         spare: 0,
     };
     context_from_kernel_frame(frame, &mut layout.ucontext.uc_mcontext);
+    save_frame_fpu(&mut layout, &thread);
     let size = core::mem::size_of::<sigframe::SigFrameLayout>();
     let bytes = unsafe {
         // SAFETY: the scratch frame is a live, fully initialised POD frame; the byte view
@@ -539,9 +623,9 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
             .lock()
             .set(record.signo, crate::process::SigAction::default_action());
     }
-    thread.sig_in_handler.store(true, Ordering::Release);
-    thread.sig_frame.store(place.sp, Ordering::Release);
-    thread.sig_on_altstack.store(on_altstack, Ordering::Release);
+    if on_altstack {
+        thread.sig_on_altstack.store(true, Ordering::Release);
+    }
     frame.x[sigframe::ARG_SIG] = u64::from(record.signo);
     frame.x[sigframe::ARG_SIGINFO] = place.siginfo;
     frame.x[sigframe::ARG_UCONTEXT] = place.ucontext;

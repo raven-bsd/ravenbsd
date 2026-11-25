@@ -223,8 +223,6 @@ pub fn replace_image_from_user(
         thread.signal_mask.store(0, Ordering::Release);
         thread.resend.store(false, Ordering::Release);
         thread.kick_bits.store(0, Ordering::Release);
-        thread.sig_in_handler.store(false, Ordering::Release);
-        thread.sig_frame.store(0, Ordering::Release);
         thread.sig_alt_sp.store(0, Ordering::Release);
         thread.sig_alt_size.store(0, Ordering::Release);
         thread

@@ -473,17 +473,20 @@ pub struct Thread {
     pub signal_mask: AtomicU64,
     /// Per-thread blocked mask for the kernel sigaction model (signal 1 is bit 0).
     pub sig_blocked: AtomicU64,
-    /// True while a kernel-built sigframe handler is running.
-    pub sig_in_handler: AtomicBool,
-    /// User address of the kernel-built sigframe currently active.
-    pub sig_frame: AtomicU64,
     /// Alternate signal stack base (`ss_sp`); zero while disabled.
     pub sig_alt_sp: AtomicU64,
     /// Alternate signal stack size (`ss_size`).
     pub sig_alt_size: AtomicU64,
     /// Alternate signal stack flags (`SS_DISABLE`/`SS_ONSTACK`).
     pub sig_alt_flags: AtomicU32,
-    /// True while the handler runs on the alternate stack.
+    /// True while execution is on the alternate signal stack.
+    ///
+    /// One flag, not a per-frame stack: the NetBSD `l_sigstk.ss_flags` model keeps
+    /// `SS_ONSTACK` set across a nested delivery that runs on the normal stack, and each
+    /// `ucontext_t` records the previous state in `uc_flags` (`_UC_SETSTACK`/`_UC_CLRSTACK`)
+    /// so `SIGRETURN` restores it. There is no kernel frame pointer or "in handler" boolean:
+    /// the return path derives and validates the frame from the trap frame itself, so nested
+    /// frames restore independently.
     pub sig_on_altstack: AtomicBool,
     /// A `SIGRESEND` re-entry is waiting for the return-to-user path.
     pub resend: AtomicBool,
@@ -659,8 +662,6 @@ impl Thread {
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sig_blocked: AtomicU64::new(0),
-            sig_in_handler: AtomicBool::new(false),
-            sig_frame: AtomicU64::new(0),
             sig_alt_sp: AtomicU64::new(0),
             sig_alt_size: AtomicU64::new(0),
             sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
@@ -785,8 +786,6 @@ impl Thread {
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sig_blocked: AtomicU64::new(0),
-            sig_in_handler: AtomicBool::new(false),
-            sig_frame: AtomicU64::new(0),
             sig_alt_sp: AtomicU64::new(0),
             sig_alt_size: AtomicU64::new(0),
             sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),
@@ -853,8 +852,6 @@ impl Thread {
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             sig_blocked: AtomicU64::new(0),
-            sig_in_handler: AtomicBool::new(false),
-            sig_frame: AtomicU64::new(0),
             sig_alt_sp: AtomicU64::new(0),
             sig_alt_size: AtomicU64::new(0),
             sig_alt_flags: AtomicU32::new(crate::process::SS_DISABLE),

@@ -121,6 +121,24 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         && let Some(creator) = sched::current_thread()
     {
         thread.inherit_signal_mask(&creator);
+    } else if let Some(seed) = target.fork_signal.lock().take() {
+        // The forked child's first thread: FreeBSD `fork1` copied these from the forking thread
+        // (`td_sigmask`, `td_sigstk`). Consume the seed so later pthreads do not inherit it.
+        let unblockable =
+            process::signal_bit(status::SIGKILL) | process::signal_bit(status::SIGSTOP);
+        thread
+            .sig_blocked
+            .store(seed.mask & !unblockable, Ordering::Release);
+        if seed.alt_flags & crate::process::SS_DISABLE == 0
+            && seed.alt_sp != 0
+            && seed.alt_size != 0
+        {
+            thread.sig_alt_sp.store(seed.alt_sp, Ordering::Release);
+            thread.sig_alt_size.store(seed.alt_size, Ordering::Release);
+            thread
+                .sig_alt_flags
+                .store(seed.alt_flags, Ordering::Release);
+        }
     }
     if let Some(extended) = extended {
         if extended.tp != 0 {

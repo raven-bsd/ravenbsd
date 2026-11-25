@@ -186,6 +186,15 @@ const USER_RFLAGS_MASK: u64 = 0x0000_0000_0024_0fd7;
 /// RFLAGS value forced on return to user mode (bit 1 and IF).
 const USER_RFLAGS_SET: u64 = 0x202;
 
+/// NetBSD `_UC_SETSTACK`: the interrupted context was already on the signal stack.
+const UC_SETSTACK: u64 = 0x0001_0000;
+/// NetBSD `_UC_CLRSTACK`: the interrupted context was not on the signal stack.
+const UC_CLRSTACK: u64 = 0x0002_0000;
+/// Bytes of the legacy FXSAVE/x87+SSE image saved in `ucontext_t.uc_fpregs`.
+const FPU_IMAGE_BYTES: usize = 512;
+/// User RIP after the sigcode's `syscall` instruction: `mov eax, imm32` (5) + `syscall` (2).
+const SIGCODE_RETURN_RIP: u64 = crate::process::SIGCODE_BASE + 7;
+
 /// Scratch context for one delivery; serialised because the copy is short and must not enlarge
 /// the 20 KiB kernel stack by a 256-byte frame per call.
 static SIGNAL_CONTEXT: spin::Mutex<MContext> = spin::Mutex::new(MContext::zero());
@@ -350,14 +359,13 @@ pub fn restore_signal_context(frame: &mut TrapFrame, context: &MContext) {
 
 /// Restore a `SIGRETURN` frame.
 ///
-/// A kernel-built handler returns through the sigcode to this syscall with `rsp = sf_ra + 8`
-/// (the handler `ret` popped the return address), so the `sigframe` is at `rsp - 8` and the
-/// `ucontext_t` starts at `fp + 136`. The retired `SIG_SETUP` model keeps its own fallback until
-/// the crate removes it (C19 removes the registration).
+/// A kernel-built handler returns through the sigcode to this syscall with `rsp = fp + 8` (the
+/// handler `ret` popped `sf_ra`), so the `sigframe` is derived from the interrupted stack pointer
+/// and its own `sf_ra`. There is no per-thread "in handler" flag: a nested frame restores from
+/// the frame the handler returned from, and a user-forged `SIGRETURN` (RIP outside the sigcode)
+/// can never select this path. The retired `SIG_SETUP` model keeps its fallback.
 pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
-    if crate::sched::current_thread()
-        .is_some_and(|thread| thread.sig_in_handler.load(Ordering::Acquire))
-    {
+    if frame.rip == SIGCODE_RETURN_RIP {
         return sigreturn_kernel_frame(frame);
     }
     let mut context = SIGNAL_CONTEXT.lock();
@@ -366,14 +374,33 @@ pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     Ok(())
 }
 
-/// Read the C19 `ucontext_t` back from the active kernel `sigframe` and restore it.
+/// Read the C19 `ucontext_t` back from the frame the handler returned from and restore it.
 fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
-    let fp = thread.sig_frame.load(Ordering::Acquire);
-    if fp == 0 || !is_user_address(fp) {
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    // The handler's `ret` popped `sf_ra`; the frame base must look like the ABI's post-call
+    // stack and lie wholly inside the user window before any byte is read.
+    let fp = frame.rsp.checked_sub(8).ok_or(Errno::EFAULT)?;
+    if fp & 0xf != 8 || !is_user_address(fp) {
         return Err(Errno::EFAULT);
     }
-    if frame.rsp != fp.checked_add(8).ok_or(Errno::EFAULT)? {
+    let frame_size = core::mem::size_of::<SigFrame>() as u64;
+    let frame_end = fp.checked_add(frame_size).ok_or(Errno::EFAULT)?;
+    if !is_user_address(frame_end.saturating_sub(1)) {
+        return Err(Errno::EFAULT);
+    }
+    // Only a frame the kernel wrote points back at the sigcode. A user-supplied stack pattern
+    // cannot pass this check, so `sf_uc` is never read from an unvalidated object.
+    let mut return_address = 0u64;
+    let return_bytes = unsafe {
+        // SAFETY: `return_address` is a live u64; the mutable byte view covers exactly its size
+        // and the copy fills it before it is read.
+        core::slice::from_raw_parts_mut(&mut return_address as *mut u64 as *mut u8, 8)
+    };
+    copy_from_user(return_bytes, UserSlice::new(fp, 8)?)?;
+    if return_address != crate::process::SIGCODE_BASE {
         return Err(Errno::EINVAL);
     }
     let address = fp
@@ -383,7 +410,8 @@ fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     scratch.sf_uc = ZERO_UCONTEXT;
     let bytes = unsafe {
         // SAFETY: the scratch `ucontext_t` is a live POD mirror; the mutable byte view covers
-        // exactly its size and the copy fills it before it is read.
+        // exactly its size and the copy fills it before it is read. `UserSlice` bounds the user
+        // range and `copy_from_user` fails on an unmapped or read-protected page.
         core::slice::from_raw_parts_mut(
             &mut scratch.sf_uc as *mut UserUContext as *mut u8,
             core::mem::size_of::<UserUContext>(),
@@ -399,11 +427,56 @@ fn sigreturn_kernel_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
         scratch.sf_uc.uc_sigmask.first().copied().unwrap_or(0) & !unblockable,
         Ordering::Release,
     );
-    thread.sig_in_handler.store(false, Ordering::Release);
-    thread.sig_frame.store(0, Ordering::Release);
-    thread.sig_on_altstack.store(false, Ordering::Release);
+    // NetBSD `setucontext`: `_UC_SETSTACK`/`_UC_CLRSTACK` restore the altstack state that was
+    // current when this frame interrupted execution, so a nested frame cannot clear an outer
+    // handler's `SS_ONSTACK`.
+    thread
+        .sig_on_altstack
+        .store(scratch.sf_uc.uc_flags & UC_SETSTACK != 0, Ordering::Release);
+    restore_frame_fpu(&scratch.sf_uc, &thread);
     restore_signal_context(frame, &scratch.sf_uc.uc_mcontext);
     Ok(())
+}
+
+/// Copy the frame's FXSAVE image back into the thread's parked FP/SIMD area.
+///
+/// `SIGRETURN` is a syscall, so `sched_syscall_exit` restores the area after dispatch; writing
+/// the handler-visible image here is what makes the interrupted FP/SIMD state win. The XSAVE
+/// header past the 512-byte legacy image is left untouched.
+fn restore_frame_fpu(context: &UserUContext, thread: &crate::sched::thread::Thread) {
+    if !thread.fpu_saved.load(Ordering::Acquire) {
+        return;
+    }
+    let source = context.uc_fpregs.as_ptr() as *const u8;
+    let destination = thread.fpu_area_ptr();
+    // SAFETY: the frame holds 512 bytes of FXSAVE image and the thread's area is at least 512
+    // bytes and 64-byte aligned; the scheduler owns this thread's FP/SIMD area at syscall exit.
+    unsafe {
+        core::ptr::copy_nonoverlapping(source, destination, FPU_IMAGE_BYTES);
+    }
+}
+
+/// Park the interrupted FP/SIMD state into the frame and point `uc_mcontext.fpregs` at it.
+fn save_frame_fpu(sigframe: &mut SigFrame, fp: u64, thread: &crate::sched::thread::Thread) {
+    // Inside a syscall the user state is already parked by `sched_syscall_enter`; a fault path
+    // still has it live in the registers, so park it without touching the scheduler's marker.
+    if !thread.fpu_saved.load(Ordering::Acquire) {
+        // SAFETY: the fault path runs on the current thread's CPU; no other context owns the
+        // FP/SIMD registers or the thread's save area at this point.
+        unsafe {
+            crate::arch::x86_64::fpu::save(thread.fpu_area_ptr());
+        }
+    }
+    let source = thread.fpu_area_const_ptr();
+    let destination = sigframe.sf_uc.uc_fpregs.as_mut_ptr() as *mut u8;
+    // SAFETY: both areas are live; the frame field is exactly 512 bytes and the thread area is
+    // at least that large.
+    unsafe {
+        core::ptr::copy_nonoverlapping(source, destination, FPU_IMAGE_BYTES);
+    }
+    let offset = core::mem::offset_of!(SigFrame, sf_uc)
+        .saturating_add(core::mem::offset_of!(UserUContext, uc_fpregs));
+    sigframe.sf_uc.uc_mcontext.fpregs = fp.saturating_add(offset as u64);
 }
 
 /// Address of a `sigframe` below the AMD64 128-byte red zone, 8 modulo 16 as if after a `call`.
@@ -433,7 +506,7 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     let Some(thread) = crate::sched::current_thread() else {
         return false;
     };
-    if !thread.user || thread.sig_in_handler.load(Ordering::Acquire) {
+    if !thread.user {
         return false;
     }
     let blocked = thread.sig_blocked.load(Ordering::Acquire);
@@ -455,10 +528,11 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     let alt_sp = thread.sig_alt_sp.load(Ordering::Acquire);
     let alt_size = thread.sig_alt_size.load(Ordering::Acquire);
     let alt_flags = thread.sig_alt_flags.load(Ordering::Acquire);
+    let was_on_altstack = thread.sig_on_altstack.load(Ordering::Acquire);
     let on_altstack = action.flags & process::SA_ONSTACK != 0
         && alt_flags & crate::process::SS_DISABLE == 0
         && alt_sp != 0
-        && !thread.sig_on_altstack.load(Ordering::Acquire);
+        && !was_on_altstack;
     let stack_top = if on_altstack {
         match alt_sp.checked_add(alt_size) {
             Some(top) => top,
@@ -474,6 +548,13 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     sigframe.sf_ra = crate::process::SIGCODE_BASE;
     sigframe.sf_si = ZERO_SIGINFO;
     sigframe.sf_uc = ZERO_UCONTEXT;
+    // NetBSD `sendsig`: the frame records the altstack state that was current *before* this
+    // delivery, so `SIGRETURN` can restore an outer frame's `SS_ONSTACK` after a nested one.
+    sigframe.sf_uc.uc_flags = if was_on_altstack {
+        UC_SETSTACK
+    } else {
+        UC_CLRSTACK
+    };
     sigframe.sf_si.si_signo = record.signo as i32;
     sigframe.sf_si.si_code = record.code as i32;
     sigframe.sf_si.set_u32(0, record.sender as u32);
@@ -493,6 +574,7 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     };
     sigframe.sf_uc.uc_mcontext = *context;
     sigframe.sf_uc.uc_sigmask[0] = old_mask;
+    save_frame_fpu(&mut sigframe, fp, &thread);
     let size = core::mem::size_of::<SigFrame>();
     let bytes = unsafe {
         // SAFETY: the scratch frame is a live, fully initialised POD frame; the byte view covers
@@ -513,9 +595,9 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
             .lock()
             .set(record.signo, process::SigAction::default_action());
     }
-    thread.sig_in_handler.store(true, Ordering::Release);
-    thread.sig_frame.store(fp, Ordering::Release);
-    thread.sig_on_altstack.store(on_altstack, Ordering::Release);
+    if on_altstack {
+        thread.sig_on_altstack.store(true, Ordering::Release);
+    }
     frame.rdi = u64::from(record.signo);
     frame.rsi = fp + core::mem::offset_of!(SigFrame, sf_si) as u64;
     frame.rdx = fp + core::mem::offset_of!(SigFrame, sf_uc) as u64;

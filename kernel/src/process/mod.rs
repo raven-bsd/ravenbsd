@@ -513,6 +513,7 @@ pub const fn signal_bit(signo: u32) -> u64 {
 /// The table is per process because a handler installed before `fork` is shared by the child,
 /// while `execsigs` resets caught handlers and keeps `SIG_IGN` (FreeBSD `execsigs`). Index zero
 /// is unused; signals are `1..=status::SIG_MAX`.
+#[derive(Clone)]
 pub struct SigActs {
     actions: Vec<SigAction>,
 }
@@ -552,6 +553,23 @@ impl SigActs {
             }
         }
     }
+}
+
+/// Per-thread signal state a forked child's first thread inherits.
+///
+/// This is the `fork1` half that belongs to the thread, not the process: the blocked mask and the
+/// alternate-stack registration (`td_sigmask`, `td_sigstk`). Transient handler state is not
+/// copied; the child's first thread starts outside any handler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ForkSignalState {
+    /// Blocked mask inherited from the forking thread.
+    pub mask: u64,
+    /// Alternate-stack base, or zero when disabled.
+    pub alt_sp: u64,
+    /// Alternate-stack size.
+    pub alt_size: u64,
+    /// Alternate-stack flags (`SS_DISABLE` when disabled).
+    pub alt_flags: u32,
 }
 
 impl ProcessIds {
@@ -706,6 +724,13 @@ pub struct Process {
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
     /// Per-process handler dispositions (C19 `sigaction`).
     pub sigacts: Mutex<SigActs>,
+    /// Signal state a forked child's first thread inherits.
+    ///
+    /// FreeBSD `fork1` copies the new process's `p_sigacts` and the forking thread's
+    /// `td_sigmask`/`td_sigstk`. Raven creates the child's first thread later from the parent
+    /// (`PROC_FORK` + `THREAD_CREATE`), so the per-thread part is carried here and consumed by
+    /// that thread's creation. New threads in a process that was not forked do not see it.
+    pub fork_signal: Mutex<Option<ForkSignalState>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
     /// True once an exec has replaced this process image; a child then refuses `setpgid`.
@@ -987,6 +1012,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(SigActs::new()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1040,6 +1066,13 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         )
     };
     note_process_created();
+    // C19: every address space owns the kernel sigcode page from creation. A userspace spawner
+    // maps its own image and top-of-user-space stack; this page sits below the randomized kernel
+    // stack window, so the two mappings can never share a page. `build_stack` and the lazy
+    // `ensure_sigcode_page` path then find the VMA already present.
+    let mut user_address_space = UserAddressSpace::new(address_space);
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    install_sigcode(&mut user_address_space).map_err(|_| Errno::ENOMEM)?;
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -1047,7 +1080,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
-        address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
+        address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
@@ -1069,6 +1102,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(SigActs::new()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1102,20 +1136,20 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     Ok(process)
 }
 
-/// Create an unstarted child whose address space is a COW clone of `source`.
+/// Build the forked child's `Process` object in a callee frame.
 ///
-/// The handle table is forked with `HandleTable::fork_into`, so indices, generations, rights,
-/// retired slots and lineage nodes are preserved; the source's self-process handle is rewritten
-/// to the child. `NOFORK` mappings are absent and their verifiable object handles are closed in
-/// the child. The namespace and personality are copied. No thread is created.
-pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> {
-    let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+/// `Process` is a multi-kilobyte value and the kernel stack is small. Keeping its construction
+/// temporary in this `#[inline(never)]` callee means [`new_forked_process`] runs the address-space
+/// clone, the handle copy and the signal seed with the construction frame already popped. The
+/// aarch64 fork path overflowed its 7-page kernel stack when the temporary shared that frame.
+#[inline(never)]
+fn build_forked_process(source: &Arc<Process>, address_space: AddressSpace) -> Arc<Process> {
     let personality = *source.personality.lock();
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let limits = *source.limits.lock();
     let root = source.root.lock().clone();
     note_process_created();
-    let child = Arc::new(Process {
+    Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: source.path.clone(),
@@ -1143,7 +1177,8 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
-        sigacts: Mutex::new(SigActs::new()),
+        sigacts: Mutex::new((*source.sigacts.lock()).clone()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
@@ -1171,7 +1206,18 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         child_user_ns: AtomicU64::new(0),
         maxrss_bytes: AtomicU64::new(0),
         child_maxrss_bytes: AtomicU64::new(0),
-    });
+    })
+}
+
+/// Create an unstarted child whose address space is a COW clone of `source`.
+///
+/// The handle table is forked with `HandleTable::fork_into`, so indices, generations, rights,
+/// retired slots and lineage nodes are preserved; the source's self-process handle is rewritten
+/// to the child. `NOFORK` mappings are absent and their verifiable object handles are closed in
+/// the child. The namespace and personality are copied. No thread is created.
+pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> {
+    let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let child = build_forked_process(source, address_space);
 
     {
         let mut source_space = source.address_space.lock();
@@ -1179,6 +1225,27 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         let mut child_space = child.address_space.lock();
         let child_space = child_space.as_mut().ok_or(Errno::ESRCH)?;
         child_space.fork_clone_from(source_space)?;
+        // A fork of a userspace-spawned image may predate its first caught signal; the child
+        // still owns the C19 page from creation, exactly like `PROC_CREATE`.
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        if child_space.vmas().find(SIGCODE_BASE).is_none() {
+            install_sigcode(child_space).map_err(|_| Errno::ENOMEM)?;
+        }
+    }
+
+    // FreeBSD `fork1` gives the child its parent's `p_sigacts` (above) and copies the forking
+    // thread's `td_sigmask`/`td_sigstk`. Raven starts the child's first thread later, so the
+    // per-thread half waits here until that `THREAD_CREATE`.
+    let forking_thread = crate::sched::current_thread()
+        .filter(|thread| Arc::ptr_eq(&thread.process, source))
+        .or_else(|| source.threads_live.lock().iter().find_map(Weak::upgrade));
+    if let Some(thread) = forking_thread {
+        *child.fork_signal.lock() = Some(ForkSignalState {
+            mask: thread.sig_blocked.load(Ordering::Acquire),
+            alt_sp: thread.sig_alt_sp.load(Ordering::Acquire),
+            alt_size: thread.sig_alt_size.load(Ordering::Acquire),
+            alt_flags: thread.sig_alt_flags.load(Ordering::Acquire),
+        });
     }
 
     let (nofork, inherited) = {
@@ -1867,6 +1934,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
         sigacts: Mutex::new(SigActs::new()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
         exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
