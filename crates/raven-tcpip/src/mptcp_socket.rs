@@ -15,6 +15,7 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
@@ -75,6 +76,8 @@ pub struct MptcpSocket<D: Device + 'static> {
     stack: Rc<RefCell<Stack<D>>>,
     meta: MetaSocket,
     paths: BTreeMap<u32, PathInfo>,
+    /// Bytes read from a subflow for a DSS mapping that is still short of its declared length.
+    rx_pending: BTreeMap<u32, Vec<u8>>,
     fallback: Option<SocketId>,
     closed: bool,
 }
@@ -113,6 +116,7 @@ impl<D: Device + 'static> MptcpSocket<D> {
                     DEFAULT_WINDOW,
                 ),
                 paths: BTreeMap::new(),
+                rx_pending: BTreeMap::new(),
                 fallback: Some(socket),
                 closed: false,
             });
@@ -145,6 +149,7 @@ impl<D: Device + 'static> MptcpSocket<D> {
             stack,
             meta,
             paths,
+            rx_pending: BTreeMap::new(),
             fallback: None,
             closed: false,
         })
@@ -185,8 +190,12 @@ impl<D: Device + 'static> MptcpSocket<D> {
             Some(socket) => self.stack.borrow_mut().recv(socket, buffer),
             None => {
                 self.meta.refresh();
-                let id = self.meta.active().ok_or(Errno::ENOTCONN)?;
-                self.stack.borrow_mut().recv_from(SubflowId(id), buffer)
+                let count = self.meta.read(buffer);
+                if count > 0 || self.meta.peer_fin() {
+                    Ok(count)
+                } else {
+                    Err(Errno::EAGAIN)
+                }
             }
         }
     }
@@ -197,13 +206,53 @@ impl<D: Device + 'static> MptcpSocket<D> {
     /// the subflow that carried the payload. The bytes are read from that subflow and passed to
     /// the connection-level receive path, which reorders them by data sequence number. Backup
     /// and out-of-order ranges stay buffered until the gap is filled.
+    ///
+    /// A short subflow read keeps the bytes pending for `subflow_id`; the caller retries the
+    /// same mapping after the transport becomes readable again. Bytes past `data_len` are never
+    /// consumed, so the next mapping on the subflow starts at the right offset.
     pub fn receive_dss(
         &mut self,
-        _subflow_id: u32,
-        _mapping: &Mapping,
-        _data_fin: bool,
+        subflow_id: u32,
+        mapping: &Mapping,
+        data_fin: bool,
     ) -> Result<(), Errno> {
-        Err(Errno::EOPNOTSUPP)
+        if self.closed {
+            return Err(Errno::EBADF);
+        }
+        if self.fallback.is_some() {
+            return Err(Errno::EOPNOTSUPP);
+        }
+        if !self.paths.contains_key(&subflow_id) {
+            return Err(Errno::ENOENT);
+        }
+        let need = usize::from(mapping.data_len);
+        let mut pending = self.rx_pending.remove(&subflow_id).unwrap_or_default();
+        while pending.len() < need {
+            let mut buffer = vec![0u8; need - pending.len()];
+            let count = self
+                .stack
+                .borrow_mut()
+                .recv_from(SubflowId(subflow_id), &mut buffer);
+            match count {
+                Ok(0) => {
+                    self.rx_pending.insert(subflow_id, pending);
+                    return Err(Errno::ECONNRESET);
+                }
+                Ok(count) => pending.extend_from_slice(&buffer[..count]),
+                Err(error) => {
+                    self.rx_pending.insert(subflow_id, pending);
+                    return Err(error);
+                }
+            }
+        }
+        let result = self
+            .meta
+            .receive(mapping, &pending, data_fin)
+            .map_err(map_meta);
+        if result.is_err() {
+            self.rx_pending.insert(subflow_id, pending);
+        }
+        result
     }
 
     /// Live readiness: current connection bytes and path health.
@@ -219,13 +268,17 @@ impl<D: Device + 'static> MptcpSocket<D> {
             None => {
                 let Some(active) = self.meta.active() else {
                     return Readiness {
-                        readable: false,
+                        readable: self.meta.readable(),
                         writable: false,
                         hup: true,
                         error: false,
                     };
                 };
-                SubflowOps::readiness(&*self.stack.borrow(), SubflowId(active))
+                let mut readiness = SubflowOps::readiness(&*self.stack.borrow(), SubflowId(active));
+                // Connection bytes become readable only after a DSS mapping fills the next
+                // data-sequence gap; a readable subflow alone is not an MPTCP read.
+                readiness.readable = self.meta.readable();
+                readiness
             }
         }
     }

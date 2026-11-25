@@ -117,13 +117,29 @@ fn ipproto_mptcp_opens_two_paths_and_moves_data() {
         5
     );
     rig.pump_to(rig.now + 200);
+    let primary_subflow = socket
+        .subflows()
+        .iter()
+        .find(|path| !path.backup)
+        .expect("primary")
+        .subflow_id;
+    let reply_mapping = Mapping {
+        data_seq: 0,
+        subflow_seq: 0,
+        data_len: 5,
+        checksum: None,
+        dsn_64: true,
+    };
+    assert_eq!(
+        socket.receive_dss(primary_subflow, &reply_mapping, false),
+        Ok(())
+    );
     assert!(socket.readiness().readable, "live readiness sees the reply");
     let mut buffer = [0u8; 8];
     assert_eq!(socket.recv(&mut buffer), Ok(5));
     assert_eq!(&buffer[..5], b"reply");
 
     // Promote the backup: regular paths are preferred for new data.
-    let primary_subflow = socket.subflows()[0].subflow_id;
     socket
         .set_backup(primary_subflow, true)
         .expect("retire primary");
@@ -237,6 +253,49 @@ fn dss_mappings_reassemble_across_subflows_in_order() {
     };
     assert_eq!(socket.receive_dss(primary, &primary_mapping, false), Ok(()));
     assert!(socket.readiness().readable, "the gap is filled");
+    let mut received = vec![0u8; data.len()];
+    assert_eq!(socket.recv(&mut received), Ok(data.len()));
+    assert_eq!(received, data);
+    assert_eq!(socket.close(), Ok(()));
+}
+
+#[test]
+fn a_short_subflow_read_is_retried_without_losing_bytes() {
+    let mut rig = Rig::new();
+    let mut socket = rig.open(true);
+    let primary_peer = rig.accept();
+    let primary = socket.subflows()[0].subflow_id;
+    let data: Vec<u8> = (0..1000).map(|index| (index % 251) as u8).collect();
+    let mapping = Mapping {
+        data_seq: 0,
+        subflow_seq: 0,
+        data_len: 1000,
+        checksum: None,
+        dsn_64: true,
+    };
+
+    assert_eq!(
+        rig.b
+            .borrow_mut()
+            .send(primary_peer, &data[..400])
+            .expect("first part"),
+        400
+    );
+    rig.pump_to(rig.now + 200);
+    assert_eq!(
+        socket.receive_dss(primary, &mapping, false),
+        Err(Errno::EAGAIN)
+    );
+
+    assert_eq!(
+        rig.b
+            .borrow_mut()
+            .send(primary_peer, &data[400..])
+            .expect("second part"),
+        600
+    );
+    rig.pump_to(rig.now + 200);
+    assert_eq!(socket.receive_dss(primary, &mapping, false), Ok(()));
     let mut received = vec![0u8; data.len()];
     assert_eq!(socket.recv(&mut received), Ok(data.len()));
     assert_eq!(received, data);
