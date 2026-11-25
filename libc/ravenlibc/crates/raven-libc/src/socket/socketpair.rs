@@ -99,11 +99,11 @@ pub unsafe extern "C" fn sendmsg(fd: c_int, message: *const Msghdr, flags: c_int
         Err(error) => return crate::ffi::ret::ssize(Err(error)),
     };
     // SAFETY: the optional control buffer.
-    let control = unsafe {
-        crate::ffi::cast::bytes(
-            header.msg_control.cast_const(),
-            header.msg_controllen as usize,
-        )
+    let control = match unsafe {
+        crate::ffi::sockaddr::control(header.msg_control.cast_const(), header.msg_controllen)
+    } {
+        Ok(control) => control,
+        Err(error) => return crate::ffi::ret::ssize(Err(error)),
     };
     send_result(with_net(|net| net.sendmsg(fd, name, &iov, control, flags)))
 }

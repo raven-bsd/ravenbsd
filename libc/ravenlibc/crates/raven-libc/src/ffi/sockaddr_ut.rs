@@ -36,6 +36,30 @@ fn view_rejects_null_with_a_length() {
 }
 
 #[test]
+fn control_rejects_null_with_a_length() {
+    let error = unsafe { control(core::ptr::null(), 1) }.expect_err("must reject");
+    assert_eq!(i32::from(error.0), raven_libc_abi::errno::EFAULT);
+    // SAFETY: NULL with a zero length is the empty view.
+    assert_eq!(
+        unsafe { control(core::ptr::null(), 0) }.expect("empty"),
+        &[]
+    );
+}
+
+#[test]
+fn control_views_the_caller_buffer() {
+    let bytes = [1u8, 2, 3];
+    // SAFETY: three readable bytes at the base.
+    let view = unsafe { control(bytes.as_ptr().cast(), 3) }.expect("view");
+    assert_eq!(view, &[1, 2, 3]);
+    let mut out = [0u8; 3];
+    // SAFETY: three writable bytes at the base.
+    let writable = unsafe { control_mut(out.as_mut_ptr().cast(), 3) }.expect("view");
+    writable.copy_from_slice(&bytes);
+    assert_eq!(out, bytes);
+}
+
+#[test]
 fn length_reports_the_required_size() {
     // FreeBSD `user_getsockname`: only `min(ss_len, user_len)` bytes are copied out, but
     // `*alen` is the full `ss_len` the caller needs.

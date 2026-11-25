@@ -63,6 +63,35 @@ pub(crate) unsafe fn view_mut<'a>(
     Ok(unsafe { core::slice::from_raw_parts_mut(pointer.cast::<u8>(), len) })
 }
 
+/// The caller's optional control buffer; NULL with a non-zero length is `EFAULT`.
+///
+/// # Safety
+/// A non-NULL `pointer` points to `len` readable bytes.
+pub(crate) unsafe fn control<'a>(pointer: *const c_void, len: SockLen) -> Result<&'a [u8], Errno> {
+    let len = len as usize;
+    if pointer.is_null() {
+        return if len == 0 { Ok(&[]) } else { Err(fault()) };
+    }
+    // SAFETY: the caller grants `len` readable bytes.
+    Ok(unsafe { core::slice::from_raw_parts(pointer.cast::<u8>(), len) })
+}
+
+/// The caller's writable optional control buffer; NULL with a non-zero length is `EFAULT`.
+///
+/// # Safety
+/// A non-NULL `pointer` points to `len` writable bytes.
+pub(crate) unsafe fn control_mut<'a>(
+    pointer: *mut c_void,
+    len: SockLen,
+) -> Result<&'a mut [u8], Errno> {
+    let len = len as usize;
+    if pointer.is_null() {
+        return if len == 0 { Ok(&mut []) } else { Err(fault()) };
+    }
+    // SAFETY: the caller grants `len` writable bytes.
+    Ok(unsafe { core::slice::from_raw_parts_mut(pointer.cast::<u8>(), len) })
+}
+
 /// The address family byte of a byte view.
 ///
 /// FreeBSD `struct sockaddr` starts with `sa_len` and puts `sa_family` at offset 1, so a
