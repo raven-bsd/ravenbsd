@@ -108,6 +108,7 @@ static LOCK_TIMEOUT: AtomicU32 = AtomicU32::new(0);
 static LOCK_READY: AtomicU32 = AtomicU32::new(0);
 static LOCK_DONE: AtomicU32 = AtomicU32::new(0);
 static LOCK_STOP: AtomicBool = AtomicBool::new(false);
+static LOCK_EXITED: AtomicBool = AtomicBool::new(false);
 
 #[repr(align(16))]
 struct HelperStack(#[allow(dead_code)] [u8; HELPER_STACK_SIZE]);
@@ -1028,6 +1029,7 @@ extern "C" fn lock_waiter(_: usize) -> ! {
         }
         LOCK_DONE.store(seq, Ordering::Release);
     }
+    LOCK_EXITED.store(true, Ordering::Release);
     thread_exit(0)
 }
 
@@ -1043,12 +1045,13 @@ fn wait_lock_flag(flag: &AtomicU32, value: u32) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
-    let base = spawn_role(initfs, "lockbase").map_err(|_| "lockbase spawn")?;
-    if proc_wait(base).unwrap_or(-1) != 90 {
-        return Err("lockbase wait");
-    }
-    handle_close(base);
+fn lock_churn_body(announce: bool) -> Result<(), &'static str> {
+    LOCK_STOP.store(false, Ordering::Release);
+    LOCK_EXITED.store(false, Ordering::Release);
+    LOCK_READY.store(0, Ordering::Release);
+    LOCK_DONE.store(0, Ordering::Release);
+    LOCK_FUTEX.store(0, Ordering::Release);
+    LOCK_TIMEOUT.store(0, Ordering::Release);
 
     let entry: extern "C" fn(usize) -> ! = lock_waiter;
     let stack_top = helper_stack_top(core::ptr::addr_of_mut!(LOCK_STACK));
@@ -1067,6 +1070,15 @@ fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     LOCK_FUTEX.fetch_add(1, Ordering::AcqRel);
     futex_wake(&LOCK_FUTEX, 1);
     nanosleep(LOCK_DELAY_NS);
+    // Reap the worker before the caller reuses LOCK_STACK or samples the row.
+    let mut spins = 0usize;
+    while !LOCK_EXITED.load(Ordering::Acquire) {
+        yield_now();
+        spins = spins.saturating_add(1);
+        if spins > 10_000_000 {
+            return Err("lock worker exit");
+        }
+    }
     handle_close(worker);
 
     let mut timeouts = 0usize;
@@ -1078,10 +1090,28 @@ fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         }
         timeouts = timeouts.saturating_add(1);
     }
-    println!(
-        "s36: lock churn wake={} timeout={}",
-        LOCK_WAKES, LOCK_TIMEOUTS
-    );
+    if announce {
+        println!(
+            "s36: lock churn wake={} timeout={}",
+            LOCK_WAKES, LOCK_TIMEOUTS
+        );
+    }
+    Ok(())
+}
+
+fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    // Warm the futex/timer paths and give the late boot services their resident frames before
+    // the baseline sample, so the row measures the churn and not one-time service startup.
+    // The pager lifetime rows use the same steady-state-before-baseline rule.
+    lock_churn_body(false)?;
+    nanosleep(3_000_000_000);
+    let base = spawn_role(initfs, "lockbase").map_err(|_| "lockbase spawn")?;
+    if proc_wait(base).unwrap_or(-1) != 90 {
+        return Err("lockbase wait");
+    }
+    handle_close(base);
+
+    lock_churn_body(true)?;
 
     let top = spawn_role(initfs, "locktop").map_err(|_| "locktop spawn")?;
     if proc_wait(top).unwrap_or(-1) != 91 {
