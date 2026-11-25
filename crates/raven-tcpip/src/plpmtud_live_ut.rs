@@ -150,7 +150,10 @@ fn an_exhausted_search_budget_stops_the_live_timer() {
     let end = c.plp_probe.expect("probe recorded").0;
     plpmtud_on_ack(&mut c, end, 1);
     assert!(c.plp_probe.is_none());
-    assert_eq!(c.mss, u16::try_from(size).expect("probe fits the MSS field"));
+    assert_eq!(
+        c.mss,
+        u16::try_from(size).expect("probe fits the MSS field")
+    );
 
     assert_eq!(probe_due(&mut c, 1, 600_000, 4_000), None);
     assert_eq!(
@@ -162,10 +165,7 @@ fn an_exhausted_search_budget_stops_the_live_timer() {
 
 #[test]
 fn netbsd_mss_to_advertise_uses_the_max_mtu_and_default_floor() {
-    assert_eq!(
-        mss_to_advertise(1500, 9000, IpFamily::V4, false, 536),
-        8960
-    );
+    assert_eq!(mss_to_advertise(1500, 9000, IpFamily::V4, false, 536), 8960);
     assert_eq!(mss_to_advertise(1500, 9000, IpFamily::V4, true, 536), 1460);
     assert_eq!(mss_to_advertise(1500, 9000, IpFamily::V6, true, 536), 1440);
     assert_eq!(mss_to_advertise(100, 200, IpFamily::V4, false, 536), 536);
@@ -225,19 +225,19 @@ fn netbsd_icmp_pmtu_classic_pending_and_replacement() {
         PmtuResult::Pending(first)
     );
     assert_eq!(
-        on_icmp_pmtu(&mut path, 110, 100, 200, 1100, 40, 1500, 5),
+        on_icmp_pmtu(&mut path, 130, 100, 200, 1100, 40, 1500, 5),
         PmtuResult::Ignored
     );
     assert_eq!(path.pending, Some(first));
 
     let second = PmtuPending {
-        th_seq: 130,
+        th_seq: 110,
         nextmtu: 1100,
         ip_len: 1500,
         ip_hl: 5,
     };
     assert_eq!(
-        on_icmp_pmtu(&mut path, 130, 100, 200, 1100, 40, 1500, 5),
+        on_icmp_pmtu(&mut path, 110, 100, 200, 1100, 40, 1500, 5),
         PmtuResult::Pending(second)
     );
     assert_eq!(

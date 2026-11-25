@@ -116,24 +116,28 @@ impl EcnState {
                         self.permit = false;
                         self.scep = 5;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_nect = counters.ace_nect.wrapping_add(1);
                     }
                     TH_AE => {
                         self.ace_permit = true;
                         self.permit = false;
                         self.scep = 5;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_ect0 = counters.ace_ect0.wrapping_add(1);
                     }
                     value if value == (TH_CWR | TH_ECE) => {
                         self.ace_permit = true;
                         self.permit = false;
                         self.scep = 5;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_ect1 = counters.ace_ect1.wrapping_add(1);
                     }
                     value if value == (TH_AE | TH_CWR) => {
                         self.ace_permit = true;
                         self.permit = false;
                         self.scep = 6;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_nect = counters.ace_nect.wrapping_add(1);
                     }
                     _ => {
                         self.permit = false;

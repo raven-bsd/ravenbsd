@@ -153,8 +153,13 @@ pub(crate) fn mss_to_advertise(
     mss_ifmtu: bool,
     mss_default: u32,
 ) -> u32 {
-    let _ = (if_mtu, in_maxmtu, family, mss_ifmtu);
-    mss_default
+    let mut mss = if_mtu;
+    if !mss_ifmtu {
+        mss = mss.max(in_maxmtu);
+    }
+    let headers = mss_headers(family);
+    mss = mss.saturating_sub(headers);
+    mss.max(mss_default)
 }
 
 /// NetBSD `tcp_mss_from_peer`: apply the peer offer, the 256-byte floor, options and send buffer.
@@ -168,10 +173,21 @@ pub(crate) fn mss_from_peer(
     ip_optlen: u32,
     send_buffer: u32,
 ) -> PeerMss {
-    let _ = (mss_default, optlen, ip_optlen);
+    let peer_mss = if offer == 0 { mss_default } else { offer }.max(TCP_MINMSS_NETBSD);
+    let segsz = peer_mss.saturating_sub(optlen).saturating_sub(ip_optlen);
+    let segsz = if send_buffer < segsz {
+        send_buffer
+    } else {
+        segsz
+    };
+    let send_buffer = if segsz == 0 {
+        send_buffer
+    } else {
+        send_buffer.div_ceil(segsz).saturating_mul(segsz)
+    };
     PeerMss {
-        peer_mss: offer,
-        segsz: offer,
+        peer_mss,
+        segsz,
         send_buffer,
     }
 }
@@ -206,7 +222,12 @@ impl PmtuPath {
     // K259 donor helper: the live call site (`tcp_input.rs`) is owned by another lane.
     #[allow(dead_code)]
     pub(crate) fn on_ack(&mut self, ack: u32, acked: u32) {
-        let _ = (ack, acked);
+        if self.pending.is_some_and(|pending| ack > pending.th_seq) {
+            self.pending = None;
+        }
+        if self.mss_acked < acked {
+            self.mss_acked = acked;
+        }
     }
 }
 
@@ -236,17 +257,26 @@ pub(crate) fn on_icmp_pmtu(
     ip_len: u16,
     ip_hl: u8,
 ) -> PmtuResult {
-    let _ = (
-        path,
-        seq,
-        snd_una,
-        snd_max,
-        reported_mtu,
-        headers,
+    if seq < snd_una || seq >= snd_max || reported_mtu >= path.mtu_sent {
+        return PmtuResult::Ignored;
+    }
+    if reported_mtu >= headers.saturating_add(path.mss_acked) {
+        path.pending = None;
+        return PmtuResult::Classic(reported_mtu);
+    }
+    if let Some(pending) = path.pending
+        && pending.th_seq < seq
+    {
+        return PmtuResult::Ignored;
+    }
+    let pending = PmtuPending {
+        th_seq: seq,
+        nextmtu: reported_mtu,
         ip_len,
         ip_hl,
-    );
-    PmtuResult::Ignored
+    };
+    path.pending = Some(pending);
+    PmtuResult::Pending(pending)
 }
 
 /// FreeBSD `tcp_mssopt`: the MSS option for an outgoing SYN.
