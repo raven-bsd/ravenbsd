@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+# S711 kernel-provider acceptance. The Rust fixture drives the raw SIGACTION, PROC_SIGNAL,
+# THREAD_SIGQUEUE, SIGPENDING and SIGWAIT operations and a blocking read interrupted by a caught
+# signal; the S710 boundary rows run first in the same binary.
 name = "signal-acceptance"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 180
 pre = ["sh tests/signals/build.sh"]
-initfs = "build/signals/x86_64/initfs.img"
+initfs = "build/signals/x86_64/boundary-initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -16,25 +19,43 @@ qemu_extra = [
 expect_exit = "success"
 
 [[expect]]
-regex = '^signal: handler ok sig=10$'
+regex = '^signal: boundary guard ok flags=0x8000004 mask=1$'
 
 [[expect]]
-regex = '^signal: ucontext ok rip=0x[0-9a-f]+ rsp=0x[0-9a-f]+$'
+regex = '^signal: boundary canary ok flags=0x4 mask=1$'
 
 [[expect]]
-regex = '^signal: return ok$'
+regex = '^signal: boundary procmask ok mask=1$'
 
 [[expect]]
-regex = '^signal: nested ok sig=12$'
+regex = '^signal: boundary ok$'
 
 [[expect]]
-regex = '^signal: exec-default ok signal=10$'
+regex = '^signal: provider install ok$'
 
 [[expect]]
-regex = '^signal: ok$'
+regex = '^signal: provider generate ok$'
+
+[[expect]]
+regex = '^signal: provider blocked ok$'
+
+[[expect]]
+regex = '^signal: provider ignored ok$'
+
+[[expect]]
+regex = '^signal: provider thread ok$'
+
+[[expect]]
+regex = '^signal: provider wait ok$'
+
+[[expect]]
+regex = '^signal: provider interrupt ok$'
+
+[[expect]]
+regex = '^signal: provider ok$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|signal: fail|signal: exec-child survived'
+regex = '(?i)panic|signal: boundary-fail|signal: provider-fail|EXCEPTION:|shootdown timeout'

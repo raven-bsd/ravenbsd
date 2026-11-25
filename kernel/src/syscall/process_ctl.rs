@@ -16,14 +16,17 @@ use raven_usercopy::UserSlice;
 
 use crate::ipc::model::{self, NAME_MAX, PATH_MAX};
 use crate::ipc::{registry, router};
+use crate::process::status;
 use crate::process::status::{
     DefaultAction, P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit,
-    SIGKILL, WAIT_OPTIONS, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, default_action, signal_valid,
+    SIGKILL, SignalDisposition, WAIT_OPTIONS, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent,
+    signal_disposition, signal_valid,
 };
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::syscall::SyscallFrame;
 use crate::syscall::linux::install_handler;
+use crate::time;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// `proc_create(flags) -> Handle`.
@@ -1277,24 +1280,37 @@ fn signal_one_info(
     if signo == SIGKILL {
         return terminate_by_signal(caller, target, SIGKILL, false);
     }
-    let kernel_handler = target.sigacts.lock().get(signo).is_caught();
-    if !target.has_signal_entry()
-        && !kernel_handler
-        && let Some(action) = default_action(signo)
-    {
-        match action {
-            DefaultAction::Terminate => {
-                return terminate_by_signal(caller, target, signo, false);
-            }
-            DefaultAction::Core => {
-                return terminate_by_signal(caller, target, signo, true);
-            }
-            DefaultAction::Ignore => return Ok(()),
-            // Stop/continue keep the existing job-control bookkeeping in `deliver_signal_info`.
-            DefaultAction::Stop | DefaultAction::Continue => {}
+    // The legacy libc entry keeps its own pending set and applies default actions after its
+    // `PROC_SIGRECV_EX`; a kernel default must not pre-empt it. Ignore and caught decisions are
+    // still made here so a `SIG_IGN` install from the kernel table discards immediately.
+    let legacy = target.has_signal_entry();
+    let (caught, ignored) = {
+        let sigacts = target.sigacts.lock();
+        let action = sigacts.get(signo);
+        (action.is_caught(), action.handler == process::SIG_IGN)
+    };
+    // A process-directed signal is held only when no live thread can accept it now
+    // (FreeBSD `sigtd`/`tdsendsignal`: SIG_HOLD while every thread masks it).
+    let blocked = !target.accepts_signal(signo);
+    match signal_disposition(signo, caught, ignored, blocked) {
+        SignalDisposition::Discard => Ok(()),
+        SignalDisposition::Deliver | SignalDisposition::Defer => {
+            process::deliver_signal_info(target, signo, caller.id, code, uid, value)
         }
+        SignalDisposition::Default(_) if legacy => {
+            // The legacy entry decides the default from its own table.
+            process::deliver_signal_info(target, signo, caller.id, code, uid, value)
+        }
+        SignalDisposition::Default(action) => match action {
+            DefaultAction::Terminate => terminate_by_signal(caller, target, signo, false),
+            DefaultAction::Core => terminate_by_signal(caller, target, signo, true),
+            DefaultAction::Ignore => Ok(()),
+            // Stop/continue keep the existing job-control bookkeeping in `deliver_signal_info`.
+            DefaultAction::Stop | DefaultAction::Continue => {
+                process::deliver_signal_info(target, signo, caller.id, code, uid, value)
+            }
+        },
     }
-    process::deliver_signal_info(target, signo, caller.id, code, uid, value)
 }
 
 /// Apply the default terminate action for a process without a registered libc entry.
@@ -1395,6 +1411,198 @@ pub fn sigqueue(frame: &SyscallFrame) -> Result<usize, Errno> {
         signal_one_info(&caller, &target, signo, process::SI_QUEUE_CODE, uid, value)?;
     }
     Ok(0)
+}
+
+/// `thread_sigqueue(thread, signo, value) -> 0` (raw 0x8A).
+///
+/// FreeBSD `tdsendsignal` with an explicit thread targets `td_sigqueue`; the record is queued
+/// exactly like a process-directed `sigqueue` record but consumed by that thread first.
+/// `signo == 0` is the POSIX `kill(pid, 0)`-style permission/existence check.
+pub fn thread_sigqueue(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let signo = (frame.rsi as u32) as i32;
+    if signo < 0 || signo > status::SIG_MAX as i32 {
+        return Err(Errno::EINVAL);
+    }
+    let signo = signo as u32;
+    let target = if handle == Handle::NONE {
+        sched::current_thread().ok_or(Errno::ESRCH)?
+    } else {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::SIGNAL) {
+            Ok(Object::Thread(thread)) => Arc::clone(thread),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if target.state() == crate::sched::thread::ThreadState::Dead {
+        return Err(Errno::ESRCH);
+    }
+    if !signal_allowed(&caller, &target.process) {
+        return Err(Errno::EPERM);
+    }
+    if signo == 0 {
+        return Ok(0);
+    }
+    let uid = caller.ids.lock().uid;
+    signal_one_thread(
+        &caller,
+        &target,
+        signo,
+        process::SI_QUEUE_CODE,
+        uid,
+        frame.rdx,
+    )?;
+    Ok(0)
+}
+
+/// Deliver one thread-directed record, applying the same disposition order as `PROC_SIGNAL`.
+fn signal_one_thread(
+    caller: &Arc<Process>,
+    thread: &Arc<crate::sched::thread::Thread>,
+    signo: u32,
+    code: u32,
+    uid: u32,
+    value: u64,
+) -> Result<(), Errno> {
+    let target = &thread.process;
+    if signo == SIGKILL {
+        return terminate_by_signal(caller, target, SIGKILL, false);
+    }
+    let (caught, ignored) = {
+        let sigacts = target.sigacts.lock();
+        let action = sigacts.get(signo);
+        (action.is_caught(), action.handler == process::SIG_IGN)
+    };
+    let blocked = thread.sig_blocked.load(Ordering::Acquire) & process::signal_bit(signo) != 0;
+    match signal_disposition(signo, caught, ignored, blocked) {
+        SignalDisposition::Discard => Ok(()),
+        SignalDisposition::Deliver | SignalDisposition::Defer => {
+            Process::deliver_thread_signal(thread, signo, caller.id, code, uid, value);
+            Ok(())
+        }
+        SignalDisposition::Default(action) => match action {
+            DefaultAction::Terminate => terminate_by_signal(caller, target, signo, false),
+            DefaultAction::Core => terminate_by_signal(caller, target, signo, true),
+            DefaultAction::Ignore => Ok(()),
+            DefaultAction::Stop | DefaultAction::Continue => {
+                process::deliver_signal_info(target, signo, caller.id, code, uid, value)
+            }
+        },
+    }
+}
+
+/// `sigpending(out) -> count` (raw 0x8B).
+///
+/// The word is the kernel's authoritative pending set for the calling thread, not libc's mirror:
+/// the thread-directed queue ORed with the process queue.
+pub fn sigpending(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    let destination = UserSlice::new(frame.rdi, 8)?;
+    let (mask, count) = caller.pending_snapshot(Some(&thread));
+    copy_to_user(destination, &mask.to_le_bytes())?;
+    Ok(count)
+}
+
+/// Write the six-word `PROC_SIGRECV_EX` record to `destination`.
+fn write_signal_record(
+    destination: UserSlice,
+    signal: &process::PendingSignal,
+) -> Result<(), Errno> {
+    let values = [
+        u64::from(signal.signo),
+        signal.sender,
+        u64::from(signal.code),
+        u64::from(signal.uid),
+        signal.value,
+        0,
+    ];
+    let mut bytes = [0u8; 48];
+    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(destination, &bytes)
+}
+
+/// `sigwait(set, out, timeout_ns, flags) -> signo` (raw 0x8C).
+///
+/// Atomically installs `blocked & !set` as the temporary mask, then consumes the oldest pending
+/// record in `set` without running its handler. The mask is restored on every return. A signal
+/// that arrives after the mask is installed is either already queued (the predicate check) or
+/// wakes the published waiter, so no wakeup is lost. This is the native provider operation the
+/// `sigwait`/`sigtimedwait` family needs; libc keeps its user-side mirror for the legacy path.
+pub fn sigwait(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    let flags = u32::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
+    if flags & !raven_abi::syscall::SIGWAIT_POLL != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if frame.rdi == 0 || frame.rsi == 0 {
+        return Err(Errno::EINVAL);
+    }
+    let mut set = 0u64;
+    let bytes = unsafe {
+        // SAFETY: `set` is a live u64; the mutable byte view covers exactly 8 bytes and the copy
+        // fills it before it is read.
+        core::slice::from_raw_parts_mut(&mut set as *mut u64 as *mut u8, 8)
+    };
+    copy_from_user(bytes, UserSlice::new(frame.rdi, 8)?)?;
+    let destination = UserSlice::new(frame.rsi, 48)?;
+    let unblockable = process::signal_bit(status::SIGKILL) | process::signal_bit(status::SIGSTOP);
+    let old = thread.sig_blocked.load(Ordering::Acquire);
+    let temporary = old & !set & !unblockable;
+    let deadline = (frame.rdx != 0).then(|| time::now_ns().saturating_add(frame.rdx));
+    loop {
+        thread.sig_blocked.store(temporary, Ordering::Release);
+        if let Some(signal) = caller.pop_signal_for(Some(&thread), set) {
+            thread.sig_blocked.store(old, Ordering::Release);
+            write_signal_record(destination, &signal)?;
+            return Ok(signal.signo as usize);
+        }
+        if flags & raven_abi::syscall::SIGWAIT_POLL != 0 {
+            thread.sig_blocked.store(old, Ordering::Release);
+            return Err(Errno::EAGAIN);
+        }
+        let token = match sched::begin_block_interruptible() {
+            Ok(token) => token,
+            Err(error) => {
+                thread.sig_blocked.store(old, Ordering::Release);
+                return Err(error);
+            }
+        };
+        if let Some(deadline) = deadline {
+            sched::add_sleep(token, deadline, Errno::ETIMEDOUT.to_ret());
+        }
+        let queued = caller.signal_waiters.enqueue_if(caller.id, 0, || {
+            Ok(!caller.has_signal_for(Some(&thread), set))
+        });
+        match queued {
+            Ok(true) => {}
+            Ok(false) => {
+                sched::end_block(token);
+                continue;
+            }
+            Err(error) => {
+                sched::end_block(token);
+                thread.sig_blocked.store(old, Ordering::Release);
+                return Err(error);
+            }
+        }
+        let status = sched::block_current();
+        let kicked = sched::take_kick();
+        sched::end_block(token);
+        if status == Errno::ETIMEDOUT.to_ret() {
+            thread.sig_blocked.store(old, Ordering::Release);
+            return Err(Errno::EAGAIN);
+        }
+        // A matching signal, an unrelated kick or a spurious check: re-test the queue under the
+        // temporary mask before blocking again.
+        let _ = kicked;
+    }
 }
 
 /// `proc_sigrecv(out, flags) -> signo`.

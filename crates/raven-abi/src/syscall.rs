@@ -293,6 +293,34 @@ pub const SIGPROCMASK: usize = 0x88;
 /// semantics). Raw constant.
 pub const SIGALTSTACK: usize = 0x89;
 
+/// `thread_sigqueue(thread: Handle, signo: i32, value: u64) -> 0` (raw 0x8A).
+///
+/// Queues one `SI_QUEUE` record on the target thread's own queue (FreeBSD `td_sigqueue`).
+/// `Handle::NONE` targets the calling thread; another thread needs `Rights::SIGNAL` and the
+/// caller must pass the same permission test as `PROC_SIGNAL`. `signo == 0` is a pure
+/// existence/permission check and queues nothing. Raw constant, not a `Syscall` variant.
+pub const THREAD_SIGQUEUE: usize = 0x8A;
+
+/// `sigpending(out: *mut u64) -> count` (raw 0x8B).
+///
+/// Writes the authoritative kernel pending mask for the calling thread (its thread-directed
+/// queue ORed with the process queue, signal 1 is bit 0) and returns the number of queued
+/// records. The output word uses the same bit layout as `sigprocmask`. Raw constant.
+pub const SIGPENDING: usize = 0x8B;
+
+/// `sigwait(set: *const u64, out: *mut [u64; 6], timeout_ns: u64, flags: u32) -> signo`
+/// (raw 0x8C).
+///
+/// Atomically makes every signal in `set` deliverable for the calling thread, then consumes the
+/// oldest matching pending record without running its handler. The temporary mask is restored
+/// on return. `out` receives the same six words as `PROC_SIGRECV_EX`. `flags` bit 0
+/// (`SIGWAIT_POLL`) returns `-EAGAIN` instead of blocking; `timeout_ns != 0` bounds the wait
+/// (`-EAGAIN` on expiry). Raw constant.
+pub const SIGWAIT: usize = 0x8C;
+
+/// `SIGWAIT` flag: poll once and return `-EAGAIN` when no matching signal is pending.
+pub const SIGWAIT_POLL: u32 = 1;
+
 /// `thread_self() -> tid`.
 ///
 /// Returns the calling thread's stable 30-bit, nonzero tid. A raw constant,
