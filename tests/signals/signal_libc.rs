@@ -1198,6 +1198,47 @@ fn s720_sigsuspend_row() -> bool {
     provider_row(b"s720-sigsuspend", s720_child_ok(child))
 }
 
+/// A blocked temporary mask must wake from the kernel wait when another process sends.
+fn s720_sigsuspend_wait_row() -> bool {
+    S720_HANDLER_COUNT.store(0, Ordering::SeqCst);
+    let mut set = Sigset::ZERO;
+    // SAFETY: the sigset object is live for the calls.
+    let prepared = unsafe {
+        sigemptyset(&mut set) == 0
+            && sigaddset(&mut set, SIGUSR1) == 0
+            && sigaction(SIGUSR1, &signal_action(), ptr::null_mut()) == 0
+            && sigprocmask(SIG_BLOCK, &set, ptr::null_mut()) == 0
+    };
+    if !prepared {
+        return provider_row(b"s720-sigsuspend-wait", false);
+    }
+    // SAFETY: fork duplicates the process; the child only sleeps once and signals the parent.
+    let child = unsafe { fork() };
+    if child == 0 {
+        sleep_ms(20);
+        // SAFETY: the parent pid is live and the call takes two scalars.
+        let _ = unsafe { raw_signal(getppid(), SIGUSR1) };
+        // SAFETY: _exit never returns.
+        unsafe { _exit(0) };
+    }
+    // SAFETY: the empty sigset is live for the call.
+    let result = unsafe { sigsuspend(&Sigset::ZERO) };
+    // SAFETY: the errno cell belongs to this thread.
+    let error = unsafe { *__errno_location() };
+    // Restore the pre-row empty mask; this row runs in the fixture process, not a child.
+    // SAFETY: `set` is live and only names SIGUSR1.
+    unsafe {
+        let _ = sigprocmask(SIG_UNBLOCK, &set, ptr::null_mut());
+    }
+    let child_ok = wait_bounded(child, 3000)
+        .is_some_and(|status| wait_status_exited(status) && wait_status_code(status) == 0);
+    let ok = result == -1
+        && error == EINTR
+        && S720_HANDLER_COUNT.load(Ordering::SeqCst) == 1
+        && child_ok;
+    provider_row(b"s720-sigsuspend-wait", ok)
+}
+
 /// `sigwait` must consume the kernel record without running the handler.
 fn s720_sigwait_row() -> bool {
     // SAFETY: as above.
@@ -1459,6 +1500,7 @@ fn run_provider() -> bool {
         && s720_signal_ignored_row()
         && s720_pending_row()
         && s720_sigsuspend_row()
+        && s720_sigsuspend_wait_row()
         && s720_sigwait_row()
         && s720_pthread_kill_row()
         && provider_install_row()
