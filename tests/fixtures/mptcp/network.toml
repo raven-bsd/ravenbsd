@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# MPTCP2c two-tap static address: the primary bridge is 10.77.1.2/24
+# (scripts/mptcp-two-tap.sh). The backup path is 10.77.2.15/24 and needs a second guest
+# interface; netd currently attaches one `nic:` and devd cannot hand the second virtio-net
+# function a free IRQ, so it is not configured here.
+
+[network]
+hostname = "raven-mptcp"
+mode = "static"
+
+[network.static]
+address = "10.77.1.15"
+prefix = 24
+gateway = "10.77.1.2"
+dns = ["10.77.1.2"]
