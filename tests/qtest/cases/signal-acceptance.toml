@@ -21,8 +21,10 @@ regex = '^signal: handler ok sig=10$'
 [[expect]]
 regex = '^signal: ucontext ok rip=0x[0-9a-f]+ rsp=0x[0-9a-f]+$'
 
+# Serial is shared with concurrently starting services; a later service's line can be appended
+# before this newline reaches the UART. The marker itself is still anchored at line start.
 [[expect]]
-regex = '^signal: return ok$'
+regex = '^signal: return ok'
 
 [[expect]]
 regex = '^signal: nested ok sig=12$'
