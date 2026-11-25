@@ -8,8 +8,8 @@ name = "signal-poll"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 120
-pre = ["sh tests/fixtures/signal/poll/build.sh"]
-initfs = "build/signal-poll/initfs.img"
+pre = ["sh tests/fixtures/signal/build.sh"]
+initfs = "build/fixtures/signal/poll-initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",

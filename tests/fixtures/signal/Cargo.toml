@@ -21,6 +21,10 @@ path = "src/main.rs"
 name = "raven-s44-exec-probe"
 path = "src/exec_probe.rs"
 
+[[bin]]
+name = "raven-s44-poll"
+path = "src/poll.rs"
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
