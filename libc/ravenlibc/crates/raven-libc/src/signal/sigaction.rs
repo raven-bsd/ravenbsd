@@ -5,7 +5,10 @@ use core::ffi::c_int;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::Sigaction;
+use raven_libc_signal::dispositions::Disposition;
 use raven_libc_signal::sigaction_abi::{KernelSigAction, from_c, to_c};
+
+use super::DISP;
 
 /// Install or query a disposition.
 ///
@@ -45,6 +48,17 @@ pub unsafe extern "C" fn sigaction(
     if raw < 0 {
         crate::ffi::errno::set(Errno(raw.unsigned_abs() as u16));
         return -1;
+    }
+    if let Some(action) = request.as_ref() {
+        // The kernel table is the delivery authority. This mirror only serves the legacy
+        // disposition getters and the host fake's direct path; it is updated after the kernel
+        // accepted the same action, never instead of it.
+        let disposition = Disposition {
+            handler: action.handler,
+            mask: action.mask.first().copied().unwrap_or(0),
+            flags: action.flags,
+        };
+        raven_libc_signal::action::sigaction(&DISP, sig, Some(&disposition), None).ok();
     }
     if !old.is_null() {
         // SAFETY: the caller supplies a writable sigaction.

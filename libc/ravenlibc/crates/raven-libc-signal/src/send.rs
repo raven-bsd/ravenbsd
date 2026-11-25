@@ -55,9 +55,24 @@ fn validate_signal(sig: i32) -> Result<(), Errno> {
     Ok(())
 }
 
-/// `raise`: deliver to the calling thread, directly when it is unmasked.
+/// `raise`: send to the calling thread through the kernel's thread-directed queue.
+///
+/// FreeBSD `__raise` resolves the calling thread and calls `__sys_thr_kill(id, s)`; Raven's
+/// approved equivalent is `THREAD_SIGQUEUE` with `Handle::NONE`. The kernel applies the
+/// disposition, mask and default action and builds the frame, so libc never runs a handler from
+/// its own table. `raise(0)` is the donor's existence check and sends nothing.
 pub fn raise<K: SigKernel>(kernel: &K, table: &DispTable, sig: i32) -> Result<(), Errno> {
-    validate_signal(sig)?;
+    if sig != 0 {
+        validate_signal(sig)?;
+    }
+    if kernel.caps().authoritative {
+        return kernel.thread_sigqueue(crate::kernel::HANDLE_NONE, sig, 0);
+    }
+    // Host-fake fallback: the simulated kernel has no provider, so keep the legacy direct path
+    // for the delivery-model unit tests. Production never takes this branch.
+    if sig == 0 {
+        return Ok(());
+    }
     let tp = kernel.thread_pointer();
     let bit = crate::critical::signal_bit(sig);
     raw::pending_or(tp, bit);

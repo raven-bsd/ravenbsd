@@ -15,6 +15,9 @@ use raven_libc_abi::structs::{SiginfoT, Sigval};
 use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
 use crate::raw;
 
+/// `Handle::NONE`: a signal or kick targets the calling thread.
+pub const HANDLE_NONE: u32 = u32::MAX;
+
 /// The synchronous fault kinds of PG-7.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u32)]
@@ -80,6 +83,10 @@ pub struct SigCaps {
     pub stop: bool,
     /// PG-12 FP/SIMD state in the frame.
     pub fp_in_frame: bool,
+    /// The C19 kernel signal provider (`THREAD_SIGQUEUE`/`SIGPENDING`/`SIGWAIT`/`SIGPROCMASK`):
+    /// dispositions, masks and pending state are kernel-owned and libc never dispatches a handler
+    /// from its own table.
+    pub authoritative: bool,
 }
 
 impl SigCaps {
@@ -97,6 +104,7 @@ impl SigCaps {
         proc_kill: cfg!(target_os = "none"),
         stop: false,
         fp_in_frame: false,
+        authoritative: cfg!(target_os = "none"),
     };
 
     /// Every capability available (host fake only).
@@ -109,6 +117,7 @@ impl SigCaps {
         proc_kill: true,
         stop: true,
         fp_in_frame: false,
+        authoritative: false,
     };
 }
 
@@ -140,6 +149,27 @@ pub trait SigKernel: Sync {
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno>;
     /// PG-44 procd `kill`/`killpg`/`sigqueue`.
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno>;
+    /// C19 `THREAD_SIGQUEUE`: queue `sig` on one thread (`u32::MAX` = the calling thread).
+    fn thread_sigqueue(&self, _handle: u32, _sig: i32, _value: u64) -> Result<(), Errno> {
+        Err(ENOSYS_ERR)
+    }
+    /// C19 `SIGPENDING`: the kernel's authoritative pending word for the calling thread.
+    fn pending(&self) -> Result<u64, Errno> {
+        Err(ENOSYS_ERR)
+    }
+    /// C19 `SIGWAIT`: consume one pending signal with an atomic temporary mask.
+    fn wait_signal(
+        &self,
+        _set: u64,
+        _timeout_ns: u64,
+        _poll: bool,
+    ) -> Result<(i32, [u64; 6]), Errno> {
+        Err(ENOSYS_ERR)
+    }
+    /// C19 `SIGPROCMASK`: read or replace the calling thread's kernel mask.
+    fn sigprocmask(&self, _how: i32, _set: Option<u64>) -> Result<u64, Errno> {
+        Err(ENOSYS_ERR)
+    }
     /// Take one process-directed pending signal whose bit is in `deliverable`.
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)>;
     /// Wait for a kick; `None` waits forever (PG-8).
@@ -243,6 +273,68 @@ impl SigKernel for SysKernel {
         #[cfg(not(target_os = "none"))]
         {
             Self::notify(pid, sig, info)
+        }
+    }
+
+    fn thread_sigqueue(&self, handle: u32, sig: i32, value: u64) -> Result<(), Errno> {
+        #[cfg(target_os = "none")]
+        {
+            raven_libc_sys::signal::thread_sigqueue(handle, sig, value)
+                .map_err(|error| Errno(error.0))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = (handle, sig, value);
+            Err(ENOSYS_ERR)
+        }
+    }
+
+    fn pending(&self) -> Result<u64, Errno> {
+        #[cfg(target_os = "none")]
+        {
+            let mut word = 0u64;
+            raven_libc_sys::signal::sigpending(&mut word)
+                .map(|_| word)
+                .map_err(|error| Errno(error.0))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            Err(ENOSYS_ERR)
+        }
+    }
+
+    fn wait_signal(&self, set: u64, timeout_ns: u64, poll: bool) -> Result<(i32, [u64; 6]), Errno> {
+        #[cfg(target_os = "none")]
+        {
+            let mut record = [0u64; 6];
+            let flags = if poll {
+                raven_libc_sys::signal::SIGWAIT_POLL
+            } else {
+                0
+            };
+            let signo = raven_libc_sys::signal::sigwait(set, &mut record, timeout_ns, flags)
+                .map_err(|error| Errno(error.0))?;
+            Ok((signo, record))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = (set, timeout_ns, poll);
+            Err(ENOSYS_ERR)
+        }
+    }
+
+    fn sigprocmask(&self, how: i32, set: Option<u64>) -> Result<u64, Errno> {
+        #[cfg(target_os = "none")]
+        {
+            let mut old = 0u64;
+            raven_libc_sys::signal::sigprocmask(how, set, Some(&mut old))
+                .map_err(|error| Errno(error.0))?;
+            Ok(old)
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = (how, set);
+            Err(ENOSYS_ERR)
         }
     }
 

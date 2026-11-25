@@ -72,6 +72,30 @@ pub fn pthread_sigmask<K: SigKernel>(
         return number(EINVAL_ERR);
     }
     let tp = kernel.thread_pointer();
+    if kernel.caps().authoritative {
+        // The kernel is the authority for the live mask. The TCB word is only the mirror the
+        // legacy direct entry path (host fake) reads; keep it in step with the kernel result.
+        let requested = set.map(|request| request.app_word() & APP_MASK);
+        let previous = match kernel.sigprocmask(how, requested) {
+            Ok(previous) => previous,
+            Err(error) => return number(error),
+        };
+        if let Some(out) = old
+            && let Some(slot) = out.0.first_mut()
+        {
+            *slot = previous & APP_MASK;
+        }
+        let requested = requested.unwrap_or(0);
+        let unblockable = crate::critical::signal_bit(signal::SIGKILL)
+            | crate::critical::signal_bit(signal::SIGSTOP);
+        let next = match how {
+            signal::SIG_BLOCK => previous | requested,
+            signal::SIG_UNBLOCK => previous & !requested,
+            _ => requested,
+        };
+        raw::mask_store(tp, next & APP_MASK & !unblockable);
+        return 0;
+    }
     let previous = raw::mask_load(tp);
     if let Some(out) = old
         && let Some(slot) = out.0.first_mut()
@@ -99,9 +123,13 @@ pub fn pthread_sigmask<K: SigKernel>(
     0
 }
 
-/// `sigpending`: the thread-directed pending bits (process-directed bits are procd's).
+/// `sigpending`: the kernel's authoritative pending word for the calling thread.
 pub fn sigpending<K: SigKernel>(kernel: &K, out: &mut SigSet) -> Result<(), Errno> {
-    let pending = raw::pending_load(kernel.thread_pointer());
+    let pending = if kernel.caps().authoritative {
+        kernel.pending()?
+    } else {
+        raw::pending_load(kernel.thread_pointer())
+    };
     *out = mask::set_from_word(pending);
     Ok(())
 }

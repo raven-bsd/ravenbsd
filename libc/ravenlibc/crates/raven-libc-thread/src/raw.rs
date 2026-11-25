@@ -167,6 +167,27 @@ pub fn run_exit_hook(code: i32) -> ! {
     }
 }
 
+/// Queue `signo` on the thread named by `handle` (`u32::MAX` = the calling thread).
+///
+/// This is the C19 `THREAD_SIGQUEUE` provider, not the generic kick word: the kernel applies the
+/// target thread's mask, disposition and lifetime check.
+///
+/// # Errors
+///
+/// The kernel's `EINVAL`/`EBADF`/`EPERM`/`ESRCH`; `ENOSYS` on the host fake.
+pub fn thread_sigqueue(handle: u32, signo: i32, value: u64) -> Result<(), Errno> {
+    #[cfg(target_os = "none")]
+    {
+        raven_libc_sys::signal::thread_sigqueue(handle, signo, value)
+            .map_err(|error| Errno(error.0))
+    }
+    #[cfg(not(target_os = "none"))]
+    {
+        let _ = (handle, signo, value);
+        Err(ENOSYS)
+    }
+}
+
 /// A safe wrapper around the static TLS descriptor entry, for tests.
 #[must_use]
 pub fn tlsdesc_static(descriptor: &mut [usize; 2]) -> usize {
