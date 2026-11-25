@@ -20,6 +20,33 @@ expect_exit = "success"
 regex = '^signal-action: start$'
 
 [[expect]]
+regex = '^signal-raw: both-old ok$'
+
+[[expect]]
+regex = '^signal-raw: canary-old ok$'
+
+[[expect]]
+regex = '^signal-raw: fail-flags-old ok$'
+
+[[expect]]
+regex = '^signal-raw: fail-kill-old ok$'
+
+[[expect]]
+regex = '^signal-raw: fail-unmapped-old ok$'
+
+[[expect]]
+regex = '^signal-raw: alias-old ok$'
+
+[[expect]]
+regex = '^signal-raw: alias-installed ok$'
+
+[[expect]]
+regex = '^signal-raw: mask-sanitized ok$'
+
+[[expect]]
+regex = '^signal-action: raw guard ok$'
+
+[[expect]]
 regex = '^signal-action: sigaction ok$'
 
 [[expect]]

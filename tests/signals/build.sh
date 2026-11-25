@@ -50,6 +50,20 @@ for file in crt1.o crti.o crtn.o libc.a; do
     }
 done
 
+# S710b item 6: the installed public `struct sigaction` must match the Rust fixture's local
+# assertions for this architecture (152 bytes; handler 0, mask 8, flags 136, restorer 144).
+layout_cc=${CC:-clang}
+if command -v "$layout_cc" >/dev/null 2>&1; then
+    "$layout_cc" --target="$c_target" --sysroot="$sysroot" -std=gnu11 -fsyntax-only \
+        -D__ravenbsd__=1 -D__unix__=1 -D__BSD_VISIBLE=1 $fp_flags \
+        "$root/tests/signals/layout_check.c" || {
+            echo "signals: installed public sigaction layout mismatch for $arch" >&2
+            exit 1
+        }
+else
+    echo "signals: $layout_cc not found; installed public layout check skipped" >&2
+fi
+
 # Public-libc boundary rows: Rust extern "C" calls linked against the freshly packed archive,
 # in the tests/libc/std-link pattern. Guard pages, canaries and the flags/mask readback stay in
 # the Rust source, so the C acceptance fixture is untouched.
