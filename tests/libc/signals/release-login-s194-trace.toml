@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S194 diagnostic: the release login shell with RUST_BACKTRACE=full from /etc/profile. The
+# release userland is unchanged; only the profile overlay differs from the shipped image.
+
+name = "release-login-s194-trace"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 300
+pre = ["sh tests/libc/signals/build-release-s194.sh x86_64"]
+initfs = "build/fixtures/s194-release/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s194-trace=1"
+qemu_extra = [
+    "-smp", "4",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?'
+
+[[expect]]
+regex = '^/root$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "cd && pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
