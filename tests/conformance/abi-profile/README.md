@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# FreeBSD application-profile compile fixture (S721)
+# FreeBSD application-profile compile probe (S721)
 
-`fixture.c` is the reusable compile-only check for the four baseline facts of the
-FreeBSD application profile (DR-69, donor `133344405f532bd54ff3629a77d4c4e062f01fdb`):
-`EAGAIN`, `SIGUSR1`, `sizeof(sa_family_t)` and the `sockaddr`/`sockaddr_in`
-offsets. It is a compile-time fixture: it certifies no runtime behaviour.
+`libc/ravenlibc/tools/hdrgen/tests/abi_profile.rs` is the reusable compile-only check
+for the four baseline facts of the FreeBSD application profile (DR-69, donor
+`133344405f532bd54ff3629a77d4c4e062f01fdb`): `EAGAIN`, `SIGUSR1`,
+`sizeof(sa_family_t)` and the `sockaddr`/`sockaddr_in` offsets. It is a Rust probe:
+it emits the C source into a temporary directory at run time and compiles it with
+clang. No `.c` or `.h` file is committed to this stage; the product structural policy
+forbids C/C++ additions outside `addons/`.
 
 ## Expected donor values
 
@@ -19,19 +22,25 @@ offsets. It is a compile-time fixture: it certifies no runtime behaviour.
 | `sizeof(struct sockaddr_in)` | `sys/sys/socket.h` | 16 |
 | `offsetof(struct sockaddr, sa_len)` | `sys/sys/socket.h` | 0 |
 
-The donor values are verified by `hdrgen verify --profile freebsd` and by compiling
-this file against a constructed donor include tree.
+The donor values are independently verified by `hdrgen verify --profile freebsd`.
+The probe compiles the same source twice per architecture: once against a
+donor-shaped include tree built in the temporary directory (positive control, must
+pass) and once against Raven's staged public header root.
 
-## Run against Raven
+## Run
 
 ```sh
-clang --target=<x86_64|aarch64>-unknown-ravenbsd -nostdinc \
-  -isystem "$(clang -print-resource-dir)/include" \
-  -isystem libc/ravenlibc/include \
-  -isystem libc/ravenlibc/abi/generated/include \
-  -isystem libc/ravenlibc/arch/<x86_64|aarch64>/include \
-  -fsyntax-only tests/conformance/abi-profile/fixture.c
+cargo nextest run -p raven-libc-hdrgen --offline -E 'binary(abi_profile)'
 ```
 
-Both architectures are expected to fail before the FreeBSD header cutover; the
-failures are the remaining red profile gaps, not a test defect.
+The staged public header roots used by the probe are:
+
+```text
+libc/ravenlibc/include
+libc/ravenlibc/abi/generated/include
+libc/ravenlibc/arch/<x86_64|aarch64>/include
+```
+
+Both architectures are expected to report the named baseline rows before the
+FreeBSD header cutover; the failures are the remaining red profile gaps, not a test
+defect.
