@@ -52,7 +52,7 @@ fn node(record: &AddrInfoRec) -> Option<*mut AddrInfo> {
     };
     let value = Box::new(AddrInfo {
         ai_flags: record.flags,
-        ai_family: record.family,
+        ai_family: netdb::public_family(record.family),
         ai_socktype: record.socktype,
         ai_protocol: record.protocol,
         ai_addrlen: u32::try_from(length).ok()?,
@@ -111,6 +111,12 @@ pub unsafe extern "C" fn getaddrinfo(
             Err(_) => return raven_libc_resolv::Eai::Service.code(),
         }
     };
+    // The public hints carry FreeBSD-valued families; the resolver's records are Linux-valued.
+    let family = match netdb::resolver_family(hints.family) {
+        Some(family) => family,
+        None => return raven_libc_resolv::Eai::Family.code(),
+    };
+    let hints = Hints { family, ..hints };
     let records = match netdb::getaddrinfo(crate::socket::net(), &FILES, host, service, &hints) {
         Ok(records) => records,
         Err(error) => return error.code(),
