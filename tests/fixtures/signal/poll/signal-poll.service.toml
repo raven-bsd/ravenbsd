@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S44 poll-interrupt fixture. The program exits 0 only when the blocked poll returns EINTR.
+
+name = "signal-poll"
+exec = "/bin/signal-poll"
+args = ["/bin/signal-poll"]
+needs = ["scheme:tty"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
