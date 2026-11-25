@@ -37,13 +37,12 @@ fn view_rejects_null_with_a_length() {
 
 #[test]
 fn control_rejects_null_with_a_length() {
+    // SAFETY: NULL with a non-zero length is the rejected condition.
     let error = unsafe { control(core::ptr::null(), 1) }.expect_err("must reject");
     assert_eq!(i32::from(error.0), raven_libc_abi::errno::EFAULT);
     // SAFETY: NULL with a zero length is the empty view.
-    assert_eq!(
-        unsafe { control(core::ptr::null(), 0) }.expect("empty"),
-        &[]
-    );
+    let empty = unsafe { control(core::ptr::null(), 0) }.expect("empty");
+    assert_eq!(empty, &[]);
 }
 
 #[test]
