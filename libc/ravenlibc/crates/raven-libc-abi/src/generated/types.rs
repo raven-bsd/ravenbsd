@@ -49,7 +49,8 @@ pub type socklen_t = u32;
 pub type pthread_key_t = u32;
 /// DV1: 32 bits everywhere; musl x86_64 is 64 bits
 pub type blksize_t = i32;
-pub type sa_family_t = u16;
+/// DR-69/FreeBSD sys/sys/_types.h:159 __uint8_t; the sockaddr family byte follows sa_len
+pub type sa_family_t = u8;
 pub type in_port_t = u16;
 pub type reclen_t = u16;
 pub type in_addr_t = u32;

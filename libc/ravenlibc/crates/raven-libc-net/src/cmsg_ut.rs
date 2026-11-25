@@ -6,6 +6,28 @@
 use super::*;
 
 #[test]
+fn freebsd_header_offsets_and_struct_size() {
+    // FreeBSD `struct cmsghdr`: cmsg_len at 0, cmsg_level at 4, cmsg_type at 8; the
+    // structure is 12 bytes while `CMSG_DATA` starts at `_ALIGN(sizeof)=16`.
+    assert_eq!(HEADER_LEN, 16);
+    assert_eq!(core::mem::size_of::<raven_libc_abi::structs::Cmsghdr>(), 12);
+    assert_eq!(
+        core::mem::offset_of!(raven_libc_abi::structs::Cmsghdr, cmsg_level),
+        4
+    );
+    assert_eq!(
+        core::mem::offset_of!(raven_libc_abi::structs::Cmsghdr, cmsg_type),
+        8
+    );
+    let mut buffer = [0u8; 24];
+    assert_eq!(encode_cmsg(7, 9, &[0xaa], &mut buffer), Some(17));
+    assert_eq!(&buffer[0..4], &17u32.to_le_bytes());
+    assert_eq!(&buffer[4..8], &7i32.to_le_bytes());
+    assert_eq!(&buffer[8..12], &9i32.to_le_bytes());
+    assert_eq!(buffer[16], 0xaa);
+}
+
+#[test]
 fn alignment_values() {
     assert_eq!(align(0), 0);
     assert_eq!(align(1), 8);

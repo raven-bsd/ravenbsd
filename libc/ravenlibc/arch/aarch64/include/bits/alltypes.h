@@ -412,7 +412,8 @@ typedef unsigned socklen_t;
 #endif
 
 #if defined(__NEED_sa_family_t) && !defined(__DEFINED_sa_family_t)
-typedef unsigned short sa_family_t;
+/* RavenBSD: DR-69/FreeBSD sys/sys/_types.h:159, sa_family_t is one byte */
+typedef unsigned char sa_family_t;
 #define __DEFINED_sa_family_t
 #endif
 

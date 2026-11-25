@@ -15,7 +15,7 @@ use super::*;
 
 #[test]
 fn table_has_every_record() {
-    assert_eq!(STRUCTS.len(), 26);
+    assert_eq!(STRUCTS.len(), 28);
 }
 
 #[test]
@@ -91,17 +91,20 @@ fn record_names_are_unique() {
 }
 
 #[test]
-fn sockaddr_has_no_sa_len() {
+fn sockaddr_has_the_freebsd_length_byte() {
     let sockaddr = find("sockaddr").expect("sockaddr");
-    assert!(
+    let offset = |name: &str| {
         sockaddr
             .fields
             .iter()
-            .any(|field| field.name == "sa_family")
-    );
-    assert!(!sockaddr.fields.iter().any(|field| field.name == "sa_len"));
+            .find(|field| field.name == name)
+            .map(|field| field.offset)
+    };
+    assert_eq!(offset("sa_len"), Some(0));
+    assert_eq!(offset("sa_family"), Some(1));
+    assert_eq!(offset("sa_data"), Some(2));
     assert_eq!(sockaddr.size, 16);
-    assert_eq!(sockaddr.align, 2);
+    assert_eq!(sockaddr.align, 1);
 }
 
 #[test]

@@ -180,3 +180,10 @@ against = "linux-abi"
 ours = 45
 theirs = 46
 reason = "doc 14 4.6 fixes AF_MAX at 45; the pinned Linux table already counts AF_MCTP 45, so Linux's AF_MAX is 46"
+
+[[deviation]]
+name = "AF_INET6"
+against = "linux-abi"
+ours = 28
+theirs = 10
+reason = "DR-69/FreeBSD sys/sys/socket.h:256 fixes AF_INET6 at 28; the private raven-linux-abi table keeps Linux 10 and the Linux personality translates at its boundary"

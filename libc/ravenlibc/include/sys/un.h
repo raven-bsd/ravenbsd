@@ -38,9 +38,13 @@ __BEGIN_DECLS
 
 #include <bits/alltypes.h>
 
+/* RavenBSD: DR-69 FreeBSD sys/sys/un.h:54 (`SUNPATHLEN 104`). */
+#define SUNPATHLEN 104
+
 struct sockaddr_un {
-	sa_family_t sun_family;
-	char sun_path[108];
+	unsigned char sun_len;
+	unsigned char sun_family;
+	char sun_path[SUNPATHLEN];
 };
 
 #if __BSD_VISIBLE

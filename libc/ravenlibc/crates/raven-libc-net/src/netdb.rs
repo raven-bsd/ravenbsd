@@ -5,12 +5,37 @@
 
 use alloc::vec::Vec;
 
+use raven_libc_abi::socket::{AF_INET, AF_INET6, AF_UNSPEC};
 use raven_libc_nss::FileSource;
 use raven_libc_resolv::{
     AddrInfoRec, Clock, DnsIo, Eai, Entropy, Env, Hints, HostOrder, IfNames, Probe, SockAddr,
 };
 
 use crate::{Net, NetBackend, NetEnv, SocketFds, UnixBackend};
+
+/// Translate a public FreeBSD `AF_*` value to the resolver's Linux-valued family.
+///
+/// Only the families the resolver understands are mapped. Public `AF_CCITT` is 10 and must
+/// not become the resolver's IPv6 value.
+#[must_use]
+pub fn resolver_family(af: i32) -> Option<i32> {
+    match af {
+        AF_UNSPEC => Some(raven_libc_resolv::AF_UNSPEC),
+        AF_INET => Some(raven_libc_resolv::AF_INET),
+        AF_INET6 => Some(raven_libc_resolv::AF_INET6),
+        _ => None,
+    }
+}
+
+/// Translate a resolver family back to the public FreeBSD-valued family.
+#[must_use]
+pub fn public_family(af: i32) -> i32 {
+    match af {
+        raven_libc_resolv::AF_INET6 => AF_INET6,
+        raven_libc_resolv::AF_INET => AF_INET,
+        _ => af,
+    }
+}
 
 /// Bundle the six resolver seams from one `Net`.
 #[must_use]

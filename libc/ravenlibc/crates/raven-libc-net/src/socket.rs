@@ -14,7 +14,7 @@ use raven_libc_abi::socket::{
 };
 use raven_proto_net::{Call, Endpoint, Shutdown as WireShutdown, SockOpt};
 
-use crate::addr::{SockAddr, parse_sockaddr, write_sockaddr};
+use crate::addr::{SockAddr, parse_sockaddr, write_sockaddr, write_unnamed_unix};
 use crate::block::Deadline;
 use crate::flags;
 use crate::msg::{gather, total_len};
@@ -774,11 +774,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
         let table = self.table.borrow();
         let rec = table.get(info.ofd).ok_or(Errno::ENOTSOCK)?;
         if rec.domain == AF_UNIX {
-            let unnamed = SockAddr::Un {
-                path: [0u8; 108],
-                len: 0,
-            };
-            return Ok(write_sockaddr(&unnamed, out));
+            return Ok(write_unnamed_unix(out));
         }
         let local = if let Some(local) = rec.local {
             Some(local)
@@ -809,11 +805,7 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             if rec.state != SocketState::Connected {
                 return Err(Errno::ENOTCONN);
             }
-            let unnamed = SockAddr::Un {
-                path: [0u8; 108],
-                len: 0,
-            };
-            return Ok(write_sockaddr(&unnamed, out));
+            return Ok(write_unnamed_unix(out));
         }
         let peer = if let Some(peer) = rec.peer {
             Some(peer)

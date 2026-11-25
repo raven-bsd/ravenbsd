@@ -5,6 +5,7 @@
 use core::ffi::{c_char, c_int};
 
 use raven_libc_abi::errno::{EFAULT, EINVAL};
+use raven_libc_abi::socket::AF_INET;
 
 use super::records::{self, Hostent, pack_host_r};
 
@@ -16,7 +17,7 @@ use super::records::{self, Hostent, pack_host_r};
 pub unsafe extern "C" fn gethostbyname(name: *const c_char) -> *mut Hostent {
     // SAFETY: the caller's C string.
     let name = unsafe { crate::ffi::cstr::slice(name) };
-    records::host_by_name(name, 2)
+    records::host_by_name(name, AF_INET)
         .map(|entry| records::fill_host(&entry))
         .unwrap_or(core::ptr::null_mut())
 }

@@ -37,14 +37,15 @@ __BEGIN_DECLS
 #include <bits/alltypes.h>
 #endif
 
+/* RavenBSD: DR-69 FreeBSD include/netdb.h; ai_canonname precedes ai_addr. */
 struct addrinfo {
 	int ai_flags;
 	int ai_family;
 	int ai_socktype;
 	int ai_protocol;
 	socklen_t ai_addrlen;
-	struct sockaddr *ai_addr;
 	char *ai_canonname;
+	struct sockaddr *ai_addr;
 	struct addrinfo *ai_next;
 };
 

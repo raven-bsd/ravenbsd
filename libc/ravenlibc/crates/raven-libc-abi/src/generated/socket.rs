@@ -43,7 +43,8 @@ pub const AF_FILE: i32 = AF_UNIX;
 pub const AF_IB: i32 = 27;
 pub const AF_IEEE802154: i32 = 36;
 pub const AF_INET: i32 = 2;
-pub const AF_INET6: i32 = 10;
+/// DR-69/FreeBSD sys/sys/socket.h:256
+pub const AF_INET6: i32 = 28;
 pub const AF_IPX: i32 = 4;
 pub const AF_IRDA: i32 = 23;
 pub const AF_ISDN: i32 = 34;
@@ -287,7 +288,7 @@ pub const ALL: &[(&str, i128)] = &[
     ("AF_IB", 27i128),
     ("AF_IEEE802154", 36i128),
     ("AF_INET", 2i128),
-    ("AF_INET6", 10i128),
+    ("AF_INET6", 28i128),
     ("AF_IPX", 4i128),
     ("AF_IRDA", 23i128),
     ("AF_ISDN", 34i128),
@@ -358,7 +359,7 @@ pub const ALL: &[(&str, i128)] = &[
     ("PF_IB", 27i128),
     ("PF_IEEE802154", 36i128),
     ("PF_INET", 2i128),
-    ("PF_INET6", 10i128),
+    ("PF_INET6", 28i128),
     ("PF_IPX", 4i128),
     ("PF_IRDA", 23i128),
     ("PF_ISDN", 34i128),

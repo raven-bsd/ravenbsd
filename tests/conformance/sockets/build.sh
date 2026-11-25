@@ -13,13 +13,17 @@ cd "$root"
 
 pkill -f "$root/tests/conformance/sockets/host.py" 2>/dev/null || true
 
-out=${SOCKET_CONFORMANCE_OUT:-build/fixtures/socket-conformance}
-mkdir -p "$out"
 arch=${RAVEN_QT_ARCH:-x86_64}
-if [ "$arch" != x86_64 ]; then
-    echo "socket-conformance fixture: x86_64 only" >&2
-    exit 77
-fi
+case "$arch" in
+x86_64) default_out=build/fixtures/socket-conformance ;;
+aarch64) default_out=build/fixtures/socket-conformance-aarch64 ;;
+*)
+    echo "socket-conformance fixture: unsupported architecture $arch" >&2
+    exit 2
+    ;;
+esac
+out=${SOCKET_CONFORMANCE_OUT:-$default_out}
+mkdir -p "$out"
 
 sysroot=$root/build/$arch/sysroot
 libc_archive=$sysroot/usr/lib/libc.a
@@ -56,26 +60,35 @@ if ! command -v ld.lld >/dev/null 2>&1; then
     exit 77
 fi
 
-link_script=$root/tests/libc/target/x86_64.ld
+target=$arch-unknown-ravenbsd
+if [ "$arch" = aarch64 ]; then
+    link_script=$root/userland/linker/aarch64.ld
+    linker_flavor="-Wl,-m,aarch64linux"
+    fp_flags=-mgeneral-regs-only
+else
+    link_script=$root/tests/libc/target/x86_64.ld
+    linker_flavor=
+    fp_flags="-mno-sse -mno-mmx -msoft-float"
+fi
 builtins=
 if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
     builtins=1
 fi
 
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+"$CC" --target="$target" --sysroot="$sysroot" \
     -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+    -D__ravenbsd__=1 -D__unix__=1 $fp_flags \
     -c "$root/tests/conformance/sockets/main.c" -o "$out/main.o"
 
 if [ -n "$builtins" ]; then
-    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+    "$CC" --target="$target" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
         -nostdlib -nostartfiles -static -T"$link_script" \
         -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
         "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/main.o" \
         -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
         "$sysroot/usr/lib/crtn.o" -o "$out/socket-conformance"
 else
-    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+    "$CC" --target="$target" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
         -nostdlib -nostartfiles -static -T"$link_script" \
         -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
         "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/main.o" \

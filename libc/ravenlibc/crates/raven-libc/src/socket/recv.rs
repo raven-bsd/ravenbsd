@@ -2,7 +2,7 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //! `recv`, `recvfrom`, `recvmsg` and `recvmmsg`.
 
-use core::ffi::{c_int, c_uint, c_void};
+use core::ffi::{c_int, c_void};
 
 use raven_libc_abi::structs::Msghdr;
 
@@ -86,18 +86,13 @@ pub unsafe extern "C" fn recvmsg(fd: c_int, message: *mut Msghdr, flags: c_int) 
             Ok(iov) => iov,
             Err(error) => return crate::ffi::ret::ssize(Err(error)),
         };
-    let control_capacity = header.msg_controllen as usize;
-    if control_capacity != 0 && header.msg_control.is_null() {
-        return crate::ffi::ret::ssize(Err(fault()));
-    }
     // SAFETY: the caller supplied `msg_controllen` writable control bytes; a zero length does
     // not dereference the pointer.
-    let control: &mut [u8] = if control_capacity == 0 {
-        &mut []
-    } else {
-        unsafe {
-            core::slice::from_raw_parts_mut(header.msg_control.cast::<u8>(), control_capacity)
-        }
+    let control = match unsafe {
+        crate::ffi::sockaddr::control_mut(header.msg_control, header.msg_controllen)
+    } {
+        Ok(control) => control,
+        Err(error) => return crate::ffi::ret::ssize(Err(error)),
     };
     match with_net(|net| net.recvmsg(fd, name, &mut iov, control, flags)) {
         Ok(reply) => {
@@ -121,28 +116,28 @@ pub unsafe extern "C" fn recvmsg(fd: c_int, message: *mut Msghdr, flags: c_int) 
 pub unsafe extern "C" fn recvmmsg(
     fd: c_int,
     messages: *mut c_void,
-    count: c_uint,
+    count: usize,
     flags: c_int,
-    _timeout: *mut c_void,
-) -> c_int {
+    _timeout: *const c_void,
+) -> isize {
     if messages.is_null() && count != 0 {
-        return crate::ffi::ret::int(Err(fault()));
+        return crate::ffi::ret::ssize(Err(fault()));
     }
-    let mut received = 0u32;
+    let mut received = 0usize;
     while received < count {
         // SAFETY: the caller's array of mmsghdr.
-        let message = unsafe { messages.cast::<Mmsghdr>().add(received as usize) };
+        let message = unsafe { messages.cast::<Mmsghdr>().add(received) };
         // SAFETY: the current mmsghdr is writable.
-        let length = unsafe { recvmsg(fd, core::ptr::addr_of_mut!((*message).header), flags) };
+        let length = unsafe { recvmsg(fd, core::ptr::addr_of_mut!((*message).msg_hdr), flags) };
         if length < 0 {
             if received == 0 {
-                return length as c_int;
+                return length;
             }
             break;
         }
         // SAFETY: the current mmsghdr is writable.
-        unsafe { (*message).len = u32::try_from(length).unwrap_or(u32::MAX) };
+        unsafe { (*message).msg_len = i64::try_from(length).unwrap_or(i64::MAX) };
         received = received.saturating_add(1);
     }
-    c_int::try_from(received).unwrap_or(c_int::MAX)
+    isize::try_from(received).unwrap_or(isize::MAX)
 }

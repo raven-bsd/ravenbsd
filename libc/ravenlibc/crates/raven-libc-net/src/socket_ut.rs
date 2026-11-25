@@ -885,11 +885,13 @@ fn probe_route_failure_and_loopback() {
 fn unix_named_bind_and_control_are_unsupported() {
     let net = net(Caps::default());
     let fd = net.socketpair(AF_UNIX, SOCK_STREAM, 0).expect("pair");
-    let mut path = [0u8; 110];
+    let mut path_bytes = [0u8; crate::addr::SUN_PATH_LEN];
+    path_bytes[..4].copy_from_slice(b"/tmp");
+    let mut path = [0u8; 6];
     crate::write_sockaddr(
         &crate::SockAddr::Un {
-            path: [0u8; 108],
-            len: 0,
+            path: path_bytes,
+            len: 4,
         },
         &mut path,
     );
@@ -930,7 +932,7 @@ fn getsockname_truncation_and_unconnected_peer() {
     net.bind(fd, &addr([10, 0, 0, 1], 1234)).expect("bind");
     let mut small = [0u8; 4];
     assert_eq!(net.getsockname(fd, &mut small), Ok(16));
-    assert_eq!(small, [2, 0, 4, 210]);
+    assert_eq!(small, [16, 2, 4, 210]);
     assert_eq!(net.getpeername(fd, &mut small), Err(Errno::ENOTCONN));
 }
 

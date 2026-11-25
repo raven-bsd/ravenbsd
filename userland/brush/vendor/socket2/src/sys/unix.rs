@@ -394,9 +394,8 @@ const MAX_BUF_LEN: usize = c_int::MAX as usize - 1;
 const TCP_CA_NAME_MAX: usize = 16;
 
 #[cfg(any(
-    target_os = "ravenbsd",
     all(
-        any(target_os = "linux", target_os = "ravenbsd"),
+        target_os = "linux",
         any(
             target_env = "gnu",
             all(target_env = "uclibc", target_pointer_width = "64")
@@ -408,7 +407,7 @@ type IovLen = usize;
 
 #[cfg(any(
     all(
-        any(target_os = "linux", target_os = "ravenbsd"),
+        target_os = "linux",
         any(
             target_env = "musl",
             target_env = "ohos",
@@ -419,6 +418,7 @@ type IovLen = usize;
     target_os = "dragonfly",
     target_os = "emscripten",
     target_os = "freebsd",
+    target_os = "ravenbsd",
     target_os = "fuchsia",
     target_os = "haiku",
     target_os = "hurd",

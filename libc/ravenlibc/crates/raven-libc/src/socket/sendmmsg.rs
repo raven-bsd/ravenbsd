@@ -2,7 +2,7 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //! `sendmmsg`.
 
-use core::ffi::{c_int, c_uint, c_void};
+use core::ffi::{c_int, c_void};
 
 use super::*;
 
@@ -14,29 +14,29 @@ use super::*;
 pub unsafe extern "C" fn sendmmsg(
     fd: c_int,
     messages: *mut c_void,
-    count: c_uint,
+    count: usize,
     flags: c_int,
-) -> c_int {
+) -> isize {
     if messages.is_null() && count != 0 {
-        return crate::ffi::ret::int(Err(fault()));
+        return crate::ffi::ret::ssize(Err(fault()));
     }
-    let mut sent = 0u32;
+    let mut sent = 0usize;
     while sent < count {
         // SAFETY: the caller's array of mmsghdr.
-        let message = unsafe { messages.cast::<Mmsghdr>().add(sent as usize) };
+        let message = unsafe { messages.cast::<Mmsghdr>().add(sent) };
         // SAFETY: the current mmsghdr is writable.
         let length = unsafe {
-            super::socketpair::sendmsg(fd, core::ptr::addr_of!((*message).header), flags)
+            super::socketpair::sendmsg(fd, core::ptr::addr_of!((*message).msg_hdr), flags)
         };
         if length < 0 {
             if sent == 0 {
-                return length as c_int;
+                return length;
             }
             break;
         }
         // SAFETY: the current mmsghdr is writable.
-        unsafe { (*message).len = u32::try_from(length).unwrap_or(u32::MAX) };
+        unsafe { (*message).msg_len = i64::try_from(length).unwrap_or(i64::MAX) };
         sent = sent.saturating_add(1);
     }
-    c_int::try_from(sent).unwrap_or(c_int::MAX)
+    isize::try_from(sent).unwrap_or(isize::MAX)
 }

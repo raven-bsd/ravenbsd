@@ -426,6 +426,8 @@ pub trait ErrnoExt {
     const ENOTTY: Errno;
     /// Network unreachable.
     const ENETUNREACH: Errno;
+    /// Name too long.
+    const ENAMETOOLONG: Errno;
 }
 
 impl ErrnoExt for Errno {
@@ -459,6 +461,7 @@ impl ErrnoExt for Errno {
     const ENOMEM: Errno = Errno(raven_libc_abi::generated::errno::ENOMEM as u16);
     const ENOTTY: Errno = Errno(raven_libc_abi::generated::errno::ENOTTY as u16);
     const ENETUNREACH: Errno = Errno(raven_libc_abi::generated::errno::ENETUNREACH as u16);
+    const ENAMETOOLONG: Errno = Errno(raven_libc_abi::generated::errno::ENAMETOOLONG as u16);
 }
 
 #[cfg(test)]
