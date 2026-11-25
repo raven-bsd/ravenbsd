@@ -68,4 +68,4 @@ regex = '^.*CONTRACT SUMMARY PASS 10/10$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)CONTRACT K([1-9]|10)(-shutdown)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION'
+regex = '(?i)CONTRACT K([1-9]|10)(-shutdown)? FAIL|CONTRACT SUMMARY FAIL|panic|EXCEPTION|tlb shootdown timeout'
