@@ -51,7 +51,7 @@ const MODE_SHARED: &str = "shared-handle";
 
 /// Raw `proc_fork(src, flags) -> Handle` number (the ABI crate is reviewer-owned).
 const PROC_FORK: usize = 0x39;
-const SPIN_LIMIT: usize = 20_000_000;
+const SPIN_LIMIT: usize = 1_000_000;
 
 fn fence() {
     core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
