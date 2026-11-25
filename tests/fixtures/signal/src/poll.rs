@@ -83,9 +83,7 @@ fn elapsed_ns(start: Timespec) -> u64 {
     };
     let seconds = now.tv_sec.saturating_sub(start.tv_sec).max(0) as u64;
     let nanos = now.tv_nsec.saturating_sub(start.tv_nsec).max(0) as u64;
-    seconds
-        .saturating_mul(1_000_000_000)
-        .saturating_add(nanos)
+    seconds.saturating_mul(1_000_000_000).saturating_add(nanos)
 }
 
 fn main(_args: raven_rt::Args) -> i32 {
@@ -97,14 +95,8 @@ fn main(_args: raven_rt::Args) -> i32 {
         restorer: 0,
     };
     // SAFETY: the kernel copies the 40-byte request from the live stack object.
-    let installed = unsafe {
-        sys::syscall3(
-            SIGACTION,
-            SIGUSR1,
-            &action as *const SigAction as usize,
-            0,
-        )
-    };
+    let installed =
+        unsafe { sys::syscall3(SIGACTION, SIGUSR1, &action as *const SigAction as usize, 0) };
     if installed < 0 {
         return fail("sigaction", installed);
     }
