@@ -15,7 +15,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::{PROC_SIGQUEUE, SIGACTION};
-use raven_abi::types::Handle;
+use raven_abi::types::{Handle, Timespec, clock};
 use raven_rt::entry;
 use raven_rt::event::{EventQueue, EvqEvent, READABLE};
 use raven_rt::pipe;
@@ -31,6 +31,7 @@ const SIGNALLER_DELAY_NS: u64 = 200_000_000;
 
 static HANDLED: AtomicU32 = AtomicU32::new(0);
 static HANDLER_SIG: AtomicU32 = AtomicU32::new(0);
+static WAIT_ARMED: AtomicU32 = AtomicU32::new(0);
 
 /// The Raven private 40-byte `SIGACTION` request (C19; `kernel/src/syscall/thread.rs`).
 #[repr(C)]
@@ -61,6 +62,9 @@ extern "C" fn handler(signo: i32) {
 
 /// Queue SIGUSR1 once the main thread is inside the event wait.
 extern "C" fn signaller(_arg: usize) -> ! {
+    while WAIT_ARMED.load(Ordering::Acquire) == 0 {
+        core::hint::spin_loop();
+    }
     let _ = sys::nanosleep(SIGNALLER_DELAY_NS);
     // SAFETY: scalar syscall arguments; target 0 is this process.
     let sent = unsafe { sys::syscall3(PROC_SIGQUEUE, 0, SIGUSR1, 0) };
@@ -70,6 +74,18 @@ extern "C" fn signaller(_arg: usize) -> ! {
 fn fail(row: &str, value: isize) -> i32 {
     println!("signal-poll: fail {} value={}", row, value);
     1
+}
+
+/// Nanoseconds from `start` to now; `u64::MAX` when the clock cannot be read.
+fn elapsed_ns(start: Timespec) -> u64 {
+    let Ok(now) = sys::clock_get(clock::MONOTONIC) else {
+        return u64::MAX;
+    };
+    let seconds = now.tv_sec.saturating_sub(start.tv_sec).max(0) as u64;
+    let nanos = now.tv_nsec.saturating_sub(start.tv_nsec).max(0) as u64;
+    seconds
+        .saturating_mul(1_000_000_000)
+        .saturating_add(nanos)
 }
 
 fn main(_args: raven_rt::Args) -> i32 {
@@ -117,7 +133,12 @@ fn main(_args: raven_rt::Args) -> i32 {
         Err(error) => return fail("thread-create", error.0 as isize),
     };
 
+    let started = match sys::clock_get(clock::MONOTONIC) {
+        Ok(start) => start,
+        Err(error) => return fail("clock", error.0 as isize),
+    };
     let mut events = [EvqEvent::default(); 1];
+    WAIT_ARMED.store(1, Ordering::Release);
     let waited = queue.wait(&mut events, WAIT_TIMEOUT_NS);
     let _ = sys::handle_close(thread);
     match waited {
@@ -126,6 +147,12 @@ fn main(_args: raven_rt::Args) -> i32 {
                 || HANDLER_SIG.load(Ordering::SeqCst) != SIGUSR1 as u32
             {
                 return fail("handler", HANDLED.load(Ordering::SeqCst) as isize);
+            }
+            // A stale kick turned into EINTR only after the 3 s timeout would pass the result
+            // check without proving the wake. The signal is sent about 200 ms after arming.
+            let elapsed = elapsed_ns(started);
+            if elapsed >= 1_000_000_000 {
+                return fail("poll-latency", elapsed as isize);
             }
             println!("signal-poll: poll EINTR");
             println!("signal-poll: handler ok");
