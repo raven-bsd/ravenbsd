@@ -13,6 +13,10 @@ rust-version.workspace = true
 [package.metadata.raven]
 target = "none"
 
+[lib]
+name = "raven_smp_tlb"
+path = "src/lib.rs"
+
 [[bin]]
 name = "smp-tlb-init"
 path = "src/main.rs"

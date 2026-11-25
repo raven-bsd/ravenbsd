@@ -21,11 +21,12 @@
 use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use raven_abi::errno::Errno;
-use raven_abi::syscall::Syscall;
-use raven_abi::types::{Handle, map, prot};
+use raven_abi::syscall::{Syscall, THREAD_SELF};
+use raven_abi::types::{Handle, clock, map, prot};
 use raven_rt::entry;
 use raven_rt::println;
 use raven_rt::sys;
+use raven_smp_tlb::{StateSnapshot, deadline_reached};
 
 entry!(main);
 
@@ -34,8 +35,9 @@ const OBJECT_PAGES: usize = 2;
 const STACK_LEN: usize = 16 * PAGE;
 /// Remap rounds. Each round is one unmap (which must shoot down) plus one fixed map.
 const ROUNDS: u32 = 200;
-/// Bounded spin budget for the handshakes: ~millions of `yield` hints, not a wall-clock claim.
-const POLL_LIMIT: u32 = 20_000_000;
+/// Iterations between monotonic-clock reads. The reader must not yield (a context switch would
+/// flush its TLB and hide a missing shootdown), so its clock check is periodic.
+const CLOCK_CHECK_INTERVAL: u32 = 1 << 16;
 
 const VALUE_LOW: u64 = 0x1111_1111_1111_1111;
 const VALUE_HIGH: u64 = 0x2222_2222_2222_2222;
@@ -52,10 +54,34 @@ static SEEN: AtomicU64 = AtomicU64::new(0);
 static STOP: AtomicU32 = AtomicU32::new(0);
 /// Set by the reader just before it exits.
 static EXITED: AtomicU32 = AtomicU32::new(0);
+/// Reader thread id, so a timeout report names the thread the kernel placed on the AP.
+static READER_TID: AtomicU32 = AtomicU32::new(0);
 
 fn fail(message: &str) -> i32 {
     println!("smp-tlb: fail {message}");
     1
+}
+
+/// Nanoseconds from the monotonic clock, or `None` when the clock is unavailable.
+fn now_ns() -> Option<u64> {
+    let timespec = sys::clock_get(clock::MONOTONIC).ok()?;
+    let seconds = u64::try_from(timespec.tv_sec).ok()?;
+    let nanos = u64::try_from(timespec.tv_nsec).ok()?;
+    Some(seconds.saturating_mul(1_000_000_000).saturating_add(nanos))
+}
+
+fn snapshot() -> StateSnapshot {
+    StateSnapshot {
+        go: GO.load(Ordering::Acquire),
+        done: DONE.load(Ordering::Acquire),
+        seen: SEEN.load(Ordering::Acquire),
+        exited: EXITED.load(Ordering::Acquire),
+        reader_tid: READER_TID.load(Ordering::Acquire),
+    }
+}
+
+fn report_state(label: &str, round: u32) {
+    println!("smp-tlb: {label} round={round} {}", snapshot());
 }
 
 fn memobj_create(len: usize) -> Result<Handle, Errno> {
@@ -102,23 +128,21 @@ fn write_word(address: usize, value: u64) {
 }
 
 extern "C" fn reader() -> ! {
+    // SAFETY: THREAD_SELF takes no arguments and returns this thread's tid.
+    let tid = unsafe { sys::syscall0(THREAD_SELF) };
+    READER_TID.store(u32::try_from(tid).unwrap_or(0), Ordering::Release);
     let address = MAP_ADDR.load(Ordering::Acquire);
     let mut last = 0u32;
     loop {
-        let mut spins = 0u32;
-        // Spin without yielding: a context switch to the kernel idle thread changes TTBR0 and
-        // flushes this CPU's TLB, which would hide a missing shootdown.
+        // Spin without yielding and without a syscall: a context switch (or a kernel entry that
+        // swaps TTBR0) flushes this CPU's TLB, which would hide a missing shootdown. The
+        // controller's wall-clock bound ends the process if the handshake never completes.
         while GO.load(Ordering::Acquire) == last {
             if STOP.load(Ordering::Acquire) != 0 {
                 EXITED.store(1, Ordering::Release);
                 sys::thread_exit(0)
             }
             core::hint::spin_loop();
-            spins = spins.saturating_add(1);
-            if spins > POLL_LIMIT {
-                EXITED.store(2, Ordering::Release);
-                sys::thread_exit(1)
-            }
         }
         let round = GO.load(Ordering::Acquire);
         SEEN.store(read_word(address), Ordering::Release);
@@ -189,12 +213,25 @@ fn main(_args: raven_rt::Args) -> i32 {
         }
         GO.store(round, Ordering::Release);
 
-        let mut spins = 0u32;
+        let Some(start) = now_ns() else {
+            return fail("clock");
+        };
+        let mut yields = 0u32;
         while DONE.load(Ordering::Acquire) != round {
+            if EXITED.load(Ordering::Acquire) != 0 {
+                report_state("reader exit code", round);
+                return fail("reader exit code");
+            }
             sys::yield_now();
-            spins = spins.saturating_add(1);
-            if spins > POLL_LIMIT {
-                return fail("reader timeout");
+            yields = yields.wrapping_add(1);
+            if yields & (CLOCK_CHECK_INTERVAL - 1) == 0 {
+                let Some(now) = now_ns() else {
+                    return fail("clock");
+                };
+                if deadline_reached(start, now) {
+                    report_state("reader timeout", round);
+                    return fail("reader timeout");
+                }
             }
         }
         let seen = SEEN.load(Ordering::Acquire);
@@ -207,15 +244,25 @@ fn main(_args: raven_rt::Args) -> i32 {
 
     STOP.store(1, Ordering::Release);
     GO.store(ROUNDS.saturating_add(1), Ordering::Release);
-    let mut spins = 0u32;
+    let Some(start) = now_ns() else {
+        return fail("clock");
+    };
+    let mut yields = 0u32;
     while EXITED.load(Ordering::Acquire) == 0 {
         sys::yield_now();
-        spins = spins.saturating_add(1);
-        if spins > POLL_LIMIT {
-            return fail("reader join");
+        yields = yields.wrapping_add(1);
+        if yields & (CLOCK_CHECK_INTERVAL - 1) == 0 {
+            let Some(now) = now_ns() else {
+                return fail("clock");
+            };
+            if deadline_reached(start, now) {
+                report_state("reader join", ROUNDS);
+                return fail("reader join");
+            }
         }
     }
     if EXITED.load(Ordering::Acquire) != 1 {
+        report_state("reader exit code", ROUNDS);
         return fail("reader exit code");
     }
     println!("smp-tlb: rounds={ROUNDS} stale={stale}");
