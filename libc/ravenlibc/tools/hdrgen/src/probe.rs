@@ -676,8 +676,7 @@ fn probe_constants(
 }
 
 pub(crate) fn same_mod_64(left: i128, right: i128) -> bool {
-    let _ = (left, right);
-    true
+    (left as u128 as u64) == (right as u128 as u64)
 }
 
 fn musl_source_files(musl: &Path, sources: &[String]) -> Vec<PathBuf> {
