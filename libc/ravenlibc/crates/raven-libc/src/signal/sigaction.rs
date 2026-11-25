@@ -5,7 +5,11 @@ use core::ffi::c_int;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::Sigaction;
+use raven_libc_signal::action;
+use raven_libc_signal::dispositions::Disposition;
 use raven_libc_signal::sigaction_abi::{KernelSigAction, from_c, to_c};
+
+use super::DISP;
 
 /// Install or query a disposition.
 ///
@@ -45,6 +49,17 @@ pub unsafe extern "C" fn sigaction(
     if raw < 0 {
         crate::ffi::errno::set(Errno(raw.unsigned_abs() as u16));
         return -1;
+    }
+    if let Some(action) = request.as_ref() {
+        // Keep the libc disposition table in step with the kernel table. `raise` runs the
+        // handler from this table; the kernel uses its own table for process-directed signals.
+        // The two stores are now one logical disposition, not two independent states.
+        let disposition = Disposition {
+            handler: action.handler,
+            mask: action.mask[0],
+            flags: action.flags,
+        };
+        let _ = action::sigaction(&DISP, sig, Some(&disposition), None);
     }
     if !old.is_null() {
         // SAFETY: the caller supplies a writable sigaction.
