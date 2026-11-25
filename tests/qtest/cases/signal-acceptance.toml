@@ -37,10 +37,10 @@ regex = '^signal: blocked-held$'
 regex = '^signal: blocked ok signal=10$'
 
 [[expect]]
-regex = '^signal: ignored ok$'
+regex = '^signal: exec-default ok signal=10$'
 
 [[expect]]
-regex = '^signal: exec-default ok signal=10$'
+regex = '^signal: ignored ok$'
 
 [[expect]]
 regex = '^signal: ok$'

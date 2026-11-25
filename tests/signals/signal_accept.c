@@ -192,8 +192,9 @@ static int interrupt_row(void) {
     }
     child = fork();
     if (child == 0) {
+        // Keep the write end open while spinning: the parent's read must block, not see EOF,
+        // until the signal interrupts it.
         close(fds[0]);
-        close(fds[1]);
         for (volatile long spin = 0; spin < 50000000; spin++) {
             __asm__ volatile("" ::: "memory");
         }
@@ -311,7 +312,9 @@ int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("signal: start pid=%d\n", (int)getpid());
     if (argc > 1 && strcmp(argv[1], "exec-child") == 0) {
-        (void)raise(SIGUSR1);
+        // The kernel sigacts table is reset by exec; the raw default action must terminate the
+        // new image with SIGUSR1, not a normal exit.
+        (void)raw_signal(getpid(), SIGUSR1);
         printf("signal: exec-child survived after exec\n");
         _exit(1);
     }

@@ -75,12 +75,23 @@ const PAGE: u64 = 4096;
 /// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
 /// and headroom. The first process gets the same 256 KiB mapping.
 const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
-/// Fixed user VA of the kernel-installed sigcode page (the last page below `USER_END`).
+/// Fixed user VA of the kernel-installed sigcode page.
 ///
 /// C19 installs the return trampoline at exec, read-only+exec; every handler's frame return
 /// address points here, so a new image can never inherit an entry address from the old one.
+///
+/// The page sits immediately below the lowest randomized kernel-built stack
+/// (`USER_END - STACK_WINDOW - STACK_SIZE - STACK_GUARD`). It must not use the top stack page:
+/// a userspace-spawned image places its initial stack near `USER_END`, and mapping the
+/// trampoline there leaves the handler's return address non-executable. `raven_rt::spawn`
+/// does not call the kernel stack builder, so the page is also installed lazily on the first
+/// caught-signal delivery ([`Process::ensure_sigcode_page`]).
 #[cfg(target_arch = "x86_64")]
-pub const SIGCODE_BASE: u64 = raven_abi::layout::x86_64::USER_END - PAGE;
+pub const SIGCODE_BASE: u64 = raven_abi::layout::x86_64::USER_END
+    - crate::memory::aslr::STACK_WINDOW
+    - crate::memory::aslr::STACK_SIZE
+    - crate::memory::aslr::STACK_GUARD
+    - PAGE;
 /// `mov eax, SIGRETURN; syscall; ud2`: the only job of the sigcode trampoline.
 #[cfg(target_arch = "x86_64")]
 pub const SIGCODE: [u8; 9] = [
@@ -94,9 +105,14 @@ pub const SIGCODE: [u8; 9] = [
     0x0F,
     0x0B,
 ];
-/// Fixed user VA of the aarch64 sigcode page (the last page below `USER_END`).
+/// Fixed user VA of the aarch64 sigcode page (below the randomized stack window, same as
+/// x86_64; see the x86_64 comment for the spawn-stack collision).
 #[cfg(target_arch = "aarch64")]
-pub const SIGCODE_BASE: u64 = USER_END - PAGE;
+pub const SIGCODE_BASE: u64 = USER_END
+    - crate::memory::aslr::STACK_WINDOW
+    - crate::memory::aslr::STACK_SIZE
+    - crate::memory::aslr::STACK_GUARD
+    - PAGE;
 /// `mov x8, #SIGRETURN; svc #0`: the aarch64 sigcode trampoline.
 #[cfg(target_arch = "aarch64")]
 pub const SIGCODE: [u8; 8] = crate::arch::aarch64::signal::SIGCODE;
@@ -1352,6 +1368,23 @@ impl Process {
         !any
     }
 
+    /// Install the C19 sigcode trampoline page when the image has not mapped it yet.
+    ///
+    /// `build_stack` installs it for kernel-built exec images. A userspace spawner
+    /// (`raven_rt::spawn`, svcd services) maps its own image and stack, so the first caught
+    /// kernel signal installs the page before the frame's `sf_ra` can point at it. Repeated
+    /// deliveries see the existing VMA and return immediately.
+    pub fn ensure_sigcode_page(&self) -> Result<(), Errno> {
+        let mut slot = self.address_space.lock();
+        let Some(address_space) = slot.as_mut() else {
+            return Ok(());
+        };
+        if address_space.vmas().find(SIGCODE_BASE).is_some() {
+            return Ok(());
+        }
+        install_sigcode(address_space).map_err(|_| Errno::ENOMEM)
+    }
+
     /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
     ///
     /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
@@ -1480,6 +1513,9 @@ impl Process {
                 .and_then(|thread| take_queued_where(&thread.pending_signals, caught))
                 .or_else(|| take_queued_where(&self.pending_signals, caught))?;
             let action = sigacts.get(record.signo);
+            if self.ensure_sigcode_page().is_err() {
+                exit_process(Errno::ENOMEM.to_ret() as i32);
+            }
             return Some((record, action));
         }
         loop {
@@ -1495,6 +1531,9 @@ impl Process {
                 continue;
             }
             if action.is_caught() {
+                if self.ensure_sigcode_page().is_err() {
+                    exit_process(Errno::ENOMEM.to_ret() as i32);
+                }
                 return Some((record, action));
             }
             // SIG_DFL reached delivery only because the signal was held while masked. Apply the
