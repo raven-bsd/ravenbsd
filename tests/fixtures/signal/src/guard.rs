@@ -244,7 +244,10 @@ pub fn run() -> Result<(), &'static str> {
         let mut a = action_a();
         a.handler = handler_address();
         write_request(a_region.last_wire_slot(), a);
-        expect("both-preinstall", sigaction(a_region.last_wire_slot(), 0) == 0)?;
+        expect(
+            "both-preinstall",
+            sigaction(a_region.last_wire_slot(), 0) == 0,
+        )?;
 
         let at = act_region.last_wire_slot();
         let old = old_region.last_wire_slot();
@@ -313,7 +316,10 @@ pub fn run() -> Result<(), &'static str> {
         kill.handler = handler_address();
         write_request(at, kill);
         fill(old, POISON, WIRE);
-        expect("fail-sigkill-errno", sigaction_for(SIGKILL, at, old) == EINVAL)?;
+        expect(
+            "fail-sigkill-errno",
+            sigaction_for(SIGKILL, at, old) == EINVAL,
+        )?;
         expect("fail-sigkill-old-unchanged", slot_is(old, POISON))?;
 
         // SIGSTOP with a handler
