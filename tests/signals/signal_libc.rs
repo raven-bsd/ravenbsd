@@ -92,6 +92,7 @@ unsafe extern "C" {
     fn pipe(fds: *mut c_int) -> c_int;
     fn fork() -> c_int;
     fn read(fd: c_int, buf: *mut u8, count: usize) -> isize;
+    fn write(fd: c_int, buf: *const u8, count: usize) -> isize;
     fn close(fd: c_int) -> c_int;
     fn getpid() -> c_int;
     fn getppid() -> c_int;
@@ -101,7 +102,7 @@ unsafe extern "C" {
     fn nanosleep(request: *const Timespec, remaining: *mut Timespec) -> c_int;
 }
 
-/// `struct timespec` for the bounded child delay before it signals.
+/// `struct timespec` for the child's bounded delay after the parent announces its read.
 #[repr(C)]
 struct Timespec {
     tv_sec: i64,
@@ -663,41 +664,58 @@ fn provider_wait_row() -> bool {
 /// A blocking read returns `EINTR` when a caught kernel signal arrives.
 fn provider_interrupt_row() -> bool {
     let mut fds = [-1i32; 2];
+    let mut ack = [-1i32; 2];
     let mut byte = 0u8;
     let mut status = 0i32;
     let mut result = 0isize;
     let mut error = 0i32;
     let before = HANDLER_COUNT.load(Ordering::SeqCst);
-    // SAFETY: the fd pair and byte are live stack values for the whole call.
-    let mut ok = unsafe { pipe(fds.as_mut_ptr()) } == 0;
+    // SAFETY: the fd pairs and byte are live stack values for the whole call.
+    let mut ok = unsafe { pipe(fds.as_mut_ptr()) } == 0
+        && unsafe { pipe(ack.as_mut_ptr()) } == 0;
     if !ok {
         return provider_row(b"interrupt", false);
     }
-    // SAFETY: fork duplicates this process; the child only closes an fd, signals and exits.
+    // SAFETY: fork duplicates this process; the child signals and then waits on the ack pipe
+    // so the data write end cannot close before the parent's read returns.
     let child = unsafe { fork() };
     if child == 0 {
-        // SAFETY: the child owns fds[1] and exits without unwinding.
+        // SAFETY: the child owns fds[1] and ack[0] and exits without unwinding.
         unsafe {
             close(fds[0]);
-            // Sleep instead of spinning: a tight user loop on another TCG vCPU is what made
-            // the SMP TLB shootdown watchdog fire during this row.
+            close(ack[1]);
+            // The parent writes `go` immediately before entering read; after this byte plus a
+            // bounded delay the reader is enrolled, so the signal interrupts the wait instead
+            // of being delivered before it and leaving a silent block.
+            let mut ack_byte = 0u8;
+            let _ = read(ack[0], &mut ack_byte, 1);
             let delay = Timespec {
                 tv_sec: 0,
                 tv_nsec: 20_000_000,
             };
             let _ = nanosleep(&delay, ptr::null_mut());
             raw_signal(getppid(), SIGUSR1);
+            // Keep the data write end open until the parent acknowledges the interrupted read.
+            let _ = read(ack[0], &mut ack_byte, 1);
+            close(ack[0]);
             _exit(0);
         }
     }
-    ok = child > 0 && unsafe { close(fds[1]) } == 0;
+    ok = child > 0
+        && unsafe { close(fds[1]) } == 0
+        && unsafe { close(ack[0]) } == 0;
     if ok {
-        // SAFETY: `byte` is a live one-byte buffer; the write end stays open in the child
-        // until after the signal, so an empty pipe blocks here.
+        let go = b'g';
+        let done = b'd';
+        let _ = unsafe { write(ack[1], &go as *const u8, 1) };
+        // SAFETY: `byte` is a live one-byte buffer; the child keeps the data write end open
+        // until the acknowledgement, so an empty pipe blocks here rather than returning EOF.
         result = unsafe { read(fds[0], &mut byte, 1) };
         // SAFETY: `__errno_location` returns the live thread-local errno pointer.
         error = unsafe { *__errno_location() };
+        let _ = unsafe { write(ack[1], &done as *const u8, 1) };
         let _ = unsafe { close(fds[0]) };
+        let _ = unsafe { close(ack[1]) };
         let _ = unsafe { waitpid(child, &mut status, 0) };
         ok = result == -1 && error == EINTR;
     }
