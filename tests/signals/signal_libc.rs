@@ -116,6 +116,7 @@ unsafe extern "C" {
     fn pthread_join(thread: usize, value: *mut *mut c_void) -> c_int;
     fn pthread_self() -> usize;
     fn pthread_kill(thread: usize, sig: c_int) -> c_int;
+    fn setpgid(pid: c_int, pgid: c_int) -> c_int;
 }
 
 const WNOHANG: c_int = 1;
@@ -1430,8 +1431,30 @@ fn s720_pthread_kill_row() -> bool {
     )
 }
 
+/// A disposition installed only in the kernel (raw `SIGACTION`) must still be the one `raise`
+/// delivers; this is the exact split-store case the libc-local `DISP` table missed.
+fn s720_raise_kernel_action_row() -> bool {
+    // SAFETY: fork duplicates the process; the child only mutates its own statics.
+    let child = unsafe { fork() };
+    if child == 0 {
+        S720_HANDLER_COUNT.store(0, Ordering::SeqCst);
+        let action = RawSigAction {
+            handler: s720_handler as *const () as usize,
+            ..RAW_ACTION_ZERO
+        };
+        let installed = raw_sigaction(SIGUSR1, &action, ptr::null_mut()) == 0;
+        // SAFETY: raise takes one scalar signal number.
+        let raised = installed && unsafe { raise(SIGUSR1) } == 0;
+        let ran = S720_HANDLER_COUNT.load(Ordering::SeqCst) == 1;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if raised && ran { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-raise-kernel-action", s720_child_ok(child))
+}
+
 fn run_provider() -> bool {
     s720_raise_sigaction_row()
+        && s720_raise_kernel_action_row()
         && s720_signal_caught_row()
         && s720_signal_ignored_row()
         && s720_pending_row()
@@ -1454,6 +1477,12 @@ fn run_boundary() -> bool {
 /// `crt1.o` calls this after `__raven_libc_start`; the return value is the service exit status.
 #[unsafe(no_mangle)]
 pub extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
+    // Isolate the fixture in its own process group: the S720 matrix uses process-directed
+    // delivery as a control, and a group-wide send must never reach svcd or the other services.
+    // SAFETY: setpgid takes two scalar ids; failure leaves the inherited group unchanged.
+    unsafe {
+        setpgid(0, 0);
+    }
     let boundary = run_boundary();
     if boundary {
         debug_write(b"signal: boundary ok\n");
