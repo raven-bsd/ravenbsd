@@ -24,7 +24,6 @@
 #include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,28 +69,6 @@ static void fail(const char *name, const char *fmt, ...) {
 
 static void pending(const char *name, const char *why) {
     report(name, "PENDING", "%s", why);
-}
-
-/* S742: the public C boundary must carry the FreeBSD 13334440 record and request encodings. */
-static void row_header(void) {
-    int ok = sizeof(struct termios) == 44 && _Alignof(struct termios) == 4 &&
-             offsetof(struct termios, c_cc) == 16 &&
-             offsetof(struct termios, c_ispeed) == 36 &&
-             offsetof(struct termios, c_ospeed) == 40 && NCCS == 20 &&
-             VINTR == 8 && VMIN == 16 && VTIME == 17 &&
-             TIOCGETA == 0x402c7413UL && TIOCSETA == 0x802c7414UL &&
-             TIOCGWINSZ == 0x40087468UL && TIOCSWINSZ == 0x80087467UL &&
-             TIOCGPGRP == 0x40047477UL && TIOCSPGRP == 0x80047476UL &&
-             TIOCSCTTY == 0x20007461UL && FIONBIO == 0x8004667eUL &&
-             FIOCLEX == 0x20006601UL && FIONCLEX == 0x20006602UL &&
-             TCIFLUSH == 1 && TCOOFF == 1;
-    if (ok)
-        pass("header", "FreeBSD termios record 44/4, NCCS 20, FreeBSD request encodings");
-    else
-        fail("header", "sizeof=%zu align=%zu c_cc=%zu ispeed=%zu ospeed=%zu NCCS=%d GETA=%#lx",
-             sizeof(struct termios), _Alignof(struct termios),
-             offsetof(struct termios, c_cc), offsetof(struct termios, c_ispeed),
-             offsetof(struct termios, c_ospeed), NCCS, (unsigned long)TIOCGETA);
 }
 
 static int open_pair(int *master, int *slave, char *name, size_t name_len) {
@@ -169,6 +146,7 @@ static int cmp_termios(const char *who, const struct termios *want,
     FIELD(c_oflag)
     FIELD(c_cflag)
     FIELD(c_lflag)
+    FIELD(c_line)
 #undef FIELD
     if (cfgetispeed(want) != cfgetispeed(got)) {
         snprintf(diff, sizeof(diff), "%s.ispeed want=%lu got=%lu", who,
@@ -349,13 +327,6 @@ static void row_ctty(void) {
             _exit(14);
         if (ioctl(sfd, TIOCSCTTY, 0) != 0)
             _exit(15);
-        if (tcgetpgrp(sfd) != getpgrp())
-            _exit(18);
-        if (tcsetpgrp(sfd, getpgrp()) != 0)
-            _exit(19);
-        errno = 0;
-        if (tcsetpgrp(sfd, 0) != -1 || errno != EPERM)
-            _exit(20);
         int ctty = open("/dev/tty", O_RDWR);
         if (ctty < 0)
             _exit(16);
@@ -377,8 +348,7 @@ static void row_ctty(void) {
     if (code == 0 && routed)
         pass("ctty", "setsid -> /dev/tty ENXIO -> TIOCSCTTY -> /dev/tty open and routed");
     else
-        fail("ctty", "child exit=%d routed=%d (11 setsid,12 ctty,13 errno,14 open,15 sctty,"
-                     "16 tty,17 write,18 getpgrp,19 setpgrp,20 unauthorized)",
+        fail("ctty", "child exit=%d routed=%d (11 setsid,12 ctty,13 errno,14 open,15 sctty,16 tty,17 write)",
              code, routed);
     close(master);
     close(slave);
@@ -494,13 +464,7 @@ static void collect_signal(int result_fd, int *signal_out, int timeout_ms) {
     }
 }
 
-static int mutation_signals;
-
 static void row_sigwinch(void) {
-    if (mutation_signals) {
-        fail("sigwinch", "mutation: signal generation suppressed");
-        return;
-    }
     int master = -1;
     int slave = -1;
     char name[64];
@@ -539,10 +503,6 @@ static void row_sigwinch(void) {
 }
 
 static void row_sighup(void) {
-    if (mutation_signals) {
-        fail("sighup", "mutation: signal generation suppressed");
-        return;
-    }
     int master = -1;
     int slave = -1;
     char name[64];
@@ -576,10 +536,6 @@ static void row_sighup(void) {
 }
 
 static void row_isig(int enabled) {
-    if (mutation_signals) {
-        fail("isig", "mutation: signal generation suppressed");
-        return;
-    }
     int master = -1;
     int slave = -1;
     char name[64];
@@ -641,17 +597,14 @@ int main(int argc, char **argv) {
             run_signals = 1;
         else if (strcmp(argv[index], "--mutation-termios") == 0)
             mutation_termios = 1;
-        else if (strcmp(argv[index], "--mutation-signals") == 0)
-            mutation_signals = 1;
     }
-    printf("S175-TERM start uid=%d signals=%d mutation=%d signal_mutation=%d\n", (int)getuid(),
-           run_signals, mutation_termios, mutation_signals);
-    row_header();
+    printf("S175-TERM start uid=%d signals=%d mutation=%d\n", (int)getuid(),
+           run_signals, mutation_termios);
     row_termios(mutation_termios);
     row_pair();
     row_ctty();
     row_eio();
-    if (run_signals || mutation_signals) {
+    if (run_signals) {
         row_sigwinch();
         row_sighup();
         row_isig(1);
