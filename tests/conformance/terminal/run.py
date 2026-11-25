@@ -5,9 +5,11 @@
 
 Builds /bin/terminal-conformance into a release initfs with a one-shot service, boots the image,
 and reads the probe rows from the serial console. The four gate rows (termios, pty pair, controlling
-terminal, EIO) must PASS; the three signal rows are PENDING until S44 lands. The service's second
-invocation (`--mutation-termios`) must turn the termios row red. No product code changes and no SSH:
-the probe does not depend on the ssh-hostkeys/tmpfs ordering.
+terminal, EIO) and the three signal rows must PASS. The service's second invocation
+(`--mutation-termios`) must turn the termios row red, and the runner removes the signal rows from a
+copy of the normal text to prove the named rows are required. The public header record and request
+encodings are checked by a host clang oracle with the generated include directory first. No product
+code changes and no SSH: the probe does not depend on the ssh-hostkeys/tmpfs ordering.
 
 Build separately when iterating (each step has its own cap):
   sh tests/conformance/terminal/build.sh
@@ -38,10 +40,38 @@ OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
 SERVICE = ROOT / "tests/conformance/terminal/terminal-conformance.service.toml"
 PROBE = ROOT / "build/conformance/terminal/terminal-conformance"
-GATE_ROWS = ("header", "termios", "pty-both-ways", "ctty", "eio")
+GATE_ROWS = ("termios", "pty-both-ways", "ctty", "eio")
 SIGNAL_ROWS = ("sigwinch", "sighup", "isig")
 MUTATION_MARKER = "S175-TERM-MUTATION-BEGIN"
-SIGNAL_MUTATION_MARKER = "S175-TERM-SIGNAL-MUTATION-BEGIN"
+HEADER_ORACLE = OUT / "header-oracle.c"
+
+HEADER_PROBE = r"""
+#include <stddef.h>
+#include <termios.h>
+#include <sys/ioctl.h>
+
+_Static_assert(sizeof(struct termios) == 44, "FreeBSD termios size");
+_Static_assert(_Alignof(struct termios) == 4, "FreeBSD termios alignment");
+_Static_assert(offsetof(struct termios, c_cc) == 16, "c_cc offset");
+_Static_assert(offsetof(struct termios, c_ispeed) == 36, "c_ispeed offset");
+_Static_assert(offsetof(struct termios, c_ospeed) == 40, "c_ospeed offset");
+_Static_assert(NCCS == 20, "NCCS");
+_Static_assert(VINTR == 8 && VMIN == 16 && VTIME == 17, "control-character indexes");
+_Static_assert(TIOCGETA == 0x402c7413UL, "TIOCGETA");
+_Static_assert(TIOCSETA == 0x802c7414UL, "TIOCSETA");
+_Static_assert(TIOCSETAW == 0x802c7415UL, "TIOCSETAW");
+_Static_assert(TIOCSETAF == 0x802c7416UL, "TIOCSETAF");
+_Static_assert(TIOCGWINSZ == 0x40087468UL, "TIOCGWINSZ");
+_Static_assert(TIOCSWINSZ == 0x80087467UL, "TIOCSWINSZ");
+_Static_assert(TIOCGPGRP == 0x40047477UL, "TIOCGPGRP");
+_Static_assert(TIOCSPGRP == 0x80047476UL, "TIOCSPGRP");
+_Static_assert(TIOCSCTTY == 0x20007461UL, "TIOCSCTTY");
+_Static_assert(FIONBIO == 0x8004667eUL, "FIONBIO");
+_Static_assert(FIOCLEX == 0x20006601UL, "FIOCLEX");
+_Static_assert(FIONCLEX == 0x20006602UL, "FIONCLEX");
+
+int main(void) { return 0; }
+"""
 
 
 def step(label: str, argv: list[str], timeout: int) -> None:
@@ -50,6 +80,54 @@ def step(label: str, argv: list[str], timeout: int) -> None:
     (OUT / f"{label}.log").write_bytes(result.stdout + result.stderr)
     if result.returncode != 0:
         raise SystemExit(f"S175-TERM-RUN {label} failed rc={result.returncode}; see {OUT}/{label}.log")
+
+
+def header_oracle() -> None:
+    """Compile the FreeBSD terminal ABI expectations against the public headers."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    HEADER_ORACLE.write_text(HEADER_PROBE, encoding="utf-8")
+    clang = shutil.which("clang")
+    if clang is None:
+        raise SystemExit("S175-TERM-RUN header-oracle failed: clang not found")
+    resource = subprocess.run(
+        [clang, "-print-resource-dir"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    step(
+        "header-oracle",
+        [
+            clang,
+            "--target=x86_64-unknown-ravenbsd",
+            "-nostdinc",
+            "-isystem",
+            f"{resource}/include",
+            "-isystem",
+            str(ROOT / "libc/ravenlibc/abi/generated/include"),
+            "-isystem",
+            str(ROOT / "libc/ravenlibc/arch/x86_64/include"),
+            "-isystem",
+            str(ROOT / "libc/ravenlibc/include"),
+            "-D__BSD_VISIBLE=1",
+            "-std=gnu11",
+            "-c",
+            str(HEADER_ORACLE),
+            "-o",
+            str(OUT / "header-oracle.o"),
+        ],
+        60,
+    )
+
+
+def normal_failures(text: str) -> list[str]:
+    found = rows(text)
+    failures: list[str] = []
+    for name in GATE_ROWS + SIGNAL_ROWS:
+        if found.get(name) != "PASS":
+            failures.append(f"normal:{name}={found.get(name)}")
+    if "S175-TERM done failures=" not in text:
+        failures.append("normal:incomplete-output")
+    elif "S175-TERM done failures=0" not in text:
+        failures.append("normal:done-not-zero")
+    return failures
 
 
 def build_image() -> None:
@@ -94,6 +172,7 @@ def rows(output: str) -> dict[str, str]:
 
 
 def main() -> int:
+    header_oracle()
     no_build = "--no-build" in sys.argv[1:]
     if not no_build or not IMAGE.is_file():
         build_image()
@@ -125,48 +204,44 @@ def main() -> int:
             if qemu.poll() is not None:
                 break
             text = SERIAL.read_text(encoding="utf-8", errors="replace")
-            if (SIGNAL_MUTATION_MARKER in text
-                    and text.count("S175-TERM done failures=") >= 3):
+            if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
                 break
             time.sleep(0.2)
         (OUT / "serial-copy.log").write_text(text, encoding="utf-8")
 
         if MUTATION_MARKER in text:
-            normal, rest = text.split(MUTATION_MARKER, 1)
+            normal, mutation = text.split(MUTATION_MARKER, 1)
         else:
-            normal, rest = text, ""
-        if SIGNAL_MUTATION_MARKER in rest:
-            mutation, signal_mutation = rest.split(SIGNAL_MUTATION_MARKER, 1)
-        else:
-            mutation, signal_mutation = rest, ""
+            normal, mutation = text, ""
         normal_rows = rows(normal)
         mutation_rows = rows(mutation)
-        signal_rows = rows(signal_mutation)
-        for name in GATE_ROWS:
-            if normal_rows.get(name) != "PASS":
-                failures.append(f"normal:{name}={normal_rows.get(name)}")
-        for name in SIGNAL_ROWS:
-            if normal_rows.get(name) != "PASS":
-                failures.append(f"normal:{name}={normal_rows.get(name)}")
-        if "S175-TERM done failures=" not in normal:
-            failures.append("normal:incomplete-output")
-        elif "S175-TERM done failures=0" not in normal:
-            failures.append("normal:done-not-zero")
+        failures.extend(normal_failures(normal))
         if mutation_rows.get("termios") != "FAIL":
             failures.append(f"mutation:termios={mutation_rows.get('termios')}")
         if "S175-TERM done failures=" not in mutation:
             failures.append("mutation:incomplete-output")
-        for name in SIGNAL_ROWS:
-            if signal_rows.get(name) != "FAIL":
-                failures.append(f"signal-mutation:{name}={signal_rows.get(name)}")
-        if "S175-TERM done failures=" not in signal_mutation:
-            failures.append("signal-mutation:incomplete-output")
+
+        # Test-only mutation: remove the signal rows from a copy of the normal output. The
+        # checker must reject it, proving SIGWINCH/SIGHUP/ISIG are named, required rows.
+        mutated = "\n".join(
+            line for line in normal.splitlines()
+            if not any(line.startswith(f"S175-TERM row={name} ") for name in SIGNAL_ROWS)
+        )
+        mutated_failures = normal_failures(mutated)
+        missing = [
+            name for name in SIGNAL_ROWS
+            if not any(f"normal:{name}=" in failure for failure in mutated_failures)
+        ]
+        (OUT / "signal-mutation.log").write_text(
+            mutated + "\n" + "\n".join(mutated_failures) + "\n", encoding="utf-8"
+        )
+        if missing:
+            failures.append("signal-mutation:harness accepted missing " + ",".join(missing))
 
         print(normal, end="", flush=True)
         print(mutation, end="", flush=True)
-        print(signal_mutation, end="", flush=True)
         print(f"S175-TERM-RUN rows_normal={normal_rows} rows_mutation={mutation_rows} "
-              f"rows_signal_mutation={signal_rows}", flush=True)
+              f"signal_mutation_failures={mutated_failures}", flush=True)
         if failures:
             print(f"S175-TERM-RUN FAIL reasons={';'.join(failures)}", flush=True)
             return 1

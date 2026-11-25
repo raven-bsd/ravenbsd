@@ -32,9 +32,9 @@
 #ifndef _BITS_TERMIOS_H
 #define _BITS_TERMIOS_H
 
-#ifndef NCCS
+/* `include/termios.h` keeps its base `NCCS 32`; the public record is 20. */
+#undef NCCS
 #define NCCS 20
-#endif
 
 #define _POSIX_VDISABLE 0xff
 
