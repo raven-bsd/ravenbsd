@@ -38,6 +38,7 @@ unsafe extern "C" {
     fn geteuid() -> u32;
     fn setgid(gid: u32) -> c_int;
     fn setuid(uid: u32) -> c_int;
+    fn __errno_location() -> *mut c_int;
 }
 
 const EXPECTED_EPERM: i32 = 1;
@@ -73,11 +74,14 @@ fn errno_of(raw: isize) -> i32 {
 }
 
 fn clear_errno() {
-    raven_libc_sys::errno::set_errno(0);
+    // SAFETY: `__errno_location` returns the live, writable errno cell of the calling thread; the
+    // libc owns it and keeps it valid for the process lifetime.
+    unsafe { *__errno_location() = 0 };
 }
 
 fn libc_errno() -> i32 {
-    raven_libc_sys::errno::errno()
+    // SAFETY: same cell as `clear_errno`; the read is of a live `c_int` owned by the libc.
+    unsafe { *__errno_location() }
 }
 
 fn raw_getrlimit(resource: usize, out: &mut [u64; 2]) -> i32 {
