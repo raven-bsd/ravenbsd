@@ -20,6 +20,7 @@ static volatile int outer_sig;
 static volatile int nested_sig;
 static volatile uintptr_t interrupted_rip;
 static volatile uintptr_t interrupted_rsp;
+static volatile uintptr_t expected_rip;
 static volatile uintptr_t expected_rsp;
 static volatile int after_raise;
 static volatile int raise_nested;
@@ -92,17 +93,16 @@ static int handler_row(void) {
 
 static int ucontext_row(void) {
     long long distance;
-    /* S720: raise is thread-directed through the kernel, so the interrupted PC is the libc
-       instruction after the syscall, not the old libc-direct call site. Both live in the same
-       statically linked text image (the linker places .text first at 0x400000 and .rodata after
-       it), so the context must point into that image rather than at zero, the trampoline or data. */
-    uintptr_t text_high = (uintptr_t)"signal: ucontext ok";
     if (interrupted_rip == 0 || interrupted_rsp == 0) {
         fail_row("ucontext-empty", (long long)interrupted_rip, 0);
         return 1;
     }
-    if (interrupted_rip < 0x400000 || interrupted_rip >= text_high) {
-        fail_row("ucontext-rip", (long long)interrupted_rip, 0);
+    distance = (long long)interrupted_rip - (long long)expected_rip;
+    if (distance < 0) {
+        distance = -distance;
+    }
+    if (distance > 65536) {
+        fail_row("ucontext-rip", distance, 0);
         return 1;
     }
     distance = (long long)interrupted_rsp - (long long)expected_rsp;
@@ -164,6 +164,7 @@ int main(int argc, char **argv) {
     if (install_handlers() != 0) {
         _exit(1);
     }
+    expected_rip = (uintptr_t)&raise;
     expected_rsp = (uintptr_t)&marker;
     after_raise = 0;
     raise_nested = 1;

@@ -1281,6 +1281,30 @@ fn signal_action() -> Sigaction {
     }
 }
 
+/// `ucontext_t.uc_mcontext.gregs[REG_RIP]` on x86-64 (System V public layout).
+#[cfg(target_arch = "x86_64")]
+const S720_UC_PC_OFFSET: usize = 40 + 16 * 8;
+/// `ucontext_t.uc_mcontext.__gregs[REG_ELR]` in the C19 aarch64 kernel frame.
+#[cfg(target_arch = "aarch64")]
+const S720_UC_PC_OFFSET: usize = 0x10 + 32 * 8;
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+const S720_UC_PC_OFFSET: usize = 0;
+static S720_UC_PC: AtomicUsize = AtomicUsize::new(0);
+static S720_UC_RAN: AtomicI32 = AtomicI32::new(0);
+
+extern "C" fn s720_ucontext_handler(_signal: c_int, _info: *mut c_void, context: *mut c_void) {
+    S720_UC_RAN.store(1, Ordering::SeqCst);
+    if context.is_null() {
+        return;
+    }
+    // SAFETY: the kernel passes a live `ucontext_t`; the offset names the architecture's
+    // interrupted-PC word in the C19 frame (x86-64 RIP, aarch64 ELR).
+    let pc = unsafe {
+        core::ptr::read_volatile((context as *const u8).add(S720_UC_PC_OFFSET) as *const u64)
+    };
+    S720_UC_PC.store(pc as usize, Ordering::SeqCst);
+}
+
 static A_READY: AtomicI32 = AtomicI32::new(0);
 static B_READY: AtomicI32 = AtomicI32::new(0);
 static A_RELEASE: AtomicI32 = AtomicI32::new(0);
@@ -1493,9 +1517,41 @@ fn s720_raise_kernel_action_row() -> bool {
     provider_row(b"s720-raise-kernel-action", s720_child_ok(child))
 }
 
+/// The kernel-delivered `ucontext_t` must point at the interrupted instruction in the text image.
+///
+/// This is the S720 replacement for the C fixture's old proximity check to `&raise`: with
+/// thread-directed kernel delivery the saved PC is the libc instruction after the syscall.
+fn s720_ucontext_row() -> bool {
+    // SAFETY: fork duplicates the process; the child only mutates its own statics.
+    let child = unsafe { fork() };
+    if child == 0 {
+        S720_UC_PC.store(0, Ordering::SeqCst);
+        S720_UC_RAN.store(0, Ordering::SeqCst);
+        let action = Sigaction {
+            sa_handler: s720_ucontext_handler as *const () as usize,
+            sa_mask: Sigset::ZERO,
+            sa_flags: SA_SIGINFO,
+            _pad: 0,
+            sa_restorer: 0,
+        };
+        // SAFETY: the action is live for the call.
+        let installed = unsafe { sigaction(SIGUSR1, &action, ptr::null_mut()) } == 0;
+        // SAFETY: raise takes one scalar signal number.
+        let raised = installed && unsafe { raise(SIGUSR1) } == 0;
+        let ran = S720_UC_RAN.load(Ordering::SeqCst) == 1;
+        let pc = S720_UC_PC.load(Ordering::SeqCst);
+        let text_high = b"signal: provider ok".as_ptr() as usize;
+        let ok = raised && ran && pc >= 0x400000 && pc < text_high;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if ok { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-ucontext", s720_child_ok(child))
+}
+
 fn run_provider() -> bool {
     s720_raise_sigaction_row()
         && s720_raise_kernel_action_row()
+        && s720_ucontext_row()
         && s720_signal_caught_row()
         && s720_signal_ignored_row()
         && s720_pending_row()
