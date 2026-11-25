@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use raven_abi::errno::Errno;
+use raven_mptcp::Mapping;
 use raven_tcpip::{AF_INET, IPPROTO_MPTCP, IpAddr, MptcpSocket, SocketId, Stack};
 
 use common::{A, B, address, pair};
@@ -182,5 +183,62 @@ fn aggregation_is_opt_in_and_uses_both_regular_paths() {
     assert!(!second_bytes.is_empty(), "second regular path carried data");
     assert_eq!(first_bytes.len() + second_bytes.len(), data.len());
     assert_eq!(socket.subflows().len(), 2);
+    assert_eq!(socket.close(), Ok(()));
+}
+
+#[test]
+fn dss_mappings_reassemble_across_subflows_in_order() {
+    let mut rig = Rig::new();
+    let mut socket = rig.open(true);
+    let primary_peer = rig.accept();
+    let backup = socket
+        .add_path((IpAddr::V4(address(B)), 80), Some(address(A)), true)
+        .expect("add backup");
+    let backup_peer = rig.accept();
+    let primary = socket
+        .subflows()
+        .iter()
+        .find(|path| !path.backup)
+        .expect("primary")
+        .subflow_id;
+
+    let data: Vec<u8> = (0..3000).map(|index| (index % 251) as u8).collect();
+    let (first, second) = data.split_at(1000);
+
+    rig.b
+        .borrow_mut()
+        .send(backup_peer, second)
+        .expect("backup write");
+    rig.b
+        .borrow_mut()
+        .send(primary_peer, first)
+        .expect("primary write");
+    rig.pump_to(rig.now + 200);
+
+    let backup_mapping = Mapping {
+        data_seq: 1000,
+        subflow_seq: 0,
+        data_len: 2000,
+        checksum: None,
+        dsn_64: true,
+    };
+    assert_eq!(socket.receive_dss(backup, &backup_mapping, false), Ok(()));
+    assert!(
+        !socket.readiness().readable,
+        "an out-of-order range is buffered, not delivered"
+    );
+
+    let primary_mapping = Mapping {
+        data_seq: 0,
+        subflow_seq: 0,
+        data_len: 1000,
+        checksum: None,
+        dsn_64: true,
+    };
+    assert_eq!(socket.receive_dss(primary, &primary_mapping, false), Ok(()));
+    assert!(socket.readiness().readable, "the gap is filled");
+    let mut received = vec![0u8; data.len()];
+    assert_eq!(socket.recv(&mut received), Ok(data.len()));
+    assert_eq!(received, data);
     assert_eq!(socket.close(), Ok(()));
 }

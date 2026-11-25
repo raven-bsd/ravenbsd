@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use raven_abi::errno::Errno;
-use raven_mptcp::{Error as MptcpError, MetaSocket};
+use raven_mptcp::{Error as MptcpError, Mapping, MetaSocket};
 
 use crate::device::Device;
 use crate::event::SocketId;
@@ -189,6 +189,21 @@ impl<D: Device + 'static> MptcpSocket<D> {
                 self.stack.borrow_mut().recv_from(SubflowId(id), buffer)
             }
         }
+    }
+
+    /// Deliver one received DSS mapping for a subflow.
+    ///
+    /// The TCP option parser (outside this slice) decodes the DSS mapping and calls this with
+    /// the subflow that carried the payload. The bytes are read from that subflow and passed to
+    /// the connection-level receive path, which reorders them by data sequence number. Backup
+    /// and out-of-order ranges stay buffered until the gap is filled.
+    pub fn receive_dss(
+        &mut self,
+        _subflow_id: u32,
+        _mapping: &Mapping,
+        _data_fin: bool,
+    ) -> Result<(), Errno> {
+        Err(Errno::EOPNOTSUPP)
     }
 
     /// Live readiness: current connection bytes and path health.
