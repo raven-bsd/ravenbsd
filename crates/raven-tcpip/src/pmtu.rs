@@ -123,6 +123,162 @@ pub fn mss_headers(family: IpFamily) -> u32 {
     }
 }
 
+/// NetBSD `tcp_minmss`: the smallest peer MSS offer accepted after the 256-byte sanity clamp.
+// K259 donor helper: the live call site (`tcp_mss.rs`) is owned by another lane.
+#[allow(dead_code)]
+pub(crate) const TCP_MINMSS_NETBSD: u32 = 256;
+
+/// Result of NetBSD `tcp_mss_from_peer`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PeerMss {
+    /// `t_peermss`: the peer offer after the 256-byte floor.
+    pub peer_mss: u32,
+    /// `t_segsz`: the payload actually used after option and buffer limits.
+    pub segsz: u32,
+    /// Send buffer rounded up to a whole segment, as NetBSD grows the socket buffer.
+    pub send_buffer: u32,
+}
+
+/// NetBSD `tcp_mss_to_advertise`: the largest known MTU minus IP and TCP headers.
+///
+/// `in_maxmtu` is the largest MTU of any attached network; `mss_ifmtu` restricts the
+/// advertisement to the selected interface MTU (`tcp_mss_ifmtu`).
+// K259 donor helper: the live call site (`tcp_mss.rs`) is owned by another lane.
+#[allow(dead_code)]
+#[must_use]
+pub(crate) fn mss_to_advertise(
+    if_mtu: u32,
+    in_maxmtu: u32,
+    family: IpFamily,
+    mss_ifmtu: bool,
+    mss_default: u32,
+) -> u32 {
+    let mut mss = if_mtu;
+    if !mss_ifmtu {
+        mss = mss.max(in_maxmtu);
+    }
+    let headers = mss_headers(family);
+    mss = mss.saturating_sub(headers);
+    mss.max(mss_default)
+}
+
+/// NetBSD `tcp_mss_from_peer`: apply the peer offer, the 256-byte floor, options and send buffer.
+// K259 donor helper: the live call site (`tcp_mss.rs`) is owned by another lane.
+#[allow(dead_code)]
+#[must_use]
+pub(crate) fn mss_from_peer(
+    offer: u32,
+    mss_default: u32,
+    optlen: u32,
+    ip_optlen: u32,
+    send_buffer: u32,
+) -> PeerMss {
+    let peer_mss = if offer == 0 { mss_default } else { offer }.max(TCP_MINMSS_NETBSD);
+    let segsz = peer_mss.saturating_sub(optlen).saturating_sub(ip_optlen);
+    let segsz = if send_buffer < segsz {
+        send_buffer
+    } else {
+        segsz
+    };
+    let send_buffer = if segsz == 0 {
+        send_buffer
+    } else {
+        send_buffer.div_ceil(segsz).saturating_mul(segsz)
+    };
+    PeerMss {
+        peer_mss,
+        segsz,
+        send_buffer,
+    }
+}
+
+/// One queued ICMP PMTU report (`TF_PMTUD_PEND` fields).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PmtuPending {
+    /// TCP sequence quoted by the ICMP message.
+    pub th_seq: u32,
+    /// Advertised next-hop MTU.
+    pub nextmtu: u32,
+    /// Quoted IP length.
+    pub ip_len: u16,
+    /// Quoted IP header length in 32-bit words.
+    pub ip_hl: u8,
+}
+
+/// Per-connection NetBSD PMTU state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PmtuPath {
+    /// Largest packet ever sent (`t_pmtud_mtu_sent`).
+    pub mtu_sent: u32,
+    /// Largest acknowledged payload since the last update (`t_pmtud_mss_acked`).
+    pub mss_acked: u32,
+    /// Queued report, if any (`TF_PMTUD_PEND`).
+    pub pending: Option<PmtuPending>,
+}
+
+impl PmtuPath {
+    /// NetBSD `icmp_check`: clear a pending quote once its segment is acknowledged and track
+    /// the largest acknowledged chunk.
+    // K259 donor helper: the live call site (`tcp_input.rs`) is owned by another lane.
+    #[allow(dead_code)]
+    pub(crate) fn on_ack(&mut self, ack: u32, acked: u32) {
+        if self.pending.is_some_and(|pending| ack > pending.th_seq) {
+            self.pending = None;
+        }
+        if self.mss_acked < acked {
+            self.mss_acked = acked;
+        }
+    }
+}
+
+/// Result of one ICMP need-fragmentation report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PmtuResult {
+    /// The quote was stale, unmatched or advertised no smaller MTU.
+    Ignored,
+    /// Traditional PMTUD: the new MTU covers acknowledged data.
+    Classic(u32),
+    /// The MTU is below acknowledged data; defer it until the quote is acknowledged.
+    Pending(PmtuPending),
+}
+
+/// NetBSD `tcp_ctlinput` PRC_MSGSIZE and `icmp_check` pending/replacement rule.
+// K259 donor helper: the live call site (`tcp_input.rs`) is owned by another lane.
+#[allow(dead_code)]
+#[allow(clippy::too_many_arguments)] // Mirrors the quoted ICMP and TCP state fields.
+#[must_use]
+pub(crate) fn on_icmp_pmtu(
+    path: &mut PmtuPath,
+    seq: u32,
+    snd_una: u32,
+    snd_max: u32,
+    reported_mtu: u32,
+    headers: u32,
+    ip_len: u16,
+    ip_hl: u8,
+) -> PmtuResult {
+    if seq < snd_una || seq >= snd_max || reported_mtu >= path.mtu_sent {
+        return PmtuResult::Ignored;
+    }
+    if reported_mtu >= headers.saturating_add(path.mss_acked) {
+        path.pending = None;
+        return PmtuResult::Classic(reported_mtu);
+    }
+    if let Some(pending) = path.pending
+        && pending.th_seq < seq
+    {
+        return PmtuResult::Ignored;
+    }
+    let pending = PmtuPending {
+        th_seq: seq,
+        nextmtu: reported_mtu,
+        ip_len,
+        ip_hl,
+    };
+    path.pending = Some(pending);
+    PmtuResult::Pending(pending)
+}
+
 /// FreeBSD `tcp_mssopt`: the MSS option for an outgoing SYN.
 ///
 /// `maxmtu` is the interface/route MTU, `hc_mtu` the host-cache MTU (0 when absent), and

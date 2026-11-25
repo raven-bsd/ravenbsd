@@ -68,6 +68,12 @@ pub struct EcnCounters {
     pub sent_ect0: u64,
     /// `tcps_ecn_sndect1`.
     pub sent_ect1: u64,
+    /// `tcps_ace_nect` (Accurate ECN non-ECT or CE SYN).
+    pub ace_nect: u64,
+    /// `tcps_ace_ect0` (Accurate ECN ECT(0) SYN).
+    pub ace_ect0: u64,
+    /// `tcps_ace_ect1` (Accurate ECN ECT(1) SYN).
+    pub ace_ect1: u64,
 }
 
 impl EcnState {
@@ -110,24 +116,28 @@ impl EcnState {
                         self.permit = false;
                         self.scep = 5;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_nect = counters.ace_nect.wrapping_add(1);
                     }
                     TH_AE => {
                         self.ace_permit = true;
                         self.permit = false;
                         self.scep = 5;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_ect0 = counters.ace_ect0.wrapping_add(1);
                     }
                     value if value == (TH_CWR | TH_ECE) => {
                         self.ace_permit = true;
                         self.permit = false;
                         self.scep = 5;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_ect1 = counters.ace_ect1.wrapping_add(1);
                     }
                     value if value == (TH_AE | TH_CWR) => {
                         self.ace_permit = true;
                         self.permit = false;
                         self.scep = 6;
                         counters.handshakes = counters.handshakes.wrapping_add(1);
+                        counters.ace_nect = counters.ace_nect.wrapping_add(1);
                     }
                     _ => {
                         self.permit = false;

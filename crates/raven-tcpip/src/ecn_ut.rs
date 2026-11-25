@@ -158,3 +158,27 @@ fn modes_without_a_syn_option_emit_no_flags() {
     assert_eq!(EcnState::new(2, 1).output_syn_sent(0), 0);
     assert_eq!(EcnState::new(4, 1).output_syn_sent(0), 0);
 }
+
+#[test]
+fn accurate_syn_counters_follow_the_donor_table() {
+    let mut counters = EcnCounters::default();
+    let mut ecn = EcnState::new(3, 1);
+    ecn.input_syn_sent(TH_CWR, 0, &mut counters);
+    assert_eq!(counters.ace_nect, 1);
+    assert_eq!(counters.handshakes, 1);
+
+    let mut counters = EcnCounters::default();
+    let mut ecn = EcnState::new(3, 1);
+    ecn.input_syn_sent(TH_AE, 0, &mut counters);
+    assert_eq!(counters.ace_ect0, 1);
+
+    let mut counters = EcnCounters::default();
+    let mut ecn = EcnState::new(3, 1);
+    ecn.input_syn_sent(TH_CWR | TH_ECE, 0, &mut counters);
+    assert_eq!(counters.ace_ect1, 1);
+
+    let mut counters = EcnCounters::default();
+    let mut ecn = EcnState::new(3, 1);
+    ecn.input_syn_sent(TH_AE | TH_CWR, 0, &mut counters);
+    assert_eq!(counters.ace_nect, 1);
+}

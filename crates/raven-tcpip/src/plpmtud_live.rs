@@ -79,6 +79,11 @@ pub(crate) fn probe_due(
         _ => return None,
     }
     let Some(probe_size) = search.next_probe_size() else {
+        // `next_probe_size` is the non-consuming lookahead, so it never performs the terminal
+        // transition. Consume it here; otherwise an exhausted budget stays `Searching` and the
+        // stack timer schedules the same instant forever.
+        let terminal = search.next_probe();
+        debug_assert!(terminal.is_none());
         if search.state == PlpmtudState::Error {
             connection.plp_next_ms = i64::MAX;
         } else {
