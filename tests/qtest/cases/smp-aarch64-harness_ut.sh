@@ -73,6 +73,16 @@ tsv="$tmp/build/qtest/smp-aarch64.tsv"
 lines=$(wc -l < "$tsv" | tr -d ' ')
 [ "$lines" -eq 24 ] || fail "expected 24 runs (3 fast + 1 soak + 4 cases x 5 cross-arch), got $lines"
 
+# The aarch64 cross-arch libc row must use a case that declares aarch64; libc-threads is an
+# x86_64 case and its aarch64 row cannot build (libc-threads.toml declares arch = "x86_64").
+grep -q '^aarch64-libc	aarch64	' "$tsv" ||
+    fail "cross-arch aarch64 libc row is not aarch64-libc"
+grep -q '^libc-threads	x86_64	' "$tsv" ||
+    fail "cross-arch x86_64 libc row is not libc-threads"
+if grep -q '^libc-threads	aarch64	' "$tsv"; then
+    fail "cross-arch aarch64 libc row must not use the x86_64 libc-threads case"
+fi
+
 LC_ALL=C awk -F '	' '
     NF != 7 { printf "line %d has %d fields, expected 7: %s\n", NR, NF, $0; bad = 1 }
     $6 !~ /^[0-9]+(\.[0-9]+)?$/ { printf "line %d load1_before is not numeric: %s\n", NR, $6; bad = 1 }
@@ -87,6 +97,8 @@ header=$(head -1 "$summary")
     fail "summary header changed: $header"
 rows=$(($(wc -l < "$summary" | tr -d ' ') - 1))
 [ "$rows" -eq 8 ] || fail "expected 8 summary rows, got $rows"
+LC_ALL=C awk -F '	' '$1 == "aarch64-libc aarch64" && $2 == 5 { found = 1 } END { exit !found }' "$summary" ||
+    fail "summary is missing the aarch64-libc aarch64 row with 5 runs"
 
 grep -q 'smp-aarch64: fast_iterations=1 soak_iterations=1 cross_arch_iterations=5 timed_out=0 failed=0' "$tmp/run.log" ||
     fail "summary counters changed: $(tail -3 "$tmp/run.log")"
