@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# S164: fork and copy-on-write visibility conformance (C13). The fixture fills a private page,
-# forks, and asserts identical bytes/address until either writes; then it creates a memory object,
-# maps it SHARED, has the parent store 0xBB, and forks+execs a child on the inherited object handle;
-# the child must see the writer's 0xBB. The one-shot libc-test service runs the fixture's `all` mode.
+# S164: fork and copy-on-write visibility conformance (C13). The Rust fixture fills a private page,
+# forks in both write orders, asserts identical bytes/address until either writes, maps one memory
+# object SHARED twice and across fork, then forks+execs a child on the inherited object handle; the
+# child must see the writer's 0xBB. The one-shot libc-test service runs every row and exits.
 
 name = "cow-visibility"
 arch = "x86_64"

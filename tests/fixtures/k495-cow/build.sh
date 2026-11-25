@@ -52,14 +52,4 @@ fi
     -L"$sysroot/usr/lib" -lc \
     "$sysroot/usr/lib/crtn.o" -o "$out/k495-cow"
 
-# The memory-object rows need a real handle, which the C profile does not expose. Build the
-# standalone Rust helper and overlay it beside the C probe in the libc-test initfs.
-manifest=tests/fixtures/k495-cow/memobj/Cargo.toml
-target_dir=${CARGO_TARGET_DIR:-$root/target}
-RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld" \
-    cargo build --manifest-path "$manifest" --target-dir "$target_dir" \
-    -p raven-k495-cow-memobj --target x86_64-unknown-none --release
-cp "$target_dir/x86_64-unknown-none/release/raven-k495-cow-memobj" "$out/k495-cow-memobj"
-rm -f tests/fixtures/k495-cow/memobj/Cargo.lock
-
-echo "k495-cow fixture: staged $out/k495-cow and $out/k495-cow-memobj"
+echo "k495-cow fixture: staged $out/k495-cow"

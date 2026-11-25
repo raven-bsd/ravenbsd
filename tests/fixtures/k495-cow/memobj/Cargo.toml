@@ -6,9 +6,9 @@
 [workspace]
 
 [package]
-name = "raven-k495-cow-memobj"
+name = "raven-k495-cow-fixture"
 version = "0.1.0"
-description = "S164 C13 memory-object SHARED visibility fixture (same process and fork+exec)."
+description = "S164 C13 fork COW and memory-object SHARED visibility fixture."
 edition = "2024"
 license = "BSD-3-Clause"
 authors = ["Bo Maryniuk and RavenBSD contributors"]
@@ -18,7 +18,7 @@ rust-version = "1.97"
 target = "none"
 
 [[bin]]
-name = "raven-k495-cow-memobj"
+name = "raven-k495-cow-fixture"
 path = "src/main.rs"
 
 [dependencies]
