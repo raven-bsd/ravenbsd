@@ -6,9 +6,9 @@
 # S106 adds the four-way concurrent unmap/TLB-shootdown regression to the fast loop.
 #
 # Runs the existing aarch64 SMP cases on QEMU TCG with -smp 4, a documented soak/time-box, the
-# x86_64 counterparts and `libc-threads` on both arches. A failing iteration stops the matrix
-# (no retry that hides a failure). KVM aarch64 is probed but never faked: the binary must offer
-# the accelerator and the probe must boot.
+# x86_64 counterparts, `libc-threads` on x86_64 and `aarch64-libc` on aarch64. A failing iteration
+# stops the matrix (no retry that hides a failure). KVM aarch64 is probed but never faked: the
+# binary must offer the accelerator and the probe must boot.
 #
 # Usage: scripts/smp-aarch64.sh [--iterations N] [--timebox SECS] [--soak N] [--max-load N] [--kvm]
 # Outputs: build/qtest/smp-aarch64.tsv (case/arch/iteration/rc/duration_ms)
@@ -141,7 +141,7 @@ if [ "$FAILED" -eq 0 ]; then
         run_case smp-user x86_64 "$x_iter" || break
         run_case smp-soak x86_64 "$x_iter" || break
         run_case libc-threads x86_64 "$x_iter" || break
-        run_case libc-threads aarch64 "$x_iter" || break
+        run_case aarch64-libc aarch64 "$x_iter" || break
         x_iter=$((x_iter + 1))
     done
 fi
