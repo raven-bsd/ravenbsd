@@ -181,6 +181,19 @@ fields = [
   { name = "msg_flags", ty = "i32", off = 44 },
 ]
 
+# DR-69 FreeBSD `sys/sys/socket.h:680`: `struct msghdr` plus `ssize_t msg_len`.
+[[record]]
+name = "mmsghdr"
+rust = "Mmsghdr"
+c = "struct mmsghdr"
+musl = "struct mmsghdr"
+size = 56
+align = 8
+fields = [
+  { name = "msg_hdr", ty = "msghdr", off = 0 },
+  { name = "msg_len", ty = "i64", off = 48 },
+]
+
 # DR-69 FreeBSD `sys/sys/socket.h:496`: `socklen_t cmsg_len`, then level and type; 12 bytes.
 [[record]]
 name = "cmsghdr"

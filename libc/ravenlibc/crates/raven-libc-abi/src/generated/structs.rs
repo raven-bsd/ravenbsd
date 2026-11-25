@@ -318,6 +318,26 @@ const _: () = assert!(core::mem::offset_of!(Msghdr, msg_flags) == 44);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mmsghdr {
+    pub msg_hdr: Msghdr,
+    pub msg_len: i64,
+}
+
+impl Mmsghdr {
+    /// All-zero value.
+    pub const ZERO: Self = Self {
+        msg_hdr: Msghdr::ZERO,
+        msg_len: 0,
+    };
+}
+
+const _: () =
+    assert!(core::mem::size_of::<Mmsghdr>() == 56 && core::mem::align_of::<Mmsghdr>() == 8);
+const _: () = assert!(core::mem::offset_of!(Mmsghdr, msg_hdr) == 0);
+const _: () = assert!(core::mem::offset_of!(Mmsghdr, msg_len) == 48);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cmsghdr {
     pub cmsg_len: u32,
     pub cmsg_level: i32,

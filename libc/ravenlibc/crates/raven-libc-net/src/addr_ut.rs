@@ -167,7 +167,8 @@ fn unix_maximum_path_and_oversize() {
 fn generated_socket_records_are_freebsd_shaped() {
     use core::mem::{align_of, offset_of, size_of};
     use raven_libc_abi::structs::{
-        Addrinfo, Cmsghdr, Msghdr, Sockaddr, SockaddrIn, SockaddrIn6, SockaddrStorage, SockaddrUn,
+        Addrinfo, Cmsghdr, Mmsghdr, Msghdr, Sockaddr, SockaddrIn, SockaddrIn6, SockaddrStorage,
+        SockaddrUn,
     };
 
     assert_eq!((size_of::<Sockaddr>(), align_of::<Sockaddr>()), (16, 1));
@@ -206,6 +207,11 @@ fn generated_socket_records_are_freebsd_shaped() {
 
     assert_eq!((size_of::<Msghdr>(), align_of::<Msghdr>()), (48, 8));
     assert_eq!(offset_of!(Msghdr, msg_flags), 44);
+
+    assert_eq!((size_of::<Mmsghdr>(), align_of::<Mmsghdr>()), (56, 8));
+    assert_eq!(offset_of!(Mmsghdr, msg_hdr), 0);
+    assert_eq!(offset_of!(Mmsghdr, msg_len), 48);
+    assert_eq!(core::mem::size_of_val(&Mmsghdr::ZERO.msg_len), 8);
 
     assert_eq!((size_of::<Cmsghdr>(), align_of::<Cmsghdr>()), (12, 4));
     assert_eq!(offset_of!(Cmsghdr, cmsg_level), 4);

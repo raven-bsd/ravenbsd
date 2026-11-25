@@ -14,6 +14,7 @@ use crate::generated::structs::Flock;
 use crate::generated::structs::Group;
 use crate::generated::structs::Iovec;
 use crate::generated::structs::Itimerspec;
+use crate::generated::structs::Mmsghdr;
 use crate::generated::structs::Msghdr;
 use crate::generated::structs::Passwd;
 use crate::generated::structs::Pollfd;
@@ -387,6 +388,24 @@ pub const STRUCTS: &[StructLayout] = &[
                 name: "msg_flags",
                 offset: core::mem::offset_of!(Msghdr, msg_flags),
                 size: 4,
+            },
+        ],
+    },
+    StructLayout {
+        name: "mmsghdr",
+        c_name: "struct mmsghdr",
+        size: core::mem::size_of::<Mmsghdr>(),
+        align: core::mem::align_of::<Mmsghdr>(),
+        fields: &[
+            FieldLayout {
+                name: "msg_hdr",
+                offset: core::mem::offset_of!(Mmsghdr, msg_hdr),
+                size: 48,
+            },
+            FieldLayout {
+                name: "msg_len",
+                offset: core::mem::offset_of!(Mmsghdr, msg_len),
+                size: 8,
             },
         ],
     },

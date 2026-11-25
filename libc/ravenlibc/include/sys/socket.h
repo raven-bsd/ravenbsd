@@ -71,15 +71,16 @@ struct ucred {
 #endif
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
+/* RavenBSD: DR-69 FreeBSD sys/sys/socket.h:680; ssize_t msg_len. */
 struct mmsghdr {
 	struct msghdr msg_hdr;
-	unsigned int  msg_len;
+	ssize_t msg_len;
 };
 
 struct timespec;
 
-int sendmmsg (int, struct mmsghdr *, unsigned int, unsigned int);
-int recvmmsg (int, struct mmsghdr *, unsigned int, unsigned int, struct timespec *);
+ssize_t sendmmsg (int, struct mmsghdr *, size_t, int);
+ssize_t recvmmsg (int, struct mmsghdr *__restrict, size_t, int, const struct timespec *__restrict);
 #endif
 
 struct linger {
