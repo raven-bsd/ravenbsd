@@ -489,7 +489,9 @@ const ZERO_SIGACTION: UserSigAction = UserSigAction {
 /// [`UserSigAction`] wire (handler at 0, two mask words at 8, `flags` at 24, `restorer` at 32);
 /// libc converts the public 152-byte C `struct sigaction` to this before the syscall.
 /// `SIGKILL`/`SIGSTOP` accept only `SIG_DFL`; unknown handler flags are `EINVAL` when a handler
-/// is caught, matching FreeBSD `kern_sigaction`.
+/// is caught, matching FreeBSD `kern_sigaction`. A failed call leaves the caller's `old` buffer
+/// untouched: the old action is copied out only after the new one was validated and installed,
+/// matching FreeBSD `sys_sigaction` (`kern_sig.c:952-958`).
 pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
     let signo = (frame.rdi as u32) as i32;
     if signo < 1 || signo > status::SIG_MAX as i32 {
@@ -499,26 +501,11 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let act = frame.rsi as *const UserSigAction;
     let old = frame.rdx as *mut UserSigAction;
-    let mut sigacts = caller.sigacts.lock();
-    if !old.is_null() {
-        let previous = sigacts.get(signo);
-        let mut out = ZERO_SIGACTION;
-        out.handler = previous.handler;
-        out.mask[0] = previous.mask;
-        out.flags = previous.flags;
-        let destination = UserSlice::new(old as u64, size_of::<UserSigAction>() as u64)?;
-        let bytes = unsafe {
-            // SAFETY: `out` is a live, fully initialised user-structure mirror; the byte view
-            // covers exactly its size and is only read for the copy.
-            core::slice::from_raw_parts(
-                &out as *const UserSigAction as *const u8,
-                size_of::<UserSigAction>(),
-            )
-        };
-        copy_to_user(destination, bytes)?;
-    }
+    // Copy the new action in and validate it before the disposition table changes or the
+    // caller's old buffer can be written. FreeBSD `sys_sigaction` copies the old action out only
+    // when `kern_sigaction` succeeded (`sys/kern/kern_sig.c:952-958`).
+    let mut input = ZERO_SIGACTION;
     if !act.is_null() {
-        let mut input = ZERO_SIGACTION;
         let source = UserSlice::new(act as u64, size_of::<UserSigAction>() as u64)?;
         let bytes = unsafe {
             // SAFETY: `input` is a live, uninitialised-by-value POD mirror; the mutable byte view
@@ -543,21 +530,41 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
         if (signo == status::SIGKILL || signo == status::SIGSTOP) && handler != process::SIG_DFL {
             return Err(Errno::EINVAL);
         }
+    }
+    let mut sigacts = caller.sigacts.lock();
+    let previous = sigacts.get(signo);
+    if !act.is_null() {
         sigacts.set(
             signo,
             process::SigAction {
-                handler,
+                handler: input.handler,
                 mask: input.mask.first().copied().unwrap_or(0),
-                flags,
+                flags: input.flags,
             },
         );
-        if handler == process::SIG_IGN {
+        if input.handler == process::SIG_IGN {
             // The donor drops a queued signal when it becomes ignored (`sigqueue_delete_proc`).
             caller
                 .pending_signals
                 .lock()
                 .retain(|signal| signal.signo != signo);
         }
+    }
+    if !old.is_null() {
+        let mut out = ZERO_SIGACTION;
+        out.handler = previous.handler;
+        out.mask[0] = previous.mask;
+        out.flags = previous.flags;
+        let destination = UserSlice::new(old as u64, size_of::<UserSigAction>() as u64)?;
+        let bytes = unsafe {
+            // SAFETY: `out` is a live, fully initialised user-structure mirror; the byte view
+            // covers exactly its size and is only read for the copy.
+            core::slice::from_raw_parts(
+                &out as *const UserSigAction as *const u8,
+                size_of::<UserSigAction>(),
+            )
+        };
+        copy_to_user(destination, bytes)?;
     }
     Ok(0)
 }
