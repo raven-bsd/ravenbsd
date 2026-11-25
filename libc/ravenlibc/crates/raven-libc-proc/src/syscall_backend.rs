@@ -31,6 +31,12 @@ pub const PROC_SETCRED_EX: usize = 0x3B;
 pub const PROC_CRED_INFO: usize = 0x3C;
 /// Raw `proc_getgroups(out, size)`.
 pub const PROC_GETGROUPS: usize = 0x3D;
+/// Raw `proc_getrusage(who, out, count)` (kernel `process_ctl.rs`).
+pub const PROC_GETRUSAGE: usize = 0x4D;
+/// Raw `proc_getrlimit(resource, out)` (kernel `process_ctl.rs`).
+pub const PROC_GETRLIMIT: usize = 0x4E;
+/// Raw `proc_setrlimit(resource, cur, max)` (kernel `process_ctl.rs`).
+pub const PROC_SETRLIMIT: usize = 0x4F;
 
 /// The six credential words returned by `PROC_CRED_INFO`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
