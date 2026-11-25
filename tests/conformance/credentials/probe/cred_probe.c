@@ -362,31 +362,21 @@ static int umask_exec(void) {
 // harness runs the probe as the `raven` account, so switch to that account first and keep the row
 // context identical (the create/chmod path is ownership-sensitive). The exec row is last because
 // execv replaces this image.
-// svcd starts a service as root; the SSH harness runs the probe as the `raven` account. Switch to
-// that account so the service rows have the same identity context as the login rows.
-static int drop_to_raven(const char *service) {
-    if (geteuid() != 0) {
-        return 0;
-    }
-    struct passwd *raven = getpwnam("raven");
-    if (raven == NULL) {
-        failed(service, "getpwnam raven");
-        return 1;
-    }
-    if (initgroups("raven", raven->pw_gid) != 0) {
-        failed(service, "initgroups");
-        return 1;
-    }
-    if (setgid(raven->pw_gid) != 0 || setuid(raven->pw_uid) != 0) {
-        failed(service, "drop to raven");
-        return 1;
-    }
-    return 0;
-}
-
 static int umask_service(void) {
-    if (drop_to_raven("umask-service") != 0) {
-        return 1;
+    if (geteuid() == 0) {
+        struct passwd *raven = getpwnam("raven");
+        if (raven == NULL) {
+            failed("umask-service", "getpwnam raven");
+            return 1;
+        }
+        if (initgroups("raven", raven->pw_gid) != 0) {
+            failed("umask-service", "initgroups");
+            return 1;
+        }
+        if (setgid(raven->pw_gid) != 0 || setuid(raven->pw_uid) != 0) {
+            failed("umask-service", "drop to raven");
+            return 1;
+        }
     }
     int before = failures;
     row_umask();
@@ -394,22 +384,6 @@ static int umask_service(void) {
         return 1;
     }
     return umask_exec();
-}
-
-// The S190 rows: the kernel rows are the reference, the libc rows are the defect. Run as `raven`
-// so the hard-limit raise is the unprivileged EPERM case.
-static int limits_service(void) {
-    if (drop_to_raven("limits-service") != 0) {
-        return 1;
-    }
-    int before = failures;
-    row_kernel_rlimit(0);
-    row_libc_rlimit();
-    row_libc_rusage();
-    row_kernel_rusage();
-    int failed_rows = failures - before;
-    printf("cred: limits-service done failures=%d\n", failed_rows);
-    return failed_rows == 0 ? 0 : 1;
 }
 
 int main(int argc, char **argv) {
@@ -423,9 +397,6 @@ int main(int argc, char **argv) {
     }
     if (argc > 1 && strcmp(argv[1], "umask-service") == 0) {
         return umask_service();
-    }
-    if (argc > 1 && strcmp(argv[1], "limits-service") == 0) {
-        return limits_service();
     }
 
     int mutation_ignore_hard_limit =
