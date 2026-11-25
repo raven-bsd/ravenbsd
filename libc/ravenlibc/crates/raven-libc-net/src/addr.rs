@@ -62,7 +62,14 @@ impl SockAddr {
         match self {
             Self::In { .. } => SOCKADDR_IN_LEN,
             Self::In6 { .. } => SOCKADDR_IN6_LEN,
-            Self::Un { len, .. } => 2usize.saturating_add(*len),
+            Self::Un { len, .. } => {
+                let len = if *len > SUN_PATH_LEN {
+                    SUN_PATH_LEN
+                } else {
+                    *len
+                };
+                2usize.saturating_add(len)
+            }
         }
     }
 
@@ -217,9 +224,10 @@ pub fn write_sockaddr(addr: &SockAddr, out: &mut [u8]) -> usize {
             put_u32(out, 24, *scope);
         }
         SockAddr::Un { path, len } => {
+            let path_len = (*len).min(SUN_PATH_LEN);
             put_u8(out, 0, full as u8);
             put_u8(out, 1, AF_UNIX as u8);
-            put_bytes(out, 2, path.get(..*len).unwrap_or(&[]));
+            put_bytes(out, 2, path.get(..path_len).unwrap_or(&[]));
         }
     }
     full

@@ -130,6 +130,22 @@ fn unix_path_roundtrip() {
 }
 
 #[test]
+fn unix_private_len_is_clamped_to_the_record() {
+    // The private variant is constructible inside the crate; a length beyond the 104-byte
+    // field must not emit a `sa_len` larger than `sizeof(struct sockaddr_un)`.
+    let addr = SockAddr::Un {
+        path: [b'x'; SUN_PATH_LEN],
+        len: 200,
+    };
+    assert_eq!(addr.encoded_len(), 106);
+    let mut out = [0u8; 106];
+    assert_eq!(write_sockaddr(&addr, &mut out), 106);
+    assert_eq!(out[0], 106);
+    assert_eq!(out[1], AF_UNIX as u8);
+    assert_eq!(&out[2..], &[b'x'; SUN_PATH_LEN]);
+}
+
+#[test]
 fn unix_maximum_path_and_oversize() {
     let mut bytes = [0u8; 106];
     bytes[0] = 106;
