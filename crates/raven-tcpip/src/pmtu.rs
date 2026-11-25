@@ -123,6 +123,132 @@ pub fn mss_headers(family: IpFamily) -> u32 {
     }
 }
 
+/// NetBSD `tcp_minmss`: the smallest peer MSS offer accepted after the 256-byte sanity clamp.
+// K259 donor helper: the live call site (`tcp_mss.rs`) is owned by another lane.
+#[allow(dead_code)]
+pub(crate) const TCP_MINMSS_NETBSD: u32 = 256;
+
+/// Result of NetBSD `tcp_mss_from_peer`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PeerMss {
+    /// `t_peermss`: the peer offer after the 256-byte floor.
+    pub peer_mss: u32,
+    /// `t_segsz`: the payload actually used after option and buffer limits.
+    pub segsz: u32,
+    /// Send buffer rounded up to a whole segment, as NetBSD grows the socket buffer.
+    pub send_buffer: u32,
+}
+
+/// NetBSD `tcp_mss_to_advertise`: the largest known MTU minus IP and TCP headers.
+///
+/// `in_maxmtu` is the largest MTU of any attached network; `mss_ifmtu` restricts the
+/// advertisement to the selected interface MTU (`tcp_mss_ifmtu`).
+// K259 donor helper: the live call site (`tcp_mss.rs`) is owned by another lane.
+#[allow(dead_code)]
+#[must_use]
+pub(crate) fn mss_to_advertise(
+    if_mtu: u32,
+    in_maxmtu: u32,
+    family: IpFamily,
+    mss_ifmtu: bool,
+    mss_default: u32,
+) -> u32 {
+    let _ = (if_mtu, in_maxmtu, family, mss_ifmtu);
+    mss_default
+}
+
+/// NetBSD `tcp_mss_from_peer`: apply the peer offer, the 256-byte floor, options and send buffer.
+// K259 donor helper: the live call site (`tcp_mss.rs`) is owned by another lane.
+#[allow(dead_code)]
+#[must_use]
+pub(crate) fn mss_from_peer(
+    offer: u32,
+    mss_default: u32,
+    optlen: u32,
+    ip_optlen: u32,
+    send_buffer: u32,
+) -> PeerMss {
+    let _ = (mss_default, optlen, ip_optlen);
+    PeerMss {
+        peer_mss: offer,
+        segsz: offer,
+        send_buffer,
+    }
+}
+
+/// One queued ICMP PMTU report (`TF_PMTUD_PEND` fields).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PmtuPending {
+    /// TCP sequence quoted by the ICMP message.
+    pub th_seq: u32,
+    /// Advertised next-hop MTU.
+    pub nextmtu: u32,
+    /// Quoted IP length.
+    pub ip_len: u16,
+    /// Quoted IP header length in 32-bit words.
+    pub ip_hl: u8,
+}
+
+/// Per-connection NetBSD PMTU state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PmtuPath {
+    /// Largest packet ever sent (`t_pmtud_mtu_sent`).
+    pub mtu_sent: u32,
+    /// Largest acknowledged payload since the last update (`t_pmtud_mss_acked`).
+    pub mss_acked: u32,
+    /// Queued report, if any (`TF_PMTUD_PEND`).
+    pub pending: Option<PmtuPending>,
+}
+
+impl PmtuPath {
+    /// NetBSD `icmp_check`: clear a pending quote once its segment is acknowledged and track
+    /// the largest acknowledged chunk.
+    // K259 donor helper: the live call site (`tcp_input.rs`) is owned by another lane.
+    #[allow(dead_code)]
+    pub(crate) fn on_ack(&mut self, ack: u32, acked: u32) {
+        let _ = (ack, acked);
+    }
+}
+
+/// Result of one ICMP need-fragmentation report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PmtuResult {
+    /// The quote was stale, unmatched or advertised no smaller MTU.
+    Ignored,
+    /// Traditional PMTUD: the new MTU covers acknowledged data.
+    Classic(u32),
+    /// The MTU is below acknowledged data; defer it until the quote is acknowledged.
+    Pending(PmtuPending),
+}
+
+/// NetBSD `tcp_ctlinput` PRC_MSGSIZE and `icmp_check` pending/replacement rule.
+// K259 donor helper: the live call site (`tcp_input.rs`) is owned by another lane.
+#[allow(dead_code)]
+#[allow(clippy::too_many_arguments)] // Mirrors the quoted ICMP and TCP state fields.
+#[must_use]
+pub(crate) fn on_icmp_pmtu(
+    path: &mut PmtuPath,
+    seq: u32,
+    snd_una: u32,
+    snd_max: u32,
+    reported_mtu: u32,
+    headers: u32,
+    ip_len: u16,
+    ip_hl: u8,
+) -> PmtuResult {
+    let _ = (
+        path,
+        seq,
+        snd_una,
+        snd_max,
+        reported_mtu,
+        headers,
+        ip_len,
+        ip_hl,
+    );
+    PmtuResult::Ignored
+}
+
 /// FreeBSD `tcp_mssopt`: the MSS option for an outgoing SYN.
 ///
 /// `maxmtu` is the interface/route MTU, `hc_mtu` the host-cache MTU (0 when absent), and

@@ -68,6 +68,12 @@ pub struct EcnCounters {
     pub sent_ect0: u64,
     /// `tcps_ecn_sndect1`.
     pub sent_ect1: u64,
+    /// `tcps_ace_nect` (Accurate ECN non-ECT or CE SYN).
+    pub ace_nect: u64,
+    /// `tcps_ace_ect0` (Accurate ECN ECT(0) SYN).
+    pub ace_ect0: u64,
+    /// `tcps_ace_ect1` (Accurate ECN ECT(1) SYN).
+    pub ace_ect1: u64,
 }
 
 impl EcnState {
