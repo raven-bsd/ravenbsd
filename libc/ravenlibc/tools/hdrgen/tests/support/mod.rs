@@ -39,12 +39,6 @@ pub fn resources() -> Option<PathBuf> {
 pub fn require_resources(test: &str) -> Option<PathBuf> {
     match resources() {
         Some(path) => Some(path),
-        None => {
-            eprintln!(
-                "SKIP {test}: ravenbsd-resources/donors.lock is absent; \
-                 set RAVENBSD_RESOURCES to a donor checkout to run this row"
-            );
-            None
-        }
+        None => panic!("{test}: ravenbsd-resources/donors.lock is absent"),
     }
 }
