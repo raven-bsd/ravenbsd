@@ -14,7 +14,7 @@ tests/conformance/<topic>/
   mutations.tsv            mutation <TAB> targeted-row <TAB> requirement
   build.sh                 builds build/conformance/<topic>/conformance-probe
   <service>.service.toml   one-shot service; exec is /bin/conformance-probe
-  <probe>.c                the topic rows
+  <probe>.rs               the topic rows
 ```
 
 `rows.tsv` lists every normal row. `gate = 1` means the row must pass for the topic to pass.
@@ -24,7 +24,7 @@ the correct product that row fails, which is the negative check.
 
 ## Guest row contract
 
-The probe links `conformance.h`/`conformance.c` and prints one serial line per row:
+The probe includes `conformance.rs` and prints one serial line per row:
 
 ```text
 CONFORM <topic> begin
@@ -65,7 +65,7 @@ row is reported as a red row and never as a timeout or an unmatched `init exited
 
 1. Create the ticket's own topic directory (its `Owns`) and put `rows.tsv`, `mutations.tsv`,
    `build.sh`, a service file and the probe there.
-2. Link `tests/conformance/harness/conformance.c` and include `conformance.h`.
+2. Include `tests/conformance/harness/conformance.rs` as the row module.
 3. Emit one row per assertion with exact detail values.
 4. Run the shared runner with `--topic <your-topic> --service <your-service-name>`.
 

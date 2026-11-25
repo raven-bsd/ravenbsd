@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 # Descriptor conformance (S172)
 
-`descriptor-conformance.c` asserts the POSIX/FreeBSD descriptor contract on the release image.
+`descriptor-conformance.rs` asserts the POSIX/FreeBSD descriptor contract on the release image.
 The shared runner in `../harness/runner.py` builds the probe, overlays it as a one-shot service,
 boots the image and maps the rows to an exit status. It is test-only: no product behaviour is
 changed here, and a red row is a fix ticket for the owning lane.
