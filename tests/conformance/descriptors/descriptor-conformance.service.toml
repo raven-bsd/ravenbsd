@@ -7,7 +7,7 @@
 name = "descriptor-conformance"
 exec = "/bin/conformance-probe"
 args = ["descriptor-conformance", "--all"]
-needs = ["scheme:file", "ramfsd", "ptyd", "devd"]
+needs = ["scheme:file", "ramfsd"]
 readiness = "exit"
 restart = "never"
 max_restarts = 0

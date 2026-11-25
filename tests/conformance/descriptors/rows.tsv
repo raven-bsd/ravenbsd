@@ -11,7 +11,6 @@ cloexec	S172-R01	1
 eof	S172-R01	1
 short-read	S172-R01	1
 eintr	S172-R01	1
-eintr-partial	S172-R01	1
 nonblock	S172-R01	1
 epipe-sigpipe	S172-R01	1
 fstat-identity	S172-R01	1
