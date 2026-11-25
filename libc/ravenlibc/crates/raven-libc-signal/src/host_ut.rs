@@ -78,6 +78,8 @@ pub enum Trace {
     Resend(i32),
     /// procd kill.
     ProcKill(i32, i32),
+    /// A kernel thread-directed send (C19 `THREAD_SIGQUEUE`).
+    ThreadSigqueue(u32, i32),
     /// The wait timed out or blocked.
     Wait(Option<u64>),
     /// A default action terminated the process.
@@ -448,6 +450,29 @@ impl SigKernel for HostSigKernel {
             self.kick_self(KICK_CHECK);
         }
         Ok(())
+    }
+
+    fn thread_sigqueue(&self, handle: u32, sig: i32, _value: u64) -> Result<(), Errno> {
+        self.record(Trace::ThreadSigqueue(handle, sig));
+        Ok(())
+    }
+
+    fn pending(&self) -> Result<u64, Errno> {
+        Ok(crate::raw::pending_load(self.pointer()))
+    }
+
+    fn sigprocmask(&self, how: i32, set: Option<u64>) -> Result<u64, Errno> {
+        let tp = self.pointer();
+        let previous = crate::raw::mask_load(tp);
+        if let Some(requested) = set {
+            let next = match how {
+                raven_libc_abi::generated::signal::SIG_BLOCK => previous | requested,
+                raven_libc_abi::generated::signal::SIG_UNBLOCK => previous & !requested,
+                _ => requested,
+            } & crate::sigset::APP_MASK;
+            crate::raw::mask_store(tp, next);
+        }
+        Ok(previous)
     }
 
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {

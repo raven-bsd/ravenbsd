@@ -19,7 +19,7 @@
 
 use core::ffi::{c_int, c_void};
 use core::ptr;
-use core::sync::atomic::{AtomicI32, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
 const PAGE: usize = 4096;
 const PUBLIC_SIGACTION: usize = 152;
@@ -101,7 +101,30 @@ unsafe extern "C" {
     fn sigaltstack(ss: *const Stack, old: *mut Stack) -> c_int;
     fn __errno_location() -> *mut c_int;
     fn nanosleep(request: *const Timespec, remaining: *mut Timespec) -> c_int;
+    fn raise(sig: c_int) -> c_int;
+    fn signal(sig: c_int, handler: usize) -> usize;
+    fn kill(pid: c_int, sig: c_int) -> c_int;
+    fn sigpending(set: *mut Sigset) -> c_int;
+    fn sigsuspend(set: *const Sigset) -> c_int;
+    fn sigwait(set: *const Sigset, sig: *mut c_int) -> c_int;
+    fn pthread_create(
+        thread: *mut usize,
+        attr: *const c_void,
+        start: extern "C" fn(*mut c_void) -> *mut c_void,
+        arg: *mut c_void,
+    ) -> c_int;
+    fn pthread_join(thread: usize, value: *mut *mut c_void) -> c_int;
+    fn pthread_self() -> usize;
+    fn pthread_kill(thread: usize, sig: c_int) -> c_int;
 }
+
+const WNOHANG: c_int = 1;
+const SIGKILL: c_int = 9;
+const SIG_IGN: usize = 1;
+const ONE_MS: Timespec = Timespec {
+    tv_sec: 0,
+    tv_nsec: 1_000_000,
+};
 
 /// System V amd64 `stack_t` (24 bytes), the public C layout libc marshals.
 #[repr(C)]
@@ -965,8 +988,457 @@ fn exec_transition() -> bool {
     false
 }
 
+/// S720: a disposition installed through public `sigaction` must be the one `raise` delivers.
+///
+/// The pre-fix libc raised from its own `DISP` table, so the child's default action ran and the
+/// child exited normally with 138 instead of running the handler. The parent observes the wait
+/// status with the POSIX macros, never the shell's numeric convention.
+static S720_HANDLER_COUNT: AtomicI32 = AtomicI32::new(0);
+
+extern "C" fn s720_handler(_signal: c_int) {
+    S720_HANDLER_COUNT.fetch_add(1, Ordering::SeqCst);
+}
+
+fn s720_raise_sigaction_row() -> bool {
+    // SAFETY: fork duplicates the process; the child only touches its own copy of the statics.
+    let child = unsafe { fork() };
+    if child == 0 {
+        let action = Sigaction {
+            sa_handler: s720_handler as *const () as usize,
+            sa_mask: Sigset::ZERO,
+            sa_flags: 0,
+            _pad: 0,
+            sa_restorer: 0,
+        };
+        // SAFETY: both objects are live for the call in the child.
+        let installed = unsafe { sigaction(SIGUSR1, &action, ptr::null_mut()) } == 0;
+        // SAFETY: raise takes one scalar signal number.
+        let raised = installed && unsafe { raise(SIGUSR1) } == 0;
+        let ran = S720_HANDLER_COUNT.load(Ordering::SeqCst) == 1;
+        // SAFETY: _exit never returns and does not unwind the child.
+        unsafe { _exit(if raised && ran { 0 } else { 1 }) };
+    }
+    let mut status = 0;
+    // SAFETY: status is a live writable c_int for this waitpid call.
+    let waited = unsafe { waitpid(child, &mut status, 0) } == child;
+    let exited = status & 0x7f == 0;
+    let code = (status >> 8) & 0xff;
+    debug_write(b"signal: s720 status=");
+    debug_decimal(status as u32);
+    debug_write(b" exited=");
+    debug_decimal(u32::from(exited));
+    debug_write(b" code=");
+    debug_decimal(code as u32);
+    debug_write(b" signaled=");
+    debug_decimal(u32::from(!exited));
+    debug_write(b"\n");
+    provider_row(b"s720-raise-sigaction", waited && exited && code == 0)
+}
+
+/// Emit one decimal integer on the debug sink.
+fn debug_decimal(mut value: u32) {
+    let mut digits = [0u8; 10];
+    let mut at = digits.len();
+    loop {
+        at -= 1;
+        digits[at] = b'0' + (value % 10) as u8;
+        value /= 10;
+        if value == 0 {
+            break;
+        }
+    }
+    debug_write(&digits[at..]);
+}
+
+fn wait_status_exited(status: c_int) -> bool {
+    status & 0x7f == 0
+}
+
+fn wait_status_code(status: c_int) -> c_int {
+    (status >> 8) & 0xff
+}
+
+fn sleep_ms(milliseconds: u32) {
+    let mut left = milliseconds;
+    while left != 0 {
+        // SAFETY: both Timespec values are live for the call.
+        let _ = unsafe { nanosleep(&ONE_MS, ptr::null_mut()) };
+        left -= 1;
+    }
+}
+
+/// Wait for `child` for at most `milliseconds`; kill it and return `None` on expiry.
+fn wait_bounded(child: c_int, milliseconds: u32) -> Option<c_int> {
+    let mut status = 0;
+    let mut left = milliseconds;
+    while left != 0 {
+        // SAFETY: `status` is a live writable c_int.
+        let result = unsafe { waitpid(child, &mut status, WNOHANG) };
+        if result == child {
+            return Some(status);
+        }
+        if result < 0 {
+            return None;
+        }
+        sleep_ms(1);
+        left -= 1;
+    }
+    // SAFETY: the child pid is live; SIGKILL releases a row that would otherwise hang.
+    unsafe {
+        kill(child, SIGKILL);
+        waitpid(child, &mut status, 0);
+    }
+    None
+}
+
+fn wait_counter(counter: &AtomicI32, target: i32, milliseconds: u32) -> bool {
+    let mut left = milliseconds;
+    while left != 0 {
+        if counter.load(Ordering::SeqCst) >= target {
+            return true;
+        }
+        sleep_ms(1);
+        left -= 1;
+    }
+    counter.load(Ordering::SeqCst) >= target
+}
+
+fn s720_child_ok(child: c_int) -> bool {
+    wait_bounded(child, 3000).is_some_and(|status| wait_status_exited(status) && wait_status_code(status) == 0)
+}
+
+/// `signal()` must install the kernel disposition, not only libc's table.
+fn s720_signal_caught_row() -> bool {
+    // SAFETY: fork duplicates the process; the child only mutates its own statics.
+    let child = unsafe { fork() };
+    if child == 0 {
+        S720_HANDLER_COUNT.store(0, Ordering::SeqCst);
+        // SAFETY: the handler address is a live extern "C" function.
+        let installed = unsafe { signal(SIGUSR2, s720_handler as *const () as usize) } != usize::MAX;
+        let sent = unsafe { raw_signal(getpid(), SIGUSR2) } == 0;
+        let ran = S720_HANDLER_COUNT.load(Ordering::SeqCst) == 1;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if installed && sent && ran { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-signal-caught", s720_child_ok(child))
+}
+
+/// `SIG_IGN` installed through `signal()` must survive kernel delivery.
+fn s720_signal_ignored_row() -> bool {
+    // SAFETY: as above.
+    let child = unsafe { fork() };
+    if child == 0 {
+        // SAFETY: signal takes a scalar handler word.
+        let installed = unsafe { signal(SIGUSR2, SIG_IGN) } != usize::MAX;
+        let sent = unsafe { raw_signal(getpid(), SIGUSR2) } == 0;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if installed && sent { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-signal-ignored", s720_child_ok(child))
+}
+
+/// A blocked process-directed signal must be visible through `sigpending`.
+fn s720_pending_row() -> bool {
+    // SAFETY: as above.
+    let child = unsafe { fork() };
+    if child == 0 {
+        S720_HANDLER_COUNT.store(0, Ordering::SeqCst);
+        let mut set = Sigset::ZERO;
+        let mut pending = Sigset::ZERO;
+        // SAFETY: the sigset objects are live for each call.
+        let mut ok = unsafe {
+            sigemptyset(&mut set) == 0
+                && sigaddset(&mut set, SIGUSR1) == 0
+                && sigaction(SIGUSR1, &signal_action(), ptr::null_mut()) == 0
+                && sigprocmask(SIG_BLOCK, &set, ptr::null_mut()) == 0
+                && raw_signal(getpid(), SIGUSR1) == 0
+                && sigpending(&mut pending) == 0
+                && sigismember(&pending, SIGUSR1) == 1
+                && sigprocmask(SIG_UNBLOCK, &set, ptr::null_mut()) == 0
+        };
+        ok = ok && S720_HANDLER_COUNT.load(Ordering::SeqCst) == 1;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if ok { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-pending", s720_child_ok(child))
+}
+
+/// `sigsuspend` must not lose an already-pending signal at the temporary mask change.
+fn s720_sigsuspend_row() -> bool {
+    // SAFETY: as above.
+    let child = unsafe { fork() };
+    if child == 0 {
+        S720_HANDLER_COUNT.store(0, Ordering::SeqCst);
+        let mut set = Sigset::ZERO;
+        // SAFETY: the sigset object is live for the calls.
+        let prepared = unsafe {
+            sigemptyset(&mut set) == 0
+                && sigaddset(&mut set, SIGUSR1) == 0
+                && sigaction(SIGUSR1, &signal_action(), ptr::null_mut()) == 0
+                && sigprocmask(SIG_BLOCK, &set, ptr::null_mut()) == 0
+                && raw_signal(getpid(), SIGUSR1) == 0
+        };
+        // The empty mask makes SIGUSR1 deliverable while the call waits.
+        let result = if prepared {
+            // SAFETY: the empty sigset is live for the call.
+            unsafe { sigsuspend(&Sigset::ZERO) }
+        } else {
+            -1
+        };
+        // SAFETY: the errno cell belongs to this thread.
+        let error = unsafe { *__errno_location() };
+        let ok = prepared
+            && result == -1
+            && error == EINTR
+            && S720_HANDLER_COUNT.load(Ordering::SeqCst) == 1;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if ok { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-sigsuspend", s720_child_ok(child))
+}
+
+/// `sigwait` must consume the kernel record without running the handler.
+fn s720_sigwait_row() -> bool {
+    // SAFETY: as above.
+    let child = unsafe { fork() };
+    if child == 0 {
+        S720_HANDLER_COUNT.store(0, Ordering::SeqCst);
+        let mut set = Sigset::ZERO;
+        let mut received: c_int = 0;
+        // SAFETY: the sigset and out-parameter are live for the calls.
+        let prepared = unsafe {
+            sigemptyset(&mut set) == 0
+                && sigaddset(&mut set, SIGUSR1) == 0
+                && sigaction(SIGUSR1, &signal_action(), ptr::null_mut()) == 0
+                && sigprocmask(SIG_BLOCK, &set, ptr::null_mut()) == 0
+                && raw_signal(getpid(), SIGUSR1) == 0
+        };
+        let result = if prepared {
+            // SAFETY: the set and output number are live for the call.
+            unsafe { sigwait(&set, &mut received) }
+        } else {
+            -1
+        };
+        let ok = prepared
+            && result == 0
+            && received == SIGUSR1
+            && S720_HANDLER_COUNT.load(Ordering::SeqCst) == 0;
+        // SAFETY: _exit never returns.
+        unsafe { _exit(if ok { 0 } else { 1 }) };
+    }
+    provider_row(b"s720-sigwait", s720_child_ok(child))
+}
+
+fn signal_action() -> Sigaction {
+    Sigaction {
+        sa_handler: s720_handler as *const () as usize,
+        sa_mask: Sigset::ZERO,
+        sa_flags: 0,
+        _pad: 0,
+        sa_restorer: 0,
+    }
+}
+
+static A_READY: AtomicI32 = AtomicI32::new(0);
+static B_READY: AtomicI32 = AtomicI32::new(0);
+static A_RELEASE: AtomicI32 = AtomicI32::new(0);
+static B_RELEASE: AtomicI32 = AtomicI32::new(0);
+static TARGET_A_COUNT: AtomicI32 = AtomicI32::new(0);
+static TARGET_B_COUNT: AtomicI32 = AtomicI32::new(0);
+static TARGET_A_TID: AtomicUsize = AtomicUsize::new(0);
+static TARGET_B_TID: AtomicUsize = AtomicUsize::new(0);
+
+extern "C" fn target_handler(signal_number: c_int) {
+    if signal_number == SIGUSR2 {
+        TARGET_A_TID.store(unsafe { pthread_self() }, Ordering::SeqCst);
+        TARGET_A_COUNT.fetch_add(1, Ordering::SeqCst);
+    } else {
+        TARGET_B_TID.store(unsafe { pthread_self() }, Ordering::SeqCst);
+        TARGET_B_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+extern "C" fn target_thread(arg: *mut c_void) -> *mut c_void {
+    let which = arg as usize;
+    let (blocked, unblocked) = if which == 0 {
+        (SIGUSR2, SIGUSR1)
+    } else {
+        (SIGUSR1, SIGUSR2)
+    };
+    let mut block = Sigset::ZERO;
+    let mut open = Sigset::ZERO;
+    // SAFETY: the sigset objects are live for the calls; each thread owns its own mask.
+    unsafe {
+        let _ = sigemptyset(&mut block);
+        let _ = sigaddset(&mut block, blocked);
+        let _ = sigemptyset(&mut open);
+        let _ = sigaddset(&mut open, unblocked);
+        let _ = sigprocmask(SIG_BLOCK, &block, ptr::null_mut());
+        let _ = sigprocmask(SIG_UNBLOCK, &open, ptr::null_mut());
+    }
+    if which == 0 {
+        A_READY.store(1, Ordering::SeqCst);
+        while A_RELEASE.load(Ordering::SeqCst) == 0 {
+            core::hint::spin_loop();
+        }
+    } else {
+        B_READY.store(1, Ordering::SeqCst);
+        while B_RELEASE.load(Ordering::SeqCst) == 0 {
+            core::hint::spin_loop();
+        }
+    }
+    // SAFETY: the thread's own sigset is live; the pending signal is delivered at this return.
+    unsafe {
+        let _ = sigprocmask(SIG_UNBLOCK, &block, ptr::null_mut());
+    }
+    ptr::null_mut()
+}
+
+fn wait_flag(flag: &AtomicI32, milliseconds: u32) -> bool {
+    wait_counter(flag, 1, milliseconds)
+}
+
+/// Two threads with opposite masks: delivery must stay on the thread named by `pthread_kill`.
+fn s720_pthread_kill_row() -> bool {
+    let action = Sigaction {
+        sa_handler: target_handler as *const () as usize,
+        sa_mask: Sigset::ZERO,
+        sa_flags: 0,
+        _pad: 0,
+        sa_restorer: 0,
+    };
+    // SAFETY: the action is live for each install.
+    let installed = unsafe {
+        sigaction(SIGUSR1, &action, ptr::null_mut()) == 0
+            && sigaction(SIGUSR2, &action, ptr::null_mut()) == 0
+    };
+    if !installed {
+        return provider_row(b"s720-pthread-kill", false);
+    }
+    TARGET_A_COUNT.store(0, Ordering::SeqCst);
+    TARGET_B_COUNT.store(0, Ordering::SeqCst);
+    TARGET_A_TID.store(0, Ordering::SeqCst);
+    TARGET_B_TID.store(0, Ordering::SeqCst);
+    A_READY.store(0, Ordering::SeqCst);
+    B_READY.store(0, Ordering::SeqCst);
+    A_RELEASE.store(0, Ordering::SeqCst);
+    B_RELEASE.store(0, Ordering::SeqCst);
+    let mut a_thread = 0usize;
+    let mut b_thread = 0usize;
+    // SAFETY: both thread handles and the null attribute are live/valid for the calls.
+    let created_a = unsafe {
+        pthread_create(
+            &mut a_thread,
+            ptr::null(),
+            target_thread,
+            0usize as *mut c_void,
+        ) == 0
+    };
+    let created_b = unsafe {
+        pthread_create(
+            &mut b_thread,
+            ptr::null(),
+            target_thread,
+            1usize as *mut c_void,
+        ) == 0
+    };
+    let ready = created_a && created_b && wait_flag(&A_READY, 1000) && wait_flag(&B_READY, 1000);
+    // A blocks SIGUSR2; B and main do not. A process-directed send would run on B or main now.
+    let kill_a_result = if ready {
+        unsafe { pthread_kill(a_thread, SIGUSR2) }
+    } else {
+        -1
+    };
+    let kill_a = kill_a_result == 0;
+    sleep_ms(50);
+    let quiet_a = TARGET_A_COUNT.load(Ordering::SeqCst) == 0;
+    let quiet_b = TARGET_B_COUNT.load(Ordering::SeqCst) == 0;
+    A_RELEASE.store(1, Ordering::SeqCst);
+    let ran_a = wait_counter(&TARGET_A_COUNT, 1, 1000);
+    let mut result: *mut c_void = ptr::null_mut();
+    // SAFETY: the thread handle is live until the join.
+    let joined_a = unsafe { pthread_join(a_thread, &mut result) } == 0;
+    let count_a = TARGET_A_COUNT.load(Ordering::SeqCst);
+    let tid_a = TARGET_A_TID.load(Ordering::SeqCst);
+    // B blocks SIGUSR1; A has exited and main does not block it.
+    let kill_b_result = unsafe { pthread_kill(b_thread, SIGUSR1) };
+    let kill_b = kill_b_result == 0;
+    sleep_ms(50);
+    let quiet_b2 = TARGET_B_COUNT.load(Ordering::SeqCst) == 0;
+    B_RELEASE.store(1, Ordering::SeqCst);
+    let ran_b = wait_counter(&TARGET_B_COUNT, 1, 1000);
+    // SAFETY: the thread handle is live until the join.
+    let joined_b = unsafe { pthread_join(b_thread, &mut result) } == 0;
+    let count_b = TARGET_B_COUNT.load(Ordering::SeqCst);
+    let tid_b = TARGET_B_TID.load(Ordering::SeqCst);
+    if !created_a || !created_b || !ready || !kill_a || !quiet_a || !quiet_b || !ran_a || !joined_a
+        || count_a != 1 || tid_a != a_thread || !kill_b || !quiet_b2 || !ran_b || !joined_b
+        || count_b != 1 || tid_b != b_thread
+    {
+        debug_write(b"signal: s720-pk ca=");
+        debug_decimal(u32::from(created_a));
+        debug_write(b" cb=");
+        debug_decimal(u32::from(created_b));
+        debug_write(b" ready=");
+        debug_decimal(u32::from(ready));
+        debug_write(b" ka=");
+        debug_decimal(kill_a_result as u32);
+        debug_write(b" qa=");
+        debug_decimal(u32::from(quiet_a));
+        debug_write(b" qb=");
+        debug_decimal(u32::from(quiet_b));
+        debug_write(b" ra=");
+        debug_decimal(u32::from(ran_a));
+        debug_write(b" ja=");
+        debug_decimal(u32::from(joined_a));
+        debug_write(b" ca=");
+        debug_decimal(count_a as u32);
+        debug_write(b" ta=");
+        debug_decimal(tid_a as u32);
+        debug_write(b" kb=");
+        debug_decimal(kill_b_result as u32);
+        debug_write(b" qb2=");
+        debug_decimal(u32::from(quiet_b2));
+        debug_write(b" rb=");
+        debug_decimal(u32::from(ran_b));
+        debug_write(b" jb=");
+        debug_decimal(u32::from(joined_b));
+        debug_write(b" cb=");
+        debug_decimal(count_b as u32);
+        debug_write(b" tb=");
+        debug_decimal(tid_b as u32);
+        debug_write(b"\n");
+    }
+    provider_row(
+        b"s720-pthread-kill",
+        created_a
+            && created_b
+            && ready
+            && kill_a
+            && quiet_a
+            && quiet_b
+            && ran_a
+            && joined_a
+            && count_a == 1
+            && tid_a == a_thread
+            && kill_b
+            && quiet_b2
+            && ran_b
+            && joined_b
+            && count_b == 1
+            && tid_b == b_thread,
+    )
+}
+
 fn run_provider() -> bool {
-    provider_install_row()
+    s720_raise_sigaction_row()
+        && s720_signal_caught_row()
+        && s720_signal_ignored_row()
+        && s720_pending_row()
+        && s720_sigsuspend_row()
+        && s720_sigwait_row()
+        && s720_pthread_kill_row()
+        && provider_install_row()
         && provider_generate_row()
         && provider_blocked_row()
         && provider_ignored_row()
