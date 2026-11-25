@@ -39,17 +39,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 HARNESS = ROOT / "tests/conformance/harness"
 PROBE_GUEST = "/bin/conformance-probe"
-ROW_RE = re.compile(r"^CONFORM (?P<topic>\S+) row=(?P<name>\S+) status=(?P<status>PASS|FAIL)")
+ROW_RE = re.compile(r"CONFORM (?P<topic>\S+) row=(?P<name>\S+) status=(?P<status>PASS|FAIL)")
 SUMMARY_RE = re.compile(
-    r"^CONFORM (?P<topic>\S+) summary passed=(?P<passed>\d+) total=(?P<total>\d+) "
+    r"CONFORM (?P<topic>\S+) summary passed=(?P<passed>\d+) total=(?P<total>\d+) "
     r"failures=(?P<failures>\d+)"
 )
-DONE_RE = re.compile(r"^CONFORM (?P<topic>\S+) done failures=(?P<failures>\d+)")
+DONE_RE = re.compile(r"CONFORM (?P<topic>\S+) done failures=(?P<failures>\d+)")
 MUTATION_BEGIN_RE = re.compile(
-    r"^CONFORM-MUTATION topic=(?P<topic>\S+) begin=(?P<name>\S+)"
+    r"CONFORM-MUTATION topic=(?P<topic>\S+) begin=(?P<name>\S+)"
 )
 MUTATION_END_RE = re.compile(
-    r"^CONFORM-MUTATION topic=(?P<topic>\S+) end=(?P<name>\S+) failures=(?P<failures>\d+)"
+    r"CONFORM-MUTATION topic=(?P<topic>\S+) end=(?P<name>\S+) failures=(?P<failures>\d+)"
 )
 
 
@@ -116,14 +116,14 @@ def parse_log(text: str, topic: str) -> dict[str, object]:
     current_name: str | None = None
     current_rows: dict[str, str] = normal_rows
     for line in text.splitlines():
-        begin = MUTATION_BEGIN_RE.match(line)
+        begin = MUTATION_BEGIN_RE.search(line)
         if begin is not None and begin.group("topic") == topic:
             current_name = begin.group("name")
             current_rows = {}
             mutations[current_name] = {"rows": current_rows, "done": None}
             current = None
             continue
-        end = MUTATION_END_RE.match(line)
+        end = MUTATION_END_RE.search(line)
         if end is not None and end.group("topic") == topic:
             if current_name is None or current_name != end.group("name"):
                 raise HarnessError(f"mutation end without matching begin: {line}")
@@ -131,12 +131,12 @@ def parse_log(text: str, topic: str) -> dict[str, object]:
             current_name = None
             current = normal_rows
             continue
-        row = ROW_RE.match(line)
+        row = ROW_RE.search(line)
         if row is not None and row.group("topic") == topic:
             target = current_rows if current_name is not None else normal_rows
             target[row.group("name")] = row.group("status")
             continue
-        done = DONE_RE.match(line)
+        done = DONE_RE.search(line)
         if done is not None and done.group("topic") == topic and current_name is None:
             normal_done = int(done.group("failures"))
     return {
@@ -245,6 +245,9 @@ def self_test() -> int:
     inconsistent = good.replace("end=mut-a failures=1", "end=mut-a failures=0")
     if not evaluate(parse_log(inconsistent, "demo"), rows, mutations, "normal", None):
         failures.append("self-test: inconsistent mutation end accepted")
+    prefixed = "\n".join(f"login: {line}" for line in good.splitlines())
+    if evaluate(parse_log(prefixed, "demo"), rows, mutations, "normal", None):
+        failures.append("self-test: console-prefixed rows rejected")
     if failures:
         for failure in failures:
             print(f"conformance-self-test: FAIL {failure}", flush=True)
@@ -276,10 +279,10 @@ def write_case(
             'expect_exit = "any"',
             "",
             "[[expect]]",
-            f"regex = '^CONFORM {topic} begin$'",
+            f"regex = 'CONFORM {topic} begin'",
             "",
             "[[expect]]",
-            f"regex = '^CONFORM {topic} done failures=[0-9]+$'",
+            f"regex = 'CONFORM {topic} done failures=[0-9]+'",
             "",
             "[[forbid]]",
             "regex = '(?i)panic|EXCEPTION'",
