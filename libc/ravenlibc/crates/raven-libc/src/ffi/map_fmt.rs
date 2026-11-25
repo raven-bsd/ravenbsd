@@ -13,23 +13,23 @@ use raven_libc_abi::errno::Errno;
 pub(crate) fn apply(error: FmtErr) -> i32 {
     match error {
         FmtErr::Invalid => {
-            errno::set(Errno(22));
+            errno::set(Errno::from_generated(raven_libc_abi::errno::EINVAL));
             -1
         }
         FmtErr::NoMem => {
-            errno::set(Errno(12));
+            errno::set(Errno::from_generated(raven_libc_abi::errno::ENOMEM));
             -1
         }
         FmtErr::Overflow => {
-            errno::set(Errno(75));
+            errno::set(Errno::from_generated(raven_libc_abi::errno::EOVERFLOW));
             -1
         }
         FmtErr::Encoding => {
-            errno::set(Errno(84));
+            errno::set(Errno::from_generated(raven_libc_abi::errno::EILSEQ));
             -1
         }
         FmtErr::PctNAbort => {
-            errno::set(Errno(22));
+            errno::set(Errno::from_generated(raven_libc_abi::errno::EINVAL));
             -1
         }
         // A sink failure already set `errno` in the write path; never overwrite it.

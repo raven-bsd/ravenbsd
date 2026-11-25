@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::ffi::errno;
+use raven_libc_abi::errno::Errno;
 
 #[test]
 fn int_passes_the_value_through() {
@@ -25,7 +26,10 @@ fn int_leaves_errno_untouched_on_success() {
 fn int_sets_errno_and_returns_minus_one() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
-    assert_eq!(int(Err(Errno(22))), -1);
+    assert_eq!(
+        int(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL))),
+        -1
+    );
     assert_eq!(errno::get(), 22);
 }
 
@@ -34,7 +38,10 @@ fn long_has_the_same_contract() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     assert_eq!(long(Ok(9)), 9);
-    assert_eq!(long(Err(Errno(34))), -1);
+    assert_eq!(
+        long(Err(Errno::from_generated(raven_libc_abi::errno::ERANGE))),
+        -1
+    );
     assert_eq!(errno::get(), 34);
 }
 
@@ -42,20 +49,26 @@ fn long_has_the_same_contract() {
 fn size_returns_the_c_sentinel_on_error() {
     let _guard = crate::ffi::TestLock::acquire();
     assert_eq!(size(Ok(3)), 3);
-    assert_eq!(size(Err(Errno(12))), usize::MAX);
+    assert_eq!(
+        size(Err(Errno::from_generated(raven_libc_abi::errno::ENOMEM))),
+        usize::MAX
+    );
 }
 
 #[test]
 fn ssize_returns_minus_one_on_error() {
     let _guard = crate::ffi::TestLock::acquire();
     assert_eq!(ssize(Ok(4)), 4);
-    assert_eq!(ssize(Err(Errno(5))), -1);
+    assert_eq!(
+        ssize(Err(Errno::from_generated(raven_libc_abi::errno::EIO))),
+        -1
+    );
 }
 
 #[test]
 fn ptr_returns_null_and_sets_errno() {
     let _guard = crate::ffi::TestLock::acquire();
-    let value = ptr::<u8>(Err(Errno(12)));
+    let value = ptr::<u8>(Err(Errno::from_generated(raven_libc_abi::errno::ENOMEM)));
     assert!(value.is_null());
     assert_eq!(errno::get(), 12);
 }
@@ -63,7 +76,7 @@ fn ptr_returns_null_and_sets_errno() {
 #[test]
 fn null_sets_errno() {
     let _guard = crate::ffi::TestLock::acquire();
-    let value = null::<u8>(Errno(2));
+    let value = null::<u8>(Errno::from_generated(raven_libc_abi::errno::ENOENT));
     assert!(value.is_null());
     assert_eq!(errno::get(), 2);
 }
@@ -72,7 +85,10 @@ fn null_sets_errno() {
 fn unit_maps_ok_to_zero() {
     let _guard = crate::ffi::TestLock::acquire();
     assert_eq!(unit(Ok(())), 0);
-    assert_eq!(unit(Err(Errno(22))), -1);
+    assert_eq!(
+        unit(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL))),
+        -1
+    );
 }
 
 #[test]
@@ -95,5 +111,8 @@ fn platform_ssize_maps_a_short_count() {
 fn an_oversized_platform_count_is_eoverflow() {
     let _guard = crate::ffi::TestLock::acquire();
     assert_eq!(platform_ssize(Ok(usize::MAX)), -1);
-    assert_eq!(errno::get(), 75);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::EOVERFLOW).0)
+    );
 }
