@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S710: the public libc `struct sigaction` marshal/unmarshal row. The new and old 152-byte
-# objects sit at the last slot before inaccessible guard pages, a canary copy proves no write
-# beyond the public object, and the installed SA_SIGINFO/SA_ONSTACK flags plus the mask are read
-# back through the real libc sigaction path. This runs without libc raise, which is a separate
-# owned defect and keeps signal-acceptance.toml red.
+# S710: the public libc `struct sigaction` marshal/unmarshal row from the Rust libc acceptance
+# program. The new and old 152-byte objects sit at the last slot before inaccessible guard pages,
+# a canary copy proves no write beyond the public object, and the installed SA_SIGINFO/SA_ONSTACK
+# flags plus the mask are read back through the real libc sigaction/sigprocmask path. This runs
+# without libc raise, which is a separate owned defect and keeps signal-acceptance.toml red.
 
 name = "signal-acceptance-boundary"
 arch = "x86_64"
@@ -26,6 +26,9 @@ regex = '^signal: boundary guard ok flags=0x8000004 mask=1$'
 
 [[expect]]
 regex = '^signal: boundary canary ok flags=0x4 mask=1$'
+
+[[expect]]
+regex = '^signal: boundary procmask ok mask=1$'
 
 [[expect]]
 regex = '^signal: boundary ok$'

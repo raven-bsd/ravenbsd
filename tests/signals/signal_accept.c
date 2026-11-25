@@ -10,79 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/wait.h>
 #include <ucontext.h>
 #include <unistd.h>
-
-#define BOUNDARY_PAGE 4096
-#define BOUNDARY_CANARY 0x5a
-#define RAVEN_DEBUG_WRITE 3
-
-/// The service's inherited stdout is not the serial console on every architecture, so the
-/// boundary rows go to the kernel debug sink (`DEBUG_WRITE`) that the qtest serial captures.
-static long boundary_write(const char *bytes, unsigned long len) {
-#if defined(__x86_64__)
-    register long rax __asm__("rax") = RAVEN_DEBUG_WRITE;
-    register long rdi __asm__("rdi") = (long)bytes;
-    register long rsi __asm__("rsi") = (long)len;
-    __asm__ volatile("syscall" : "+r"(rax) : "r"(rdi), "r"(rsi) : "rcx", "r11", "memory");
-    return rax;
-#elif defined(__aarch64__)
-    register long x8 __asm__("x8") = RAVEN_DEBUG_WRITE;
-    register long x0 __asm__("x0") = (long)bytes;
-    register long x1 __asm__("x1") = (long)len;
-    __asm__ volatile("svc #0" : "+r"(x0) : "r"(x8), "r"(x1) : "memory");
-    return x0;
-#else
-    (void)bytes;
-    (void)len;
-    return -1;
-#endif
-}
-
-static void boundary_log(const char *text) {
-    unsigned long len = 0;
-    while (text[len] != '\0') {
-        len++;
-    }
-    (void)boundary_write(text, len);
-}
-
-/// Emit `<name> ok flags=0x<hex> mask=1` with the installed flags actually read back.
-static void boundary_row(const char *name, unsigned flags) {
-    char buffer[160];
-    size_t at = 0;
-    const char *prefix = "signal: boundary ";
-    while (*prefix != '\0') {
-        buffer[at++] = *prefix++;
-    }
-    while (*name != '\0') {
-        buffer[at++] = *name++;
-    }
-    const char *suffix = " ok flags=0x";
-    while (*suffix != '\0') {
-        buffer[at++] = *suffix++;
-    }
-    char digits[8];
-    size_t count = 0;
-    if (flags == 0) {
-        digits[count++] = '0';
-    }
-    while (flags != 0 && count < sizeof(digits)) {
-        unsigned digit = flags & 0xfu;
-        digits[count++] = (char)(digit < 10 ? '0' + digit : 'a' + digit - 10);
-        flags >>= 4;
-    }
-    while (count > 0) {
-        buffer[at++] = digits[--count];
-    }
-    const char *tail = " mask=1\n";
-    while (*tail != '\0') {
-        buffer[at++] = *tail++;
-    }
-    (void)boundary_write(buffer, (unsigned long)at);
-}
 
 static volatile sig_atomic_t outer_count;
 static volatile sig_atomic_t nested_count;
@@ -115,7 +45,6 @@ static void outer_handler(int signal_number, siginfo_t *info, void *context) {
     if (info == NULL || info->si_signo != signal_number) {
         outer_sig = -1;
     }
-#if defined(__x86_64__)
     if (ucontext != NULL) {
         interrupted_rip = (uintptr_t)ucontext->uc_mcontext.gregs[REG_RIP];
         interrupted_rsp = (uintptr_t)ucontext->uc_mcontext.gregs[REG_RSP];
@@ -123,123 +52,12 @@ static void outer_handler(int signal_number, siginfo_t *info, void *context) {
         interrupted_rip = 0;
         interrupted_rsp = 0;
     }
-#else
-    // The boundary rows do not deliver a signal; the raise-dependent ucontext rows stay x86_64.
-    (void)ucontext;
-    interrupted_rip = 0;
-    interrupted_rsp = 0;
-#endif
     if (raise_nested != 0) {
         raise_nested = 0;
         if (raise(SIGUSR2) != 0) {
             nested_sig = -1;
         }
     }
-}
-
-static int boundary_fail(const char *row, long long value, int error) {
-    printf("signal: boundary-fail %s value=%lld errno=%d\n", row, value, error);
-    (void)value;
-    (void)error;
-    boundary_log("signal: boundary-fail\n");
-    return 1;
-}
-
-/// Canary bytes survive outside the two public 152-byte objects.
-static int boundary_canaries_intact(const unsigned char *page, size_t first, size_t second) {
-    for (size_t i = 0; i < BOUNDARY_PAGE; i++) {
-        if ((i >= first && i < first + sizeof(struct sigaction)) ||
-            (i >= second && i < second + sizeof(struct sigaction))) {
-            continue;
-        }
-        if (page[i] != BOUNDARY_CANARY) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-/// The public 152-byte C `struct sigaction` row: libc must marshal it to the private 40-byte
-/// kernel request, preserve the public size, and return the installed flags and mask exactly.
-/// The new and old objects sit at the last public-struct slot before an inaccessible guard page;
-/// a separate copy is surrounded by canaries so a wider write is visible as data damage.
-static int boundary_rows(void) {
-    int failures = 0;
-    size_t len = 4 * BOUNDARY_PAGE;
-
-    _Static_assert(sizeof(struct sigaction) == 152, "the public C sigaction keeps its 152 bytes");
-
-    unsigned char *region =
-        mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (region == MAP_FAILED) {
-        return boundary_fail("mmap-region", 0, errno);
-    }
-    if (mprotect(region + BOUNDARY_PAGE, BOUNDARY_PAGE, PROT_NONE) != 0 ||
-        mprotect(region + 3 * BOUNDARY_PAGE, BOUNDARY_PAGE, PROT_NONE) != 0) {
-        munmap(region, len);
-        return boundary_fail("mprotect-region", 0, errno);
-    }
-
-    struct sigaction *act =
-        (struct sigaction *)(region + BOUNDARY_PAGE - sizeof(struct sigaction));
-    struct sigaction *old =
-        (struct sigaction *)(region + 3 * BOUNDARY_PAGE - sizeof(struct sigaction));
-    memset(act, 0, sizeof(*act));
-    memset(old, 0, sizeof(*old));
-    act->sa_sigaction = outer_handler;
-    act->sa_flags = SA_SIGINFO | SA_ONSTACK;
-    sigemptyset(&act->sa_mask);
-    if (sigaddset(&act->sa_mask, SIGUSR2) != 0) {
-        munmap(region, len);
-        return boundary_fail("sigaddset", 0, errno);
-    }
-
-    if (sigaction(SIGUSR1, act, NULL) != 0) {
-        failures += boundary_fail("guard-install", 0, errno);
-    } else if (sigaction(SIGUSR1, NULL, old) != 0) {
-        failures += boundary_fail("guard-query", 0, errno);
-    } else if (old->sa_sigaction != outer_handler ||
-               (old->sa_flags & (SA_SIGINFO | SA_ONSTACK)) != (SA_SIGINFO | SA_ONSTACK) ||
-               sigismember(&old->sa_mask, SIGUSR2) != 1 || old->sa_restorer != NULL) {
-        failures += boundary_fail("guard-flags-mask", old->sa_flags, errno);
-    } else {
-        boundary_row("guard", (unsigned)old->sa_flags);
-    }
-    munmap(region, len);
-
-    unsigned char *page =
-        mmap(NULL, BOUNDARY_PAGE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (page == MAP_FAILED) {
-        return failures + boundary_fail("mmap-canary", 0, errno);
-    }
-    memset(page, BOUNDARY_CANARY, BOUNDARY_PAGE);
-    const size_t act_offset = 128;
-    const size_t old_offset = 512;
-    struct sigaction *cact = (struct sigaction *)(page + act_offset);
-    struct sigaction *cold = (struct sigaction *)(page + old_offset);
-    memset(cact, 0, sizeof(*cact));
-    memset(cold, 0, sizeof(*cold));
-    cact->sa_sigaction = nested_handler;
-    cact->sa_flags = SA_SIGINFO;
-    sigemptyset(&cact->sa_mask);
-    if (sigaddset(&cact->sa_mask, SIGUSR1) != 0) {
-        munmap(page, BOUNDARY_PAGE);
-        return failures + boundary_fail("canary-sigaddset", 0, errno);
-    }
-    if (sigaction(SIGUSR2, cact, NULL) != 0) {
-        failures += boundary_fail("canary-install", 0, errno);
-    } else if (sigaction(SIGUSR2, NULL, cold) != 0) {
-        failures += boundary_fail("canary-query", 0, errno);
-    } else if (cold->sa_sigaction != nested_handler ||
-               (cold->sa_flags & SA_SIGINFO) != SA_SIGINFO ||
-               sigismember(&cold->sa_mask, SIGUSR1) != 1 ||
-               !boundary_canaries_intact(page, act_offset, old_offset)) {
-        failures += boundary_fail("canary-data-flags-mask", cold->sa_flags, errno);
-    } else {
-        boundary_row("canary", (unsigned)cold->sa_flags);
-    }
-    munmap(page, BOUNDARY_PAGE);
-    return failures;
 }
 
 static int install_handlers(void) {
@@ -337,14 +155,6 @@ int main(int argc, char **argv) {
     char marker = 0;
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    if (argc > 1 && strcmp(argv[1], "boundary") == 0) {
-        if (boundary_rows() != 0) {
-            boundary_log("signal: boundary-fail rows\n");
-            _exit(1);
-        }
-        boundary_log("signal: boundary ok\n");
-        _exit(0);
-    }
     if (argc > 1 && strcmp(argv[1], "exec-child") == 0) {
         (void)raise(SIGUSR1);
         printf("signal: exec-child survived after exec\n");
