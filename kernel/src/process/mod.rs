@@ -1867,8 +1867,58 @@ pub fn init_available(cmdline: &CmdLine) -> bool {
     initfs::lookup(path).is_some()
 }
 
+/// C19 sigacts selftest rows: install, read back, clear, and `execsigs`.
+///
+/// Returns the failing step name, or `None` when every row holds. Split from the
+/// exit path so the host `_ut` test can prove the same rows without QEMU.
+fn sigacts_selftest_check() -> Option<&'static str> {
+    let mut table = SigActs::new();
+    let handler = SigAction {
+        handler: 0x1234,
+        mask: 0,
+        flags: 0,
+    };
+    table.set(status::SIGUSR1, handler);
+    if table.get(status::SIGUSR1) != handler {
+        return Some("readback");
+    }
+    table.set(status::SIGUSR1, SigAction::default_action());
+    if table.get(status::SIGUSR1).handler != SIG_DFL {
+        return Some("clear readback");
+    }
+    table.set(status::SIGUSR1, handler);
+    table.set(
+        status::SIGTERM,
+        SigAction {
+            handler: SIG_IGN,
+            mask: 0,
+            flags: 0,
+        },
+    );
+    table.exec_reset();
+    if table.get(status::SIGUSR1).handler != SIG_DFL
+        || table.get(status::SIGTERM).handler != SIG_IGN
+    {
+        return Some("exec reset");
+    }
+    None
+}
+
+/// Run the sigacts selftest before PID 1 and exit QEMU through the C5 protocol.
+fn sigacts_selftest() -> ! {
+    if let Some(step) = sigacts_selftest_check() {
+        kprintln!("s44: sigacts failed {step}");
+        crate::boot::exit_qemu(0x11);
+    }
+    kprintln!("s44: sigacts table ok");
+    crate::boot::exit_qemu(0x10);
+}
+
 /// Create PID 1 from the initfs and enter ring 3. On success this never returns.
 pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
+    if cmdline.get("s44-sigactscheck").is_some() {
+        sigacts_selftest();
+    }
     let path = cmdline.get("init").unwrap_or("/init");
     let entry = initfs::lookup(path).ok_or(ProcessError::NoInit)?;
     let data = entry.data;

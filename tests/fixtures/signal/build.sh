@@ -33,3 +33,9 @@ RUSTFLAGS="$rustflags" \
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
     /init="$target_dir/$target/release/raven-s44-action"
+
+# S44 poll-interrupt row: a distinct first process blocks in EVQ_WAIT and is interrupted by a
+# caught kernel SIGUSR1 sent from a helper thread.
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/poll-initfs.img" \
+    /init="$target_dir/$target/release/raven-s44-poll"
