@@ -111,8 +111,8 @@ def parse_log(text: str, topic: str) -> dict[str, object]:
     """Split a serial log into the normal section and each mutation section."""
     normal_rows: dict[str, str] = {}
     normal_done: int | None = None
+    normal_duplicates: set[str] = set()
     mutations: dict[str, dict[str, object]] = {}
-    current: dict[str, str] | None = normal_rows
     current_name: str | None = None
     current_rows: dict[str, str] = normal_rows
     for line in text.splitlines():
@@ -120,8 +120,11 @@ def parse_log(text: str, topic: str) -> dict[str, object]:
         if begin is not None and begin.group("topic") == topic:
             current_name = begin.group("name")
             current_rows = {}
-            mutations[current_name] = {"rows": current_rows, "done": None}
-            current = None
+            mutations[current_name] = {
+                "rows": current_rows,
+                "done": None,
+                "duplicates": set(),
+            }
             continue
         end = MUTATION_END_RE.search(line)
         if end is not None and end.group("topic") == topic:
@@ -129,12 +132,20 @@ def parse_log(text: str, topic: str) -> dict[str, object]:
                 raise HarnessError(f"mutation end without matching begin: {line}")
             mutations[current_name]["done"] = int(end.group("failures"))
             current_name = None
-            current = normal_rows
+            current_rows = normal_rows
             continue
         row = ROW_RE.search(line)
         if row is not None and row.group("topic") == topic:
-            target = current_rows if current_name is not None else normal_rows
-            target[row.group("name")] = row.group("status")
+            if current_name is not None:
+                target = current_rows
+                duplicates = mutations[current_name]["duplicates"]
+            else:
+                target = normal_rows
+                duplicates = normal_duplicates
+            name = row.group("name")
+            if name in target:
+                duplicates.add(name)  # type: ignore[union-attr]
+            target[name] = row.group("status")
             continue
         done = DONE_RE.search(line)
         if done is not None and done.group("topic") == topic and current_name is None:
@@ -142,6 +153,7 @@ def parse_log(text: str, topic: str) -> dict[str, object]:
     return {
         "rows": normal_rows,
         "done": normal_done,
+        "duplicates": sorted(normal_duplicates),
         "mutations": mutations,
     }
 
@@ -165,11 +177,15 @@ def evaluate(
                 reasons.append(f"row:{row['name']}={status or 'missing'}")
         if parsed["done"] != 0:
             reasons.append(f"normal:done={parsed['done']}")
+        for name in parsed.get("duplicates", []):  # type: ignore[union-attr]
+            reasons.append(f"duplicate-row:{name}")
         for expected in mutations:
             section = parsed["mutations"].get(expected["name"])  # type: ignore[union-attr]
             if section is None:
                 reasons.append(f"mutation:{expected['name']}=missing-section")
                 continue
+            for name in section.get("duplicates", []):
+                reasons.append(f"mutation:{expected['name']}:duplicate-row={name}")
             status = section["rows"].get(expected["row"])
             if status != "FAIL":
                 reasons.append(f"mutation:{expected['name']}:{expected['row']}={status}")
@@ -192,6 +208,8 @@ def evaluate(
     section = parsed["mutations"].get(mutation)  # type: ignore[union-attr]
     if section is None:
         return [f"mutation:{mutation}=missing-section"]
+    for name in section.get("duplicates", []):
+        return [f"mutation:{mutation}:duplicate-row={name}"]
     status = section["rows"].get(expected["row"])
     # The controlled mutation is caught only when the row it targets turns red.
     if status != "FAIL":
