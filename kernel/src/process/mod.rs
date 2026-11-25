@@ -1391,6 +1391,14 @@ impl Process {
         uid: u32,
         value: u64,
     ) {
+        if thread.process.has_signal_entry() {
+            // The libc entry only consumes the process queue (`PROC_SIGRECV_EX`); keep a
+            // thread-directed send visible to it until the legacy registration is retired.
+            thread
+                .process
+                .queue_signal_info(signo, sender, code, uid, value);
+            return;
+        }
         thread.pending_signals.lock().push_back(PendingSignal {
             signo,
             sender,
@@ -1457,6 +1465,22 @@ impl Process {
             // The wait reason is consumed together with the delivery that returns to user; any
             // signal still queued blocks again on its own pending record.
             thread.signal_wake.store(false, Ordering::Release);
+        }
+        // A live legacy `SIG_SETUP` entry owns its own dispositions and consumes the process
+        // queue through `PROC_SIGRECV_EX`; the kernel table is not authoritative for it. Only a
+        // genuinely caught kernel record is delivered here in that mode, exactly as before the
+        // C19 migration completes.
+        if self.has_signal_entry() {
+            let sigacts = self.sigacts.lock();
+            let caught = |signal: &PendingSignal| {
+                blocked & signal_bit(signal.signo) == 0 && sigacts.get(signal.signo).is_caught()
+            };
+            let record = thread
+                .as_ref()
+                .and_then(|thread| take_queued_where(&thread.pending_signals, caught))
+                .or_else(|| take_queued_where(&self.pending_signals, caught))?;
+            let action = sigacts.get(record.signo);
+            return Some((record, action));
         }
         loop {
             // FreeBSD `postsig` consumes the thread-directed queue (`td_sigqueue`) first, then
@@ -1625,6 +1649,16 @@ fn take_queued(queue: &Mutex<VecDeque<PendingSignal>>, blocked: u64) -> Option<P
     let index = pending
         .iter()
         .position(|signal| blocked & signal_bit(signal.signo) == 0)?;
+    pending.remove(index)
+}
+
+/// Remove the oldest queued signal matching `predicate`.
+fn take_queued_where(
+    queue: &Mutex<VecDeque<PendingSignal>>,
+    mut predicate: impl FnMut(&PendingSignal) -> bool,
+) -> Option<PendingSignal> {
+    let mut pending = queue.lock();
+    let index = pending.iter().position(&mut predicate)?;
     pending.remove(index)
 }
 

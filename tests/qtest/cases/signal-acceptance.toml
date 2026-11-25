@@ -28,6 +28,18 @@ regex = '^signal: return ok$'
 regex = '^signal: nested ok sig=12$'
 
 [[expect]]
+regex = '^signal: interrupt ok sig=10$'
+
+[[expect]]
+regex = '^signal: blocked-held$'
+
+[[expect]]
+regex = '^signal: blocked ok signal=10$'
+
+[[expect]]
+regex = '^signal: ignored ok$'
+
+[[expect]]
 regex = '^signal: exec-default ok signal=10$'
 
 [[expect]]

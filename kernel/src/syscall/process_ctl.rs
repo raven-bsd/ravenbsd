@@ -1280,11 +1280,10 @@ fn signal_one_info(
     if signo == SIGKILL {
         return terminate_by_signal(caller, target, SIGKILL, false);
     }
-    // The legacy libc entry owns its own pending set and default actions; it keeps the old
-    // queue-everything contract until that path is retired.
-    if target.has_signal_entry() {
-        return process::deliver_signal_info(target, signo, caller.id, code, uid, value);
-    }
+    // The legacy libc entry keeps its own pending set and applies default actions after its
+    // `PROC_SIGRECV_EX`; a kernel default must not pre-empt it. Ignore and caught decisions are
+    // still made here so a `SIG_IGN` install from the kernel table discards immediately.
+    let legacy = target.has_signal_entry();
     let (caught, ignored) = {
         let sigacts = target.sigacts.lock();
         let action = sigacts.get(signo);
@@ -1296,6 +1295,10 @@ fn signal_one_info(
     match signal_disposition(signo, caught, ignored, blocked) {
         SignalDisposition::Discard => Ok(()),
         SignalDisposition::Deliver | SignalDisposition::Defer => {
+            process::deliver_signal_info(target, signo, caller.id, code, uid, value)
+        }
+        SignalDisposition::Default(_) if legacy => {
+            // The legacy entry decides the default from its own table.
             process::deliver_signal_info(target, signo, caller.id, code, uid, value)
         }
         SignalDisposition::Default(action) => match action {
