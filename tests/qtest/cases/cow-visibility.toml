@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S164: fork and copy-on-write visibility conformance (C13). The Rust fixture fills a private page,
+# forks in both write orders, asserts identical bytes/address until either writes, maps one memory
+# object SHARED twice and across fork, then forks+execs a child on the inherited object handle; the
+# child must see the writer's 0xBB. The one-shot libc-test service runs every row and exits.
+
+name = "cow-visibility"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/k495-cow/prepare-qtest-initfs.sh"]
+initfs = "build/qtest/cow-visibility-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^K495-COW fork-parent pid=\d+ addr=0x[0-9a-f]+ initial=aa last=aa$'
+
+[[expect]]
+regex = '^K495-COW fork-child pid=\d+ addr=0x[0-9a-f]+ inherited=aa first=aa after-parent=aa after-child=cc last=aa$'
+
+[[expect]]
+regex = '^K495-COW fork-parent status=0 after-parent=bb last=aa$'
+
+[[expect]]
+regex = '^K495-COW fork-child-first-parent pid=\d+ initial=aa$'
+
+[[expect]]
+regex = '^K495-COW fork-child-first-child pid=\d+ addr=0x[0-9a-f]+ stored=cc after-parent-store=cc$'
+
+[[expect]]
+regex = '^K495-COW fork-child-first-parent status=0 after-child=aa after-parent=bb$'
+
+[[expect]]
+regex = '^K495-COW shared-fork-parent pid=\d+ addr=0x[0-9a-f]+ initial=aa$'
+
+[[expect]]
+regex = '^K495-COW shared-fork-child pid=\d+ addr=0x[0-9a-f]+ inherited=aa after-store=bb$'
+
+[[expect]]
+regex = '^K495-COW shared-fork-parent status=0 after-store=bb$'
+
+[[expect]]
+regex = '^K495-COW remap-parent pid=\d+ first=aa after-store=bb$'
+
+[[expect]]
+regex = '^K495-COW spawn-parent pid=\d+ addr=0x[0-9a-f]+ seeded=aa store=bb first=aa last=aa$'
+
+[[expect]]
+regex = '^K495-COW exec-child pid=\d+ object=\d+ addr=0x[0-9a-f]+ first=aa before-store=aa after-store=bb last=aa$'
+
+[[expect]]
+regex = '^K495-COW spawn-parent status=0 after-store=bb last=aa$'
+
+[[expect]]
+regex = '^K495-COW ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)K495-COW FAIL|panic|EXCEPTION'
