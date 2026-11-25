@@ -61,13 +61,14 @@ fn reads_the_pinned_revisions() {
         lock.linux_raw_sys,
         "3b15c17f2688445cd3e9ef2907113829837773dd"
     );
+    assert_eq!(lock.freebsd, "133344405f532bd54ff3629a77d4c4e062f01fdb");
 }
 
 #[test]
 fn import_entries_cover_every_derived_file() {
     let tables = tables();
     let lock = read_lock(&resources()).expect("lock");
-    let entries = import_entries(&tables, "2026-11-13", &lock);
+    let entries = import_entries(&tables, "2026-11-13", &lock).expect("entries");
     assert_eq!(entries.len(), 45);
     let musl: Vec<&ImportEntry> = entries
         .iter()
@@ -101,7 +102,7 @@ fn import_entries_cover_every_derived_file() {
 fn every_import_path_is_under_the_repository_roots() {
     let tables = tables();
     let lock = read_lock(&resources()).expect("lock");
-    for entry in import_entries(&tables, "2026-11-13", &lock) {
+    for entry in import_entries(&tables, "2026-11-13", &lock).expect("entries") {
         assert!(entry.path.starts_with("libc/ravenlibc/"), "{}", entry.path);
     }
 }
@@ -111,7 +112,7 @@ fn every_import_path_exists_in_the_repository() {
     let tables = tables();
     let lock = read_lock(&resources()).expect("lock");
     let root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.."));
-    for entry in import_entries(&tables, "2026-11-13", &lock) {
+    for entry in import_entries(&tables, "2026-11-13", &lock).expect("entries") {
         assert!(
             root.join(&entry.path).is_file(),
             "import path does not exist: {}",
@@ -124,7 +125,7 @@ fn every_import_path_exists_in_the_repository() {
 fn rendered_entry_parses_as_toml() {
     let tables = tables();
     let lock = read_lock(&resources()).expect("lock");
-    for entry in import_entries(&tables, "2026-11-13", &lock) {
+    for entry in import_entries(&tables, "2026-11-13", &lock).expect("entries") {
         let text = entry.render();
         let parsed: toml::Value = toml::from_str(&text).expect("entry TOML");
         let table = parsed.as_table().expect("table");

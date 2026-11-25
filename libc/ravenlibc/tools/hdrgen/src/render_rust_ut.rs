@@ -16,7 +16,18 @@ fn tables() -> (Tables, validate::Values) {
 
 fn files() -> BTreeMap<String, String> {
     let (tables, values) = tables();
-    render_all(&tables, &values, "7813e9119eb5fe681b6750b8a033a0490bca0941").expect("render")
+    let lock = crate::provenance::read_lock(&resources()).expect("lock");
+    render_all(
+        &tables,
+        &values,
+        &crate::attribution::Attributions::resolve(&tables, &lock).expect("attribution"),
+    )
+    .expect("render")
+}
+
+fn resources() -> std::path::PathBuf {
+    let here = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    crate::provenance::discover_resources(&here).expect("ravenbsd-resources")
 }
 
 #[test]
