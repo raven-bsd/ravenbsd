@@ -55,7 +55,7 @@ regex = '^.*CONFORM rebound PASS .*$'
 regex = '^.*CONFORM SUMMARY PASS 10/10$'
 
 [[expect]]
-regex = '^init exited \(0\)$'
+regex = '^.*init exited \(0\)$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION'
