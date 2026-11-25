@@ -101,18 +101,21 @@ fields = [
   { name = "d_name", ty = "[c_char; 256]", off = 19 },
 ]
 
+# DR-69 FreeBSD `sys/sys/socket.h:336`: `unsigned char sa_len`, then `sa_family_t`.
 [[record]]
 name = "sockaddr"
 rust = "Sockaddr"
 c = "struct sockaddr"
 musl = "struct sockaddr"
 size = 16
-align = 2
+align = 1
 fields = [
-  { name = "sa_family", ty = "u16", off = 0 },
+  { name = "sa_len", ty = "u8", off = 0 },
+  { name = "sa_family", ty = "u8", off = 1 },
   { name = "sa_data", ty = "[c_char; 14]", off = 2 },
 ]
 
+# DR-69 FreeBSD `sys/netinet/in.h`: `uint8_t sin_len`, `sa_family_t sin_family`.
 [[record]]
 name = "sockaddr_in"
 rust = "SockaddrIn"
@@ -121,12 +124,14 @@ musl = "struct sockaddr_in"
 size = 16
 align = 4
 fields = [
-  { name = "sin_family", ty = "u16", off = 0 },
+  { name = "sin_len", ty = "u8", off = 0 },
+  { name = "sin_family", ty = "u8", off = 1 },
   { name = "sin_port", ty = "u16", off = 2 },
   { name = "sin_addr", ty = "u32", off = 4 },
   { name = "sin_zero", ty = "[u8; 8]", off = 8 },
 ]
 
+# DR-69 FreeBSD `sys/netinet6/in6.h`: `uint8_t sin6_len`, `sa_family_t sin6_family`.
 [[record]]
 name = "sockaddr_in6"
 rust = "SockaddrIn6"
@@ -135,58 +140,62 @@ musl = "struct sockaddr_in6"
 size = 28
 align = 4
 fields = [
-  { name = "sin6_family", ty = "u16", off = 0 },
+  { name = "sin6_len", ty = "u8", off = 0 },
+  { name = "sin6_family", ty = "u8", off = 1 },
   { name = "sin6_port", ty = "u16", off = 2 },
   { name = "sin6_flowinfo", ty = "u32", off = 4 },
   { name = "sin6_addr", ty = "[u8; 16]", off = 8 },
   { name = "sin6_scope_id", ty = "u32", off = 24 },
 ]
 
+# DR-69 FreeBSD `sys/sys/un.h:54`: `unsigned char sun_len`, `SUNPATHLEN 104`.
 [[record]]
 name = "sockaddr_un"
 rust = "SockaddrUn"
 c = "struct sockaddr_un"
 musl = "struct sockaddr_un"
-size = 110
-align = 2
+size = 106
+align = 1
 fields = [
-  { name = "sun_family", ty = "u16", off = 0 },
-  { name = "sun_path", ty = "[c_char; 108]", off = 2 },
+  { name = "sun_len", ty = "u8", off = 0 },
+  { name = "sun_family", ty = "u8", off = 1 },
+  { name = "sun_path", ty = "[c_char; 104]", off = 2 },
 ]
 
+# DR-69 FreeBSD `sys/sys/socket.h:444`: `int msg_iovlen`, `socklen_t` lengths. The donor
+# has implicit padding at 12, 20, 28 and 40 only; no named pad fields.
 [[record]]
 name = "msghdr"
 rust = "Msghdr"
 c = "struct msghdr"
 musl = "struct msghdr"
-size = 56
+size = 48
 align = 8
 fields = [
   { name = "msg_name", ty = "ptr", off = 0 },
   { name = "msg_namelen", ty = "u32", off = 8 },
   { name = "msg_iov", ty = "ptr", off = 16 },
   { name = "msg_iovlen", ty = "i32", off = 24 },
-  { name = "__pad1", ty = "i32", off = 28, musl_field = "" },
   { name = "msg_control", ty = "ptr", off = 32 },
   { name = "msg_controllen", ty = "u32", off = 40 },
-  { name = "__pad2", ty = "i32", off = 44, musl_field = "" },
-  { name = "msg_flags", ty = "i32", off = 48 },
+  { name = "msg_flags", ty = "i32", off = 44 },
 ]
 
+# DR-69 FreeBSD `sys/sys/socket.h:496`: `socklen_t cmsg_len`, then level and type; 12 bytes.
 [[record]]
 name = "cmsghdr"
 rust = "Cmsghdr"
 c = "struct cmsghdr"
 musl = "struct cmsghdr"
-size = 16
+size = 12
 align = 4
 fields = [
   { name = "cmsg_len", ty = "u32", off = 0 },
-  { name = "__pad1", ty = "i32", off = 4, musl_field = "" },
-  { name = "cmsg_level", ty = "i32", off = 8 },
-  { name = "cmsg_type", ty = "i32", off = 12 },
+  { name = "cmsg_level", ty = "i32", off = 4 },
+  { name = "cmsg_type", ty = "i32", off = 8 },
 ]
 
+# DR-69 FreeBSD `include/netdb.h`: `ai_canonname` precedes `ai_addr`.
 [[record]]
 name = "addrinfo"
 rust = "Addrinfo"
@@ -200,10 +209,29 @@ fields = [
   { name = "ai_socktype", ty = "i32", off = 8 },
   { name = "ai_protocol", ty = "i32", off = 12 },
   { name = "ai_addrlen", ty = "u32", off = 16 },
-  { name = "ai_addr", ty = "ptr", off = 24 },
-  { name = "ai_canonname", ty = "ptr", off = 32 },
+  { name = "ai_canonname", ty = "ptr", off = 24 },
+  { name = "ai_addr", ty = "ptr", off = 32 },
   { name = "ai_next", ty = "ptr", off = 40 },
 ]
+
+# DR-69 FreeBSD `sys/sys/_sockaddr_storage.h`: `ss_len`, `ss_family`, pad1[6],
+# `__ss_align` and pad2[112] make 128 bytes with 8-byte alignment.
+[[record]]
+name = "sockaddr_storage"
+rust = "SockaddrStorage"
+c = "struct sockaddr_storage"
+musl = "struct sockaddr_storage"
+size = 128
+align = 8
+fields = [
+  { name = "ss_len", ty = "u8", off = 0 },
+  { name = "ss_family", ty = "u8", off = 1 },
+  { name = "__ss_pad1", ty = "[u8; 6]", off = 2 },
+  { name = "__ss_align", ty = "i64", off = 8 },
+  { name = "__ss_pad2", ty = "[u8; 112]", off = 16 },
+]
+
+
 
 [[record]]
 name = "tm"
@@ -603,14 +631,6 @@ musl = "mbstate_t"
 size = 8
 align = 4
 doc = "[u32; 2]"
-
-[[opaque]]
-name = "sockaddr_storage"
-rust = "SockaddrStorage"
-c = "struct sockaddr_storage"
-musl = "struct sockaddr_storage"
-size = 128
-align = 8
 
 [[opaque]]
 name = "posix_spawnattr_t"

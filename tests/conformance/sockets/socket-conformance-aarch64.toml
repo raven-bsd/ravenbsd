@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S740: S174 socket conformance on aarch64. The guest runs the same one-shot probe and
+# host peer as the x86_64 TCG case, on a separate fixture directory so the two
+# architectures never share an object, image or pcap.
+name = "socket-conformance-aarch64"
+arch = "aarch64"
+profile = "network-config-test"
+timeout_secs = 180
+pre = [
+    "RAVEN_QT_ARCH=aarch64 SOCKET_CONFORMANCE_OUT=build/fixtures/socket-conformance-aarch64 sh tests/conformance/sockets/build.sh",
+    "RAVEN_QT_ARCH=aarch64 SOCKET_CONFORMANCE_OUT=build/fixtures/socket-conformance-aarch64 sh tests/conformance/sockets/start-host.sh",
+]
+initfs = "build/fixtures/socket-conformance-aarch64/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = [
+    "-accel", "tcg", "-smp", "1",
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:0-:23100",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-monitor", "unix:build/fixtures/socket-conformance-aarch64/monitor.sock,server=on,wait=off",
+    "-object", "filter-dump,id=f0,netdev=n0,file=build/fixtures/socket-conformance-aarch64/qemu.pcap",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*CONFORM layout PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM reuseaddr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM accept PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM soerror PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutdown PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM half PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutrd PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM shutrdwr PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM rebound PASS .*$'
+
+[[expect]]
+regex = '^.*CONFORM SUMMARY PASS 10/10$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

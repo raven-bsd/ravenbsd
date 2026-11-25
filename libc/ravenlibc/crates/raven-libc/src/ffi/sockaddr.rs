@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! The `struct sockaddr *` plus `socklen_t` contract of C64 4.7: a pointer and a length become
-//! a byte view, the family word is read without alignment assumptions and an in/out
-//! `socklen_t *` follows the POSIX truncation rule (the caller's capacity wins, the full length
-//! is what the caller should see). The socket family that consumes the helper is deferred with
-//! C63; the conversion and its tests are the C64-owned part.
+//! The `struct sockaddr *` plus `socklen_t` contract: a pointer and a length become a byte
+//! view, the FreeBSD `sa_len`/`sa_family` prefix is read without alignment assumptions, and an
+//! in/out `socklen_t *` reports the full required length even when the caller's buffer is
+//! smaller (FreeBSD `user_getsockname`).
 
 use core::ffi::{c_int, c_uint, c_void};
 
 use raven_libc_abi::errno::{EFAULT, Errno};
-use raven_libc_abi::structs::Sockaddr;
 
 /// The C `struct in_addr` (one network-order word).
 #[repr(C)]
@@ -65,27 +63,32 @@ pub(crate) unsafe fn view_mut<'a>(
     Ok(unsafe { core::slice::from_raw_parts_mut(pointer.cast::<u8>(), len) })
 }
 
-/// The address family word of a byte view, or `None` when the view is shorter than `sockaddr`.
+/// The address family byte of a byte view.
+///
+/// FreeBSD `struct sockaddr` starts with `sa_len` and puts `sa_family` at offset 1, so a
+/// view shorter than two bytes has no family. Reading a two-byte word at offset 0 is the
+/// S174 defect this cutover removes.
 pub(crate) fn family(bytes: &[u8]) -> Option<c_int> {
-    if bytes.len() < core::mem::size_of::<Sockaddr>() {
+    if bytes.len() < 2 {
         return None;
     }
-    let mut word = [0u8; 2];
-    word.copy_from_slice(bytes.get(..2)?);
-    Some(c_int::from(u16::from_ne_bytes(word)))
+    Some(c_int::from(*bytes.get(1)?))
 }
 
-/// Write the in/out length: the caller's capacity, never more than the real length.
+/// Write the in/out length.
+///
+/// FreeBSD `user_getsockname` copies only `min(ss_len, caller_len)` bytes out, but stores the
+/// full `ss_len` in `*alen` so the caller learns the size it needs. The write itself is already
+/// bounded by the caller-provided `view_mut` capacity.
 ///
 /// # Safety
 /// `out` is NULL or points to a writable `socklen_t`.
-pub(crate) unsafe fn write_len(out: *mut SockLen, full: usize, capacity: SockLen) {
+pub(crate) unsafe fn write_len(out: *mut SockLen, full: usize, _capacity: SockLen) {
     if out.is_null() {
         return;
     }
-    let capped = full.min(capacity as usize);
     // SAFETY: the caller grants a writable `socklen_t`.
-    unsafe { out.write(capped as SockLen) };
+    unsafe { out.write(full as SockLen) };
 }
 
 #[cfg(test)]

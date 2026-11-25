@@ -12,11 +12,20 @@ fn address_types_match_the_c_layout() {
 }
 
 #[test]
-fn family_reads_the_first_word() {
+fn family_reads_the_byte_after_sa_len() {
+    // FreeBSD `struct sockaddr`: `sa_len` at 0, `sa_family` at 1.
+    let mut bytes = [0u8; 16];
+    bytes[0] = 16;
+    bytes[1] = AF_INET as u8;
+    assert_eq!(family(&bytes), Some(AF_INET));
+    assert_eq!(family(&bytes[..1]), None);
+}
+
+#[test]
+fn a_linux_family_word_is_not_read_at_offset_zero() {
     let mut bytes = [0u8; 16];
     bytes[0..2].copy_from_slice(&(AF_INET as u16).to_ne_bytes());
-    assert_eq!(family(&bytes), Some(AF_INET));
-    assert_eq!(family(&bytes[..2]), None);
+    assert_eq!(family(&bytes), Some(0));
 }
 
 #[test]
@@ -27,14 +36,16 @@ fn view_rejects_null_with_a_length() {
 }
 
 #[test]
-fn length_is_capped_by_the_caller() {
+fn length_reports_the_required_size() {
+    // FreeBSD `user_getsockname`: only `min(ss_len, user_len)` bytes are copied out, but
+    // `*alen` is the full `ss_len` the caller needs.
     let mut out = 0u32;
     // SAFETY: one writable `socklen_t`.
-    unsafe { write_len(&mut out, 128, 16) };
-    assert_eq!(out, 16);
+    unsafe { write_len(&mut out, 128, 128) };
+    assert_eq!(out, 128);
     // SAFETY: one writable `socklen_t`.
-    unsafe { write_len(&mut out, 4, 16) };
-    assert_eq!(out, 4);
+    unsafe { write_len(&mut out, 128, 16) };
+    assert_eq!(out, 128);
 }
 
 const AF_INET: i32 = 2;

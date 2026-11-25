@@ -24,6 +24,7 @@ use crate::generated::structs::SiginfoT;
 use crate::generated::structs::Sockaddr;
 use crate::generated::structs::SockaddrIn;
 use crate::generated::structs::SockaddrIn6;
+use crate::generated::structs::SockaddrStorage;
 use crate::generated::structs::SockaddrUn;
 use crate::generated::structs::StackT;
 use crate::generated::structs::Stat;
@@ -236,9 +237,14 @@ pub const STRUCTS: &[StructLayout] = &[
         align: core::mem::align_of::<Sockaddr>(),
         fields: &[
             FieldLayout {
+                name: "sa_len",
+                offset: core::mem::offset_of!(Sockaddr, sa_len),
+                size: 1,
+            },
+            FieldLayout {
                 name: "sa_family",
                 offset: core::mem::offset_of!(Sockaddr, sa_family),
-                size: 2,
+                size: 1,
             },
             FieldLayout {
                 name: "sa_data",
@@ -254,9 +260,14 @@ pub const STRUCTS: &[StructLayout] = &[
         align: core::mem::align_of::<SockaddrIn>(),
         fields: &[
             FieldLayout {
+                name: "sin_len",
+                offset: core::mem::offset_of!(SockaddrIn, sin_len),
+                size: 1,
+            },
+            FieldLayout {
                 name: "sin_family",
                 offset: core::mem::offset_of!(SockaddrIn, sin_family),
-                size: 2,
+                size: 1,
             },
             FieldLayout {
                 name: "sin_port",
@@ -282,9 +293,14 @@ pub const STRUCTS: &[StructLayout] = &[
         align: core::mem::align_of::<SockaddrIn6>(),
         fields: &[
             FieldLayout {
+                name: "sin6_len",
+                offset: core::mem::offset_of!(SockaddrIn6, sin6_len),
+                size: 1,
+            },
+            FieldLayout {
                 name: "sin6_family",
                 offset: core::mem::offset_of!(SockaddrIn6, sin6_family),
-                size: 2,
+                size: 1,
             },
             FieldLayout {
                 name: "sin6_port",
@@ -315,14 +331,19 @@ pub const STRUCTS: &[StructLayout] = &[
         align: core::mem::align_of::<SockaddrUn>(),
         fields: &[
             FieldLayout {
+                name: "sun_len",
+                offset: core::mem::offset_of!(SockaddrUn, sun_len),
+                size: 1,
+            },
+            FieldLayout {
                 name: "sun_family",
                 offset: core::mem::offset_of!(SockaddrUn, sun_family),
-                size: 2,
+                size: 1,
             },
             FieldLayout {
                 name: "sun_path",
                 offset: core::mem::offset_of!(SockaddrUn, sun_path),
-                size: 108,
+                size: 104,
             },
         ],
     },
@@ -353,11 +374,6 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 4,
             },
             FieldLayout {
-                name: "__pad1",
-                offset: core::mem::offset_of!(Msghdr, __pad1),
-                size: 4,
-            },
-            FieldLayout {
                 name: "msg_control",
                 offset: core::mem::offset_of!(Msghdr, msg_control),
                 size: 8,
@@ -365,11 +381,6 @@ pub const STRUCTS: &[StructLayout] = &[
             FieldLayout {
                 name: "msg_controllen",
                 offset: core::mem::offset_of!(Msghdr, msg_controllen),
-                size: 4,
-            },
-            FieldLayout {
-                name: "__pad2",
-                offset: core::mem::offset_of!(Msghdr, __pad2),
                 size: 4,
             },
             FieldLayout {
@@ -388,11 +399,6 @@ pub const STRUCTS: &[StructLayout] = &[
             FieldLayout {
                 name: "cmsg_len",
                 offset: core::mem::offset_of!(Cmsghdr, cmsg_len),
-                size: 4,
-            },
-            FieldLayout {
-                name: "__pad1",
-                offset: core::mem::offset_of!(Cmsghdr, __pad1),
                 size: 4,
             },
             FieldLayout {
@@ -439,19 +445,52 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 4,
             },
             FieldLayout {
-                name: "ai_addr",
-                offset: core::mem::offset_of!(Addrinfo, ai_addr),
+                name: "ai_canonname",
+                offset: core::mem::offset_of!(Addrinfo, ai_canonname),
                 size: 8,
             },
             FieldLayout {
-                name: "ai_canonname",
-                offset: core::mem::offset_of!(Addrinfo, ai_canonname),
+                name: "ai_addr",
+                offset: core::mem::offset_of!(Addrinfo, ai_addr),
                 size: 8,
             },
             FieldLayout {
                 name: "ai_next",
                 offset: core::mem::offset_of!(Addrinfo, ai_next),
                 size: 8,
+            },
+        ],
+    },
+    StructLayout {
+        name: "sockaddr_storage",
+        c_name: "struct sockaddr_storage",
+        size: core::mem::size_of::<SockaddrStorage>(),
+        align: core::mem::align_of::<SockaddrStorage>(),
+        fields: &[
+            FieldLayout {
+                name: "ss_len",
+                offset: core::mem::offset_of!(SockaddrStorage, ss_len),
+                size: 1,
+            },
+            FieldLayout {
+                name: "ss_family",
+                offset: core::mem::offset_of!(SockaddrStorage, ss_family),
+                size: 1,
+            },
+            FieldLayout {
+                name: "__ss_pad1",
+                offset: core::mem::offset_of!(SockaddrStorage, __ss_pad1),
+                size: 6,
+            },
+            FieldLayout {
+                name: "__ss_align",
+                offset: core::mem::offset_of!(SockaddrStorage, __ss_align),
+                size: 8,
+            },
+            FieldLayout {
+                name: "__ss_pad2",
+                offset: core::mem::offset_of!(SockaddrStorage, __ss_pad2),
+                size: 112,
             },
         ],
     },

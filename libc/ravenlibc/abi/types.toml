@@ -269,10 +269,11 @@ doc = "DV1: 32 bits everywhere; musl x86_64 is 64 bits"
 
 [[type]]
 name = "sa_family_t"
-rust = "u16"
-c = "unsigned short"
-bits = 16
+rust = "u8"
+c = "unsigned char"
+bits = 8
 signed = false
+doc = "DR-69/FreeBSD sys/sys/_types.h:159 __uint8_t; the sockaddr family byte follows sa_len"
 
 [[type]]
 name = "in_port_t"

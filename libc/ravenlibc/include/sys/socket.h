@@ -43,27 +43,21 @@ __BEGIN_DECLS
 
 #include <bits/socket.h>
 
+/* RavenBSD: DR-69 FreeBSD sys/sys/socket.h:444. The padding at 12, 20, 28 and 40 is
+ * implicit; the donor has no named pad members. */
 struct msghdr {
 	void *msg_name;
 	socklen_t msg_namelen;
 	struct iovec *msg_iov;
 	int msg_iovlen;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __LITTLE_ENDIAN
-	int __pad1;
-#endif
 	void *msg_control;
 	socklen_t msg_controllen;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __LITTLE_ENDIAN
-	int __pad2;
-#endif
 	int msg_flags;
 };
 
+/* RavenBSD: DR-69 FreeBSD sys/sys/socket.h:496; 12 bytes, no named pad member. */
 struct cmsghdr {
 	socklen_t cmsg_len;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __LITTLE_ENDIAN
-	int __pad1;
-#endif
 	int cmsg_level;
 	int cmsg_type;
 };
@@ -111,29 +105,41 @@ struct linger {
 #ifndef SOL_SOCKET
 #endif
 
-#define __CMSG_LEN(cmsg) (((cmsg)->cmsg_len + sizeof(long) - 1) & ~(long)(sizeof(long) - 1))
+/* RavenBSD: DR-69 FreeBSD sys/sys/socket.h:564. `CMSG_DATA` starts at
+ * `_ALIGN(sizeof(struct cmsghdr))`, which is 16 on a 64-bit target even though the
+ * structure itself is 12 bytes. `CMSG_LEN(n)` is 16 + n. */
+#define __CMSG_ALIGN(n) (((n) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
+#define __CMSG_LEN(cmsg) __CMSG_ALIGN((cmsg)->cmsg_len)
 #define __CMSG_NEXT(cmsg) ((unsigned char *)(cmsg) + __CMSG_LEN(cmsg))
 #define __MHDR_END(mhdr) ((unsigned char *)(mhdr)->msg_control + (mhdr)->msg_controllen)
 
-#define CMSG_DATA(cmsg) ((unsigned char *) (((struct cmsghdr *)(cmsg)) + 1))
-#define CMSG_NXTHDR(mhdr, cmsg) ((cmsg)->cmsg_len < sizeof (struct cmsghdr) || \
-	__CMSG_LEN(cmsg) + sizeof(struct cmsghdr) >= __MHDR_END(mhdr) - (unsigned char *)(cmsg) \
+#define CMSG_DATA(cmsg) ((unsigned char *)(cmsg) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
+#define CMSG_NXTHDR(mhdr, cmsg) ((cmsg) == 0 ? CMSG_FIRSTHDR(mhdr) : \
+	__CMSG_LEN(cmsg) + __CMSG_ALIGN(sizeof(struct cmsghdr)) > \
+	__MHDR_END(mhdr) - (unsigned char *)(cmsg) \
 	? 0 : (struct cmsghdr *)__CMSG_NEXT(cmsg))
 #define CMSG_FIRSTHDR(mhdr) ((size_t) (mhdr)->msg_controllen >= sizeof (struct cmsghdr) ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) 0)
 
-#define CMSG_ALIGN(len) (((len) + sizeof (size_t) - 1) & (size_t) ~(sizeof (size_t) - 1))
-#define CMSG_SPACE(len) (CMSG_ALIGN (len) + CMSG_ALIGN (sizeof (struct cmsghdr)))
-#define CMSG_LEN(len)   (CMSG_ALIGN (sizeof (struct cmsghdr)) + (len))
+#define CMSG_ALIGN(len) __CMSG_ALIGN(len)
+#define CMSG_SPACE(len) (__CMSG_ALIGN (sizeof (struct cmsghdr)) + __CMSG_ALIGN (len))
+#define CMSG_LEN(len)   (__CMSG_ALIGN (sizeof (struct cmsghdr)) + (len))
 
+/* RavenBSD: DR-69 FreeBSD sys/sys/socket.h:336. */
 struct sockaddr {
-	sa_family_t sa_family;
+	unsigned char sa_len;
+	unsigned char sa_family;
 	char sa_data[14];
 };
 
+/* RavenBSD: DR-69 FreeBSD sys/sys/_sockaddr_storage.h. */
 struct sockaddr_storage {
-	sa_family_t ss_family;
-	char __ss_padding[128-sizeof(long)-sizeof(sa_family_t)];
-	unsigned long __ss_align;
+	unsigned char ss_len;
+	unsigned char ss_family;
+	char __ss_pad1[sizeof(long long) - sizeof(unsigned char) - sizeof(unsigned char)];
+	long long __ss_align;
+	char __ss_pad2[128 - sizeof(unsigned char) - sizeof(unsigned char)
+	    - (sizeof(long long) - sizeof(unsigned char) - sizeof(unsigned char))
+	    - sizeof(long long)];
 };
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE

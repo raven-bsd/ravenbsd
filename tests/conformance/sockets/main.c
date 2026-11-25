@@ -85,6 +85,7 @@ static int listener(void)
         return -1;
     }
     memset(&address, 0, sizeof(address));
+    address.sin_len = sizeof(address);
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
     address.sin_port = htons(LISTEN_PORT);
@@ -117,24 +118,49 @@ static int accept_one(int listen_fd)
 static int row_layout(void)
 {
     struct sockaddr_in in;
+    struct sockaddr_in6 in6;
     struct sockaddr_un un;
+    struct sockaddr_storage storage;
+    struct msghdr msg;
+    struct cmsghdr cmsg;
+    struct addrinfo ai;
     unsigned short port = htons(0x1234);
     unsigned char wire[2];
     memcpy(wire, &port, sizeof(wire));
-    if (sizeof(in) != 16 || offsetof(struct sockaddr_in, sin_family) != 0 ||
+    /* Literal FreeBSD records at the S700 pin: the length byte is first and the family
+     * is one byte at offset 1. These are independent expectations, not a Raven-to-Raven
+     * comparison. */
+    if (sizeof(in) != 16 || offsetof(struct sockaddr_in, sin_len) != 0 ||
+        offsetof(struct sockaddr_in, sin_family) != 1 ||
         offsetof(struct sockaddr_in, sin_port) != 2 ||
         offsetof(struct sockaddr_in, sin_addr) != 4 ||
-        offsetof(struct sockaddr_un, sun_family) != 0 ||
-        offsetof(struct sockaddr_un, sun_path) != 2 ||
-        sizeof(un) < offsetof(struct sockaddr_un, sun_path) + 1 ||
+        sizeof(in6) != 28 || offsetof(struct sockaddr_in6, sin6_len) != 0 ||
+        offsetof(struct sockaddr_in6, sin6_family) != 1 ||
+        offsetof(struct sockaddr_un, sun_len) != 0 ||
+        offsetof(struct sockaddr_un, sun_family) != 1 ||
+        offsetof(struct sockaddr_un, sun_path) != 2 || sizeof(un) != 106 ||
+        offsetof(struct sockaddr_storage, ss_len) != 0 ||
+        offsetof(struct sockaddr_storage, ss_family) != 1 ||
+        sizeof(storage) != 128 || sizeof(msg) != 48 ||
+        offsetof(struct msghdr, msg_flags) != 44 || sizeof(cmsg) != 12 ||
+        offsetof(struct cmsghdr, cmsg_level) != 4 ||
+        offsetof(struct cmsghdr, cmsg_type) != 8 ||
+        offsetof(struct addrinfo, ai_canonname) != 24 ||
+        offsetof(struct addrinfo, ai_addr) != 32 || AF_INET6 != 28 ||
         wire[0] != 0x12 || wire[1] != 0x34) {
-        char detail[96];
+        char detail[160];
         (void)snprintf(detail, sizeof(detail),
-                       "in=%u un=%u port=%02x%02x", (unsigned)sizeof(in),
-                       (unsigned)sizeof(un), wire[0], wire[1]);
+                       "in=%u in6=%u un=%u storage=%u msg=%u cmsg=%u af6=%d "
+                       "port=%02x%02x",
+                       (unsigned)sizeof(in), (unsigned)sizeof(in6),
+                       (unsigned)sizeof(un), (unsigned)sizeof(storage),
+                       (unsigned)sizeof(msg), (unsigned)sizeof(cmsg), AF_INET6,
+                       wire[0], wire[1]);
         return fail("layout", detail);
     }
-    return pass("layout", "sockaddr_in=16 offset=2 sockaddr_un path=2 be-port");
+    return pass("layout",
+                "freebsd sa_len=0 family=1 in=16 in6=28 un=106 storage=128 "
+                "msg=48 cmsg=12 af6=28 be-port");
 }
 
 static int row_reuseaddr(int listen_fd)
@@ -208,6 +234,7 @@ static int row_soerror(void)
         return fail("soerror", "nonblock");
     }
     memset(&peer, 0, sizeof(peer));
+    peer.sin_len = sizeof(peer);
     peer.sin_family = AF_INET;
     peer.sin_addr.s_addr = htonl(0x7f000001); /* the guest's own loopback */
     peer.sin_port = htons(9);
