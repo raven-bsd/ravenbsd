@@ -13,7 +13,7 @@
 //! `call::probe()` at the other CPU concurrently. This is the S102 proof that the probe wait is
 //! interruptible: a probe waiter must be able to take the other probe's IPI.
 
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use alloc::vec::Vec;
 
@@ -100,9 +100,23 @@ static ACK_READY: AtomicU32 = AtomicU32::new(0);
 /// Selftest TLB target completion for the lost-NMI and delayed-ack rows.
 #[cfg(target_arch = "x86_64")]
 static ACK_DONE: AtomicU32 = AtomicU32::new(0);
+/// Pinned CPU0 shootdown driver: done and the measured result.
+#[cfg(target_arch = "x86_64")]
+static DRIVER_DONE: AtomicU32 = AtomicU32::new(0);
+#[cfg(target_arch = "x86_64")]
+static DRIVER_FLUSHED: AtomicU32 = AtomicU32::new(0);
+#[cfg(target_arch = "x86_64")]
+static DRIVER_MS: AtomicU64 = AtomicU64::new(0);
+#[cfg(target_arch = "x86_64")]
+static DRIVER_FLUSHES: AtomicU64 = AtomicU64::new(0);
+/// 1 = drop the NMI, 2 = delay the ack, 3 = one-shot lost-delivery injection.
+#[cfg(target_arch = "x86_64")]
+static DRIVER_MODE: AtomicU64 = AtomicU64::new(0);
 /// Delay used by the delayed-ack row: past the 100 ms diagnostic deadline.
 #[cfg(target_arch = "x86_64")]
 const ACK_DELAY_NS: u64 = 250_000_000;
+/// The mutation run selects the dropped-ack row instead of the normal selftest rows.
+static DROP_ACK_TEST: AtomicBool = AtomicBool::new(false);
 
 /// Read by both CPUs in the concurrent call-probe test.
 static PROBE_BYTE: u8 = 0x5a;
@@ -284,9 +298,7 @@ fn ipiq_test() -> Result<u32, &'static str> {
 pub fn run() -> ! {
     let cpus = online_cpus();
     let cmdline = crate::cmdline::CmdLine::parse(crate::memory::paging::cmdline());
-    if cmdline.flag("selftest-tlb-drop-ack") {
-        lost_ack_test(cpus);
-    }
+    DROP_ACK_TEST.store(cmdline.flag("selftest-tlb-drop-ack"), Ordering::Release);
     match tlb_test(cpus) {
         Ok(()) => kprintln!("selftest: smp tlb ok cpus={cpus}"),
         Err(reason) => {
@@ -348,6 +360,10 @@ fn worker(index: usize) {
 }
 
 fn monitor() {
+    #[cfg(target_arch = "x86_64")]
+    if DROP_ACK_TEST.load(Ordering::Acquire) {
+        lost_ack_test(online_cpus());
+    }
     let start = sleep::now_ns();
     while DONE.load(Ordering::SeqCst) < WORKERS as u32 {
         if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
@@ -658,13 +674,57 @@ fn stop_ack_target() {
     sleep::sleep_ns(20_000_000);
 }
 
+/// Pinned CPU0 driver: the monitor can migrate, so the shooter itself must stay on CPU0 and
+/// never become the target CPU1.
 #[cfg(target_arch = "x86_64")]
-fn shootdown_once() -> (bool, u64, u64) {
+fn shootdown_driver() {
+    match DRIVER_MODE.load(Ordering::SeqCst) {
+        1 => shootdown::arm_nmi_drop(1),
+        2 => shootdown::arm_ack_delay(1, ACK_DELAY_NS),
+        3 => shootdown::set_failure_injection(true),
+        _ => {}
+    }
     let before = shootdown::flush_count(1);
     let start = sleep::now_ns();
     let flushed = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
-    let elapsed_ms = sleep::now_ns().saturating_sub(start) / 1_000_000;
-    (flushed, elapsed_ms, shootdown::flush_count(1).saturating_sub(before))
+    DRIVER_MS.store(
+        sleep::now_ns().saturating_sub(start) / 1_000_000,
+        Ordering::SeqCst,
+    );
+    DRIVER_FLUSHES.store(
+        shootdown::flush_count(1).saturating_sub(before),
+        Ordering::SeqCst,
+    );
+    DRIVER_FLUSHED.store(u32::from(flushed), Ordering::SeqCst);
+    DRIVER_DONE.store(1, Ordering::SeqCst);
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn run_shootdown(mode: u64) -> Result<(bool, u64, u64), &'static str> {
+    start_ack_target()?;
+    DRIVER_DONE.store(0, Ordering::SeqCst);
+    DRIVER_FLUSHED.store(0, Ordering::SeqCst);
+    DRIVER_MS.store(0, Ordering::SeqCst);
+    DRIVER_FLUSHES.store(0, Ordering::SeqCst);
+    DRIVER_MODE.store(mode, Ordering::SeqCst);
+    if sched::spawn_kernel_on(0, "smp-tlb-driver", shootdown_driver).is_err() {
+        stop_ack_target();
+        return Err("cannot spawn shootdown driver");
+    }
+    let start = sleep::now_ns();
+    while DRIVER_DONE.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            stop_ack_target();
+            return Err("shootdown driver timed out");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let flushed = DRIVER_FLUSHED.load(Ordering::SeqCst) != 0;
+    let elapsed_ms = DRIVER_MS.load(Ordering::SeqCst);
+    let flushes = DRIVER_FLUSHES.load(Ordering::SeqCst);
+    stop_ack_target();
+    Ok((flushed, elapsed_ms, flushes))
 }
 
 /// S195: a lost NMI must not lose the shootdown; the fixed IPI is the latched fallback.
@@ -673,10 +733,7 @@ fn lost_nmi_test(cpus: usize) -> Result<u64, &'static str> {
     if cpus < 2 {
         return Ok(0);
     }
-    start_ack_target()?;
-    shootdown::arm_nmi_drop(1);
-    let (flushed, elapsed_ms, flushes) = shootdown_once();
-    stop_ack_target();
+    let (flushed, elapsed_ms, flushes) = run_shootdown(1)?;
     if !flushed {
         return Err("lost-NMI shootdown timed out");
     }
@@ -692,15 +749,15 @@ fn delayed_ack_test(cpus: usize) -> Result<u64, &'static str> {
     if cpus < 2 {
         return Ok(0);
     }
-    start_ack_target()?;
-    shootdown::arm_ack_delay(1, ACK_DELAY_NS);
-    let (flushed, elapsed_ms, flushes) = shootdown_once();
-    stop_ack_target();
+    let (flushed, elapsed_ms, flushes) = run_shootdown(2)?;
     if !flushed {
         return Err("delayed-ack shootdown timed out");
     }
     if flushes == 0 {
         return Err("delayed-ack target did not flush");
+    }
+    if elapsed_ms < ACK_DELAY_NS / 1_000_000 {
+        return Err("delayed-ack did not delay");
     }
     Ok(elapsed_ms)
 }
@@ -712,12 +769,14 @@ fn lost_ack_test(cpus: usize) -> ! {
         kprintln!("selftest: smp tlb lost-ack failed: too few CPUs");
         boot::exit_qemu(0x11);
     }
-    shootdown::set_failure_injection(true);
-    let (flushed, _elapsed_ms, _flushes) = shootdown_once();
-    if flushed {
-        kprintln!("selftest: smp tlb lost-ack failed: shootdown passed without an ack");
-    } else {
-        kprintln!("selftest: smp tlb lost-ack failed: ack missing");
+    match run_shootdown(3) {
+        Ok((true, _elapsed_ms, _flushes)) => {
+            kprintln!("selftest: smp tlb lost-ack failed: shootdown passed without an ack")
+        }
+        Ok((false, _elapsed_ms, _flushes)) => {
+            kprintln!("selftest: smp tlb lost-ack failed: ack missing")
+        }
+        Err(reason) => kprintln!("selftest: smp tlb lost-ack failed: {reason}"),
     }
     boot::exit_qemu(0x11)
 }

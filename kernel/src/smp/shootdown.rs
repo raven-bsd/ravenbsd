@@ -19,9 +19,12 @@
 //!   shooter waits with interrupts enabled, so a target that is spinning on an address-space
 //!   lock can still take the TLB IPI. The guard masks interrupts only while publishing/clearing
 //!   the active request and restores the caller's original IF on drop.
-//! * A missing acknowledgement is a timeout after 100 ms.  The per-CPU pending slot is cleared so
-//!   a late IPI is ignored, the timeout is logged, and `false` is returned; the caller decides how
-//!   to react.  No frame or slot is allocated, so a timeout cannot leak.
+//! * Every online target must acknowledge before the shooter proceeds. The NMI is the fast path
+//!   for a target in an IF=0 section; a fixed TLB IPI is sent with it and stays pending in the
+//!   target's local APIC if the NMI is blocked or lost, so a lost NMI cannot lose the
+//!   invalidation. The 100 ms deadline is diagnostic only: a late acknowledgement is still
+//!   waited for and the pending sequence is not cleared. The `s34-tlb-fail` fault injection
+//!   keeps the historical bounded-timeout failure path for its mutation test.
 //!
 //! Memory ordering: the shooter stores the range and the per-CPU pending sequence with
 //! `SeqCst` before sending the IPI; the handler loads the pending sequence and the range with
@@ -33,8 +36,9 @@
 //! # Fault injection
 //!
 //! The `s34-tlb-fail` boot flag arms a one-shot injection: the next shootdown skips one remote
-//! IPI, waits out the normal deadline, logs the timeout and returns `false`.  It exists to test
-//! the timeout path under SMP load; it never fires unless the flag is present.
+//! delivery (both NMI and fixed IPI), waits out the normal deadline, logs the timeout and
+//! returns `false`.  It exists to test the timeout path under SMP load; it never fires unless
+//! the flag is present.
 
 #![allow(clippy::indexing_slicing)]
 
@@ -164,8 +168,13 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
         if cpu != me {
             if inject && !skipped {
                 skipped = true;
-            } else if !DROP_NMI[cpu].swap(false, Ordering::AcqRel) {
-                ipi::send_tlb(cpu);
+            } else {
+                if !DROP_NMI[cpu].swap(false, Ordering::AcqRel) {
+                    ipi::send_tlb(cpu);
+                }
+                // The fixed IPI stays pending in the target's local APIC while NMI is blocked
+                // or the target is not running, so a lost NMI cannot lose the invalidation.
+                ipi::send_tlb_ipi(cpu);
             }
         }
         cpu = cpu.saturating_add(1);
@@ -177,6 +186,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
     let deadline = start.saturating_add(100_000_000);
     ap_start::enable_local_interrupts();
     let mut all_acked = true;
+    let mut warned = false;
     cpu = 0;
     while cpu < online {
         if cpu != me {
@@ -184,11 +194,21 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
                 && LAST[cpu].load(Ordering::SeqCst) != sequence
             {
                 if time::now_ns() > deadline {
-                    // Test-only baseline: the pre-fix bounded timeout.
-                    report_stall("timeout", cpu, sequence, start);
-                    PENDING[cpu].store(0, Ordering::SeqCst);
-                    all_acked = false;
-                    break;
+                    if inject {
+                        // Fault injection only: reproduce the historical lost-ack failure.
+                        // The mailbox is cleared so a late IPI is ignored; production never
+                        // reaches this path.
+                        report_stall("timeout", cpu, sequence, start);
+                        PENDING[cpu].store(0, Ordering::SeqCst);
+                        all_acked = false;
+                        break;
+                    }
+                    if !warned {
+                        // Still waiting: the target has not acknowledged within the diagnostic
+                        // window. Keep the request published and do not proceed without the ack.
+                        report_stall("ack delay", cpu, sequence, start);
+                        warned = true;
+                    }
                 }
                 core::hint::spin_loop();
             }

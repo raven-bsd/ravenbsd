@@ -177,6 +177,15 @@ pub fn send_tlb(cpu: usize) {
     apic::send_nmi(destination);
 }
 
+/// Ask `cpu` to flush its TLB with a maskable fixed IPI.
+///
+/// S195 sends this alongside the NMI: the local APIC keeps the fixed delivery pending while the
+/// target is in an NMI handler or has IF clear, so a lost or blocked NMI cannot lose the
+/// invalidation. The handler is idempotent (it ignores a sequence already flushed).
+pub fn send_tlb_ipi(cpu: usize) {
+    send(cpu, TLB_VECTOR);
+}
+
 /// Run the probe handler on `cpu`.
 pub fn send_call(cpu: usize) {
     send(cpu, CALL_VECTOR);
@@ -205,7 +214,9 @@ extern "C" fn tlb_interrupt(_rsp: u64) {
 /// through the emergency console, preserving the previous generic NMI diagnostic.
 #[unsafe(no_mangle)]
 extern "C" fn nmi_tlb_interrupt(_rsp: u64) {
-    if !smp::shootdown::handle_ipi() {
+    let cpu = crate::sched::smp::percpu::this_cpu();
+    let pending = smp::shootdown::pending_sequence(cpu);
+    if !smp::shootdown::handle_ipi() && pending == 0 {
         crate::kprintln_emergency!("EXCEPTION: nmi with no pending shootdown");
     }
 }
