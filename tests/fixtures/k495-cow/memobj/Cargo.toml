@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone fixture package: the probe is a throw-away test program, not a product workspace
+# member, so it keeps its own workspace root and is built with --manifest-path.
+[workspace]
+
+[package]
+name = "raven-k495-cow-memobj"
+version = "0.1.0"
+description = "S164 C13 memory-object SHARED visibility fixture (same process and fork+exec)."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-k495-cow-memobj"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"

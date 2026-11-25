@@ -2,9 +2,9 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # S164: fork and copy-on-write visibility conformance (C13). The fixture fills a private page,
-# forks, and asserts identical bytes/address until either writes; then it seeds a file-backed
-# MAP_SHARED page, has the parent store 0xBB, and forks+execs a child on inherited fd 3; the child
-# must see the writer's 0xBB. The one-shot libc-test service runs the fixture's `all` mode.
+# forks, and asserts identical bytes/address until either writes; then it creates a memory object,
+# maps it SHARED, has the parent store 0xBB, and forks+execs a child on the inherited object handle;
+# the child must see the writer's 0xBB. The one-shot libc-test service runs the fixture's `all` mode.
 
 name = "cow-visibility"
 arch = "x86_64"
@@ -49,7 +49,7 @@ regex = '^K495-COW remap-parent pid=\d+ first=aa after-store=bb$'
 regex = '^K495-COW spawn-parent pid=\d+ addr=0x[0-9a-f]+ seeded=aa store=bb first=aa last=aa$'
 
 [[expect]]
-regex = '^K495-COW exec-child pid=\d+ fd=3 addr=0x[0-9a-f]+ first=aa before-store=aa after-store=bb last=aa$'
+regex = '^K495-COW exec-child pid=\d+ object=\d+ addr=0x[0-9a-f]+ first=aa before-store=aa after-store=bb last=aa$'
 
 [[expect]]
 regex = '^K495-COW spawn-parent status=0 after-store=bb last=aa$'

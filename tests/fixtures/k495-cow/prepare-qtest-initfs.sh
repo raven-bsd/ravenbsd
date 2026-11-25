@@ -4,7 +4,8 @@
 #
 # S164 test-only: build the k495-cow fixture and a libc-test-profile initfs whose one-shot
 # /bin/libc-test service is the fixture. The qtest installs the initfs over the libc-test profile;
-# the fixture's default `all` mode runs the fork COW and shared-store assertions and exits.
+# the fixture's default `all` mode runs the C13 fork COW and shared memory-object assertions and
+# exits.
 #
 # Usage: sh tests/fixtures/k495-cow/prepare-qtest-initfs.sh
 # Output: build/qtest/cow-visibility-initfs.img
@@ -27,6 +28,7 @@ cargo xtask initfs --arch x86_64 --profile libc-test > "$out/cow-initfs-build.lo
 
 target/debug/raven-b70-overlay build/x86_64/initfs.img "$out/cow-visibility-initfs.img" \
     "/bin/libc-test=$root/build/fixtures/k495-cow/k495-cow:0755" \
+    "/bin/k495-cow-memobj=$root/build/fixtures/k495-cow/k495-cow-memobj:0755" \
     > "$out/cow-overlay.log" 2>&1
 
 echo "cow-visibility: initfs $out/cow-visibility-initfs.img"
