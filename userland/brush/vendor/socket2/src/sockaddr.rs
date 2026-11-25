@@ -364,6 +364,7 @@ impl From<SocketAddrV4> for SockAddr {
         #[cfg(any(
             target_os = "dragonfly",
             target_os = "freebsd",
+            target_os = "ravenbsd",
             target_os = "haiku",
             target_os = "hermit",
             target_os = "ios",
@@ -408,6 +409,7 @@ impl From<SocketAddrV6> for SockAddr {
         #[cfg(any(
             target_os = "dragonfly",
             target_os = "freebsd",
+            target_os = "ravenbsd",
             target_os = "haiku",
             target_os = "hermit",
             target_os = "ios",
@@ -433,6 +435,7 @@ impl fmt::Debug for SockAddr {
         #[cfg(any(
             target_os = "dragonfly",
             target_os = "freebsd",
+            target_os = "ravenbsd",
             target_os = "haiku",
             target_os = "hermit",
             target_os = "ios",
