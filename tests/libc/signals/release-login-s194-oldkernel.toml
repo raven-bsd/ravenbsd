@@ -7,7 +7,7 @@
 
 name = "release-login-s194-oldkernel"
 arch = "x86_64"
-profile = "release"
+profile = "libc-test"
 timeout_secs = 300
 pre = ["true"]
 initfs = "build/fixtures/s194-release/initfs.img"
