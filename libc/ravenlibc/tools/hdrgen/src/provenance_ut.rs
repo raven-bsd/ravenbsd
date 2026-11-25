@@ -12,9 +12,31 @@ fn tables() -> Tables {
     validate::load(&abi).expect("tables")
 }
 
-fn resources() -> PathBuf {
+fn resources() -> Option<PathBuf> {
+    if let Some(value) = std::env::var_os("RAVENBSD_RESOURCES") {
+        let path = PathBuf::from(value);
+        assert!(
+            path.join("donors.lock").is_file(),
+            "RAVENBSD_RESOURCES has no donors.lock: {}",
+            path.display()
+        );
+        return Some(path);
+    }
     let here = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    discover_resources(&here).expect("ravenbsd-resources")
+    discover_resources(&here)
+}
+
+fn require_resources() -> Option<PathBuf> {
+    match resources() {
+        Some(path) => Some(path),
+        None => {
+            eprintln!(
+                "SKIP: ravenbsd-resources/donors.lock is absent; \
+                 set RAVENBSD_RESOURCES to a donor checkout to run this row"
+            );
+            None
+        }
+    }
 }
 
 #[test]
@@ -45,7 +67,9 @@ fn first_party_header_names_the_source() {
 
 #[test]
 fn discovers_the_resources_tree() {
-    let found = resources();
+    let Some(found) = require_resources() else {
+        return;
+    };
     assert!(found.join("donors.lock").is_file());
     assert_eq!(
         found.file_name().and_then(|name| name.to_str()),
@@ -55,7 +79,10 @@ fn discovers_the_resources_tree() {
 
 #[test]
 fn reads_the_pinned_revisions() {
-    let lock = read_lock(&resources()).expect("lock");
+    let Some(resources) = require_resources() else {
+        return;
+    };
+    let lock = read_lock(&resources).expect("lock");
     assert_eq!(lock.musl, "7813e9119eb5fe681b6750b8a033a0490bca0941");
     assert_eq!(
         lock.linux_raw_sys,
@@ -66,8 +93,11 @@ fn reads_the_pinned_revisions() {
 
 #[test]
 fn import_entries_cover_every_derived_file() {
+    let Some(resources) = require_resources() else {
+        return;
+    };
     let tables = tables();
-    let lock = read_lock(&resources()).expect("lock");
+    let lock = read_lock(&resources).expect("lock");
     let entries = import_entries(&tables, "2026-11-13", &lock).expect("entries");
     assert_eq!(entries.len(), 45);
     let musl: Vec<&ImportEntry> = entries
@@ -100,8 +130,11 @@ fn import_entries_cover_every_derived_file() {
 
 #[test]
 fn every_import_path_is_under_the_repository_roots() {
+    let Some(resources) = require_resources() else {
+        return;
+    };
     let tables = tables();
-    let lock = read_lock(&resources()).expect("lock");
+    let lock = read_lock(&resources).expect("lock");
     for entry in import_entries(&tables, "2026-11-13", &lock).expect("entries") {
         assert!(entry.path.starts_with("libc/ravenlibc/"), "{}", entry.path);
     }
@@ -109,8 +142,11 @@ fn every_import_path_is_under_the_repository_roots() {
 
 #[test]
 fn every_import_path_exists_in_the_repository() {
+    let Some(resources) = require_resources() else {
+        return;
+    };
     let tables = tables();
-    let lock = read_lock(&resources()).expect("lock");
+    let lock = read_lock(&resources).expect("lock");
     let root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.."));
     for entry in import_entries(&tables, "2026-11-13", &lock).expect("entries") {
         assert!(
@@ -123,8 +159,11 @@ fn every_import_path_exists_in_the_repository() {
 
 #[test]
 fn rendered_entry_parses_as_toml() {
+    let Some(resources) = require_resources() else {
+        return;
+    };
     let tables = tables();
-    let lock = read_lock(&resources()).expect("lock");
+    let lock = read_lock(&resources).expect("lock");
     for entry in import_entries(&tables, "2026-11-13", &lock).expect("entries") {
         let text = entry.render();
         let parsed: toml::Value = toml::from_str(&text).expect("entry TOML");

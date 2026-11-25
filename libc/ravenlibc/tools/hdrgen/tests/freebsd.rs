@@ -3,28 +3,15 @@
 
 //! Fail-closed integration checks for the FreeBSD profile CLI.
 
-use std::path::{Path, PathBuf};
+mod support;
+
+use std::path::Path;
 use std::process::{Command, Output};
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..")
-}
+use support::{repo_root, require_resources};
 
-fn resources() -> PathBuf {
-    let mut directory = Some(repo_root());
-    while let Some(current) = directory {
-        let candidate = current.join("ravenbsd-resources");
-        if candidate.join("donors.lock").is_file() {
-            return candidate;
-        }
-        directory = current.parent().map(Path::to_path_buf);
-    }
-    panic!("cannot find ravenbsd-resources");
-}
-
-fn run(extra: &[&str]) -> Output {
+fn run(extra: &[&str], resources: &Path) -> Output {
     let root = repo_root();
-    let res = resources();
     let mut args = vec![
         "verify",
         "--profile",
@@ -32,7 +19,7 @@ fn run(extra: &[&str]) -> Output {
         "--root",
         root.to_str().unwrap(),
         "--resources",
-        res.to_str().unwrap(),
+        resources.to_str().unwrap(),
     ];
     args.extend(extra.iter().copied());
     Command::new(env!("CARGO_BIN_EXE_raven-libc-hdrgen"))
@@ -47,12 +34,18 @@ fn stderr(output: &Output) -> String {
 
 #[test]
 fn a_missing_donor_is_not_a_pass() {
-    let output = run(&[
-        "--target",
-        "x86_64",
-        "--freebsd",
-        "/nonexistent/s721-freebsd",
-    ]);
+    let Some(resources) = require_resources("a_missing_donor_is_not_a_pass") else {
+        return;
+    };
+    let output = run(
+        &[
+            "--target",
+            "x86_64",
+            "--freebsd",
+            "/nonexistent/s721-freebsd",
+        ],
+        &resources,
+    );
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     let text = stderr(&output);
     assert!(text.contains("oracle integrity"), "{text}");
@@ -64,14 +57,18 @@ fn a_missing_donor_is_not_a_pass() {
 
 #[test]
 fn an_empty_or_misspelled_family_is_a_usage_error() {
-    let empty = run(&["--target", "x86_64", "--families", ""]);
+    let Some(resources) = require_resources("an_empty_or_misspelled_family_is_a_usage_error")
+    else {
+        return;
+    };
+    let empty = run(&["--target", "x86_64", "--families", ""], &resources);
     assert_eq!(empty.status.code(), Some(2), "{}", stderr(&empty));
     assert!(
         stderr(&empty).contains("at least one family"),
         "{}",
         stderr(&empty)
     );
-    let typo = run(&["--target", "x86_64", "--families", "errnoo"]);
+    let typo = run(&["--target", "x86_64", "--families", "errnoo"], &resources);
     assert_eq!(typo.status.code(), Some(2), "{}", stderr(&typo));
     assert!(
         stderr(&typo).contains("unknown family"),
@@ -82,13 +79,22 @@ fn an_empty_or_misspelled_family_is_a_usage_error() {
 
 #[test]
 fn a_nonexistent_abi_root_is_not_a_pass() {
-    let output = run(&["--target", "x86_64", "--abi", "/nonexistent/s721-abi"]);
+    let Some(resources) = require_resources("a_nonexistent_abi_root_is_not_a_pass") else {
+        return;
+    };
+    let output = run(
+        &["--target", "x86_64", "--abi", "/nonexistent/s721-abi"],
+        &resources,
+    );
     assert_ne!(output.status.code(), Some(0), "{}", stderr(&output));
 }
 
 #[test]
 fn riscv64_is_not_a_freebsd_target() {
-    let output = run(&["--target", "riscv64"]);
+    let Some(resources) = require_resources("riscv64_is_not_a_freebsd_target") else {
+        return;
+    };
+    let output = run(&["--target", "riscv64"], &resources);
     assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
     assert!(
         stderr(&output).contains("unknown FreeBSD --target"),

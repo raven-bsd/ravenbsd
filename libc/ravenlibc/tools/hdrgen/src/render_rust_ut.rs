@@ -14,25 +14,48 @@ fn tables() -> (Tables, validate::Values) {
     (tables, values)
 }
 
-fn files() -> BTreeMap<String, String> {
+fn files() -> Option<BTreeMap<String, String>> {
+    let resources = resources_or_skip()?;
     let (tables, values) = tables();
-    let lock = crate::provenance::read_lock(&resources()).expect("lock");
-    render_all(
-        &tables,
-        &values,
-        &crate::attribution::Attributions::resolve(&tables, &lock).expect("attribution"),
+    let lock = crate::provenance::read_lock(&resources).expect("lock");
+    Some(
+        render_all(
+            &tables,
+            &values,
+            &crate::attribution::Attributions::resolve(&tables, &lock).expect("attribution"),
+        )
+        .expect("render"),
     )
-    .expect("render")
 }
 
-fn resources() -> std::path::PathBuf {
+fn resources_or_skip() -> Option<std::path::PathBuf> {
+    if let Some(value) = std::env::var_os("RAVENBSD_RESOURCES") {
+        let path = std::path::PathBuf::from(value);
+        assert!(
+            path.join("donors.lock").is_file(),
+            "RAVENBSD_RESOURCES has no donors.lock: {}",
+            path.display()
+        );
+        return Some(path);
+    }
     let here = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    crate::provenance::discover_resources(&here).expect("ravenbsd-resources")
+    match crate::provenance::discover_resources(&here) {
+        Some(path) => Some(path),
+        None => {
+            eprintln!(
+                "SKIP: ravenbsd-resources/donors.lock is absent; \
+                 set RAVENBSD_RESOURCES to a donor checkout to run this row"
+            );
+            None
+        }
+    }
 }
 
 #[test]
 fn renders_eighteen_files() {
-    let files = files();
+    let Some(files) = files() else {
+        return;
+    };
     assert_eq!(files.len(), 18);
     for name in [
         "mod.rs",
@@ -60,7 +83,10 @@ fn renders_eighteen_files() {
 
 #[test]
 fn every_file_starts_with_an_spdx_line() {
-    for (name, text) in files() {
+    let Some(files) = files() else {
+        return;
+    };
+    for (name, text) in files {
         let first = text.lines().next().unwrap_or("");
         assert!(
             first.contains("SPDX-License-Identifier:"),
@@ -71,7 +97,9 @@ fn every_file_starts_with_an_spdx_line() {
 
 #[test]
 fn musl_group_files_carry_the_notice_and_revision() {
-    let files = files();
+    let Some(files) = files() else {
+        return;
+    };
     for name in ["errno.rs", "signal.rs", "fcntl.rs", "sysconf.rs"] {
         let text = &files[name];
         assert!(
@@ -89,7 +117,9 @@ fn musl_group_files_carry_the_notice_and_revision() {
 
 #[test]
 fn first_party_files_have_the_raven_notice() {
-    let files = files();
+    let Some(files) = files() else {
+        return;
+    };
     for name in ["types.rs", "structs.rs", "layout_table.rs", "mod.rs"] {
         assert!(
             files[name].contains("Copyright (c) 2026, Bo Maryniuk"),
@@ -104,7 +134,10 @@ fn first_party_files_have_the_raven_notice() {
 
 #[test]
 fn types_contains_one_wchar_definition_per_arch() {
-    let text = &files()["types.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["types.rs"];
     assert_eq!(text.matches("pub type wchar_t").count(), 2);
     assert!(text.contains("#[cfg(target_arch = \"aarch64\")]"));
     assert!(text.contains("pub const CHAR_IS_SIGNED: bool"));
@@ -114,7 +147,10 @@ fn types_contains_one_wchar_definition_per_arch() {
 
 #[test]
 fn structs_contains_records_zeros_and_assertions() {
-    let text = &files()["structs.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["structs.rs"];
     assert!(text.contains("pub struct Stat {"));
     assert!(text.contains("impl Stat {"));
     assert!(text.contains("pub const ZERO: Self"));
@@ -126,7 +162,10 @@ fn structs_contains_records_zeros_and_assertions() {
 
 #[test]
 fn opaque_per_arch_sizes_are_gated() {
-    let text = &files()["structs.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["structs.rs"];
     assert!(text.contains("#[cfg(target_arch = \"x86_64\")]"));
     assert!(text.contains("core::mem::size_of::<UcontextT>() == 936"));
     assert!(text.contains("core::mem::size_of::<UcontextT>() == 4560"));
@@ -135,7 +174,10 @@ fn opaque_per_arch_sizes_are_gated() {
 
 #[test]
 fn layout_table_has_all_records() {
-    let text = &files()["layout_table.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["layout_table.rs"];
     assert_eq!(text.matches("StructLayout {").count(), 26);
     assert!(text.contains("pub const STRUCTS: &[StructLayout]"));
     assert!(text.contains("core::mem::offset_of!(Stat, st_size)"));
@@ -144,7 +186,10 @@ fn layout_table_has_all_records() {
 
 #[test]
 fn group_file_has_constants_and_all() {
-    let text = &files()["errno.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["errno.rs"];
     assert!(text.contains("pub const EPERM: i32 = 1;"));
     assert!(text.contains("pub const EWOULDBLOCK: i32 = EAGAIN;"));
     assert!(text.contains("pub const ALL: &[(&str, i128)]"));
@@ -153,26 +198,41 @@ fn group_file_has_constants_and_all() {
 
 #[test]
 fn arch_gated_constants_get_a_cfg() {
-    let text = &files()["mman.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["mman.rs"];
     assert!(text.contains("#[cfg(target_arch = \"x86_64\")]"));
     assert!(text.contains("pub const MAP_32BIT: i32 = 0x40;"));
 }
 
 #[test]
 fn visible_constants_get_a_doc_line() {
-    let text = &files()["fcntl.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["fcntl.rs"];
     assert!(text.contains("/// visible: bsd"));
     assert!(text.contains("pub const O_EXLOCK: i32 = 0x10000000;"));
 }
 
 #[test]
 fn rendering_is_deterministic() {
-    assert_eq!(files(), files());
+    let Some(first) = files() else {
+        return;
+    };
+    let Some(second) = files() else {
+        return;
+    };
+    assert_eq!(first, second);
 }
 
 #[test]
 fn mod_lists_every_module() {
-    let text = &files()["mod.rs"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["mod.rs"];
     for module in ["errno", "signal", "layout_table", "structs", "types"] {
         assert!(text.contains(&format!("pub mod {module};")), "{module}");
     }
@@ -180,7 +240,10 @@ fn mod_lists_every_module() {
 
 #[test]
 fn every_file_ends_with_a_newline() {
-    for (name, text) in files() {
+    let Some(files) = files() else {
+        return;
+    };
+    for (name, text) in files {
         assert!(text.ends_with('\n'), "{name}");
     }
 }
