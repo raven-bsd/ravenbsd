@@ -217,29 +217,28 @@ fn default_termios_has_cread_and_cs8() {
 /// field; K444 is red when any one of them is dropped.
 #[test]
 fn tcsetattr_round_trips_every_termios_field() {
-    const IGNBRK: u32 = 0o0000001;
-    const ICRNL: u32 = 0o0000400;
-    const IXON: u32 = 0o0002000;
-    const OPOST: u32 = 0o0000001;
-    const ONLCR: u32 = 0o0000004;
-    const ISIG: u32 = 0o0000001;
-    const IEXTEN: u32 = 0o100000;
-    const VINTR: usize = 0;
-    const VERASE: usize = 2;
-    const VKILL: usize = 3;
-    const VEOF: usize = 4;
-    const VSTART: usize = 8;
-    const VSTOP: usize = 9;
-    const B9600: u32 = 0o15;
-    const B19200: u32 = 0o16;
+    const IGNBRK: u32 = 0x0000_0001;
+    const ICRNL: u32 = 0x0000_0100;
+    const IXON: u32 = 0x0000_0200;
+    const OPOST: u32 = 0x0000_0001;
+    const ONLCR: u32 = 0x0000_0002;
+    const ISIG: u32 = 0x0000_0080;
+    const IEXTEN: u32 = 0x0000_0400;
+    const VINTR: usize = 8;
+    const VERASE: usize = 3;
+    const VKILL: usize = 5;
+    const VEOF: usize = 0;
+    const VSTART: usize = 12;
+    const VSTOP: usize = 13;
+    const B9600: u32 = 9600;
+    const B19200: u32 = 19_200;
 
     let (platform, fd) = tty_platform();
     let mut want = default_termios();
     want.c_iflag = IGNBRK | ICRNL | IXON;
     want.c_oflag = OPOST | ONLCR;
-    want.c_cflag = crate::ioctl::tty::CS8 | crate::ioctl::tty::CREAD | B38400;
+    want.c_cflag = crate::ioctl::tty::CS8 | crate::ioctl::tty::CREAD;
     want.c_lflag = ISIG | ICANON | ECHO | IEXTEN;
-    want.c_line = 0;
     want.c_cc[VINTR] = 3;
     want.c_cc[VERASE] = 0x7f;
     want.c_cc[VKILL] = 0x15;
@@ -248,8 +247,8 @@ fn tcsetattr_round_trips_every_termios_field() {
     want.c_cc[VSTOP] = 0x13;
     want.c_cc[VMIN] = 7;
     want.c_cc[VTIME] = 3;
-    want.__c_ispeed = B9600;
-    want.__c_ospeed = B19200;
+    want.c_ispeed = B9600;
+    want.c_ospeed = B19200;
 
     tcsetattr(&platform, fd, &want).expect("tcsetattr");
     let got = tcgetattr(&platform, fd).expect("tcgetattr");

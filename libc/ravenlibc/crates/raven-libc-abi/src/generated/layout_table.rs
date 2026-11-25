@@ -836,23 +836,18 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 4,
             },
             FieldLayout {
-                name: "c_line",
-                offset: core::mem::offset_of!(Termios, c_line),
-                size: 1,
-            },
-            FieldLayout {
                 name: "c_cc",
                 offset: core::mem::offset_of!(Termios, c_cc),
-                size: 32,
+                size: 20,
             },
             FieldLayout {
-                name: "__c_ispeed",
-                offset: core::mem::offset_of!(Termios, __c_ispeed),
+                name: "c_ispeed",
+                offset: core::mem::offset_of!(Termios, c_ispeed),
                 size: 4,
             },
             FieldLayout {
-                name: "__c_ospeed",
-                offset: core::mem::offset_of!(Termios, __c_ospeed),
+                name: "c_ospeed",
+                offset: core::mem::offset_of!(Termios, c_ospeed),
                 size: 4,
             },
         ],

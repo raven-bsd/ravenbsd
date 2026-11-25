@@ -657,6 +657,7 @@ const _: () = assert!(core::mem::offset_of!(SiginfoT, si_code) == 8);
 const _: () = assert!(core::mem::offset_of!(SiginfoT, __pad) == 12);
 const _: () = assert!(core::mem::offset_of!(SiginfoT, __si_fields) == 16);
 
+/// S742/DR-69: FreeBSD 13334440 struct termios, NCCS=20, no c_line, speeds after c_cc
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Termios {
@@ -664,10 +665,9 @@ pub struct Termios {
     pub c_oflag: u32,
     pub c_cflag: u32,
     pub c_lflag: u32,
-    pub c_line: u8,
-    pub c_cc: [u8; 32],
-    pub __c_ispeed: u32,
-    pub __c_ospeed: u32,
+    pub c_cc: [u8; 20],
+    pub c_ispeed: u32,
+    pub c_ospeed: u32,
 }
 
 impl Termios {
@@ -677,23 +677,21 @@ impl Termios {
         c_oflag: 0,
         c_cflag: 0,
         c_lflag: 0,
-        c_line: 0,
-        c_cc: [0; 32],
-        __c_ispeed: 0,
-        __c_ospeed: 0,
+        c_cc: [0; 20],
+        c_ispeed: 0,
+        c_ospeed: 0,
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Termios>() == 60 && core::mem::align_of::<Termios>() == 4);
+    assert!(core::mem::size_of::<Termios>() == 44 && core::mem::align_of::<Termios>() == 4);
 const _: () = assert!(core::mem::offset_of!(Termios, c_iflag) == 0);
 const _: () = assert!(core::mem::offset_of!(Termios, c_oflag) == 4);
 const _: () = assert!(core::mem::offset_of!(Termios, c_cflag) == 8);
 const _: () = assert!(core::mem::offset_of!(Termios, c_lflag) == 12);
-const _: () = assert!(core::mem::offset_of!(Termios, c_line) == 16);
-const _: () = assert!(core::mem::offset_of!(Termios, c_cc) == 17);
-const _: () = assert!(core::mem::offset_of!(Termios, __c_ispeed) == 52);
-const _: () = assert!(core::mem::offset_of!(Termios, __c_ospeed) == 56);
+const _: () = assert!(core::mem::offset_of!(Termios, c_cc) == 16);
+const _: () = assert!(core::mem::offset_of!(Termios, c_ispeed) == 36);
+const _: () = assert!(core::mem::offset_of!(Termios, c_ospeed) == 40);
 
 /// FreeBSD 133344405 struct statvfs: counters first, then the block and flag words
 #[repr(C)]
