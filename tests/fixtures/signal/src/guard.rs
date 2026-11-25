@@ -318,7 +318,10 @@ pub fn run() -> Result<(), &'static str> {
 
         // SIGSTOP with a handler
         fill(old, POISON, WIRE);
-        expect("fail-sigstop-errno", sigaction_for(SIGSTOP, at, old) == EINVAL)?;
+        expect(
+            "fail-sigstop-errno",
+            sigaction_for(SIGSTOP, at, old) == EINVAL,
+        )?;
         expect("fail-sigstop-old-unchanged", slot_is(old, POISON))?;
 
         // unmapped act pointer
