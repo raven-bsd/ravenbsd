@@ -336,7 +336,7 @@ fn stat_layout_and_zero() {
 
 #[test]
 fn every_record_runtime_layout_matches_the_constant_table() {
-    assert_eq!(raven_libc_abi::layout::STRUCTS.len(), 26);
+    assert_eq!(raven_libc_abi::layout::STRUCTS.len(), 28);
     assert_eq!(core::mem::size_of::<raven_libc_abi::structs::Flock>(), 32);
     assert_eq!(
         core::mem::offset_of!(raven_libc_abi::structs::Flock, l_start),
@@ -373,17 +373,22 @@ typedef struct { unsigned long st_dev; unsigned long st_ino; unsigned int st_mod
   __ab_timespec st_atim; __ab_timespec st_mtim; __ab_timespec st_ctim; unsigned int __unused[2]; } __ab_stat;
 typedef struct { unsigned long d_ino; long d_off; unsigned short d_reclen;
   unsigned char d_type; char d_name[256]; } __ab_dirent;
-typedef struct { unsigned short sa_family; char sa_data[14]; } __ab_sockaddr;
-typedef struct { unsigned short sin_family; unsigned short sin_port; unsigned int sin_addr;
-  unsigned char sin_zero[8]; } __ab_sockaddr_in;
-typedef struct { unsigned short sin6_family; unsigned short sin6_port; unsigned int sin6_flowinfo;
-  unsigned char sin6_addr[16]; unsigned int sin6_scope_id; } __ab_sockaddr_in6;
-typedef struct { unsigned short sun_family; char sun_path[108]; } __ab_sockaddr_un;
+typedef struct { unsigned char sa_len; unsigned char sa_family; char sa_data[14]; } __ab_sockaddr;
+typedef struct { unsigned char sin_len; unsigned char sin_family; unsigned short sin_port;
+  unsigned int sin_addr; unsigned char sin_zero[8]; } __ab_sockaddr_in;
+typedef struct { unsigned char sin6_len; unsigned char sin6_family; unsigned short sin6_port;
+  unsigned int sin6_flowinfo; unsigned char sin6_addr[16];
+  unsigned int sin6_scope_id; } __ab_sockaddr_in6;
+typedef struct { unsigned char sun_len; unsigned char sun_family;
+  char sun_path[104]; } __ab_sockaddr_un;
+typedef struct { unsigned char ss_len; unsigned char ss_family; unsigned char __ss_pad1[6];
+  long __ss_align; unsigned char __ss_pad2[112]; } __ab_sockaddr_storage;
 typedef struct { void *msg_name; unsigned int msg_namelen; void *msg_iov; int msg_iovlen;
-  int __pad1; void *msg_control; unsigned int msg_controllen; int __pad2; int msg_flags; } __ab_msghdr;
-typedef struct { unsigned int cmsg_len; int __pad1; int cmsg_level; int cmsg_type; } __ab_cmsghdr;
+  void *msg_control; unsigned int msg_controllen; int msg_flags; } __ab_msghdr;
+typedef struct { __ab_msghdr msg_hdr; long msg_len; } __ab_mmsghdr;
+typedef struct { unsigned int cmsg_len; int cmsg_level; int cmsg_type; } __ab_cmsghdr;
 typedef struct { int ai_flags; int ai_family; int ai_socktype; int ai_protocol;
-  unsigned int ai_addrlen; void *ai_addr; void *ai_canonname; void *ai_next; } __ab_addrinfo;
+  unsigned int ai_addrlen; void *ai_canonname; void *ai_addr; void *ai_next; } __ab_addrinfo;
 typedef struct { int tm_sec; int tm_min; int tm_hour; int tm_mday; int tm_mon; int tm_year;
   int tm_wday; int tm_yday; int tm_isdst; long tm_gmtoff; void *tm_zone; } __ab_tm;
 typedef struct { int fd; short events; short revents; } __ab_pollfd;
@@ -412,8 +417,8 @@ typedef struct { short l_type; short l_whence; long l_start; long l_len; int l_p
   const int sz_##name = sizeof(__ab_##name); \
   const int al_##name = _Alignof(__ab_##name);
 REC(timespec) REC(timeval) REC(itimerspec) REC(iovec) REC(stat) REC(dirent)
-REC(sockaddr) REC(sockaddr_in) REC(sockaddr_in6) REC(sockaddr_un) REC(msghdr)
-REC(cmsghdr) REC(addrinfo) REC(tm) REC(pollfd) REC(rlimit) REC(rusage)
+REC(sockaddr) REC(sockaddr_in) REC(sockaddr_in6) REC(sockaddr_un) REC(sockaddr_storage)
+REC(msghdr) REC(mmsghdr) REC(cmsghdr) REC(addrinfo) REC(tm) REC(pollfd) REC(rlimit) REC(rusage)
 REC(utsname) REC(sigaction) REC(stack_t) REC(siginfo_t) REC(termios)
 REC(statvfs) REC(passwd) REC(group) REC(flock)
 
@@ -423,8 +428,16 @@ OFF(stat, st_gid) OFF(stat, st_rdev) OFF(stat, __pad1) OFF(stat, st_size) OFF(st
 OFF(stat, __pad2) OFF(stat, st_blocks) OFF(stat, st_atim) OFF(stat, st_mtim) OFF(stat, st_ctim)
 OFF(stat, __unused)
 OFF(dirent, d_ino) OFF(dirent, d_off) OFF(dirent, d_reclen) OFF(dirent, d_type) OFF(dirent, d_name)
+OFF(sockaddr, sa_len) OFF(sockaddr, sa_family) OFF(sockaddr, sa_data)
+OFF(sockaddr_in, sin_len) OFF(sockaddr_in, sin_family)
+OFF(sockaddr_un, sun_len) OFF(sockaddr_un, sun_family) OFF(sockaddr_un, sun_path)
+OFF(sockaddr_storage, ss_len) OFF(sockaddr_storage, ss_family)
+OFF(sockaddr_storage, __ss_align) OFF(sockaddr_storage, __ss_pad2)
 OFF(msghdr, msg_name) OFF(msghdr, msg_namelen) OFF(msghdr, msg_iov) OFF(msghdr, msg_iovlen)
 OFF(msghdr, msg_control) OFF(msghdr, msg_controllen) OFF(msghdr, msg_flags)
+OFF(mmsghdr, msg_hdr) OFF(mmsghdr, msg_len)
+OFF(cmsghdr, cmsg_len) OFF(cmsghdr, cmsg_level) OFF(cmsghdr, cmsg_type)
+OFF(addrinfo, ai_addrlen) OFF(addrinfo, ai_canonname) OFF(addrinfo, ai_addr) OFF(addrinfo, ai_next)
 OFF(sigaction, sa_handler) OFF(sigaction, sa_mask) OFF(sigaction, sa_flags) OFF(sigaction, sa_restorer)
 OFF(siginfo_t, si_signo) OFF(siginfo_t, si_errno) OFF(siginfo_t, si_code) OFF(siginfo_t, __si_fields)
 OFF(sockaddr_in6, sin6_addr) OFF(sockaddr_in6, sin6_scope_id)
