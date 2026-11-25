@@ -8,9 +8,10 @@ use std::fmt::Write as _;
 
 use anyhow::{Context, Result, bail};
 
+use crate::attribution::Attributions;
 use crate::layout::{FieldType, opaque_layout};
 use crate::model::{ARCHES, ConstDef, OpaqueDef, RecordDef, TypeDef};
-use crate::provenance::{CommentStyle, first_party_generated, musl_notice};
+use crate::provenance::{CommentStyle, first_party_generated};
 use crate::validate::{Tables, layouts, rust_name};
 use crate::values::{self, render_i128};
 
@@ -18,15 +19,17 @@ use crate::values::{self, render_i128};
 pub fn render_all(
     tables: &Tables,
     values: &crate::validate::Values,
-    musl_rev: &str,
+    attributions: &Attributions,
 ) -> Result<BTreeMap<String, String>> {
     let mut files = BTreeMap::new();
     files.insert("types.rs".to_string(), render_types(tables)?);
     files.insert("structs.rs".to_string(), render_structs(tables)?);
     files.insert("layout_table.rs".to_string(), render_layout_table(tables)?);
     for group in &tables.groups {
-        let upstream = group.def.source.join(", ");
-        let mut out = musl_notice(CommentStyle::LineSlash, &upstream, musl_rev);
+        let attribution = attributions
+            .get(&group.stem)
+            .with_context(|| format!("group {} has no attribution", group.stem))?;
+        let mut out = attribution.notice(CommentStyle::LineSlash);
         out.push('\n');
         let _ = writeln!(
             out,

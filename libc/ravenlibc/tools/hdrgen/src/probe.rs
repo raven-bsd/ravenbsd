@@ -55,12 +55,12 @@ impl Report {
 }
 
 /// A temporary directory removed on drop.
-struct TempDir {
+pub(crate) struct TempDir {
     path: PathBuf,
 }
 
 impl TempDir {
-    fn new(tag: &str) -> Result<Self> {
+    pub(crate) fn new(tag: &str) -> Result<Self> {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let serial = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -71,7 +71,7 @@ impl TempDir {
         Ok(Self { path })
     }
 
-    fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Path {
         &self.path
     }
 }
@@ -88,7 +88,7 @@ pub fn required() -> bool {
     std::env::var("RL_ABI_REQUIRED").is_ok_and(|value| value == "1")
 }
 
-fn tool_exists(tool: &str) -> bool {
+pub(crate) fn tool_exists(tool: &str) -> bool {
     Command::new(tool)
         .arg("--version")
         .stdout(std::process::Stdio::null())
@@ -117,7 +117,7 @@ pub fn tools(clang: &str, sed: &str) -> Result<Option<(String, String)>> {
     Ok(None)
 }
 
-fn run_command(program: &str, args: &[String]) -> Result<String> {
+pub(crate) fn run_command(program: &str, args: &[String]) -> Result<String> {
     let output = Command::new(program)
         .args(args)
         .output()
@@ -134,14 +134,14 @@ fn run_command(program: &str, args: &[String]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-fn resource_include(clang: &str) -> Result<PathBuf> {
+pub(crate) fn resource_include(clang: &str) -> Result<PathBuf> {
     let output = run_command(clang, &["-print-resource-dir".to_string()])?;
     let root = PathBuf::from(output.trim());
     Ok(root.join("include"))
 }
 
 /// Copy a directory tree recursively.
-fn copy_tree(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<()> {
     std::fs::create_dir_all(to).with_context(|| format!("cannot create {}", to.display()))?;
     let mut entries: Vec<PathBuf> = std::fs::read_dir(from)
         .with_context(|| format!("cannot read {}", from.display()))?
@@ -193,7 +193,7 @@ fn musl_tree(musl: &Path, sed: &str, arch: &str, temp: &Path) -> Result<PathBuf>
 }
 
 /// Parse `label:` -> value from clang `-S` output.
-fn parse_assembly(output: &str, labels: &BTreeSet<String>) -> BTreeMap<String, i128> {
+pub(crate) fn parse_assembly(output: &str, labels: &BTreeSet<String>) -> BTreeMap<String, i128> {
     let mut values = BTreeMap::new();
     let mut wanted: Option<String> = None;
     for line in output.lines() {
@@ -225,7 +225,7 @@ fn parse_assembly(output: &str, labels: &BTreeSet<String>) -> BTreeMap<String, i
 }
 
 /// Run clang on `source` and return stdout.
-fn clang_run(
+pub(crate) fn clang_run(
     clang: &str,
     target: &str,
     resource: &Path,
@@ -675,7 +675,7 @@ fn probe_constants(
     Ok(parse_assembly(&output, &labels))
 }
 
-fn same_mod_64(left: i128, right: i128) -> bool {
+pub(crate) fn same_mod_64(left: i128, right: i128) -> bool {
     (left as u128 as u64) == (right as u128 as u64)
 }
 
