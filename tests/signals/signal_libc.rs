@@ -98,9 +98,27 @@ unsafe extern "C" {
     fn getppid() -> c_int;
     fn _exit(code: c_int) -> !;
     fn waitpid(pid: c_int, status: *mut c_int, options: c_int) -> c_int;
+    fn sigaltstack(ss: *const Stack, old: *mut Stack) -> c_int;
     fn __errno_location() -> *mut c_int;
     fn nanosleep(request: *const Timespec, remaining: *mut Timespec) -> c_int;
 }
+
+/// System V amd64 `stack_t` (24 bytes), the public C layout libc marshals.
+#[repr(C)]
+struct Stack {
+    ss_sp: usize,
+    ss_flags: c_int,
+    _pad: c_int,
+    ss_size: usize,
+}
+
+/// `SS_DISABLE`: the alternate signal stack is off.
+const SS_DISABLE: c_int = 2;
+
+#[repr(C, align(16))]
+struct AlternateStack([u8; 8192]);
+
+static mut EXEC_ALT: AlternateStack = AlternateStack([0; 8192]);
 
 /// `struct timespec` for the child's bounded delay after the parent announces its read.
 #[repr(C)]
@@ -439,6 +457,61 @@ const RAW_SIGPENDING: usize = 0x8B;
 const RAW_SIGWAIT: usize = 0x8C;
 const HANDLE_NONE: usize = u32::MAX as usize;
 const EINTR: c_int = 4;
+const ENOEXEC: isize = 8;
+
+/// Raw `PROC_EXEC(request) -> 0` number (`userland/rt/src/exec.rs`).
+const PROC_EXEC: usize = 0x6a;
+
+/// S712 exec probe image, embedded at build time so the exec path needs no file scheme.
+const EXEC_PROBE: &[u8] = include_bytes!(env!("RAVEN_EXEC_PROBE"));
+
+/// One `PROC_EXEC` request (88 bytes; `userland/rt/src/exec.rs:ExecRequest`).
+#[repr(C)]
+struct ExecRequest {
+    image: u64,
+    image_len: u64,
+    path: u64,
+    path_len: u64,
+    argv: u64,
+    argc: u64,
+    envp: u64,
+    envc: u64,
+    close_list: u64,
+    close_count: u64,
+    flags: u64,
+}
+
+const _: () = assert!(core::mem::size_of::<ExecRequest>() == 88);
+
+/// Replace this image through raw `PROC_EXEC`.
+///
+/// `arg0` must be NUL-terminated; the path length is explicit, matching the kernel request.
+fn exec_image(image: &[u8], path: &[u8], arg0: &[u8]) -> isize {
+    let argv: [*const u8; 1] = [arg0.as_ptr()];
+    let request = ExecRequest {
+        image: image.as_ptr() as u64,
+        image_len: image.len() as u64,
+        path: path.as_ptr() as u64,
+        path_len: path.len() as u64,
+        argv: argv.as_ptr() as u64,
+        argc: 1,
+        envp: 0,
+        envc: 0,
+        close_list: 0,
+        close_count: 0,
+        flags: 0,
+    };
+    // SAFETY: the request, image, path and NUL-terminated argv are live for the call; the kernel
+    // validates every user range and copies only the declared lengths.
+    unsafe {
+        raw3(
+            PROC_EXEC,
+            &request as *const ExecRequest as usize,
+            0,
+            0,
+        )
+    }
+}
 
 /// The kernel's 40-byte `SIGACTION` request (`kernel/src/syscall/thread.rs`).
 #[repr(C)]
@@ -691,7 +764,7 @@ fn provider_interrupt_row() -> bool {
             let _ = read(ack[0], &mut ack_byte, 1);
             let delay = Timespec {
                 tv_sec: 0,
-                tv_nsec: 20_000_000,
+                tv_nsec: 100_000_000,
             };
             let _ = nanosleep(&delay, ptr::null_mut());
             raw_signal(getppid(), SIGUSR1);
@@ -761,6 +834,137 @@ fn provider_interrupt_row() -> bool {
     provider_row(b"interrupt", ok)
 }
 
+/// Signal state the exec transition must keep across a **failed** exec.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct SignalState {
+    caught: bool,
+    ignored: bool,
+    blocked: bool,
+    altstack_on: bool,
+}
+
+/// Read the dispositions, thread mask and altstack through the public libc calls.
+fn current_signal_state() -> Option<SignalState> {
+    let mut us1 = Sigaction {
+        sa_handler: 0,
+        sa_mask: Sigset::ZERO,
+        sa_flags: 0,
+        _pad: 0,
+        sa_restorer: 0,
+    };
+    let mut us2 = Sigaction {
+        sa_handler: 0,
+        sa_mask: Sigset::ZERO,
+        sa_flags: 0,
+        _pad: 0,
+        sa_restorer: 0,
+    };
+    let mut mask = Sigset::ZERO;
+    let mut stack = Stack {
+        ss_sp: 0,
+        ss_flags: 0,
+        _pad: 0,
+        ss_size: 0,
+    };
+    // SAFETY: every object is live and each call only reads (`act` and `ss` are NULL, `how` is
+    // ignored without a set).
+    let queried = unsafe {
+        sigaction(SIGUSR1, ptr::null(), &mut us1) == 0
+            && sigaction(SIGUSR2, ptr::null(), &mut us2) == 0
+            && sigprocmask(SIG_BLOCK, ptr::null(), &mut mask) == 0
+            && sigaltstack(ptr::null(), &mut stack) == 0
+    };
+    if !queried {
+        return None;
+    }
+    // SAFETY: `mask` was filled by the successful sigprocmask readback.
+    Some(SignalState {
+        caught: us1.sa_handler == handler_address(),
+        ignored: us2.sa_handler == 1,
+        blocked: unsafe { sigismember(&mask, SIGUSR2) } == 1,
+        altstack_on: stack.ss_flags & SS_DISABLE == 0,
+    })
+}
+
+/// Emit `signal: exec-errno=0x<hex>` after a failed successful-path exec.
+fn debug_exec_errno(error: c_int) {
+    let mut line = [0u8; 48];
+    let mut at = 0;
+    for byte in b"signal: exec-errno=0x" {
+        line[at] = *byte;
+        at += 1;
+    }
+    let mut digits = [0u8; 8];
+    let count = write_hex(error as u32, &mut digits);
+    for index in (0..count).rev() {
+        line[at] = digits[index];
+        at += 1;
+    }
+    line[at] = b'\n';
+    at += 1;
+    debug_write(&line[..at]);
+}
+
+/// S712 step 4: a failed exec leaves the old image's signal state coherent; a successful exec
+/// resets caught handlers, keeps `SIG_IGN` and the mask, and disables the alternate stack.
+///
+/// The success half never returns: the service image is replaced by `/bin/exec-probe`, which
+/// reads the kernel table of the new image and exits with the row result.
+fn exec_transition() -> bool {
+    let caught = Sigaction {
+        sa_handler: handler_address(),
+        sa_mask: Sigset::ZERO,
+        sa_flags: SA_SIGINFO,
+        _pad: 0,
+        sa_restorer: 0,
+    };
+    let ignored = Sigaction {
+        sa_handler: 1,
+        sa_mask: Sigset::ZERO,
+        sa_flags: 0,
+        _pad: 0,
+        sa_restorer: 0,
+    };
+    let mut set = Sigset::ZERO;
+    let stack = Stack {
+        ss_sp: core::ptr::addr_of!(EXEC_ALT) as usize,
+        ss_flags: 0,
+        _pad: 0,
+        ss_size: core::mem::size_of::<AlternateStack>(),
+    };
+    // SAFETY: every object is live; `sigaddset` fills `set`, `sigaltstack` reads `stack`, and
+    // the disposition/mask calls use the public libc entry points.
+    let installed = unsafe {
+        sigemptyset(&mut set) == 0
+            && sigaddset(&mut set, SIGUSR2) == 0
+            && sigaction(SIGUSR1, &caught, ptr::null_mut()) == 0
+            && sigaction(SIGUSR2, &ignored, ptr::null_mut()) == 0
+            && sigprocmask(SIG_BLOCK, &set, ptr::null_mut()) == 0
+            && sigaltstack(&stack, ptr::null_mut()) == 0
+    };
+    if !installed {
+        debug_write(b"signal: provider-fail exec-install\n");
+        return false;
+    }
+    let before = current_signal_state();
+    // A malformed image fails ELF validation before the address space is touched; the old
+    // image's dispositions, mask and altstack must still be exactly what they were.
+    let failed =
+        exec_image(b"not-an-executable-image", b"/bin/exec-probe-missing", b"missing\0")
+            == -ENOEXEC;
+    let after = current_signal_state();
+    let coherent = failed && before.is_some() && before == after;
+    if !coherent {
+        debug_write(b"signal: provider-fail exec-failure\n");
+        return false;
+    }
+    debug_write(b"signal: exec-failure ok\n");
+    let result = exec_image(EXEC_PROBE, b"/bin/exec-probe", b"exec-probe\0");
+    debug_exec_errno((-result) as c_int);
+    debug_write(b"signal: provider-fail exec-success\n");
+    false
+}
+
 fn run_provider() -> bool {
     provider_install_row()
         && provider_generate_row()
@@ -787,7 +991,13 @@ pub extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
     let provider = run_provider();
     if boundary && provider {
         debug_write(b"signal: provider ok\n");
-        0
+        // S712 step 4: the old image now carries a caught handler, an ignored disposition, a
+        // blocked signal and an alternate stack. A failed exec must keep them; a successful one
+        // must reset/keep/disable them in the probe image.
+        if exec_transition() {
+            return 1;
+        }
+        1
     } else {
         1
     }

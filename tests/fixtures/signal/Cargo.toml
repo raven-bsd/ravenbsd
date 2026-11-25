@@ -17,6 +17,10 @@ target = "none"
 name = "raven-s44-action"
 path = "src/main.rs"
 
+[[bin]]
+name = "raven-s44-exec-probe"
+path = "src/exec_probe.rs"
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }

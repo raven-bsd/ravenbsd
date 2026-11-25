@@ -53,6 +53,21 @@ done
 # Public-libc boundary rows: Rust extern "C" calls linked against the freshly packed archive,
 # in the tests/libc/std-link pattern. Guard pages, canaries and the flags/mask readback stay in
 # the Rust source, so the C acceptance fixture is untouched.
+#
+# S712 exec probe: the new-image program is built first and embedded into the libc fixture with
+# `include_bytes!(env!("RAVEN_EXEC_PROBE"))`; exec therefore never needs the file scheme.
+# shellcheck disable=SC2086
+RUSTFLAGS="-C relocation-model=static -C lto=no $rust_code_model -C link-arg=-T$linker_script" \
+    cargo build -q -p raven-s44-action --bin raven-s44-exec-probe \
+    --target "$rust_target" --release
+probe=${CARGO_TARGET_DIR:-$root/target}/$rust_target/release/raven-s44-exec-probe
+[ -f "$probe" ] || {
+    echo "signals: missing exec probe $probe" >&2
+    exit 1
+}
+RAVEN_EXEC_PROBE=$probe
+export RAVEN_EXEC_PROBE
+
 # shellcheck disable=SC2086
 rustc --target "$rust_target" --edition 2024 -O -C panic=abort \
     -C relocation-model=static $rust_code_model \
