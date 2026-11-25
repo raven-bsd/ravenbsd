@@ -144,7 +144,7 @@ if [ "$FAILED" -eq 0 ]; then
         run_case smp-user x86_64 "$x_iter" || break
         run_case smp-soak x86_64 "$x_iter" || break
         run_case libc-threads x86_64 "$x_iter" || break
-        run_case libc-threads aarch64 "$x_iter" || break
+        run_case aarch64-libc aarch64 "$x_iter" || break
         x_iter=$((x_iter + 1))
     done
 fi
