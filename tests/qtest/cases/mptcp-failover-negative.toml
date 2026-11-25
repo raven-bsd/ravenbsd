@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# MPTCP2c negative control. One plain TCP connection to the MPTCP-capable host peer crosses the
+# primary tap, streams 64 KiB, and the host unplugs the primary netdev through QMP. There is no
+# backup path in use, so the connection must stop delivering data within the fixture's bound.
+# This proves the two-tap helper, the host peer and the QMP unplug can detect a dead path before
+# the MPTCP positive case is accepted.
+#
+# The guest also probes IPPROTO_MPTCP after the control; the probe result is evidence in the
+# report, not an assertion here, so this case stays valid once MPTCP2b lands.
+
+name = "mptcp-failover-negative"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/mptcp/initfs-negative.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none", "-smp", "1",
+    "-netdev", "tap,id=n0,ifname=mptcp-tap0,script=no,downscript=no",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-qmp", "unix:build/qtest/mptcp-qmp-harness.sock,server=on,wait=off",
+    "-qmp", "unix:build/qtest/mptcp-qmp.sock,server=on,wait=off",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/mptcp/build.sh negative",
+    "sh tests/fixtures/mptcp/start.sh negative",
+]
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^.*mptcp: fixture mode=negative$'
+
+[[expect]]
+regex = '^.*mptcp: negative connected$'
+
+[[expect]]
+regex = '^.*mptcp: negative go$'
+
+[[expect]]
+regex = '^.*mptcp: negative sent=65536$'
+
+[[expect]]
+regex = '^.*mptcp: negative unplug requested$'
+
+[[expect]]
+regex = '^.*mptcp: negative tick_bytes=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^.*mptcp: negative died_ms=[0-9]+$'
+
+[[expect]]
+regex = '^.*mptcp: negative ok=1$'
+
+[[expect]]
+regex = '^.*mptcp: negative bound_ms=6000$'
+
+[[expect]]
+regex = '^.*mptcp: negative done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)mptcp: negative ok=0|mptcp: fail|panic|EXCEPTION'

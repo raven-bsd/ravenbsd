@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# MPTCP2c failover acceptance. The guest has two interfaces on two isolated L2 segments
+# (mptcp-tap0 primary, mptcp-tap1 backup); the host peer listens on 10.77.1.2 and 10.77.2.2 with
+# MPTCP sockets. The case opens an MPTCP connection, streams data, unplugs the primary netdev
+# through QMP mid-stream, and requires: no reset, no lost or duplicated bytes, the backup path
+# used only after the failure, and a measured switch under the fixture bound.
+#
+# This case is wired but cannot pass until the netd MPTCP server and the second NIC land: the libc
+# half accepts IPPROTO_MPTCP (MPTCP2c1 merged), but netd has no net:mptcp path (MPTCP2c2), so
+# socket() returns EINVAL 22, and netd attaches one nic:, so the second virtio-net function fails
+# devd's driver registration with `irq: resource busy`. The case fails closed on the first missing
+# line; the serial names the exact blocker. Do not weaken these expectations.
+
+name = "mptcp-failover"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 420
+initfs = "build/fixtures/mptcp/initfs-positive.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "tap,id=n0,ifname=mptcp-tap0,script=no,downscript=no",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-netdev", "tap,id=n1,ifname=mptcp-tap1,script=no,downscript=no",
+    "-device", "virtio-net-pci,netdev=n1,disable-legacy=on",
+    "-qmp", "unix:build/qtest/mptcp-qmp-harness.sock,server=on,wait=off",
+    "-qmp", "unix:build/qtest/mptcp-qmp.sock,server=on,wait=off",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/mptcp/build.sh positive",
+    "sh tests/fixtures/mptcp/start.sh positive",
+]
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^.*mptcp: fixture mode=positive$'
+
+[[expect]]
+regex = '^.*mptcp: connected primary=10\.77\.1\.15 backup=10\.77\.2\.15$'
+
+[[expect]]
+regex = '^.*mptcp: backup idle before failure$'
+
+[[expect]]
+regex = '^.*mptcp: stream primary_bytes=[0-9]+ backup_bytes=0$'
+
+[[expect]]
+regex = '^.*mptcp: unplug primary after_bytes=[0-9]+$'
+
+[[expect]]
+regex = '^.*mptcp: switch_ms=[0-9]+$'
+
+[[expect]]
+regex = '^.*mptcp: switch_bound_ms=1500$'
+
+[[expect]]
+regex = '^.*mptcp: byte_exact=1 lost=0 duplicated=0 reset=0$'
+
+[[expect]]
+regex = '^.*mptcp: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)mptcp: blocked|mptcp: fail|panic|EXCEPTION'
