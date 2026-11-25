@@ -23,12 +23,14 @@ use raven_rt::entry;
 use raven_rt::println;
 use raven_rt::sys;
 
+mod guard;
+
 entry!(main);
 
 const SIGUSR1: i32 = 10;
 const SIGUSR2: i32 = 12;
-const SA_SIGINFO: i32 = 4;
-const SA_ONSTACK: i32 = 0x0800_0000;
+const SA_SIGINFO: u32 = 4;
+const SA_ONSTACK: u32 = 0x0800_0000;
 const SIG_BLOCK: usize = 0;
 const SIG_UNBLOCK: usize = 1;
 const SS_ONSTACK: u32 = 1;
@@ -36,14 +38,27 @@ const ALT_SIZE: usize = 8192;
 const SIGFRAME_SIZE: usize = 0x410;
 const SIGINFO_SIZE: usize = 0x50;
 
-/// System V `struct sigaction` (152 bytes; the kernel parser is architecture-neutral).
+/// The Raven private 40-byte `SIGACTION` request (C19; `raven-libc-signal/src/sigaction_abi.rs`
+/// and `kernel/src/syscall/thread.rs:UserSigAction`). This is not the public C `struct sigaction`.
 #[repr(C)]
 struct SigAction {
     handler: u64,
-    mask: [u64; 16],
-    flags: i32,
-    _pad: i32,
+    mask: [u64; 2],
+    flags: u32,
+    _pad: u32,
     restorer: u64,
+}
+
+impl SigAction {
+    const fn zero() -> Self {
+        Self {
+            handler: 0,
+            mask: [0; 2],
+            flags: 0,
+            _pad: 0,
+            restorer: 0,
+        }
+    }
 }
 
 /// Linux/System V `stack_t` (24 bytes) for `sigaltstack`.
@@ -120,7 +135,11 @@ struct UContext {
     fpregs: [u64; 64],
 }
 
-const _: () = assert!(core::mem::size_of::<SigAction>() == 152);
+const _: () = assert!(core::mem::size_of::<SigAction>() == 40);
+const _: () = assert!(core::mem::offset_of!(SigAction, handler) == 0);
+const _: () = assert!(core::mem::offset_of!(SigAction, mask) == 8);
+const _: () = assert!(core::mem::offset_of!(SigAction, flags) == 24);
+const _: () = assert!(core::mem::offset_of!(SigAction, restorer) == 32);
 const _: () = assert!(core::mem::size_of::<Stack>() == 24);
 #[cfg(target_arch = "x86_64")]
 const _: () = assert!(core::mem::size_of::<SigInfo>() == 128);
@@ -290,6 +309,18 @@ fn sigaction(signo: i32, action: &SigAction) -> isize {
     }
 }
 
+/// Read the installed disposition through the same private 40-byte wire.
+fn sigaction_query(signo: i32, previous: &mut SigAction) -> isize {
+    unsafe {
+        syscall3(
+            SIGACTION,
+            signo as usize,
+            0,
+            previous as *mut SigAction as usize,
+        )
+    }
+}
+
 fn sigprocmask(how: usize, set: &u64) -> isize {
     unsafe { syscall3(SIGPROCMASK, how, set as *const u64 as usize, 0) }
 }
@@ -353,9 +384,14 @@ fn action_handler() -> u64 {
 
 fn main(_args: raven_rt::Args) -> i32 {
     println!("signal-action: start");
+    if guard::run().is_err() {
+        println!("signal-action: raw guard failed");
+        sys::thread_exit(1);
+    }
+    println!("signal-action: raw guard ok");
     let action = SigAction {
         handler: action_handler(),
-        mask: [0; 16],
+        mask: [0; 2],
         flags: SA_SIGINFO,
         _pad: 0,
         restorer: 0,
@@ -364,7 +400,17 @@ fn main(_args: raven_rt::Args) -> i32 {
         println!("signal-action: sigaction failed");
         sys::thread_exit(1);
     }
+    let mut installed = SigAction::zero();
+    if sigaction_query(SIGUSR1, &mut installed) != 0 {
+        println!("signal-action: sigaction query failed");
+        sys::thread_exit(1);
+    }
+    if installed.handler != action_handler() || installed.flags & SA_SIGINFO == 0 {
+        println!("signal-action: installed flags wrong");
+        sys::thread_exit(1);
+    }
     println!("signal-action: sigaction ok");
+    println!("signal-action: installed us1 flags=0x{:x}", installed.flags);
 
     let bit = 1u64 << (SIGUSR1 - 1);
     if sigprocmask(SIG_BLOCK, &bit) != 0 {
@@ -413,7 +459,7 @@ fn main(_args: raven_rt::Args) -> i32 {
 
     let action = SigAction {
         handler: action_handler(),
-        mask: [0; 16],
+        mask: [0; 2],
         flags: SA_SIGINFO | SA_ONSTACK,
         _pad: 0,
         restorer: 0,
@@ -422,7 +468,19 @@ fn main(_args: raven_rt::Args) -> i32 {
         println!("signal-action: alt sigaction failed");
         sys::thread_exit(1);
     }
+    let mut installed = SigAction::zero();
+    if sigaction_query(SIGUSR2, &mut installed) != 0 {
+        println!("signal-action: alt sigaction query failed");
+        sys::thread_exit(1);
+    }
+    if installed.handler != action_handler()
+        || installed.flags & (SA_SIGINFO | SA_ONSTACK) != SA_SIGINFO | SA_ONSTACK
+    {
+        println!("signal-action: alt installed flags wrong");
+        sys::thread_exit(1);
+    }
     println!("signal-action: alt sigaction ok");
+    println!("signal-action: installed us2 flags=0x{:x}", installed.flags);
     let stack = Stack {
         ss_sp: core::ptr::addr_of_mut!(ALT_STACK) as u64,
         ss_flags: 0,

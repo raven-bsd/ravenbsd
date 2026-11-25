@@ -437,8 +437,10 @@ struct UserSigAction {
 }
 
 const _: () = assert!(size_of::<UserSigAction>() == 40);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, handler) == 0);
 const _: () = assert!(core::mem::offset_of!(UserSigAction, mask) == 8);
 const _: () = assert!(core::mem::offset_of!(UserSigAction, flags) == 24);
+const _: () = assert!(core::mem::offset_of!(UserSigAction, _pad) == 28);
 const _: () = assert!(core::mem::offset_of!(UserSigAction, restorer) == 32);
 
 /// The System V amd64 `stack_t` (24 bytes).
@@ -465,10 +467,11 @@ const ZERO_SIGACTION: UserSigAction = UserSigAction {
 
 /// `sigaction(signo: i32, act: *const SigAction, old: *mut SigAction) -> 0` (raw 0x87).
 ///
-/// Installs or reads the per-process disposition. The user structure is the System V amd64
-/// `struct sigaction` (handler at 0, `sigset_t sa_mask` at 8, `sa_flags` at 136, `sa_restorer` at
-/// 144). `SIGKILL`/`SIGSTOP` accept only `SIG_DFL`; unknown handler flags are `EINVAL` when a
-/// handler is caught, matching FreeBSD `kern_sigaction`.
+/// Installs or reads the per-process disposition. The user structure is the Raven private
+/// [`UserSigAction`] wire (handler at 0, two mask words at 8, `flags` at 24, `restorer` at 32);
+/// libc converts the public 152-byte C `struct sigaction` to this before the syscall.
+/// `SIGKILL`/`SIGSTOP` accept only `SIG_DFL`; unknown handler flags are `EINVAL` when a handler
+/// is caught, matching FreeBSD `kern_sigaction`.
 pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
     let signo = (frame.rdi as u32) as i32;
     if signo < 1 || signo > status::SIG_MAX as i32 {
