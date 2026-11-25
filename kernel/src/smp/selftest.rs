@@ -94,6 +94,16 @@ const INVALID_KERNEL_GS_BASE: u64 = 0x0000_dead_beef_0000;
 #[cfg(target_arch = "x86_64")]
 const NESTED_ROUNDS: u32 = 16;
 
+/// Selftest TLB target readiness/completion for the lost-NMI and delayed-ack rows.
+#[cfg(target_arch = "x86_64")]
+static ACK_READY: AtomicU32 = AtomicU32::new(0);
+/// Selftest TLB target completion for the lost-NMI and delayed-ack rows.
+#[cfg(target_arch = "x86_64")]
+static ACK_DONE: AtomicU32 = AtomicU32::new(0);
+/// Delay used by the delayed-ack row: past the 100 ms diagnostic deadline.
+#[cfg(target_arch = "x86_64")]
+const ACK_DELAY_NS: u64 = 250_000_000;
+
 /// Read by both CPUs in the concurrent call-probe test.
 static PROBE_BYTE: u8 = 0x5a;
 static PROBE_DONE: AtomicU32 = AtomicU32::new(0);
@@ -273,6 +283,10 @@ fn ipiq_test() -> Result<u32, &'static str> {
 /// Run the SMP self-test; on success this never returns.
 pub fn run() -> ! {
     let cpus = online_cpus();
+    let cmdline = crate::cmdline::CmdLine::parse(crate::memory::paging::cmdline());
+    if cmdline.flag("selftest-tlb-drop-ack") {
+        lost_ack_test(cpus);
+    }
     match tlb_test(cpus) {
         Ok(()) => kprintln!("selftest: smp tlb ok cpus={cpus}"),
         Err(reason) => {
@@ -424,6 +438,22 @@ fn monitor() {
         Ok(elapsed_ms) => kprintln!("selftest: smp tlb if0 ok elapsed_ms={elapsed_ms}"),
         Err(reason) => {
             kprintln!("selftest: smp tlb if0 failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    match lost_nmi_test(cpus) {
+        Ok(elapsed_ms) => kprintln!("selftest: smp tlb lost-nmi ok elapsed_ms={elapsed_ms}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb lost-nmi failed: {reason}");
+            boot::exit_qemu(0x11);
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    match delayed_ack_test(cpus) {
+        Ok(elapsed_ms) => kprintln!("selftest: smp tlb delayed-ack ok elapsed_ms={elapsed_ms}"),
+        Err(reason) => {
+            kprintln!("selftest: smp tlb delayed-ack failed: {reason}");
             boot::exit_qemu(0x11);
         }
     }
@@ -593,6 +623,103 @@ fn swapgs_window_test(cpus: usize) -> Result<u64, &'static str> {
     }
     sleep::sleep_ns(10_000_000);
     Ok(elapsed_ms)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn ack_target() {
+    ACK_READY.store(1, Ordering::SeqCst);
+    while ACK_DONE.load(Ordering::SeqCst) == 0 {
+        sleep::sleep_ns(1_000_000);
+    }
+    sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
+fn start_ack_target() -> Result<(), &'static str> {
+    ACK_READY.store(0, Ordering::SeqCst);
+    ACK_DONE.store(0, Ordering::SeqCst);
+    if sched::spawn_kernel_on(1, "smp-ack-target", ack_target).is_err() {
+        return Err("cannot spawn ack target");
+    }
+    let start = sleep::now_ns();
+    while ACK_READY.load(Ordering::SeqCst) == 0 {
+        if sleep::now_ns().saturating_sub(start) > TIMEOUT_NS {
+            return Err("ack target not ready");
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    Ok(())
+}
+
+#[cfg(target_arch = "x86_64")]
+fn stop_ack_target() {
+    ACK_DONE.store(1, Ordering::SeqCst);
+    // Let the target leave CPU1 before a later row arms another delivery hook.
+    sleep::sleep_ns(20_000_000);
+}
+
+#[cfg(target_arch = "x86_64")]
+fn shootdown_once() -> (bool, u64, u64) {
+    let before = shootdown::flush_count(1);
+    let start = sleep::now_ns();
+    let flushed = shootdown::flush_range(TLB_TEST_BASE, frame::PAGE_SIZE);
+    let elapsed_ms = sleep::now_ns().saturating_sub(start) / 1_000_000;
+    (flushed, elapsed_ms, shootdown::flush_count(1).saturating_sub(before))
+}
+
+/// S195: a lost NMI must not lose the shootdown; the fixed IPI is the latched fallback.
+#[cfg(target_arch = "x86_64")]
+fn lost_nmi_test(cpus: usize) -> Result<u64, &'static str> {
+    if cpus < 2 {
+        return Ok(0);
+    }
+    start_ack_target()?;
+    shootdown::arm_nmi_drop(1);
+    let (flushed, elapsed_ms, flushes) = shootdown_once();
+    stop_ack_target();
+    if !flushed {
+        return Err("lost-NMI shootdown timed out");
+    }
+    if flushes == 0 {
+        return Err("lost-NMI target did not flush");
+    }
+    Ok(elapsed_ms)
+}
+
+/// S195: a target that acks after the 100 ms diagnostic must still be waited for.
+#[cfg(target_arch = "x86_64")]
+fn delayed_ack_test(cpus: usize) -> Result<u64, &'static str> {
+    if cpus < 2 {
+        return Ok(0);
+    }
+    start_ack_target()?;
+    shootdown::arm_ack_delay(1, ACK_DELAY_NS);
+    let (flushed, elapsed_ms, flushes) = shootdown_once();
+    stop_ack_target();
+    if !flushed {
+        return Err("delayed-ack shootdown timed out");
+    }
+    if flushes == 0 {
+        return Err("delayed-ack target did not flush");
+    }
+    Ok(elapsed_ms)
+}
+
+/// S195 mutation: drop one ack and the row must report a failure (not a silent pass).
+#[cfg(target_arch = "x86_64")]
+fn lost_ack_test(cpus: usize) -> ! {
+    if cpus < 2 {
+        kprintln!("selftest: smp tlb lost-ack failed: too few CPUs");
+        boot::exit_qemu(0x11);
+    }
+    shootdown::set_failure_injection(true);
+    let (flushed, _elapsed_ms, _flushes) = shootdown_once();
+    if flushed {
+        kprintln!("selftest: smp tlb lost-ack failed: shootdown passed without an ack");
+    } else {
+        kprintln!("selftest: smp tlb lost-ack failed: ack missing");
+    }
+    boot::exit_qemu(0x11)
 }
 
 #[cfg(target_arch = "x86_64")]
