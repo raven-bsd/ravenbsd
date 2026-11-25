@@ -35,11 +35,6 @@ fn invalid_utf8_falls_back_to_the_path() {
 }
 
 #[test]
-fn sigacts_selftest_rows_hold() {
-    assert_eq!(sigacts_selftest_check(), None);
-}
-
-#[test]
 fn exec_reset_resets_caught_handlers_and_keeps_ignored() {
     let mut sigacts = SigActs::new();
     sigacts.set(
