@@ -299,7 +299,7 @@ def build_and_run(args: argparse.Namespace, topic_dir: Path, topic: str, rows: l
     out.mkdir(parents=True, exist_ok=True)
     profile = args.profile
     build = topic_dir / "build.sh"
-    service = topic_dir / "descriptor-conformance.service.toml"
+    service = topic_dir / f"{args.service}.service.toml"
     probe = ROOT / "build" / "conformance" / topic / "conformance-probe"
     if not build.is_file():
         raise HarnessError(f"{topic}: missing {build}")
