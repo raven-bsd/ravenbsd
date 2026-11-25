@@ -66,7 +66,7 @@ use crate::usercopy::copy_from_user;
 const KICK_CHECK: u32 = 1;
 
 use self::handle::Object;
-use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
+use self::status::{DefaultAction, RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
 
 /// Page size used by the user loader and stack.
 const PAGE: u64 = 4096;
@@ -1334,6 +1334,24 @@ impl Process {
             .any(|thread| thread.signal_entry.load(Ordering::Acquire) != 0)
     }
 
+    /// True when at least one live thread does not mask `signo`.
+    ///
+    /// FreeBSD `sigtd` picks a thread whose `td_sigmask` does not contain the signal; when every
+    /// thread masks it, `tdsendsignal` holds the signal (`SIG_HOLD`) instead of applying the
+    /// default action. A process with no live thread is treated as accepting so a terminal
+    /// target still reaches its default action.
+    pub fn accepts_signal(&self, signo: u32) -> bool {
+        let bit = signal_bit(signo);
+        let mut any = false;
+        for thread in self.threads_live.lock().iter().filter_map(Weak::upgrade) {
+            any = true;
+            if thread.sig_blocked.load(Ordering::Acquire) & bit == 0 {
+                return true;
+            }
+        }
+        !any
+    }
+
     /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
     ///
     /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
@@ -1360,6 +1378,39 @@ impl Process {
         self.kick_threads(signo);
     }
 
+    /// Queue a signal for one thread (`THREAD_SIGQUEUE`).
+    ///
+    /// FreeBSD `tdsendsignal` with a non-NULL `td` lands in `td_sigqueue`; `issignal` merges the
+    /// thread and process queues and `postsig` consumes the thread queue first. A masked record
+    /// stays held (no `EINTR`); `sigprocmask` re-checks it when the mask opens.
+    pub fn deliver_thread_signal(
+        thread: &Arc<Thread>,
+        signo: u32,
+        sender: u64,
+        code: u32,
+        uid: u32,
+        value: u64,
+    ) {
+        thread.pending_signals.lock().push_back(PendingSignal {
+            signo,
+            sender,
+            code,
+            uid,
+            value,
+        });
+        thread.process.signal_waiters.wake_all();
+        if thread.sig_blocked.load(Ordering::Acquire) & signal_bit(signo) != 0 {
+            return;
+        }
+        thread.signal_wake.store(true, Ordering::Release);
+        thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+        if thread.interruptible.load(Ordering::Acquire) {
+            let token = thread.block_token.load(Ordering::SeqCst);
+            let token = (token != 0).then_some(token);
+            let _ = crate::sched::wake(Arc::clone(thread), token, Errno::EINTR.to_ret());
+        }
+    }
+
     /// Kick every live thread of this process with the signal-check bit.
     ///
     /// A kick is meaningful when either libc registered the retired PG-7 entry or the process
@@ -1367,18 +1418,25 @@ impl Process {
     /// `PROC_SIGRECV` and no unrelated wait is disturbed.
     fn kick_threads(&self, signo: u32) {
         let kernel_handler = self.sigacts.lock().get(signo).is_caught();
+        let bit = signal_bit(signo);
         let mut threads = self.threads_live.lock();
         threads.retain(|weak| {
             let Some(thread) = weak.upgrade() else {
                 return false;
             };
             let legacy = thread.signal_entry.load(Ordering::Acquire) != 0;
-            if !legacy && !kernel_handler {
+            // A thread that masks this signal keeps the record pending; only a thread that can
+            // accept it is kicked (FreeBSD `sigtd`). A legacy libc entry keeps the old
+            // queue-and-kick contract until that path is retired.
+            let accepts = thread.sig_blocked.load(Ordering::Acquire) & bit == 0;
+            if !legacy && (!kernel_handler || !accepts) {
                 return true;
             }
-            if legacy {
-                thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
-            }
+            // The kernel sigaction path needs the sticky bit too: `deliver_kernel_signal` runs
+            // on every user return, but an interruptible wait must see the reason to return
+            // `EINTR` instead of a bare successful wake (FreeBSD `signotify`).
+            thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            thread.signal_wake.store(true, Ordering::Release);
             if thread.interruptible.load(Ordering::Acquire) {
                 let token = thread.block_token.load(Ordering::SeqCst);
                 let token = (token != 0).then_some(token);
@@ -1394,15 +1452,93 @@ impl Process {
     /// leaves a masked signal queued. A `SIG_IGN` record is dropped when `sigaction` installs the
     /// ignore, so it is not selected here.
     pub fn next_kernel_signal(&self, blocked: u64) -> Option<(PendingSignal, SigAction)> {
-        let sigacts = self.sigacts.lock();
-        let mut pending = self.pending_signals.lock();
-        let index = pending.iter().position(|signal| {
-            let action = sigacts.get(signal.signo);
-            action.is_caught() && blocked & signal_bit(signal.signo) == 0
-        })?;
-        let record = pending.remove(index)?;
-        let action = sigacts.get(record.signo);
-        Some((record, action))
+        let thread = crate::sched::current_thread();
+        if let Some(thread) = &thread {
+            // The wait reason is consumed together with the delivery that returns to user; any
+            // signal still queued blocks again on its own pending record.
+            thread.signal_wake.store(false, Ordering::Release);
+        }
+        loop {
+            // FreeBSD `postsig` consumes the thread-directed queue (`td_sigqueue`) first, then
+            // the process queue (`p_sigqueue`).
+            let record = thread
+                .as_ref()
+                .and_then(|thread| take_queued(&thread.pending_signals, blocked))
+                .or_else(|| take_queued(&self.pending_signals, blocked))?;
+            let action = self.sigacts.lock().get(record.signo);
+            if action.handler == SIG_IGN {
+                // A record can outlive a `SIG_IGN` install only through the legacy path; drop it.
+                continue;
+            }
+            if action.is_caught() {
+                return Some((record, action));
+            }
+            // SIG_DFL reached delivery only because the signal was held while masked. Apply the
+            // default action now, in `sigprocess` order, and keep looking for a handler signal.
+            match status::default_action(record.signo) {
+                None | Some(DefaultAction::Ignore) => continue,
+                Some(DefaultAction::Terminate) => {
+                    exit_process(-status::signal_status(record.signo, false))
+                }
+                Some(DefaultAction::Core) => {
+                    exit_process(-status::signal_status(record.signo, true))
+                }
+                Some(DefaultAction::Stop) => {
+                    self.apply_stop_default(record.signo);
+                    continue;
+                }
+                Some(DefaultAction::Continue) => {
+                    self.apply_continue_default();
+                    continue;
+                }
+            }
+        }
+    }
+
+    /// Apply a held `SIG_DFL` stop signal at delivery.
+    fn apply_stop_default(&self, signo: u32) {
+        if self.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
+            self.stop_reported.store(false, Ordering::Release);
+        }
+        notify_parent(self, false);
+    }
+
+    /// Apply a held `SIG_DFL` continue signal at delivery.
+    fn apply_continue_default(&self) {
+        if self.stop_signal.swap(0, Ordering::AcqRel) != 0 {
+            self.continued.store(true, Ordering::Release);
+            self.stop_reported.store(false, Ordering::Release);
+        }
+        notify_parent(self, false);
+    }
+
+    /// Apply a held default-action signal for the calling thread after it unblocks it.
+    ///
+    /// FreeBSD `issignal` applies `SIG_DFL` only after `SIGSETNAND(pending, td_sigmask)`; a
+    /// signal that stayed masked must not terminate the process at generation time. Caught and
+    /// ignored records are left to the delivery path; only held defaults are consumed here.
+    pub fn apply_deferred_defaults(&self, blocked: u64) {
+        loop {
+            let thread = crate::sched::current_thread();
+            let record = thread
+                .as_ref()
+                .and_then(|thread| take_deferred(&thread.pending_signals, self, blocked))
+                .or_else(|| take_deferred(&self.pending_signals, self, blocked));
+            let Some(record) = record else {
+                return;
+            };
+            match status::default_action(record.signo) {
+                None | Some(DefaultAction::Ignore) => {}
+                Some(DefaultAction::Terminate) => {
+                    exit_process(-status::signal_status(record.signo, false))
+                }
+                Some(DefaultAction::Core) => {
+                    exit_process(-status::signal_status(record.signo, true))
+                }
+                Some(DefaultAction::Stop) => self.apply_stop_default(record.signo),
+                Some(DefaultAction::Continue) => self.apply_continue_default(),
+            }
+        }
     }
 
     /// Pop the oldest queued signal.
@@ -1430,6 +1566,47 @@ impl Process {
         !self.pending_signals.lock().is_empty()
     }
 
+    /// Authoritative pending mask and record count for `thread`, whose own queue is included.
+    ///
+    /// The bit layout matches `sigprocmask` (signal 1 is bit 0). FreeBSD `sigpending` merges
+    /// `td_sigqueue` with `p_sigqueue`.
+    pub fn pending_snapshot(&self, thread: Option<&Thread>) -> (u64, usize) {
+        let mut mask = 0u64;
+        let mut count = 0usize;
+        for signal in self.pending_signals.lock().iter() {
+            mask |= signal_bit(signal.signo);
+            count = count.saturating_add(1);
+        }
+        if let Some(thread) = thread {
+            for signal in thread.pending_signals.lock().iter() {
+                mask |= signal_bit(signal.signo);
+                count = count.saturating_add(1);
+            }
+        }
+        (mask, count)
+    }
+
+    /// Consume the oldest pending signal whose bit is in `set`, thread queue first.
+    pub fn pop_signal_for(&self, thread: Option<&Thread>, set: u64) -> Option<PendingSignal> {
+        if let Some(thread) = thread
+            && let Some(record) = take_from_queue_set(&thread.pending_signals, set)
+        {
+            return Some(record);
+        }
+        take_from_queue_set(&self.pending_signals, set)
+    }
+
+    /// True when a signal whose bit is in `set` is queued for the process or `thread`.
+    pub fn has_signal_for(&self, thread: Option<&Thread>, set: u64) -> bool {
+        let matches = |signal: &PendingSignal| set & signal_bit(signal.signo) != 0;
+        if let Some(thread) = thread
+            && thread.pending_signals.lock().iter().any(matches)
+        {
+            return true;
+        }
+        self.pending_signals.lock().iter().any(matches)
+    }
+
     /// True when at least one queued signal matches `predicate`.
     pub fn has_pending_signal_where(
         &self,
@@ -1440,6 +1617,43 @@ impl Process {
             .iter()
             .any(|signal| predicate(signal))
     }
+}
+
+/// Remove the oldest queued signal the caller does not mask.
+fn take_queued(queue: &Mutex<VecDeque<PendingSignal>>, blocked: u64) -> Option<PendingSignal> {
+    let mut pending = queue.lock();
+    let index = pending
+        .iter()
+        .position(|signal| blocked & signal_bit(signal.signo) == 0)?;
+    pending.remove(index)
+}
+
+/// Remove the oldest queued signal whose bit is in `set`.
+fn take_from_queue_set(queue: &Mutex<VecDeque<PendingSignal>>, set: u64) -> Option<PendingSignal> {
+    let mut pending = queue.lock();
+    let index = pending
+        .iter()
+        .position(|signal| set & signal_bit(signal.signo) != 0)?;
+    pending.remove(index)
+}
+
+/// Remove the oldest queued `SIG_DFL` signal whose default action is not ignore.
+fn take_deferred(
+    queue: &Mutex<VecDeque<PendingSignal>>,
+    process: &Process,
+    blocked: u64,
+) -> Option<PendingSignal> {
+    let sigacts = process.sigacts.lock();
+    let mut pending = queue.lock();
+    let index = pending.iter().position(|signal| {
+        blocked & signal_bit(signal.signo) == 0
+            && sigacts.get(signal.signo).handler == SIG_DFL
+            && !matches!(
+                status::default_action(signal.signo),
+                None | Some(DefaultAction::Ignore)
+            )
+    })?;
+    pending.remove(index)
 }
 
 /// Reparent every live child of `parent` to PID 1 (init).

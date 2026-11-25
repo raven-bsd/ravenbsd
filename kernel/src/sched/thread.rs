@@ -444,6 +444,17 @@ pub struct Thread {
     pub user_enter_ns: AtomicU64,
     /// Sticky thread-kick bits (PG-8).
     pub kick_bits: AtomicU32,
+    /// Signals whose disposition is caught and that are pending for this thread only.
+    ///
+    /// FreeBSD keeps a thread-directed queue (`td_sigqueue`) beside the process queue
+    /// (`p_sigqueue`); `sigtd`/`issignal` merge both, and `postsig` consumes the thread queue
+    /// first. A thread-directed send (`THREAD_SIGQUEUE`) lands here.
+    pub pending_signals: Mutex<alloc::collections::VecDeque<crate::process::PendingSignal>>,
+    /// Sticky reason for an interruptible wait: a caught signal is queued for this thread.
+    ///
+    /// `sched::wake` must not downgrade this `EINTR` to a bare successful wake just because the
+    /// retired `SIG_SETUP` entry is absent (C19 kernel `sigaction` model).
+    pub signal_wake: AtomicBool,
     /// True while the thread is in an interruptible blocking wait.
     pub interruptible: AtomicBool,
     /// Registered `SIG_SETUP` entry point; zero means no signal delivery (S44).
@@ -637,6 +648,8 @@ impl Thread {
             tls_base: AtomicU64::new(0),
             user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
+            pending_signals: Mutex::new(alloc::collections::VecDeque::new()),
+            signal_wake: AtomicBool::new(false),
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
             signal_ctx_offset: AtomicU64::new(0),
@@ -761,6 +774,8 @@ impl Thread {
             tls_base: AtomicU64::new(0),
             user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
+            pending_signals: Mutex::new(alloc::collections::VecDeque::new()),
+            signal_wake: AtomicBool::new(false),
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
             signal_ctx_offset: AtomicU64::new(0),
@@ -827,6 +842,8 @@ impl Thread {
             tls_base: AtomicU64::new(0),
             user_enter_ns: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
+            pending_signals: Mutex::new(alloc::collections::VecDeque::new()),
+            signal_wake: AtomicBool::new(false),
             interruptible: AtomicBool::new(false),
             signal_entry: AtomicU64::new(0),
             signal_ctx_offset: AtomicU64::new(0),

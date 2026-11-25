@@ -36,6 +36,34 @@ fn sigresend_is_the_agreed_number() {
 }
 
 #[test]
+fn provider_ids_are_distinct_and_in_the_signal_range() {
+    use crate::syscall::{SIGPENDING, SIGWAIT, THREAD_SIGQUEUE};
+    assert_eq!(THREAD_SIGQUEUE, 0x8A);
+    assert_eq!(SIGPENDING, 0x8B);
+    assert_eq!(SIGWAIT, 0x8C);
+    let all = [
+        crate::syscall::SIGACTION,
+        crate::syscall::SIGPROCMASK,
+        crate::syscall::SIGALTSTACK,
+        THREAD_SIGQUEUE,
+        SIGPENDING,
+        SIGWAIT,
+    ];
+    for (index, left) in all.iter().enumerate() {
+        assert!(
+            all.iter().skip(index + 1).all(|right| left != right),
+            "duplicate provider id {left:#x}"
+        );
+    }
+}
+
+#[test]
+fn sigwait_poll_flag_is_one_bit() {
+    assert_eq!(crate::syscall::SIGWAIT_POLL, 1);
+    assert_eq!(crate::syscall::SIGWAIT_POLL & !1, 0);
+}
+
+#[test]
 fn kick_bits_are_the_pg7_set() {
     assert_eq!(KICK_CHECK, 1);
     assert_eq!(KICK_CANCEL, 2);

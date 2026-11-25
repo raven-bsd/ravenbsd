@@ -1019,20 +1019,23 @@ pub fn take_kick() -> bool {
     current_thread().is_some_and(|thread| kick_pending(&thread))
 }
 
-/// Test (and, without a registered handler, consume) one thread's kick word.
+/// Test (and, without a signal reason, consume) one thread's kick word.
 ///
-/// Only a registered `SIG_SETUP` entry can run a user handler, so only that case is a signal
-/// interrupt. NetBSD `sleepq_block` has the same shape: `LW_CATCHINTR` plus a catchable pending
-/// signal (`sigispending`/`issignal`), never a bare wake.
+/// Only a queued catchable signal makes a kick an `EINTR`: the retired `SIG_SETUP` entry, or the
+/// C19 kernel `sigaction` path, which marks the reason on the thread before waking it. A bare
+/// kick without either stays a plain wake. NetBSD `sleepq_block` has the same shape:
+/// `LW_CATCHINTR` plus a catchable pending signal (`sigispending`/`issignal`), never a bare wake.
 fn kick_pending(thread: &Thread) -> bool {
     if thread.kick_bits.load(Ordering::Acquire) == 0 {
         return false;
     }
-    if thread.signal_entry.load(Ordering::Acquire) == 0 {
-        thread.kick_bits.swap(0, Ordering::AcqRel);
-        return false;
+    if thread.signal_entry.load(Ordering::Acquire) != 0
+        || thread.signal_wake.load(Ordering::Acquire)
+    {
+        return true;
     }
-    true
+    thread.kick_bits.swap(0, Ordering::AcqRel);
+    false
 }
 
 /// Register a timeout for the current blocking operation with its wake status.
@@ -1173,14 +1176,17 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
     // and `schedule_locked`. Holding the thread's block lock makes "read state" and "publish
     // the wake" atomic with the waiter's "set Blocked, re-check pending" sequence.
     let _block = lock_block(&thread);
-    // A kick without a registered handler cannot run user code, so it is a plain wake, not an
-    // EINTR. Keep the interrupt for a thread with a real SIG_SETUP entry.
-    let status =
-        if status == Errno::EINTR.to_ret() && thread.signal_entry.load(Ordering::Acquire) == 0 {
-            0
-        } else {
-            status
-        };
+    // A kick with no signal reason cannot run user code, so it is a plain wake, not an EINTR.
+    // Keep the interrupt for a thread with a legacy SIG_SETUP entry or a queued kernel-path
+    // signal; otherwise every successful timer or event wake would turn into EINTR.
+    let status = if status == Errno::EINTR.to_ret()
+        && thread.signal_entry.load(Ordering::Acquire) == 0
+        && !thread.signal_wake.load(Ordering::Acquire)
+    {
+        0
+    } else {
+        status
+    };
     if let Some(token) = token
         && thread.block_token.load(Ordering::SeqCst) != token
     {

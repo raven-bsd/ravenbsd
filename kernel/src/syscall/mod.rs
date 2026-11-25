@@ -252,6 +252,17 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::SIGALTSTACK {
         return thread::sigaltstack(frame);
     }
+    // S711 native provider operations: thread-directed send, authoritative pending query and
+    // synchronous pending consumption with an atomic temporary mask.
+    if number == raven_abi::syscall::THREAD_SIGQUEUE {
+        return process_ctl::thread_sigqueue(frame);
+    }
+    if number == raven_abi::syscall::SIGPENDING {
+        return process_ctl::sigpending(frame);
+    }
+    if number == raven_abi::syscall::SIGWAIT {
+        return process_ctl::sigwait(frame);
+    }
     if number == raven_abi::syscall::THREAD_KICK {
         return thread::kick(frame);
     }

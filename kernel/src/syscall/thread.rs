@@ -582,10 +582,16 @@ pub fn sigprocmask(frame: &SyscallFrame) -> Result<usize, Errno> {
             process::SIG_UNBLOCK => current & !requested,
             process::SIG_SETMASK => requested,
             _ => return Err(Errno::EINVAL),
-        };
-        thread
-            .sig_blocked
-            .store(updated & !unblockable, Ordering::Release);
+        } & !unblockable;
+        thread.sig_blocked.store(updated, Ordering::Release);
+        let caller = process::current().ok_or(Errno::ESRCH)?;
+        // A held default-action signal runs now that the mask opened (FreeBSD `issignal`), and
+        // an unblocked caught signal must re-check the kernel queue before the next wait.
+        caller.apply_deferred_defaults(updated);
+        if current & !updated != 0 {
+            thread.signal_wake.store(true, Ordering::Release);
+            thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+        }
     }
     Ok(0)
 }

@@ -260,8 +260,15 @@ pub const fn signal_disposition(
     ignored: bool,
     blocked: bool,
 ) -> SignalDisposition {
+    if ignored {
+        return SignalDisposition::Discard;
+    }
     if caught {
         return SignalDisposition::Deliver;
+    }
+    let unblockable = signo == SIGKILL || signo == SIGSTOP;
+    if blocked && !unblockable {
+        return SignalDisposition::Defer;
     }
     match default_action(signo) {
         None | Some(DefaultAction::Ignore) => SignalDisposition::Discard,
