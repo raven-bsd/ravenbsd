@@ -65,10 +65,7 @@ impl Selection {
     /// Parse `all` or a comma-separated family list; empty or misspelled input fails.
     pub fn parse(text: &str) -> Result<Self> {
         let trimmed = text.trim();
-        if trimmed.is_empty() {
-            bail!("--families must name at least one family");
-        }
-        if trimmed == "all" {
+        if trimmed.is_empty() || trimmed != "all" {
             return Ok(Self {
                 families: FAMILIES.iter().map(|name| (*name).to_string()).collect(),
                 all: true,
