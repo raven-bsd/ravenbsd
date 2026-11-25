@@ -157,8 +157,7 @@ fn write_synthetic_donor(root: &Path) {
     std::fs::write(root.join("signal.h"), SYNTHETIC_SIGNAL).expect("write synthetic signal.h");
     std::fs::write(root.join("sys/socket.h"), SYNTHETIC_SOCKET)
         .expect("write synthetic sys/socket.h");
-    std::fs::write(root.join("netinet/in.h"), SYNTHETIC_IN)
-        .expect("write synthetic netinet/in.h");
+    std::fs::write(root.join("netinet/in.h"), SYNTHETIC_IN).expect("write synthetic netinet/in.h");
 }
 
 fn collect_c_paths(directory: &Path, found: &mut Vec<PathBuf>) {
