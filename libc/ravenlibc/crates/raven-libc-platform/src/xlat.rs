@@ -266,39 +266,66 @@ pub enum IoctlAction {
     Fioclex,
     /// Clear `FD_CLOEXEC`.
     Fionclex,
+    /// Acquire the controlling terminal (kernel session operation).
+    TiocSctty,
+    /// Read the foreground process group (kernel session operation).
+    TiocGPgrp,
+    /// Write the foreground process group (kernel session operation).
+    TiocSPgrp,
     /// Unknown request: `ENOTTY`.
     Unknown,
 }
 
-/// Linux ioctl request values fixed by doc 11 section 3.2.
-pub const TCGETS: u32 = 0x5401;
-/// `TCSETS`.
-pub const TCSETS: u32 = 0x5402;
-/// `TCSETSW`.
-pub const TCSETSW: u32 = 0x5403;
-/// `TCSETSF`.
-pub const TCSETSF: u32 = 0x5404;
-/// `TIOCGWINSZ`.
-pub const TIOCGWINSZ: u32 = 0x5413;
-/// `TIOCSWINSZ`.
-pub const TIOCSWINSZ: u32 = 0x5414;
-/// `FIONREAD`.
-pub const FIONREAD: u32 = 0x541B;
-/// `FIONBIO`.
-pub const FIONBIO: u32 = 0x5421;
-/// `FIONCLEX`.
-pub const FIONCLEX: u32 = 0x5450;
-/// `FIOCLEX`.
-pub const FIOCLEX: u32 = 0x5451;
+/// `TIOCGETA`: the FreeBSD `_IOR('t', 19, struct termios)` encoding, 44-byte record.
+pub const TIOCGETA: u32 = 0x402c_7413;
+/// `TIOCSETA`: the FreeBSD `_IOW('t', 20, struct termios)` encoding.
+pub const TIOCSETA: u32 = 0x802c_7414;
+/// `TIOCSETAW`: write and drain.
+pub const TIOCSETAW: u32 = 0x802c_7415;
+/// `TIOCSETAF`: write and flush.
+pub const TIOCSETAF: u32 = 0x802c_7416;
+/// `TCGETS`: compatibility alias of [`TIOCGETA`].
+pub const TCGETS: u32 = TIOCGETA;
+/// `TCSETS`: compatibility alias of [`TIOCSETA`].
+pub const TCSETS: u32 = TIOCSETA;
+/// `TCSETSW`: compatibility alias of [`TIOCSETAW`].
+pub const TCSETSW: u32 = TIOCSETAW;
+/// `TCSETSF`: compatibility alias of [`TIOCSETAF`].
+pub const TCSETSF: u32 = TIOCSETAF;
+/// `TIOCGWINSZ`: `_IOR('t', 104, struct winsize)`.
+pub const TIOCGWINSZ: u32 = 0x4008_7468;
+/// `TIOCSWINSZ`: `_IOW('t', 103, struct winsize)`.
+pub const TIOCSWINSZ: u32 = 0x8008_7467;
+/// `TIOCGPGRP`: `_IOR('t', 119, int)`.
+pub const TIOCGPGRP: u32 = 0x4004_7477;
+/// `TIOCSPGRP`: `_IOW('t', 118, int)`.
+pub const TIOCSPGRP: u32 = 0x8004_7476;
+/// `TIOCSCTTY`: `_IO('t', 97)`.
+pub const TIOCSCTTY: u32 = 0x2000_7461;
+/// `FIONREAD`: `_IOR('f', 127, int)`.
+pub const FIONREAD: u32 = 0x4004_667f;
+/// `FIONBIO`: `_IOW('f', 126, int)`.
+pub const FIONBIO: u32 = 0x8004_667e;
+/// `FIONCLEX`: `_IO('f', 2)`.
+pub const FIONCLEX: u32 = 0x2000_6602;
+/// `FIOCLEX`: `_IO('f', 1)`.
+pub const FIOCLEX: u32 = 0x2000_6601;
 
-/// `ioctl` request rows as `(name, Linux value, action)`.
+/// `ioctl` request rows as `(name, FreeBSD encoding, action)`.
 pub const IOCTL_REQUESTS: &[(&str, u32, IoctlAction)] = &[
+    ("TIOCGETA", TIOCGETA, IoctlAction::TcGets),
+    ("TIOCSETA", TIOCSETA, IoctlAction::TcSets),
+    ("TIOCSETAW", TIOCSETAW, IoctlAction::TcSetSw),
+    ("TIOCSETAF", TIOCSETAF, IoctlAction::TcSetSf),
     ("TCGETS", TCGETS, IoctlAction::TcGets),
     ("TCSETS", TCSETS, IoctlAction::TcSets),
     ("TCSETSW", TCSETSW, IoctlAction::TcSetSw),
     ("TCSETSF", TCSETSF, IoctlAction::TcSetSf),
     ("TIOCGWINSZ", TIOCGWINSZ, IoctlAction::TiocGWinsz),
     ("TIOCSWINSZ", TIOCSWINSZ, IoctlAction::TiocSWinsz),
+    ("TIOCGPGRP", TIOCGPGRP, IoctlAction::TiocGPgrp),
+    ("TIOCSPGRP", TIOCSPGRP, IoctlAction::TiocSPgrp),
+    ("TIOCSCTTY", TIOCSCTTY, IoctlAction::TiocSctty),
     ("FIONREAD", FIONREAD, IoctlAction::FionRead),
     ("FIONBIO", FIONBIO, IoctlAction::FionBio),
     ("FIONCLEX", FIONCLEX, IoctlAction::Fionclex),
@@ -308,12 +335,15 @@ pub const IOCTL_REQUESTS: &[(&str, u32, IoctlAction)] = &[
 /// Classify an ioctl request.
 pub fn ioctl_action(request: u32) -> IoctlAction {
     match request {
-        TCGETS => IoctlAction::TcGets,
-        TCSETS => IoctlAction::TcSets,
-        TCSETSW => IoctlAction::TcSetSw,
-        TCSETSF => IoctlAction::TcSetSf,
+        TIOCGETA => IoctlAction::TcGets,
+        TIOCSETA => IoctlAction::TcSets,
+        TIOCSETAW => IoctlAction::TcSetSw,
+        TIOCSETAF => IoctlAction::TcSetSf,
         TIOCGWINSZ => IoctlAction::TiocGWinsz,
         TIOCSWINSZ => IoctlAction::TiocSWinsz,
+        TIOCGPGRP => IoctlAction::TiocGPgrp,
+        TIOCSPGRP => IoctlAction::TiocSPgrp,
+        TIOCSCTTY => IoctlAction::TiocSctty,
         FIONREAD => IoctlAction::FionRead,
         FIONBIO => IoctlAction::FionBio,
         FIONCLEX => IoctlAction::Fionclex,

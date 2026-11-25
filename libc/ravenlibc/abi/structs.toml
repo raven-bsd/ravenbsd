@@ -341,17 +341,18 @@ name = "termios"
 rust = "Termios"
 c = "struct termios"
 musl = "struct termios"
-size = 60
+size = 44
 align = 4
+deviates = { x86_64 = { size = 60, align = 4 }, aarch64 = { size = 60, align = 4 }, riscv64 = { size = 60, align = 4 } }
+doc = "S742/DR-69: FreeBSD 13334440 struct termios, NCCS=20, no c_line, speeds after c_cc"
 fields = [
   { name = "c_iflag", ty = "u32", off = 0 },
   { name = "c_oflag", ty = "u32", off = 4 },
   { name = "c_cflag", ty = "u32", off = 8 },
   { name = "c_lflag", ty = "u32", off = 12 },
-  { name = "c_line", ty = "u8", off = 16 },
-  { name = "c_cc", ty = "[u8; 32]", off = 17 },
-  { name = "__c_ispeed", ty = "u32", off = 52 },
-  { name = "__c_ospeed", ty = "u32", off = 56 },
+  { name = "c_cc", ty = "[u8; 20]", off = 16 },
+  { name = "c_ispeed", ty = "u32", off = 36 },
+  { name = "c_ospeed", ty = "u32", off = 40 },
 ]
 
 [[record]]

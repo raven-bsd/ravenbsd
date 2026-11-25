@@ -38,9 +38,10 @@ OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
 OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
 SERVICE = ROOT / "tests/conformance/terminal/terminal-conformance.service.toml"
 PROBE = ROOT / "build/conformance/terminal/terminal-conformance"
-GATE_ROWS = ("termios", "pty-both-ways", "ctty", "eio")
-PENDING_ROWS = ("sigwinch", "sighup", "isig")
+GATE_ROWS = ("header", "termios", "pty-both-ways", "ctty", "eio")
+SIGNAL_ROWS = ("sigwinch", "sighup", "isig")
 MUTATION_MARKER = "S175-TERM-MUTATION-BEGIN"
+SIGNAL_MUTATION_MARKER = "S175-TERM-SIGNAL-MUTATION-BEGIN"
 
 
 def step(label: str, argv: list[str], timeout: int) -> None:
@@ -124,22 +125,28 @@ def main() -> int:
             if qemu.poll() is not None:
                 break
             text = SERIAL.read_text(encoding="utf-8", errors="replace")
-            if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
+            if (SIGNAL_MUTATION_MARKER in text
+                    and text.count("S175-TERM done failures=") >= 3):
                 break
             time.sleep(0.2)
         (OUT / "serial-copy.log").write_text(text, encoding="utf-8")
 
         if MUTATION_MARKER in text:
-            normal, mutation = text.split(MUTATION_MARKER, 1)
+            normal, rest = text.split(MUTATION_MARKER, 1)
         else:
-            normal, mutation = text, ""
+            normal, rest = text, ""
+        if SIGNAL_MUTATION_MARKER in rest:
+            mutation, signal_mutation = rest.split(SIGNAL_MUTATION_MARKER, 1)
+        else:
+            mutation, signal_mutation = rest, ""
         normal_rows = rows(normal)
         mutation_rows = rows(mutation)
+        signal_rows = rows(signal_mutation)
         for name in GATE_ROWS:
             if normal_rows.get(name) != "PASS":
                 failures.append(f"normal:{name}={normal_rows.get(name)}")
-        for name in PENDING_ROWS:
-            if normal_rows.get(name) != "PENDING":
+        for name in SIGNAL_ROWS:
+            if normal_rows.get(name) != "PASS":
                 failures.append(f"normal:{name}={normal_rows.get(name)}")
         if "S175-TERM done failures=" not in normal:
             failures.append("normal:incomplete-output")
@@ -149,10 +156,17 @@ def main() -> int:
             failures.append(f"mutation:termios={mutation_rows.get('termios')}")
         if "S175-TERM done failures=" not in mutation:
             failures.append("mutation:incomplete-output")
+        for name in SIGNAL_ROWS:
+            if signal_rows.get(name) != "FAIL":
+                failures.append(f"signal-mutation:{name}={signal_rows.get(name)}")
+        if "S175-TERM done failures=" not in signal_mutation:
+            failures.append("signal-mutation:incomplete-output")
 
         print(normal, end="", flush=True)
         print(mutation, end="", flush=True)
-        print(f"S175-TERM-RUN rows_normal={normal_rows} rows_mutation={mutation_rows}", flush=True)
+        print(signal_mutation, end="", flush=True)
+        print(f"S175-TERM-RUN rows_normal={normal_rows} rows_mutation={mutation_rows} "
+              f"rows_signal_mutation={signal_rows}", flush=True)
         if failures:
             print(f"S175-TERM-RUN FAIL reasons={';'.join(failures)}", flush=True)
             return 1
