@@ -6,7 +6,7 @@ arch = "x86_64"
 profile = "base"
 timeout_secs = 180
 pre = ["sh tests/signals/build.sh"]
-initfs = "build/signals/initfs.img"
+initfs = "build/signals/x86_64/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
