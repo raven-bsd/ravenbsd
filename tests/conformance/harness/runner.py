@@ -227,6 +227,9 @@ def self_test() -> int:
         failures.append("self-test: undetected mutation accepted")
     if not evaluate(parse_log("", "demo"), rows, mutations, "normal", None):
         failures.append("self-test: empty log accepted")
+    inconsistent = good.replace("end=mut-a failures=1", "end=mut-a failures=0")
+    if not evaluate(parse_log(inconsistent, "demo"), rows, mutations, "normal", None):
+        failures.append("self-test: inconsistent mutation end accepted")
     if failures:
         for failure in failures:
             print(f"conformance-self-test: FAIL {failure}", flush=True)
