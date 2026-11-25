@@ -49,6 +49,15 @@ if [ "$mode" = "pager" ]; then
         "/bin/pager-lifetime=$root/target/x86_64-unknown-none/release/raven-s36-lifecycle:0755" \
         "/etc/services.d/pager-lifetime.toml=$root/tests/fixtures/s36-lifecycle/pager-lifetime.service.toml:0644" \
         "/etc/svcd.conf=$root/tests/fixtures/s36-lifecycle/pager-lifetime.svcd.conf:0644"
+elif [ "$mode" = "c16" ]; then
+    # S169: the same binary runs only the C16 termination rows, so an unrelated red lifecycle
+    # row cannot mask the contract evidence.
+    "$overlay" "$base" "$out/c16-initfs.img" \
+        "/sbin/vfsd=$vfsd:0755" \
+        "/bin/s36-lifecycle=$root/target/x86_64-unknown-none/release/raven-s36-lifecycle:0755" \
+        "/bin/c16-marker=$root/tests/fixtures/s36-lifecycle/c16.marker:0644" \
+        "/etc/services.d/s36-lifecycle.toml=$root/tests/fixtures/s36-lifecycle/s36.service.toml:0644" \
+        "/etc/svcd.conf=$root/tests/fixtures/s36-lifecycle/s36.svcd.conf:0644"
 else
     "$overlay" "$base" "$out/initfs.img" \
         "/sbin/vfsd=$vfsd:0755" \

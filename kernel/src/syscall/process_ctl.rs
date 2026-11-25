@@ -925,7 +925,9 @@ pub fn set_personality(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// the `SIGNAL` right; an unprivileged caller gets `EPERM`, a terminal target `ESRCH`.
 pub fn terminate(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
-    let handle = Handle(frame.rdi as u32);
+    // A register value outside the 32-bit Handle encoding is an invalid handle, not a
+    // truncation: `0x1_0000_0000` must not alias `SELF_PROC` (C16 EBADF).
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let code = frame.rsi as i32;
     let target = {
         let handles = caller.handles.lock();
@@ -994,7 +996,8 @@ pub fn namespace(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// `proc_wait(proc, out_code) -> 0`.
 pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
-    let handle = Handle(frame.rdi as u32);
+    // Same invalid-handle rule as `terminate`: do not truncate a raw register to 32 bits.
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let target = {
         let handles = caller.handles.lock();
         match handles.get(handle, Rights::READ)? {

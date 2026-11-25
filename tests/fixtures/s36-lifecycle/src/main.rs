@@ -300,6 +300,28 @@ fn proc_terminate(process: Handle, code: i32) -> Result<(), Errno> {
     .map(|_| ())
 }
 
+/// Pass the raw register value instead of a `Handle`, so the kernel parameter validation is
+/// exercised. A value above `u32::MAX` is not a handle and must be `EBADF`.
+fn proc_terminate_raw(raw: usize, code: i32) -> Result<(), Errno> {
+    result(syscall2(
+        Syscall::PROC_TERMINATE as usize,
+        raw,
+        code as usize,
+    ))
+    .map(|_| ())
+}
+
+/// Raw-register `PROC_WAIT` for the same invalid-parameter check.
+fn proc_wait_raw(raw: usize) -> Result<i32, Errno> {
+    let mut code = -1i32;
+    result(syscall2(
+        Syscall::PROC_WAIT as usize,
+        raw,
+        &mut code as *mut i32 as usize,
+    ))?;
+    Ok(code)
+}
+
 fn thread_create(
     process: Handle,
     entry: usize,
@@ -1141,6 +1163,22 @@ fn child_main(role: &str) -> i32 {
         "sleep" => loop {
             nanosleep(60_000_000_000);
         },
+        // C16: terminating self is exit(43), and the syscall never returns.
+        "selfterm" => {
+            let _ = proc_terminate(Handle::SELF_PROC, 43);
+            println!("s36: failed self terminate returned");
+            1
+        }
+        // A register value above `u32::MAX` is not a Handle; truncating it must not alias
+        // SELF_PROC and terminate this process.
+        "badterm" => match proc_terminate_raw(0x1_0000_0000, 55) {
+            Err(Errno::EBADF) => 42,
+            _ => 1,
+        },
+        "badwait" => match proc_wait_raw(0x1_0000_0000) {
+            Err(Errno::EBADF) => 42,
+            _ => 1,
+        },
         "delayed" => {
             nanosleep(100_000_000);
             42
@@ -1250,6 +1288,39 @@ fn terminate_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     handle_close(weak);
     handle_close(child);
     println!("s36: eperm ebadf esrch ok");
+    Ok(())
+}
+
+/// C16: self-terminate behaves like `exit(43)`; the parent observes the exact code.
+fn self_terminate_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let child = spawn_role(initfs, "selfterm").map_err(|_| "selfterm spawn")?;
+    match proc_wait(child) {
+        Ok(43) => {}
+        Ok(_) => return Err("selfterm code"),
+        Err(_) => return Err("selfterm wait"),
+    }
+    handle_close(child);
+    println!("s36: self terminate ok");
+    Ok(())
+}
+
+/// C16: a raw value above the 32-bit Handle encoding is invalid (`EBADF`), never SELF_PROC.
+fn bad_handle_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let child = spawn_role(initfs, "badterm").map_err(|_| "badterm spawn")?;
+    match proc_wait(child) {
+        Ok(42) => {}
+        Ok(_) => return Err("bad terminate handle accepted"),
+        Err(_) => return Err("badterm wait"),
+    }
+    handle_close(child);
+    let child = spawn_role(initfs, "badwait").map_err(|_| "badwait spawn")?;
+    match proc_wait(child) {
+        Ok(42) => {}
+        Ok(_) => return Err("bad wait handle accepted"),
+        Err(_) => return Err("badwait wait"),
+    }
+    handle_close(child);
+    println!("s36: bad handle split ok");
     Ok(())
 }
 
@@ -1409,6 +1480,25 @@ fn main(args: raven_rt::Args) -> i32 {
         return 0;
     }
 
+    // S169: the C16 initfs stages a marker, so the contract rows run without the unrelated
+    // lock/map lifecycle rows.
+    if initfs.get("/bin/c16-marker").is_some() {
+        if let Err(message) = terminate_part(&initfs) {
+            fail(message);
+        }
+        if let Err(message) = self_terminate_part(&initfs) {
+            fail(message);
+        }
+        if let Err(message) = bad_handle_part(&initfs) {
+            fail(message);
+        }
+        if let Err(message) = admission_part(&initfs) {
+            fail(message);
+        }
+        println!("s36: lifecycle ok");
+        return 0;
+    }
+
     #[cfg(feature = "s36-churn-only")]
     {
         if let Err(message) = churn_only(&initfs) {
@@ -1460,6 +1550,13 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     // Scenario 5: authorized termination and its errors.
     if let Err(message) = terminate_part(&initfs) {
+        fail(message);
+    }
+    // C16: self-terminate equals exit, and an out-of-range handle is EBADF, not SELF_PROC.
+    if let Err(message) = self_terminate_part(&initfs) {
+        fail(message);
+    }
+    if let Err(message) = bad_handle_part(&initfs) {
         fail(message);
     }
     // Scenario 6: scheme name released on exit.
