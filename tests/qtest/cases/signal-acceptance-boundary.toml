@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S710: the public libc `struct sigaction` marshal/unmarshal row. The new and old 152-byte
+# objects sit at the last slot before inaccessible guard pages, a canary copy proves no write
+# beyond the public object, and the installed SA_SIGINFO/SA_ONSTACK flags plus the mask are read
+# back through the real libc sigaction path. This runs without libc raise, which is a separate
+# owned defect and keeps signal-acceptance.toml red.
+
+name = "signal-acceptance-boundary"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/signals/build.sh"]
+initfs = "build/signals/x86_64/boundary-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal: boundary guard ok flags=0x8000004 mask=1$'
+
+[[expect]]
+regex = '^signal: boundary canary ok flags=0x4 mask=1$'
+
+[[expect]]
+regex = '^signal: boundary ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|signal: boundary-fail'
