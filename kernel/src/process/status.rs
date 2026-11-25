@@ -34,6 +34,8 @@ pub const SIGTERM: u32 = 15;
 pub const SIGKILL: u32 = 9;
 /// User-defined signal 1.
 pub const SIGUSR1: u32 = 10;
+/// Segmentation violation (default core dump).
+pub const SIGSEGV: u32 = 11;
 /// Child exit/stop notification.
 pub const SIGCHLD: u32 = 17;
 /// Continue a stopped process.
@@ -231,6 +233,40 @@ impl WaitEvent {
 #[must_use]
 pub const fn exit_code_fits(code: i32) -> bool {
     code >= 0 && code <= 0xff
+}
+
+/// What the kernel does with one generated signal for a target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SignalDisposition {
+    /// Discard the signal without queueing it (`SIG_IGN` or a default-ignore signal).
+    Discard,
+    /// Queue the signal for delivery to a user handler.
+    Deliver,
+    /// Queue the signal and apply its default action when the target unblocks it.
+    Defer,
+    /// Apply the default action now.
+    Default(DefaultAction),
+}
+
+/// Decide one generated signal's disposition (FreeBSD `tdsendsignal` and `sigprocess`).
+///
+/// FreeBSD discards an ignored signal at generation (`kern_sig_discard_ign`), queues a caught
+/// signal even while it is masked, and holds a default-action signal as `SIG_HOLD` while a
+/// thread masks it; the default action runs at delivery (`issignal`/`postsig`). `SIGKILL` and
+/// `SIGSTOP` can never be held.
+pub const fn signal_disposition(
+    signo: u32,
+    caught: bool,
+    ignored: bool,
+    blocked: bool,
+) -> SignalDisposition {
+    if caught {
+        return SignalDisposition::Deliver;
+    }
+    match default_action(signo) {
+        None | Some(DefaultAction::Ignore) => SignalDisposition::Discard,
+        Some(action) => SignalDisposition::Default(action),
+    }
 }
 
 #[cfg(test)]

@@ -81,3 +81,79 @@ fn exit_code_range_is_the_low_byte() {
     assert!(!exit_code_fits(256));
     assert!(!exit_code_fits(-1));
 }
+
+#[test]
+fn an_ignored_signal_is_discarded_not_fatal() {
+    // SIGUSR1 has a default-terminate action; SIG_IGN must win over it.
+    assert_eq!(
+        signal_disposition(SIGUSR1, false, true, false),
+        SignalDisposition::Discard
+    );
+    assert_eq!(
+        signal_disposition(SIGTERM, false, true, false),
+        SignalDisposition::Discard
+    );
+}
+
+#[test]
+fn a_blocked_default_signal_is_held_until_unblock() {
+    // FreeBSD `tdsendsignal` takes SIG_HOLD for a masked signal; the default action runs in
+    // `issignal`/`postsig` after the mask opens, never at generation.
+    assert_eq!(
+        signal_disposition(SIGTERM, false, false, true),
+        SignalDisposition::Defer
+    );
+    assert_eq!(
+        signal_disposition(SIGTSTP, false, false, true),
+        SignalDisposition::Defer
+    );
+}
+
+#[test]
+fn an_unblocked_default_signal_takes_its_action_now() {
+    assert_eq!(
+        signal_disposition(SIGTERM, false, false, false),
+        SignalDisposition::Default(DefaultAction::Terminate)
+    );
+    assert_eq!(
+        signal_disposition(SIGSEGV, false, false, false),
+        SignalDisposition::Default(DefaultAction::Core)
+    );
+    assert_eq!(
+        signal_disposition(SIGTSTP, false, false, false),
+        SignalDisposition::Default(DefaultAction::Stop)
+    );
+}
+
+#[test]
+fn kill_and_stop_can_never_be_held() {
+    // SIGKILL/SIGSTOP are unmaskable, so a mask bit must not defer them (POSIX/FreeBSD).
+    assert_eq!(
+        signal_disposition(SIGKILL, false, false, true),
+        SignalDisposition::Default(DefaultAction::Terminate)
+    );
+    assert_eq!(
+        signal_disposition(SIGSTOP, false, false, true),
+        SignalDisposition::Default(DefaultAction::Stop)
+    );
+}
+
+#[test]
+fn a_caught_signal_is_queued_even_when_blocked() {
+    assert_eq!(
+        signal_disposition(SIGUSR1, true, false, true),
+        SignalDisposition::Deliver
+    );
+    assert_eq!(
+        signal_disposition(SIGUSR1, true, false, false),
+        SignalDisposition::Deliver
+    );
+}
+
+#[test]
+fn a_default_ignore_signal_is_discarded() {
+    assert_eq!(
+        signal_disposition(SIGCHLD, false, false, false),
+        SignalDisposition::Discard
+    );
+}
