@@ -248,6 +248,13 @@ def self_test() -> int:
     prefixed = "\n".join(f"login: {line}" for line in good.splitlines())
     if evaluate(parse_log(prefixed, "demo"), rows, mutations, "normal", None):
         failures.append("self-test: console-prefixed rows rejected")
+    duplicate = good.replace(
+        "CONFORM demo row=row-a status=PASS detail=a=1\n",
+        "CONFORM demo row=row-a status=FAIL detail=a=0\n"
+        "CONFORM demo row=row-a status=PASS detail=a=1\n",
+    )
+    if not evaluate(parse_log(duplicate, "demo"), rows, mutations, "normal", None):
+        failures.append("self-test: duplicate row accepted")
     if failures:
         for failure in failures:
             print(f"conformance-self-test: FAIL {failure}", flush=True)
