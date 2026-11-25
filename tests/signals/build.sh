@@ -50,6 +50,30 @@ for file in crt1.o crti.o crtn.o libc.a; do
     }
 done
 
+# S710b installed public type: the fixture declares the 152-byte C `struct sigaction` and the
+# 128-byte `sigset_t`; its compile-time assertions use the same offsets as this check. Assert
+# that the *deployed* sysroot header for this architecture has exactly that layout, so the row
+# proves the installed public type rather than only a local mirror.
+CC=${CC:-clang}
+command -v "$CC" >/dev/null 2>&1 || {
+    echo "signals: $CC not found (needed for the installed-header layout check)" >&2
+    exit 77
+}
+"$CC" --target="$c_target" --sysroot="$sysroot" -isystem "$sysroot/usr/include" \
+    -std=c11 -fsyntax-only -x c - <<'EOF'
+#define _GNU_SOURCE 1
+#include <signal.h>
+_Static_assert(sizeof(sigset_t) == 128, "installed sigset_t size");
+_Static_assert(sizeof(struct sigaction) == 152, "installed sigaction size");
+_Static_assert(__builtin_offsetof(struct sigaction, sa_handler) == 0, "installed handler offset");
+_Static_assert(__builtin_offsetof(struct sigaction, sa_mask) == 8, "installed mask offset");
+_Static_assert(__builtin_offsetof(struct sigaction, sa_flags) == 136, "installed flags offset");
+_Static_assert(__builtin_offsetof(struct sigaction, sa_restorer) == 144, "installed restorer offset");
+_Static_assert(SA_SIGINFO == 4, "installed SA_SIGINFO");
+_Static_assert(SA_ONSTACK == 0x08000000, "installed SA_ONSTACK");
+EOF
+echo "signals: $arch installed sigaction layout 152/0/8/136/144 verified against $sysroot/usr/include/signal.h"
+
 # Public-libc boundary rows: Rust extern "C" calls linked against the freshly packed archive,
 # in the tests/libc/std-link pattern. Guard pages, canaries and the flags/mask readback stay in
 # the Rust source, so the C acceptance fixture is untouched.

@@ -22,6 +22,9 @@ qemu_extra = [
 expect_exit = "success"
 
 [[expect]]
+regex = '^signal: layout ok size=152 handler=0 mask=8 flags=136 restorer=144$'
+
+[[expect]]
 regex = '^signal: boundary guard ok flags=0x8000004 mask=1$'
 
 [[expect]]

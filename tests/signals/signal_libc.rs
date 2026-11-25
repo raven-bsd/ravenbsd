@@ -265,6 +265,41 @@ fn row_fail(name: &[u8]) {
     debug_write(&line[..at]);
 }
 
+/// Emit the deployed public layout and fail if it differs from the installed sysroot header.
+///
+/// `tests/signals/build.sh` asserts the same size and offsets against
+/// `build/<arch>/sysroot/usr/include/signal.h` before this program is linked, so the two checks
+/// together bind this declaration to the installed public type rather than to a local mirror.
+fn layout_row() -> bool {
+    let size = core::mem::size_of::<Sigaction>();
+    let handler = core::mem::offset_of!(Sigaction, sa_handler);
+    let mask = core::mem::offset_of!(Sigaction, sa_mask);
+    let flags = core::mem::offset_of!(Sigaction, sa_flags);
+    let restorer = core::mem::offset_of!(Sigaction, sa_restorer);
+    let ok = size == PUBLIC_SIGACTION
+        && core::mem::size_of::<Sigset>() == 128
+        && handler == 0
+        && mask == 8
+        && flags == 136
+        && restorer == 144;
+    if !ok {
+        row_fail(b"layout");
+        return false;
+    }
+    debug_write(b"signal: layout ok size=");
+    debug_decimal(size as u32);
+    debug_write(b" handler=");
+    debug_decimal(handler as u32);
+    debug_write(b" mask=");
+    debug_decimal(mask as u32);
+    debug_write(b" flags=");
+    debug_decimal(flags as u32);
+    debug_write(b" restorer=");
+    debug_decimal(restorer as u32);
+    debug_write(b"\n");
+    true
+}
+
 /// Map `pages` zeroed writable pages.
 fn map(pages: usize) -> Option<usize> {
     // SAFETY: the libc mmap contract; no file descriptor is used with MAP_ANON.
@@ -1569,7 +1604,7 @@ fn run_provider() -> bool {
 }
 
 fn run_boundary() -> bool {
-    guard_row() && canary_row() && procmask_row()
+    layout_row() && guard_row() && canary_row() && procmask_row()
 }
 
 /// `crt1.o` calls this after `__raven_libc_start`; the return value is the service exit status.
