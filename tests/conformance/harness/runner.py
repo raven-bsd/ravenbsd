@@ -72,6 +72,21 @@ def read_table(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def read_mutations(path: Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 3:
+            raise HarnessError(f"{path}:{line_number}: expected three tab-separated fields")
+        rows.append({"name": fields[0], "row": fields[1], "requirement": fields[2]})
+    if not rows:
+        raise HarnessError(f"{path}: empty mutation table")
+    return rows
+
+
 def run_step(label: str, argv: list[str], timeout: int) -> tuple[int, str]:
     print(f"conformance: step={label} argv={argv} timeout={timeout}", flush=True)
     wrapped = ["timeout", str(timeout), *argv]
@@ -385,7 +400,7 @@ def main() -> int:
     topic = topic_dir.name
     try:
         rows = read_table(topic_dir / "rows.tsv")
-        mutations = read_table(topic_dir / "mutations.tsv")
+        mutations = read_mutations(topic_dir / "mutations.tsv")
         return build_and_run(args, topic_dir, topic, rows, mutations)
     except HarnessError as error:
         print(f"conformance: HARNESS-ERROR {error}", file=sys.stderr, flush=True)

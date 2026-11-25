@@ -34,7 +34,7 @@
 #include "conformance.h"
 
 #define TOPIC "descriptors"
-#define SELF "/bin/descriptor-conformance"
+#define SELF "/bin/conformance-probe"
 #define PATH_MAX_LOCAL 128
 
 static volatile sig_atomic_t sigpipe_seen;
@@ -504,22 +504,27 @@ static void row_eintr(struct conform_state *state) {
     errno = 0;
     ssize_t blocked = ok ? read(empty[0], buffer, sizeof(buffer)) : -1;
     int blocked_errno = errno;
+    int empty_signals = (int)sigalrm_seen;
     (void)alarm(0);
 
+    /* A pipe read returns the bytes that are available instead of blocking to fill the buffer,
+     * so the partial case asserts that a short read is data and never a spurious EINTR. */
     ok = ok && write_all(partial[1], "12", 2) == 0;
     sigalrm_seen = 0;
     (void)alarm(1);
     errno = 0;
     ssize_t short_count = ok ? read(partial[0], buffer, sizeof(buffer)) : -1;
     int short_errno = errno;
+    int partial_signals = (int)sigalrm_seen;
     (void)alarm(0);
 
-    ok = ok && blocked == -1 && blocked_errno == EINTR && short_count == 2 &&
-         (short_errno == 0 || short_errno == EINTR) && sigalrm_seen >= 1;
+    ok = ok && blocked == -1 && blocked_errno == EINTR && empty_signals >= 1 &&
+         short_count == 2 && short_errno == 0;
 
     conform_detail(detail, sizeof(detail),
-                   "empty=%zd errno=%d partial=%zd errno=%d signals=%d",
-                   blocked, blocked_errno, short_count, short_errno, (int)sigalrm_seen);
+                   "empty=%zd errno=%d signals=%d partial=%zd errno=%d partial_signals=%d",
+                   blocked, blocked_errno, empty_signals, short_count, short_errno,
+                   partial_signals);
     conform_check(state, "eintr", ok, detail);
     if (empty[0] >= 0) {
         close(empty[0]);
