@@ -33,7 +33,7 @@ const FIXTURE: &str = r#"/*
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-_Static_assert(EAGAIN == 11, "FreeBSD errno: EAGAIN is 35");
+_Static_assert(EAGAIN == 35, "FreeBSD errno: EAGAIN is 35");
 _Static_assert(SIGUSR1 == 30, "FreeBSD signal: SIGUSR1 is 30");
 _Static_assert(sizeof(sa_family_t) == 1, "FreeBSD sa_family_t is one byte");
 _Static_assert(
