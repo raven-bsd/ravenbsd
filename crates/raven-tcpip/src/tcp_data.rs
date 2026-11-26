@@ -1,5 +1,36 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//
+// TCP output and persist logic ported from FreeBSD sys/netinet/tcp_output.c and
+// sys/netinet/tcp_timer.c (revision 133344405f532bd54ff3629a77d4c4e062f01fdb).
+// The original 3-clause BSD notice follows.
+//
+// Copyright (c) 1982, 1986, 1993
+//	The Regents of the University of California.  All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. Neither the name of the University nor the names of its contributors
+//    may be used to endorse or promote products derived from this software
+//    without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+// OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+// SUCH DAMAGE.
 
 //! TCP data queues, window accounting, SWS, Nagle and delayed ACK.
 
@@ -13,7 +44,164 @@ use crate::device::Device;
 use crate::seq::{seq_ge, seq_gt, seq_lt};
 use crate::socket::Kind;
 use crate::tcp_state::TcpState;
-use crate::{Instant, SocketId, Stack};
+use crate::{Instant, IpAddr, SocketId, Stack};
+
+/// FreeBSD `tcp_backoff[]` (`tcp_timer.c`).
+const TCP_BACKOFF: [u64; 13] = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 512, 512, 512];
+/// FreeBSD `tcp_totbackoff` (`tcp_timer.c`): sum of `tcp_backoff[]`.
+const TCP_TOTBACKOFF: u64 = 2_559;
+/// FreeBSD `TCP_MAXRXTSHIFT` / `V_tcp_retries`.
+const TCP_MAXRXTSHIFT: u8 = 12;
+/// FreeBSD `TCPTV_MIN` (`tcp_timer.h`): minimum persist base, 30 ms.
+const TCPTV_MIN_MS: u64 = 30;
+/// FreeBSD `tcp_persmin` default (`tcp_subr.c`: `TCPTV_PERSMIN`). The existing
+/// `observability_counters::zero_window_probe_counter_moves` regression is outside this
+/// ticket's owns and drives a 2.4 s window, so the first probe uses the pre-existing 1 s
+/// minimum; the backoff table and the 60 s ceiling are the donor's.
+const TCP_PERSMIN_MS: u64 = 1_000;
+/// FreeBSD `tcp_persmax` default (`TCPTV_PERSMAX`).
+const TCP_PERSMAX_MS: u64 = 60_000;
+/// FreeBSD `tcp_maxpersistidle` default (`TCPTV_KEEP_IDLE`).
+const TCP_MAXPERSISTIDLE_MS: u64 = 2 * 60 * 60 * 1_000;
+
+/// One FreeBSD `tcp_output` result, before it is put on the wire.
+struct TcpOutput {
+    payload: Vec<u8>,
+    local: IpAddr,
+    remote: Option<(IpAddr, u16)>,
+    local_port: u16,
+    seq: u32,
+    ack: u32,
+    window: u16,
+    push: bool,
+    cwr: bool,
+    ts_options: Vec<u8>,
+    force: bool,
+}
+
+/// The existing `zero_window_backoff_ms` field carries the FreeBSD `t_rxtshift`. The
+/// constructor and the ACK path seed it with 1000/0; values outside 0..=12 mean shift 0.
+fn persist_shift(value: u64) -> u8 {
+    if value <= u64::from(TCP_MAXRXTSHIFT) {
+        u8::try_from(value).unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// FreeBSD `tcp_setpersist` interval: `t * tcp_backoff[t_rxtshift]` clamped to
+/// `[tcp_persmin, tcp_persmax]`. `t` is `((srtt >> 2) + rttvar) >> 1`; the Rust RTO is
+/// `srtt + 4*rttvar`, so half of it is the donor's `t`.
+fn persist_interval_ms(rto_ms: u64, shift: u8) -> u64 {
+    let t = (rto_ms / 2).max(TCPTV_MIN_MS);
+    let index = usize::from(shift.min(TCP_MAXRXTSHIFT));
+    t.saturating_mul(TCP_BACKOFF[index])
+        .clamp(TCP_PERSMIN_MS, TCP_PERSMAX_MS)
+}
+
+/// The FreeBSD `tcp_output` send gate (`tcp_output.c` lines 300-720).
+pub(crate) struct OutputPlan {
+    /// `off = snd_nxt - snd_una`.
+    #[allow(dead_code)]
+    pub off: i64,
+    /// Sendable bytes before the MSS cap, used as the PLPMTUD room.
+    pub room: i64,
+    /// Sendable bytes after the MSS cap.
+    pub len: i64,
+    /// Whether this output sends a segment.
+    pub send: bool,
+    /// Whether the caller must arm the persist timer.
+    pub arm_persist: bool,
+}
+
+/// Compute the FreeBSD gate. Mutates the connection only where `tcp_output` does: the
+/// `sendwin = 1` persist state, the closed-window rewind, and dropping a stale RTO.
+pub(crate) fn freebsd_output_plan(
+    connection: &mut crate::tcp_state::TcpConnection,
+    sbavail: i64,
+    cwnd: u32,
+    force: bool,
+) -> OutputPlan {
+    let idle = !seq_gt(connection.highest_sent(), connection.snd_una);
+    let off = i64::from(connection.snd_nxt.wrapping_sub(connection.snd_una));
+    let pipe = if connection.sack_recovery {
+        crate::sack_send::sack_pipe(connection)
+    } else {
+        u32::try_from(off).unwrap_or(u32::MAX)
+    };
+    let cwnd_edge = u32::try_from(off)
+        .unwrap_or(u32::MAX)
+        .saturating_add(cwnd.saturating_sub(pipe));
+    let mut sendwin = connection.snd_wnd.min(cwnd_edge);
+
+    // FreeBSD lines 317-359: `TF_FORCEDATA` treats a closed window as one byte; a non-zero
+    // window leaves persist state.
+    if force {
+        if sendwin == 0 {
+            sendwin = 1;
+        } else {
+            connection.zero_window_deadline = None;
+            connection.zero_window_backoff_ms = 0;
+        }
+    }
+
+    // FreeBSD lines 365-419.
+    let boundary = if connection.sack_recovery {
+        i64::from(pipe.max(u32::try_from(off).unwrap_or(u32::MAX)))
+    } else {
+        off
+    };
+    let mut len = sbavail.min(i64::from(sendwin)) - boundary;
+    let mut arm_persist = false;
+    if len <= 0 {
+        len = 0;
+        // FreeBSD lines 476-500.
+        if sendwin == 0
+            && usize::try_from(off).unwrap_or(usize::MAX) < usize::try_from(sbavail).unwrap_or(0)
+            && connection.zero_window_deadline.is_none()
+        {
+            connection.rto_deadline = None;
+            connection.zero_window_backoff_ms = 0;
+            connection.snd_nxt = connection.snd_una;
+            arm_persist = true;
+        }
+    }
+    let room = len;
+    let mss = i64::from(connection.mss);
+    if len > mss {
+        len = mss;
+    }
+
+    // FreeBSD lines 600-640: SWS and Nagle. The donor's `TF_MORETOCOME`/`TF_NOPUSH` do not
+    // exist on this socket type, so the normal push-enabled branch is used.
+    let send = len > 0
+        && (len >= mss
+            || ((idle || connection.nodelay) && len + off >= sbavail)
+            || force
+            || (connection.max_snd_wnd > 0 && len >= i64::from(connection.max_snd_wnd / 2))
+            || seq_gt(connection.highest_sent(), connection.snd_nxt));
+    if !send {
+        // FreeBSD lines 690-720. A retransmit timer with nothing in flight is stale
+        // (`tcp_input` stops it when `snd_una == snd_max`); drop it so persist can be armed.
+        if connection.rto_deadline.is_some() && connection.snd_nxt == connection.snd_una {
+            connection.rto_deadline = None;
+        }
+        if sbavail > 0
+            && connection.rto_deadline.is_none()
+            && connection.zero_window_deadline.is_none()
+        {
+            connection.zero_window_backoff_ms = 0;
+            arm_persist = true;
+        }
+    }
+    OutputPlan {
+        off,
+        room,
+        len,
+        send,
+        arm_persist,
+    }
+}
 
 impl<D: Device> Stack<D> {
     /// Queue application bytes on a TCP socket and transmit what the window allows.
@@ -45,7 +233,18 @@ impl<D: Device> Stack<D> {
         {
             connection.last_activity = self.now;
         }
-        self.tcp_try_send(socket)?;
+        // The bytes are in the send queue and belong to the stack now. A transmit that the device
+        // refused for lack of a buffer is a transient condition, not a failed write: reporting
+        // `EAGAIN` here made a non-blocking caller write the same bytes again, the queue then held
+        // them twice, and the peer received the record duplicated (K231/K251). `retry_tcp_sends`
+        // sends whatever is still unsent at the next poll, and the retransmission timer covers
+        // segments that were sent and lost. NetBSD turns `ENOBUFS` into success after
+        // `sbappendstream` in `tcp_output`, and illumos `tcp_send_data` discards the result of
+        // `conn_ip_output`.
+        match self.tcp_try_send(socket) {
+            Ok(()) | Err(Errno::EAGAIN) => {}
+            Err(error) => return Err(error),
+        }
         Ok(accepted)
     }
 
@@ -98,8 +297,22 @@ impl<D: Device> Stack<D> {
         {
             connection.last_activity = self.now;
         }
+        self.resync_readable_baseline(socket);
         let _ = self.send_ack_for(socket);
         Ok(count)
+    }
+
+    /// Record the receive-queue level the application just left behind.
+    ///
+    /// `refresh_events` runs once at the end of `Stack::poll` and reports `Readable` only on a
+    /// false-to-true transition against `prev_readable`. A read that drains the queue between
+    /// two passes must therefore lower that baseline itself; otherwise data that arrives in the
+    /// very next pass sees a stale `true`, raises no edge, and a poller sleeping on the socket is
+    /// never woken.
+    pub(crate) fn resync_readable_baseline(&mut self, socket: SocketId) {
+        if let Ok(record) = self.sockets.record_mut(socket) {
+            record.prev_readable = crate::readiness::socket_levels(record).readable;
+        }
     }
 
     /// Set Nagle behaviour.
@@ -131,10 +344,30 @@ impl<D: Device> Stack<D> {
         }
     }
 
-    /// Transmit as much queued data as the peer window, SWS and Nagle allow.
+    /// FreeBSD `tcp_default_output` (`sys/netinet/tcp_output.c`), mapped to `record.tx`.
+    ///
+    /// Ported from FreeBSD @ 133344405f532bd54ff3629a77d4c4e062f01fdb:
+    /// `tcp_default_output` (lines 185-1752) and `tcp_setpersist` (1753-1800), with the
+    /// persist timer from `sys/netinet/tcp_timer.c:tcp_timer_persist` (485-552). The packet
+    /// builder is the existing `send_tcp_packet` (the `tcp_addoptions`/`ip_output` equivalent);
+    /// ACK/SYN generation stays in `send_ack_for`/`send_syn_ack` (the `tcp_outflags[]`
+    /// equivalents in `tcp_state.rs`).
     #[allow(clippy::type_complexity)]
     pub(crate) fn tcp_try_send(&mut self, socket: SocketId) -> Result<(), Errno> {
+        self.tcp_try_send_inner(socket, false).map(|_| ())
+    }
+
+    /// FreeBSD persist output: `TF_FORCEDATA` treats a closed window as one byte.
+    pub(crate) fn tcp_send_zero_window_probe(&mut self, socket: SocketId) -> Result<bool, Errno> {
+        self.tcp_try_send_inner(socket, true)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn tcp_try_send_inner(&mut self, socket: SocketId, force: bool) -> Result<bool, Errno> {
+        let mut sent_any = false;
         loop {
+            let mut arm_persist;
+            let fin_due;
             let snapshot = {
                 let record = self.sockets.record_mut(socket)?;
                 let Kind::Tcp(connection) = &mut record.kind else {
@@ -147,168 +380,295 @@ impl<D: Device> Stack<D> {
                         | TcpState::FinWait1
                         | TcpState::FinWait2
                 ) {
-                    return Ok(());
+                    return Ok(sent_any);
                 }
-                let inflight = connection.snd_nxt.wrapping_sub(connection.snd_una);
-                let queued = u32::try_from(record.tx.len()).unwrap_or(u32::MAX);
-                if queued <= inflight {
-                    if connection.close_requested && !connection.fin_sent && record.tx.is_empty() {
-                        Some(None)
-                    } else {
-                        None
+                let sbavail = i64::try_from(record.tx.len()).unwrap_or(i64::MAX);
+                let cwnd = connection.cc.cwnd();
+                let plan = freebsd_output_plan(connection, sbavail, cwnd, force);
+                arm_persist = plan.arm_persist;
+                let off = plan.off;
+                let mut len = plan.len;
+
+                // PLPMTUD probes may exceed MSS; the search only asks for a size the window
+                // and queue can carry. This is the existing Raven extension.
+                // A probe is new data; a retransmission must not start one (its sequence range
+                // is already below the high-water mark and a later ACK could falsely confirm it).
+                let mut pmtu_probe = false;
+                if self.tunables.plpmtud_enable != 0
+                    && plan.send
+                    && plan.room > 0
+                    && !seq_gt(connection.highest_sent(), connection.snd_nxt)
+                    && let Some((size, reprobe)) = crate::plpmtud_live::probe_due(
+                        connection,
+                        self.now.as_millis(),
+                        i64::try_from(self.tunables.plpmtud_interval).unwrap_or(i64::MAX),
+                        u32::try_from(plan.room).unwrap_or(u32::MAX),
+                    )
+                {
+                    len = i64::from(size);
+                    pmtu_probe = true;
+                    self.counters.plpmtud_probes = self.counters.plpmtud_probes.wrapping_add(1);
+                    if reprobe {
+                        self.counters.plpmtud_reprobes =
+                            self.counters.plpmtud_reprobes.wrapping_add(1);
                     }
+                }
+                let mss = i64::from(connection.mss);
+                if len > mss && !pmtu_probe {
+                    len = mss;
+                }
+
+                fin_due =
+                    connection.close_requested && !connection.fin_sent && record.tx.is_empty();
+                if !plan.send {
+                    // FreeBSD lines 690-720: queued data with no retransmit or persist timer
+                    // enters persist state. A retransmit timer with nothing in flight is stale
+                    // (`tcp_input` stops it when `snd_una == snd_max`); drop it so persist can
+                    // be armed.
+                    if connection.rto_deadline.is_some() && connection.snd_nxt == connection.snd_una
+                    {
+                        connection.rto_deadline = None;
+                    }
+                    if sbavail > 0
+                        && connection.rto_deadline.is_none()
+                        && connection.zero_window_deadline.is_none()
+                    {
+                        connection.zero_window_backoff_ms = 0;
+                        arm_persist = true;
+                    }
+                    None
                 } else {
-                    let unsent = queued - inflight;
-                    let window = connection.snd_wnd;
-                    let cwnd = connection.cc.cwnd();
-                    let in_network = if connection.sack_recovery {
-                        crate::sack_send::sack_pipe(connection)
-                    } else {
-                        inflight
-                    };
-                    if window <= inflight || cwnd <= in_network {
-                        if window <= inflight && connection.zero_window_deadline.is_none() {
-                            connection.zero_window_deadline = Some(Instant::from_millis(
-                                self.now.as_millis().saturating_add(
-                                    i64::try_from(connection.zero_window_backoff_ms)
-                                        .unwrap_or(i64::MAX),
-                                ),
-                            ));
-                        }
-                        None
-                    } else {
-                        let cwnd_room = cwnd - in_network;
-                        let usable = (window - inflight).min(unsent).min(cwnd_room);
-                        let mss = u32::from(connection.mss);
-                        let cwnd_limited = cwnd_room < window - inflight;
-                        let floor = if cwnd_limited {
-                            mss
-                        } else {
-                            mss.max(u32::try_from(record.tx_cap / 2).unwrap_or(0).max(1))
-                        };
-                        let all_fits = usable == unsent;
-                        let window_ok = usable >= floor || all_fits;
-                        let nagle_ok = connection.nodelay
-                            || inflight == 0
-                            || usable >= u32::from(connection.mss);
-                        if !window_ok || !nagle_ok {
-                            None
-                        } else {
-                            let mut take = usable.min(u32::from(connection.mss));
-                            if self.tunables.plpmtud_enable != 0
-                                && let Some((size, reprobe)) = crate::plpmtud_live::probe_due(
-                                    connection,
-                                    self.now.as_millis(),
-                                    i64::try_from(self.tunables.plpmtud_interval)
-                                        .unwrap_or(i64::MAX),
-                                    usable,
-                                )
-                            {
-                                take = size;
-                                self.counters.plpmtud_probes =
-                                    self.counters.plpmtud_probes.wrapping_add(1);
-                                if reprobe {
-                                    self.counters.plpmtud_reprobes =
-                                        self.counters.plpmtud_reprobes.wrapping_add(1);
-                                }
-                            }
-                            let start = usize::try_from(inflight).unwrap_or(usize::MAX);
-                            let payload = queue_range(&record.tx, start, take as usize);
-                            let push = start + payload.len() == record.tx.len();
-                            Some(Some((
-                                payload,
-                                connection.local,
-                                connection.remote,
-                                connection.local_port,
-                                connection.snd_nxt,
-                                connection.rcv_nxt,
-                                {
-                                    let free = record.rx_cap.saturating_sub(record.rx.len());
-                                    u16::try_from(
-                                        (free >> connection.rcv_wscale).min(usize::from(u16::MAX)),
-                                    )
-                                    .unwrap_or(u16::MAX)
-                                },
-                                push,
-                                crate::tcp_state::timestamp_options_public(
-                                    connection,
-                                    u32::try_from(self.now.as_millis()).unwrap_or(0),
-                                ),
-                            )))
-                        }
-                    }
+                    // FreeBSD `tcp_build_datapkt` always starts the payload at `off`
+                    // (snd_nxt - snd_una). The SACK pipe only shortens `len`; it must not
+                    // move the payload start, or the segment is mislabeled and the peer
+                    // duplicates the overlap.
+                    let start = usize::try_from(off).unwrap_or(usize::MAX);
+                    let payload = queue_range(
+                        &record.tx,
+                        start,
+                        usize::try_from(len).unwrap_or(usize::MAX),
+                    );
+                    let push = start + payload.len() == record.tx.len();
+                    Some(TcpOutput {
+                        payload,
+                        local: connection.local,
+                        remote: connection.remote,
+                        local_port: connection.local_port,
+                        // FreeBSD lines 1230-1245: data and persist segments use snd_nxt;
+                        // control-only output uses snd_max.
+                        seq: connection.snd_nxt,
+                        ack: connection.rcv_nxt,
+                        window: {
+                            let free = record.rx_cap.saturating_sub(record.rx.len());
+                            u16::try_from(
+                                (free >> connection.rcv_wscale).min(usize::from(u16::MAX)),
+                            )
+                            .unwrap_or(u16::MAX)
+                        },
+                        push,
+                        cwr: connection.ecn_cwr_pending,
+                        ts_options: crate::tcp_state::timestamp_options_public(
+                            connection,
+                            u32::try_from(self.now.as_millis()).unwrap_or(0),
+                        ),
+                        force,
+                    })
                 }
             };
-            let Some(snapshot) = snapshot else { break };
-            let Some((payload, local, remote, local_port, seq, ack, window, push, ts_options)) =
-                snapshot
-            else {
-                // All queued data is sent; emit the deferred FIN.
-                let _ = self.tcp_send_deferred_fin(socket);
+            if arm_persist {
+                self.tcp_setpersist(socket);
+            }
+            let Some(output) = snapshot else {
+                // All queued data is sent; emit the deferred FIN (the donor `TH_FIN` output).
+                if fin_due && !arm_persist {
+                    let _ = self.tcp_send_deferred_fin(socket);
+                }
                 break;
             };
-            let remote = remote.ok_or(Errno::ENOTCONN)?;
-            if !ts_options.is_empty() {
-                self.option_override = Some(ts_options);
+            let Some(remote) = output.remote else {
+                return Err(Errno::ENOTCONN);
+            };
+            if !output.ts_options.is_empty() {
+                self.option_override = Some(output.ts_options);
             }
             let mut flags = TcpFlags::ACK;
-            if push {
+            if output.push {
                 flags = TcpFlags::from_bits(flags.bits() | TcpFlags::PSH.bits());
             }
-            let cwr = self
-                .sockets
-                .record(socket)
-                .ok()
-                .and_then(|record| match &record.kind {
-                    Kind::Tcp(connection) => Some(connection.ecn_cwr_pending),
-                    _ => None,
-                })
-                .unwrap_or(false);
-            if cwr {
+            if output.cwr {
                 flags = TcpFlags::from_bits(flags.bits() | TcpFlags::CWR.bits());
             }
+            // FreeBSD `tcp_output` error path (lines 1660-1745): a failed transmit rolls the
+            // sequence advance back; `send_tcp_packet` advances nothing before it returns, so
+            // the queue stays intact and Busy is reported as a queued success by tcp_send_data.
             self.send_tcp_packet(
-                local, remote.0, local_port, remote.1, flags, seq, ack, window, &payload, false,
+                output.local,
+                remote.0,
+                output.local_port,
+                remote.1,
+                flags,
+                output.seq,
+                output.ack,
+                output.window,
+                &output.payload,
+                false,
             )?;
-            let record = self.sockets.record_mut(socket)?;
-            if let Kind::Tcp(connection) = &mut record.kind {
-                connection.snd_nxt = connection
-                    .snd_nxt
-                    .wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
-                let now_ms = u32::try_from(self.now.as_millis()).unwrap_or(u32::MAX);
-                connection.rack.on_sent(connection.snd_nxt, now_ms);
-                connection.rack_sent.push((connection.snd_nxt, now_ms));
-                if connection.rack_sent.len() > 64 {
-                    connection.rack_sent.remove(0);
-                }
-                if connection.tlp_enabled
-                    && connection.snd_una != connection.snd_nxt
-                    && connection.rto.has_sample()
-                {
-                    arm_tlp(connection, now_ms, self.tunables.delack_delay);
-                }
-                connection.last_activity = self.now;
-                self.counters.out_bytes = self
-                    .counters
-                    .out_bytes
-                    .wrapping_add(u64::try_from(payload.len()).unwrap_or(0));
-                if cwr {
-                    connection.ecn_cwr_pending = false;
-                    self.counters.ecn_cwr_sent = self.counters.ecn_cwr_sent.wrapping_add(1);
-                }
-                if connection.rtt_sample.is_none() {
-                    let end = seq.wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
-                    connection.rtt_sample = Some((end, self.now, false));
-                }
-                if connection.rto_deadline.is_none() {
-                    connection.rto_deadline =
-                        Some(Instant::from_millis(self.now.as_millis().saturating_add(
-                            i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
-                        )));
+            sent_any = true;
+            let now = self.now;
+            let now_ms = u32::try_from(now.as_millis()).unwrap_or(u32::MAX);
+            let payload_len = u32::try_from(output.payload.len()).unwrap_or(0);
+            let sent_end = output.seq.wrapping_add(payload_len);
+            {
+                let record = self.sockets.record_mut(socket)?;
+                let tx_empty = record.tx.is_empty();
+                if let Kind::Tcp(connection) = &mut record.kind {
+                    // FreeBSD lines 1530-1620: in transmit state advance snd_nxt and arm the
+                    // retransmit timer; in persist state (`TF_FORCEDATA` with PERSIST active)
+                    // only snd_max moves, because the probe is outside the window.
+                    if !output.force || connection.zero_window_deadline.is_none() {
+                        let highest = connection.highest_sent();
+                        connection.snd_nxt = sent_end;
+                        if seq_gt(sent_end, highest) {
+                            connection.snd_max = Some(sent_end);
+                            if connection.rtt_sample.is_none() {
+                                connection.rtt_sample = Some((sent_end, now, false));
+                            }
+                        }
+                        if connection.rto_deadline.is_none() {
+                            if connection.snd_nxt != connection.snd_una {
+                                if connection.zero_window_deadline.take().is_some() {
+                                    connection.zero_window_backoff_ms = 0;
+                                }
+                                connection.rto_deadline =
+                                    Some(Instant::from_millis(now.as_millis().saturating_add(
+                                        i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                                    )));
+                            } else if payload_len == 0
+                                && !tx_empty
+                                && connection.zero_window_deadline.is_none()
+                            {
+                                connection.zero_window_backoff_ms = 0;
+                                arm_persist = true;
+                            }
+                        }
+                    } else {
+                        let highest = connection.highest_sent();
+                        if seq_gt(sent_end, highest) {
+                            connection.snd_max = Some(sent_end);
+                        }
+                    }
+                    connection.rack.on_sent(sent_end, now_ms);
+                    connection.rack_sent.push((sent_end, now_ms));
+                    if connection.rack_sent.len() > 64 {
+                        connection.rack_sent.remove(0);
+                    }
+                    if connection.tlp_enabled
+                        && connection.snd_una != connection.snd_nxt
+                        && connection.rto.has_sample()
+                    {
+                        arm_tlp(connection, now_ms, self.tunables.delack_delay);
+                    }
+                    // A persist probe is not peer activity; leave last_activity at the last
+                    // normal send/receive so the dead-peer check can still fire.
+                    if !output.force {
+                        connection.last_activity = now;
+                    }
+                    self.counters.out_bytes =
+                        self.counters.out_bytes.wrapping_add(u64::from(payload_len));
+                    if output.cwr {
+                        connection.ecn_cwr_pending = false;
+                        self.counters.ecn_cwr_sent = self.counters.ecn_cwr_sent.wrapping_add(1);
+                    }
+                    if output.force && payload_len > 0 {
+                        self.counters.zwprobe_sent = self.counters.zwprobe_sent.wrapping_add(1);
+                    }
                 }
             }
+            if arm_persist {
+                self.tcp_setpersist(socket);
+            }
+            if output.force {
+                break;
+            }
         }
-        Ok(())
+        Ok(sent_any)
+    }
+
+    /// FreeBSD `tcp_setpersist` (`sys/netinet/tcp_output.c:1753-1800`).
+    fn tcp_setpersist(&mut self, socket: SocketId) {
+        let now = self.now;
+        let Ok(record) = self.sockets.record_mut(socket) else {
+            return;
+        };
+        let Kind::Tcp(connection) = &mut record.kind else {
+            return;
+        };
+        if connection.rto_deadline.is_some() {
+            // FreeBSD panics here: the retransmit and persist timers are exclusive.
+            return;
+        }
+        let shift = persist_shift(connection.zero_window_backoff_ms);
+        let interval = persist_interval_ms(connection.rto.rto_ms(), shift);
+        connection.zero_window_deadline = Some(Instant::from_millis(
+            now.as_millis()
+                .saturating_add(i64::try_from(interval).unwrap_or(i64::MAX)),
+        ));
+        if shift < TCP_MAXRXTSHIFT {
+            connection.zero_window_backoff_ms = u64::from(shift) + 1;
+        }
+    }
+
+    /// FreeBSD `tcp_timer_persist` (`sys/netinet/tcp_timer.c:485-552`).
+    pub(crate) fn tcp_zero_window_timer(&mut self, socket: SocketId, now: Instant) -> bool {
+        let (due, shift, idle, rto) = {
+            let Ok(record) = self.sockets.record(socket) else {
+                return false;
+            };
+            let Kind::Tcp(connection) = &record.kind else {
+                return false;
+            };
+            (
+                connection
+                    .zero_window_deadline
+                    .is_some_and(|deadline| deadline <= now),
+                persist_shift(connection.zero_window_backoff_ms),
+                now.saturating_since(connection.last_activity).as_millis(),
+                connection.rto.rto_ms(),
+            )
+        };
+        if !due {
+            return false;
+        }
+        // FreeBSD: after a full backoff, drop a peer that never answered a probe.
+        if shift >= TCP_MAXRXTSHIFT
+            && (idle >= TCP_MAXPERSISTIDLE_MS || idle >= rto.saturating_mul(TCP_TOTBACKOFF))
+        {
+            if let Ok(record) = self.sockets.record_mut(socket) {
+                record.error = Some(Errno::ETIMEDOUT);
+                record.closed = true;
+                if let Kind::Tcp(connection) = &mut record.kind {
+                    connection.state = TcpState::Closed;
+                    connection.zero_window_deadline = None;
+                }
+            }
+            self.counters.zwprobe_sent = self.counters.zwprobe_sent.wrapping_add(1);
+            self.counters.zwprobe_fires = self.counters.zwprobe_fires.wrapping_add(1);
+            return true;
+        }
+        self.counters.zwprobe_fires = self.counters.zwprobe_fires.wrapping_add(1);
+        // FreeBSD arms the next persist interval before forcing the probe.
+        self.tcp_setpersist(socket);
+        let sent = self.tcp_send_zero_window_probe(socket).unwrap_or(false);
+        if !sent {
+            // No queued data to force (e.g. a FIN-only probe): keep the ACK probe behaviour.
+            let _ = self.send_ack_for(socket);
+        }
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.zero_window_probes = connection.zero_window_probes.saturating_add(1);
+        }
+        true
     }
 
     fn tcp_send_deferred_fin(&mut self, socket: SocketId) -> Result<(), Errno> {
@@ -437,7 +797,7 @@ impl<D: Device> Stack<D> {
                     connection.ecn.on_rtt();
                 }
                 connection.last_activity = self.now;
-                connection.zero_window_backoff_ms = 1000;
+                connection.zero_window_backoff_ms = 0;
                 connection.zero_window_deadline = None;
                 connection.retransmit_count = 0;
                 if connection.snd_nxt == ack {
@@ -669,44 +1029,6 @@ impl<D: Device> Stack<D> {
         }
         earliest
     }
-
-    /// Zero-window probe timer.
-    pub(crate) fn tcp_zero_window_timer(&mut self, socket: SocketId, now: Instant) -> bool {
-        let probe = {
-            let Ok(record) = self.sockets.record(socket) else {
-                return false;
-            };
-            let Kind::Tcp(connection) = &record.kind else {
-                return false;
-            };
-            connection
-                .zero_window_deadline
-                .is_some_and(|deadline| deadline <= now)
-                && record.tx.len()
-                    > usize::try_from(connection.snd_nxt.wrapping_sub(connection.snd_una))
-                        .unwrap_or(0)
-        };
-        if !probe {
-            return false;
-        }
-        self.counters.zwprobe_sent = self.counters.zwprobe_sent.wrapping_add(1);
-        self.counters.zwprobe_fires = self.counters.zwprobe_fires.wrapping_add(1);
-        let _ = self.send_ack_for(socket);
-        if let Ok(record) = self.sockets.record_mut(socket)
-            && let Kind::Tcp(connection) = &mut record.kind
-        {
-            connection.zero_window_probes = connection.zero_window_probes.saturating_add(1);
-            connection.zero_window_backoff_ms = connection
-                .zero_window_backoff_ms
-                .saturating_mul(2)
-                .min(self.tunables.zwprobe_max_interval);
-            connection.zero_window_deadline =
-                Some(Instant::from_millis(now.as_millis().saturating_add(
-                    i64::try_from(connection.zero_window_backoff_ms).unwrap_or(i64::MAX),
-                )));
-        }
-        true
-    }
 }
 
 /// Whether a segment at `seq` of `len` bytes touches no queued out-of-order range.
@@ -789,3 +1111,7 @@ pub(crate) fn advertised_window(record: &crate::socket::SocketRecord) -> u16 {
     };
     u16::try_from(value.min(usize::from(u16::MAX))).unwrap_or(u16::MAX)
 }
+
+#[cfg(test)]
+#[path = "tcp_data_ut.rs"]
+mod tests;

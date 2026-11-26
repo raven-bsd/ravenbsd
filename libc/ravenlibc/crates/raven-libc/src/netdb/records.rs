@@ -414,6 +414,16 @@ fn with_env<R>(f: impl FnOnce(&raven_libc_resolv::Env<'_>, &HostOrder) -> R) -> 
     f(&env, &order)
 }
 
+/// `res_query` over the process resolver seam.
+pub(crate) fn resolver_query(
+    name: &[u8],
+    class: u16,
+    rtype: u16,
+    answer: &mut [u8],
+) -> Result<usize, raven_libc_resolv::ResError> {
+    with_env(|env, _order| raven_libc_resolv::res_query(name, class, rtype, answer, env))
+}
+
 /// Look up a host by name.
 pub(crate) fn host_by_name(name: &[u8], af: i32) -> Option<HostEnt> {
     let name = core::str::from_utf8(name).ok()?;

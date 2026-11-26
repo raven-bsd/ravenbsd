@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K414: the UFS server session. getty restarts after a normal shell exit, the account
+# files and the colour profile come from the image, and the resident services stay up.
+
+[[initfs.programs]]
+package = "raven-getty"
+path = "/bin/getty"
+
+[[initfs.programs]]
+package = "login"
+path = "/bin/login"
+
+[[initfs.files]]
+src = "profiles/0.1.0-ufs.d/getty.manifest"
+path = "/etc/services.d/getty.toml"
+
+[[initfs.files]]
+src = "etc/passwd"
+path = "/etc/passwd"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/group"
+path = "/etc/group"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/shadow"
+path = "/etc/shadow"
+mode = 0o600
+
+[[initfs.files]]
+src = "profiles/0.1.0-ufs.d/profile"
+path = "/etc/profile"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/motd"
+path = "/etc/motd"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/0.1.0-ufs.d/rc.conf"
+path = "/etc/rc.conf"
+
+[[initfs.files]]
+src = "profiles/0.1.0-ufs.d/svcd.conf"
+path = "/etc/svcd.conf"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/release.d/autologin.conf"
+path = "/etc/raven/autologin.toml"
+mode = 0o644
+
+[[initfs.files]]
+src = "profiles/release.d/home-raven.keep"
+path = "/home/raven/.keep"
+mode = 0o644

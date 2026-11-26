@@ -157,8 +157,22 @@ pub fn copy_from_user(destination: &mut [u8], source: UserSlice) -> Result<(), E
     if length == 0 {
         return Ok(());
     }
-    // SAFETY: the range was validated by `UserSlice`; the assembly routine can fault on a missing
-    // user page, in which case the fixup table redirects it to `copy_from_user_fault`.
+    #[cfg(target_arch = "x86_64")]
+    {
+        // CPL0 `rep movsb` reads a supervisor-only leaf; check the active user root before the
+        // copy so `PROT_NONE` (and any other present non-user leaf) returns EFAULT.
+        let root = crate::sched::context::read_cr3();
+        if !crate::memory::uspace::user_range_user_accessible(
+            root,
+            source.address(),
+            source.length(),
+        ) {
+            return Err(Errno::EFAULT);
+        }
+    }
+    // SAFETY: the range was validated by `UserSlice` and the x86-64 leaf check above; the
+    // assembly routine can still fault on a missing user page, in which case the fixup table
+    // redirects it to `copy_from_user_fault`.
     let result = unsafe {
         copy_from_user_asm(
             destination.as_mut_ptr(),

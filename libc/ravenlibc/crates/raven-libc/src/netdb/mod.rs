@@ -4,13 +4,10 @@
 //! The name-service family of the C-ABI shell (C64 4.7, rows P02/P18/P19/X40/X41/X43/X44/Z14).
 //!
 //! The pure codec exports (`inet_*`, `hton*`, `dn_*`, `ns_get/put`, `res_init`, `gai_strerror`,
-//! `hstrerror`, `herror`, `h_errno`) go through C51's `raven-libc-resolv`. The calls that need
-//! C63's `Net`/`Env` seam — `getaddrinfo`, the host/service/protocol/network iterators,
-//! `getifaddrs`, `if_*`, `res_query`/`res_send` and `res_mkquery` (query entropy) — are
-//! deferred because `raven-libc-net` is not merged on `carl/libc`; every name is in
-//! `expected/DEFERRED.txt` with that reason. `ns_initparse`/`ns_parserr` are deferred too: C51's
-//! `NsMsg` owns a borrowed slice and cannot be reconstructed from the pointer-bearing C
-//! `ns_msg`; the pointer builders (`ns_get16`/`ns_put32`/`ns_skiprr`) are exported.
+//! `hstrerror`, `herror`, `h_errno`) go through C51's `raven-libc-resolv`. The runtime calls
+//! (`getaddrinfo`, `getifaddrs`/`freeifaddrs`, `res_query`/`__res_state`, the host/service/
+//! protocol/network iterators) use the merged `raven-libc-net` `Net`/`Env` seam. `res_querydomain`
+//! and the `ns_initparse`/`ns_parserr` pair remain deferred.
 
 #[path = "gethostbyname.rs"]
 pub(crate) mod host;
@@ -40,6 +37,7 @@ pub(crate) mod __h_errno_location;
 pub(crate) mod dn_expand;
 pub(crate) mod dn_skipname;
 pub(crate) mod gai_strerror;
+pub(crate) mod getifaddrs;
 pub(crate) mod h_errno;
 pub(crate) mod herror;
 pub(crate) mod hstrerror;
@@ -69,3 +67,5 @@ pub(crate) mod ns_skiprr;
 pub(crate) mod ntohl;
 pub(crate) mod ntohs;
 pub(crate) mod res_init;
+pub(crate) mod res_query;
+pub(crate) mod res_state;

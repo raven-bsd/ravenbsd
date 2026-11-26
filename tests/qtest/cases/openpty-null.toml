@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K499: openpty NULL-name semantics. OpenSSH calls openpty(..., NULL, NULL, NULL); FreeBSD/NetBSD
+# libutil make the name optional. The fixture also asserts NULL master/slave -> EINVAL, two
+# consecutive NULL calls get distinct pairs, a non-NULL name still fills the path, and ptyd reports
+# files=0 pairs=0 after the closes.
+
+name = "openpty-null"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh openpty-null"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^openpty-null: start uid=0$'
+
+[[expect]]
+regex = '^openpty-null: null-name master=[0-9]+ slave=[0-9]+ pts=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^openpty-null: null-name roundtrip=ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^openpty-null: null-master rc=-1 errno=22$'
+
+[[expect]]
+regex = '^openpty-null: null-slave rc=-1 errno=22$'
+
+[[expect]]
+regex = '^openpty-null: consecutive first=[0-9]+/[0-9]+ pts=/dev/pts/[0-9]+ second=[0-9]+/[0-9]+ pts=/dev/pts/[0-9]+ distinct=ok$'
+
+[[expect]]
+regex = '^openpty-null: named name=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^openpty-null: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|openpty-null: fail'

@@ -50,6 +50,42 @@ cargo xtask qtest --case ufs-disk-persist --arch x86_64
 cargo xtask qtest --case ufs-disk-ufs1 --arch x86_64
 ```
 
+## Interactive QEMU demo
+
+One command boots the full `ufs-demo` image with the UFS2 disk attached and leaves the serial
+console interactive:
+
+```sh
+sh scripts/qemu-ufs.sh
+```
+
+The first run prepares `build/fixtures/ufs-demo/disk.img` if it is missing and builds
+`build/ufs-demo/ufs-demo.img` for the current commit; later runs reuse the disk and the image.
+`UFS_DEMO_REBUILD=1` recreates both. The script prints the image, disk, commit and transcript
+paths before boot. The guest recipe is:
+
+```text
+login: root / raven
+lsblk
+gpart show block:0
+mount ufs: /mnt
+echo hello > /mnt/demo.txt
+cat /mnt/demo.txt
+umount /mnt
+exit
+```
+
+`lsblk` must show `block0p1 ... ufs-root`; `gpart show block:0` shows the GPT scheme. Run
+`sh scripts/qemu-ufs.sh` a second time **without** recreating the disk, mount `ufs: /mnt` again
+and `cat /mnt/demo.txt` to show the file survives. The image is built with
+`console=ttyS0 test-exit=1` (the same serial-exit contract as `ufs-disk`); the guest `exit 0`
+maps QEMU's `isa-debug-exit` success status 33 to shell status 0; any other status is propagated.
+
+Environment overrides: `UFS_DEMO_LOG` (default `build/ufs-demo/qemu.log`), `UFS_DEMO_IMAGE`
+(default `build/ufs-demo/ufs-demo.img`), `UFS_DEMO_REBUILD`, `RAVEN_OVMF_CODE`,
+`RAVEN_OVMF_VARS`. The script uses the same `-nic none` + virtio-net and virtio-blk arguments as
+the `ufs-disk` qtest; it does not change the qtest cases or the release profile.
+
 The first case's `pre` calls `scripts/ufs-demo.sh --prepare`, so the disk is recreated for each
 first-boot run. The persistence case has no `pre`: it must run after `ufs-disk` so it sees the
 written disk.

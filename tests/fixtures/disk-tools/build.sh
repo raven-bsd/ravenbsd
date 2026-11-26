@@ -17,24 +17,46 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
+arch=${RAVEN_QT_ARCH:-${1:-x86_64}}
+case "$arch" in
+    x86_64)
+        target=x86_64-unknown-none
+        linker=$root/userland/linker/x86_64.ld
+        ;;
+    aarch64)
+        target=aarch64-unknown-none-softfloat
+        linker=$root/userland/linker/aarch64.ld
+        ;;
+    *)
+        echo "disk-tools: unsupported arch $arch" >&2
+        exit 2
+        ;;
+esac
+
 out=build/fixtures/disk-tools
-tools=$out/tools
+tools=$out/$arch/tools
 payload=$out/blank.img
 image=$out/scratch.img
 
-echo "disk-tools: building static tools"
+echo "disk-tools: building static tools for $arch"
 rm -rf "$tools"
 mkdir -p "$tools"
-RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld" \
+RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$linker" \
     cargo build -p lsblk -p newfs -p gpart -p raven-svcctl -p raven-mount -p raven-umount \
-        --target x86_64-unknown-none --release
+        --target "$target" --release
 target_dir=${CARGO_TARGET_DIR:-target}
 for tool in lsblk newfs gpart; do
-    cp "$target_dir/x86_64-unknown-none/release/$tool" "$tools/$tool"
+    cp "$target_dir/$target/release/$tool" "$tools/$tool"
 done
-cp "$target_dir/x86_64-unknown-none/release/raven-svcctl" "$tools/disk-tool-svcctl"
-cp "$target_dir/x86_64-unknown-none/release/raven-mount" "$tools/disk-tool-mount"
-cp "$target_dir/x86_64-unknown-none/release/raven-umount" "$tools/disk-tool-umount"
+cp "$target_dir/$target/release/raven-svcctl" "$tools/disk-tool-svcctl"
+cp "$target_dir/$target/release/raven-mount" "$tools/disk-tool-mount"
+cp "$target_dir/$target/release/raven-umount" "$tools/disk-tool-umount"
+
+# The UFS demo profile still stages the legacy arch-less path; keep it as an x86_64 mirror.
+if [ "$arch" = x86_64 ]; then
+    rm -rf "$out/tools"
+    cp -a "$tools" "$out/tools"
+fi
 
 echo "disk-tools: creating $image (16 MiB blank payload + GPT)"
 rm -f "$payload" "$image"

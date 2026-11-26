@@ -10,5 +10,37 @@ src = "etc/services.d/vfsd.toml"
 path = "/etc/services.d/vfsd.toml"
 
 [[initfs.files]]
-src = "etc/mounts"
+src = "profiles/shell.d/mounts"
 path = "/etc/mounts"
+
+# K175: /etc/mounts mounts /dev/null, /dev/zero, /dev/random and /dev/urandom, so every profile
+# that inherits this fragment needs the parent directory and a visible mount point for each.
+# The initfs builder creates parent directories for staged files; the bytes of these placeholders
+# are never visible after vfsd mounts the device over the path.
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/null"
+
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/zero"
+
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/random"
+
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/urandom"
+
+# K536 rev181: the pty namespace. `/dev/pts` is a directory mount point for the `pty:` scheme;
+# `/dev/pts/<N>` resolves to the live slave pair through the pty server. `/dev/tty` is the
+# per-process controlling-terminal path (resolved by libc/kernel), with the placeholder so the
+# name exists before the first `/dev/tty` open.
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/pts/.keep"
+
+[[initfs.files]]
+src = "profiles/shell.d/mounts"
+path = "/dev/tty"

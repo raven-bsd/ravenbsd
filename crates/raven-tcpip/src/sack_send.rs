@@ -14,7 +14,7 @@ use raven_tcpip_wire::tcp::TcpFlags;
 
 use crate::device::Device;
 use crate::sack::{NextKind, SackScoreboard};
-use crate::seq::{seq_ge, seq_gt, seq_lt};
+use crate::seq::{seq_gt, seq_lt};
 use crate::socket::Kind;
 use crate::tcp_data::advertised_window;
 use crate::tcp_state::TcpConnection;
@@ -36,32 +36,45 @@ pub(crate) fn merge_sack_blocks(connection: &mut TcpConnection, blocks: &[(u32, 
     }
     let una = connection.snd_una;
     let nxt = connection.highest_sent();
+    let high_data = nxt.wrapping_sub(una);
+    let high_rxt = if seq_gt(connection.high_rxt, una) {
+        connection.high_rxt.wrapping_sub(una)
+    } else {
+        0
+    };
+    let mut board = SackScoreboard::new(
+        high_data,
+        high_rxt,
+        0,
+        u32::from(connection.mss),
+        dup_threshold(connection),
+        MAX_SACKED_RANGES,
+    );
+    board.sacked = connection
+        .sacked
+        .iter()
+        .map(|(start, end)| (start.wrapping_sub(una), end.wrapping_sub(una)))
+        .collect();
     let before = sacked_bytes(&connection.sacked);
-    for &(left, right) in blocks {
-        let left = if seq_lt(left, una) { una } else { left };
-        let right = if seq_gt(right, nxt) { nxt } else { right };
+    let mut converted: Vec<(i64, i64)> = Vec::with_capacity(blocks.len());
+    for (left, right) in blocks {
+        let left = if seq_lt(*left, una) { una } else { *left };
+        let right = if seq_gt(*right, nxt) { nxt } else { *right };
         if !seq_gt(right, left) || !seq_gt(right, una) {
             continue;
         }
-        connection.sacked.push((left, right));
+        converted.push((
+            i64::from(left) - i64::from(una),
+            i64::from(right) - i64::from(una),
+        ));
     }
-    connection
+    converted.sort_unstable_by_key(|(left, _)| *left);
+    board.add_blocks(0, high_data, &converted);
+    connection.sacked = board
         .sacked
-        .sort_unstable_by_key(|(start, _)| start.wrapping_sub(una));
-    let mut merged: Vec<(u32, u32)> = Vec::with_capacity(connection.sacked.len());
-    for &(start, end) in &connection.sacked {
-        if let Some(last) = merged.last_mut()
-            && seq_ge(last.1, start)
-        {
-            if seq_gt(end, last.1) {
-                last.1 = end;
-            }
-            continue;
-        }
-        merged.push((start, end));
-    }
-    merged.truncate(MAX_SACKED_RANGES);
-    connection.sacked = merged;
+        .iter()
+        .map(|(start, end)| (start.wrapping_add(una), end.wrapping_add(una)))
+        .collect();
     sacked_bytes(&connection.sacked) > before
 }
 
@@ -109,6 +122,7 @@ pub(crate) fn scoreboard(connection: &TcpConnection) -> SackScoreboard {
         .iter()
         .map(|(start, end)| (start.wrapping_sub(una), end.wrapping_sub(una)))
         .collect();
+    board.update_lostseq(0);
     board
 }
 

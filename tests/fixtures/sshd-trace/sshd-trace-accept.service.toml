@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K547 accepted-fd probe: one guest process owns the tap listener (23147) and a
+# loopback listener (23148), logs fstat/getsockopt/write for both accepted fds
+# through the kernel debug writer, and exits. Test-only service.
+
+name = "sshd-trace-accept"
+exec = "/bin/sshd-trace-accept"
+args = ["/bin/sshd-trace-accept"]
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

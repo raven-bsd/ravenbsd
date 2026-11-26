@@ -7,8 +7,8 @@
 # The four tools the login shell runs are staged statically: the release userland is dynamic
 # PIE, and libc `posix_spawn` cannot load an interpreter image through `raven-spawn`
 # (`spawn_image_with_fdmap` refuses it), so a dynamic `/bin/lsblk` would not execute from the
-# shell. `tests/fixtures/disk-tools/build.sh` builds them from the same sources; S99 uses the
-# same static staging for the UFS demo. `disk-tool-svcctl`/`-mount`/`-umount` are the same
+# shell. `tests/fixtures/disk-tools/build.sh` builds them from the same sources per target arch;
+# S99 uses the same static staging for the UFS demo. `disk-tool-svcctl`/`-mount`/`-umount` are the same
 # first-party tools at test-only paths (their normal `/bin/svcctl` and `/sbin/mount` paths are
 # owned by the shell fragment).
 #
@@ -18,37 +18,37 @@
 # now that svcd grants the late scheme prefixes.
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/lsblk"
+src = "build/fixtures/disk-tools/{arch}/tools/lsblk"
 path = "/bin/lsblk"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/newfs"
+src = "build/fixtures/disk-tools/{arch}/tools/newfs"
 path = "/sbin/newfs"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/gpart"
+src = "build/fixtures/disk-tools/{arch}/tools/gpart"
 path = "/sbin/gpart"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/disk-tool-svcctl"
+src = "build/fixtures/disk-tools/{arch}/tools/disk-tool-svcctl"
 path = "/sbin/disk-tool-svcctl"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/disk-tool-mount"
+src = "build/fixtures/disk-tools/{arch}/tools/disk-tool-mount"
 path = "/sbin/disk-tool-mount"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/disk-tool-umount"
+src = "build/fixtures/disk-tools/{arch}/tools/disk-tool-umount"
 path = "/sbin/disk-tool-umount"
 mode = 0o755
 generated = true

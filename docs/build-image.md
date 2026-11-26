@@ -16,13 +16,16 @@ The image and initfs paths call `xtask::initfs::ensure_prerequisites` before pac
 | Order | Prerequisite | Staged by | Outputs |
 |---|---|---|---|
 | 1 | libc pack | `cargo xtask libc-pack --arch <arch>` | `build/<arch>/libc.a`, `crt1.o`, `crti.o`, `crtn.o` |
-| 2 | brush | `cargo xtask build brush --arch <arch>` | `build/<arch>/brush` |
-| 3 | uutils slice | `cargo xtask build uutils --arch <arch>` | `build/<arch>/uutils/<name>` |
+| 2 | dynamic link | `cargo xtask libc-link --arch <arch>` | `build/<arch>/libc.so.1`, `ld-elf.so.1`, `loader-manifest.toml` |
+| 3 | brush | `cargo xtask build brush --arch <arch>` | `build/<arch>/brush` |
+| 4 | uutils slice | `cargo xtask build uutils --arch <arch>` | `build/<arch>/uutils/<name>` |
 
 Rules:
 
-* libc is built only when the resolved profile stages a libc consumer (brush or uutils), and only
-  when an archive/crt output is missing. A base image with neither does not pay for it.
+* libc is built only when the resolved profile stages a libc consumer (brush or uutils) or enables
+  `dynamic`; a base image with neither does not pay for it.
+* A dynamic profile also needs the `libc.so.1`/`ld-elf.so.1` pair and its manifest. An existing
+  loader without a matching manifest is relinked, not reused.
 * brush is built only when the profile stages `build/brush` (legacy profile spelling) or
   `build/<arch>/brush`, and the arch-correct binary is missing.
 * uutils is built only when the profile stages `build/<arch>/uutils/<name>` and a name is missing
@@ -30,6 +33,45 @@ Rules:
 * Each step runs at most once per image/initfs invocation and in the order above, so brush and
   uutils always see the libc archive and crt objects they link against.
 * A complete staging tree skips every build; normal incremental images stay fast.
+
+## Release loader freshness (K131)
+
+A release profile is a production image, so its dynamic runtime must come from the current
+sources. `ensure_prerequisites` removes `build/<arch>/libc.so.1`, `build/<arch>/ld-elf.so.1` and
+`build/<arch>/loader-manifest.toml` together with the brush/uutils staging and target caches before
+it plans the build. `libc-link` therefore always runs and produces a fresh loader.
+
+After linking, `libc-link` always runs the loader side of the K7 ELF gate and fails the build on a
+mismatch:
+
+* the first `PT_LOAD` virtual address is the supported image base `0x1000`;
+* the SONAME is `ld-elf.so.1` and the entry point is `_rtld_start`;
+* the loader exports exactly the 17 `libdl`/rtld names, has no `PT_INTERP`, `PT_TLS` or `DT_NEEDED`,
+  and has no non-relative relocation.
+
+It also writes `build/<arch>/loader-manifest.toml`:
+
+```text
+arch = "x86_64"
+revision = "d48b0eac"
+image_base = "0x1000"
+interpreter = "/libexec/ld-elf.so.1"
+size = 107128
+crc32 = "08c0f51a"
+sha256 = "7bc53ceceaf31bdc878d31461075ccd3f0a1029028003af1a82f30d3cba46e09"
+```
+
+`initfs::build` parses the finished archive before writing the image and fails when
+`/libexec/ld-elf.so.1` is absent, differs byte-for-byte from the fresh loader, or when the
+manifest's base, interpreter or CRC-32 does not match. The image can therefore not silently carry
+a stale loader. The regression test plants a 14-byte `STALE-NOT-ELF` loader and requires the
+release initfs build to replace it:
+
+```sh
+sh tests/release/check-loader.sh
+```
+
+**OBSERVED** in `tickets/kevin/reports/K131.md`.
 
 The decision logic is host-tested in `xtask/src/initfs_ut.rs` (missing/partial/complete libc,
 brush source mapping, uutils names, the combined plan). The build commands themselves are not run
@@ -48,6 +90,49 @@ remains an override: `=1` forces release and `=0` forces debug; any other value 
 leaves the profile's decision. The build-mode decision is host-tested in
 `xtask/src/initfs_ut.rs`. Rootfs profiles (`rootfs/<name>.toml`) keep their unconditional release
 build in `xtask/src/image.rs`.
+
+## Release kernel and loader (K170)
+
+A release image means **release kernel + release loader + release user programs**. Before K170 the
+image path always built the kernel and UEFI loader with `release = false`; `[initfs] release` only
+covered the user programs.
+
+The image build mode now comes from the resolved profile:
+
+* The release image names (`release` on x86_64, `pi4-release` on aarch64) are release by default.
+* Any profile can opt in with:
+
+  ```toml
+  [image]
+  release = true
+  ```
+
+  The field is additive across `extends` and `profiles/<name>.d/*.toml`, like
+  `[initfs] release`. This is the explicit switch for demo and test profiles (for example a
+  `demo-login` profile in the demo workspace); debug and test profiles keep debug builds.
+
+Both the kernel and loader are built with `--release` and the DR-22 LTO settings. Artifacts are
+profile-qualified and stamped:
+
+| Requested | Artifact | Stamp |
+|---|---|---|
+| release kernel | `build/<arch>/kernel.elf` | `kernel.elf.profile` = `release` |
+| release loader | `build/<arch>/loader.efi` | `loader.efi.profile` = `release` |
+| debug kernel | `build/<arch>/kernel-debug.elf` | `kernel-debug.elf.profile` = `debug` |
+| debug loader | `build/<arch>/loader-debug.efi` | `loader-debug.elf.profile` = `debug` |
+
+A release build refreshes the historical `kernel.elf`/`loader.efi` names. A debug build writes only
+the `-debug` names when a release artifact already occupies the historical path, so `make release`
+followed by a debug `make image` does not invalidate the release kernel or loader. The image step
+verifies the stamp of the artifact it actually embeds; a release image whose kernel or loader stamp
+says `debug` (or is missing) is rejected before the image is written. Release kernels also keep the
+clean-HEAD build-id check.
+
+The Pi 4 image path builds the Pi kernel with `RAVEN_PI4=1` in the requested profile and passes that
+ELF to the Pi layout; the Pi boot partition has no UEFI loader.
+
+Host tests cover the profile decision (`[image] release`, additive merge), the profile-qualified
+names and the stamp verify/reject path in `xtask/src/{profiles,build,image}_ut.rs`.
 
 ## Arch-correct staging
 

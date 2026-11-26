@@ -11,6 +11,7 @@
 
 use std::collections::BTreeSet;
 use std::path::Path;
+use std::thread;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -50,9 +51,57 @@ struct Summary {
 /// Run the check gate. Returns 0 when every executed step passed, 1 otherwise.
 pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8> {
     let steps = build_steps(workspace, fast, changed)?;
+    let order: Vec<String> = steps.iter().map(|step| step.name.clone()).collect();
+    // The guard scan and every command step are independent passes; run them beside each other
+    // instead of strictly after one another. The tests step dominates the gate, and the cargo
+    // steps release the target lock while they run, so fmt/clippy/doc overlap it (K548 rev335 /
+    // rev339 gate wall). Every job measures its own wall time; the gate wall is the longest job.
+    let mut deferred = Vec::new();
+    let mut jobs: Vec<(String, thread::JoinHandle<(Status, f64)>)> = Vec::new();
+    for step in steps {
+        let Step { name, kind } = step;
+        match kind {
+            StepKind::Guard => {
+                println!("==> {name}");
+                let root = workspace.root.clone();
+                let job = thread::spawn(move || {
+                    let started = Instant::now();
+                    let status = match guard::scan_repo(&root) {
+                        Ok(violations) => {
+                            guard::print_violations(&violations);
+                            status_for(i32::from(!violations.is_empty()))
+                        }
+                        Err(error) => {
+                            eprintln!("check: `guard` could not run: {error:#}");
+                            Status::Failed(1)
+                        }
+                    };
+                    (status, started.elapsed().as_secs_f64())
+                });
+                jobs.push((name, job));
+            }
+            StepKind::Command(spec) => {
+                println!("==> {name}");
+                let label = name.clone();
+                let job = thread::spawn(move || {
+                    let started = Instant::now();
+                    let status = match run_command(&spec) {
+                        Ok(code) => status_for(code),
+                        Err(error) => {
+                            eprintln!("check: `{label}` could not run: {error:#}");
+                            Status::Failed(1)
+                        }
+                    };
+                    (status, started.elapsed().as_secs_f64())
+                });
+                jobs.push((name, job));
+            }
+            other => deferred.push(Step { name, kind: other }),
+        }
+    }
     let mut summaries = Vec::new();
     let mut failed = false;
-    for step in steps {
+    for step in deferred {
         let Step { name, kind } = step;
         let started = Instant::now();
         let status = match kind {
@@ -60,19 +109,7 @@ pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8
                 println!("==> {name}: skipped ({reason})");
                 Status::Skipped(reason)
             }
-            StepKind::Guard => {
-                println!("==> {name}");
-                match guard::scan_repo(&workspace.root) {
-                    Ok(violations) => {
-                        guard::print_violations(&violations);
-                        status_for(i32::from(!violations.is_empty()))
-                    }
-                    Err(error) => {
-                        eprintln!("check: `{name}` could not run: {error:#}");
-                        Status::Failed(1)
-                    }
-                }
-            }
+            StepKind::Guard => Status::Failed(1),
             StepKind::Command(spec) => {
                 println!("==> {name}");
                 match run_command(&spec) {
@@ -119,6 +156,23 @@ pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8
             seconds,
         });
     }
+    for (name, job) in jobs {
+        let (status, seconds) = job.join().unwrap_or((Status::Failed(1), 0.0));
+        if matches!(status, Status::Failed(_)) {
+            failed = true;
+        }
+        summaries.push(Summary {
+            name,
+            status,
+            seconds,
+        });
+    }
+    summaries.sort_by_key(|summary| {
+        order
+            .iter()
+            .position(|name| name == &summary.name)
+            .unwrap_or(usize::MAX)
+    });
     print_summary(&summaries, changed);
     Ok(u8::from(failed))
 }
@@ -282,6 +336,12 @@ fn build_steps(workspace: &Workspace, fast: bool, changed: bool) -> Result<Vec<S
     } else {
         steps.extend(target_steps);
     }
+    steps.push(command_step(
+        "frozen writes",
+        &workspace.root,
+        "sh",
+        vec!["scripts/check-frozen-writes.sh".to_string()],
+    ));
     steps.push(Step {
         name: "docs".to_string(),
         kind: StepKind::Docs,
@@ -669,5 +729,33 @@ mod tests {
             "make check must run provenance with --strict: {:?}",
             spec.args
         );
+    }
+
+    #[test]
+    fn independent_command_steps_overlap() {
+        let dir =
+            std::env::temp_dir().join(format!("raven-xtask-check-overlap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let left = dir.join("left");
+        let right = dir.join("right");
+        let job = |mine: PathBuf, other: PathBuf| {
+            thread::spawn(move || {
+                std::fs::write(&mine, b"x").unwrap();
+                let deadline = Instant::now() + std::time::Duration::from_secs(5);
+                while !other.exists() {
+                    if Instant::now() >= deadline {
+                        return false;
+                    }
+                    thread::sleep(std::time::Duration::from_millis(2));
+                }
+                true
+            })
+        };
+        let one = job(left.clone(), right.clone());
+        let two = job(right, left);
+        assert!(one.join().unwrap(), "the first step never saw the second");
+        assert!(two.join().unwrap(), "the second step never saw the first");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

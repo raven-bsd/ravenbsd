@@ -50,6 +50,8 @@ pub mod pages;
 pub mod pending;
 pub mod signal;
 pub mod sys;
+
+pub use sys::pipe2;
 pub mod tp;
 pub mod unimpl;
 

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K198: stage the default strict network drop-in in the release image. A missing file keeps the
+# image default; mode=dhcp/hostname=raven is the QEMU default and raven config/net can replace it.
+[[initfs.files]]
+src = "etc/raven/conf.d/network.toml"
+path = "/etc/raven/conf.d/network.toml"
+mode = 0o644

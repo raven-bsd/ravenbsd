@@ -7,5 +7,5 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../../../.." && pwd)
 cd "$root"
-cargo nextest run -p time
+cargo nextest run -p raven-time
 printf 'ok: time host tests\n'

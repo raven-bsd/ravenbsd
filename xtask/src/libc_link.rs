@@ -15,6 +15,13 @@ use crate::process::{CommandSpec, run as run_command};
 
 const LINKER_FLAVOR: &str = "-flavor";
 
+/// The supported dynamic loader image base.
+pub(crate) const LOADER_IMAGE_BASE: u64 = 0x1000;
+/// The installed loader path every dynamic PIE requests as its interpreter.
+pub(crate) const LOADER_INTERPRETER: &str = "/libexec/ld-elf.so.1";
+/// Manifest written beside the linked loader and checked before reuse.
+const LOADER_MANIFEST: &str = "loader-manifest.toml";
+
 /// One parsed command.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Options {
@@ -24,6 +31,8 @@ pub(crate) struct Options {
     pub(crate) set: String,
     /// Run the ELF gate.
     pub(crate) check: bool,
+    /// Verify the DSO stamp instead of building.
+    pub(crate) verify: bool,
     /// Print a JSON summary.
     pub(crate) json: bool,
     /// Output directory.
@@ -34,6 +43,7 @@ fn parse(args: &[String]) -> Result<Options> {
     let mut arch = Arch::X86_64;
     let mut set = "server".to_string();
     let mut check = false;
+    let mut verify = false;
     let mut json = false;
     let mut out = None;
     let mut index = 0usize;
@@ -54,6 +64,7 @@ fn parse(args: &[String]) -> Result<Options> {
                 set = args.get(index).context("--set value")?.clone();
             }
             Some("--check") => check = true,
+            Some("--verify") => verify = true,
             Some("--json") => json = true,
             Some("--out") => {
                 index += 1;
@@ -71,6 +82,7 @@ fn parse(args: &[String]) -> Result<Options> {
         arch,
         set,
         check,
+        verify,
         json,
         out: out.unwrap_or_else(|| PathBuf::from(format!("build/{}", arch.short()))),
     })
@@ -82,6 +94,14 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     if options.set == "tiny" {
         println!("libc-link: skipped(tiny)");
         return Ok(0);
+    }
+    if options.verify {
+        if verify_dso_stamp(root, &options).is_ok() {
+            println!("libc-link: verify: ok");
+            return Ok(0);
+        }
+        eprintln!("artifact stale: run cargo xtask libc-link");
+        return Ok(1);
     }
     let out = root.join(&options.out);
     std::fs::create_dir_all(&out).with_context(|| format!("cannot create {}", out.display()))?;
@@ -146,8 +166,19 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         return Ok(1);
     }
     println!("libc-link: ld-elf.so.1: ok");
+    if let Err(error) = check_elf(&loader, "loader") {
+        println!("libc-link: loader contract: FAILED: {error}");
+        return Ok(1);
+    }
+    write_loader_manifest(root, options.arch.short(), &loader)?;
+    println!(
+        "libc-link: loader manifest: {}",
+        loader_manifest_path(root, options.arch.short()).display()
+    );
     stage_sysroot(&out, &libc, &loader)?;
     println!("libc-link: sysroot: ok");
+    write_dso_stamp(root, &options, &libc, &loader)?;
+    println!("libc-link: stamp: ok");
 
     if options.check {
         let mut failed = false;
@@ -195,6 +226,65 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
+/// DSO stamp file written after a successful `libc-link` (K441).
+pub(crate) const DSO_STAMP_FILE: &str = "libc-dso.stamp";
+const DSO_STAMP_FORMAT: &str = "k441.1";
+
+fn write_dso_stamp(root: &Path, options: &Options, libc: &Path, loader: &Path) -> Result<()> {
+    let out = root.join(&options.out);
+    let text = format!(
+        "format={DSO_STAMP_FORMAT}\narch={}\nset={}\nsources={:016x}\nlibc_so={:016x}\nsysroot_libc_so={:016x}\nloader={:016x}\nsysroot_loader={:016x}\n",
+        options.arch.short(),
+        options.set,
+        crate::libc_pack::source_hash(root)?,
+        crate::libc_pack::hash_file(libc)?,
+        crate::libc_pack::hash_file(&out.join("sysroot/lib/libc.so.1"))?,
+        crate::libc_pack::hash_file(loader)?,
+        crate::libc_pack::hash_file(&out.join("sysroot/libexec/ld-elf.so.1"))?,
+    );
+    let path = out.join(DSO_STAMP_FILE);
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, text)
+        .with_context(|| format!("cannot write {}", temporary.display()))?;
+    std::fs::rename(&temporary, &path)
+        .with_context(|| format!("cannot publish {}", path.display()))?;
+    Ok(())
+}
+
+fn verify_dso_stamp(root: &Path, options: &Options) -> Result<()> {
+    let out = root.join(&options.out);
+    let text =
+        std::fs::read_to_string(out.join(DSO_STAMP_FILE)).with_context(|| "no libc-dso stamp")?;
+    if crate::libc_pack::stamp_field(&text, "format") != Some(DSO_STAMP_FORMAT) {
+        bail!("stamp format mismatch");
+    }
+    if crate::libc_pack::stamp_field(&text, "arch") != Some(options.arch.short()) {
+        bail!("stamp arch mismatch");
+    }
+    if crate::libc_pack::stamp_field(&text, "set") != Some(options.set.as_str()) {
+        bail!("stamp set mismatch");
+    }
+    let field = |key: &str| -> Result<u64> {
+        let value = crate::libc_pack::stamp_field(&text, key)
+            .with_context(|| format!("stamp {key} missing"))?;
+        u64::from_str_radix(value, 16).with_context(|| format!("stamp {key} invalid"))
+    };
+    if field("sources")? != crate::libc_pack::source_hash(root)? {
+        bail!("sources changed");
+    }
+    for (key, path) in [
+        ("libc_so", out.join("libc.so.1")),
+        ("sysroot_libc_so", out.join("sysroot/lib/libc.so.1")),
+        ("loader", out.join("ld-elf.so.1")),
+        ("sysroot_loader", out.join("sysroot/libexec/ld-elf.so.1")),
+    ] {
+        if field(key)? != crate::libc_pack::hash_file(&path)? {
+            bail!("{key} changed");
+        }
+    }
+    Ok(())
+}
+
 /// Publish the freshly linked dynamic objects into the arch sysroot.
 ///
 /// `libc-pack` stages the static sysroot; the dynamic `libc.so.1`/`ld-elf.so.1` are only known
@@ -213,11 +303,149 @@ fn stage_sysroot(out: &Path, libc: &Path, loader: &Path) -> Result<()> {
     std::fs::copy(loader, libexec.join("ld-elf.so.1"))
         .with_context(|| format!("cannot copy {} to sysroot/libexec", loader.display()))?;
     let libc_so = usr_lib.join("libc.so");
-    if !libc_so.is_file() {
-        std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
-            .with_context(|| "cannot write sysroot libc.so script")?;
-    }
+    // Always replace a stale sysroot `libc.so`. Older trees carry a real shared object here;
+    // leaving it in place makes `-lc` prefer that stale image over the freshly linked
+    // `lib/libc.so.1`, which is how the dynamic pty exports disappeared from C links.
+    std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
+        .with_context(|| "cannot write sysroot libc.so script")?;
     Ok(())
+}
+
+/// Loader contract record written after a successful `libc-link`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LoaderManifest {
+    /// Architecture short name.
+    pub(crate) arch: String,
+    /// Product source revision that produced the loader.
+    pub(crate) revision: String,
+    /// First `PT_LOAD` virtual address.
+    pub(crate) image_base: String,
+    /// Interpreter path the loader is installed as.
+    pub(crate) interpreter: String,
+    /// Loader file size in bytes.
+    pub(crate) size: u64,
+    /// CRC-32 of the loader bytes, the fast reuse check.
+    pub(crate) crc32: String,
+    /// SHA-256 of the loader bytes for the release inventory; `unavailable` when no tool exists.
+    pub(crate) sha256: String,
+}
+
+/// Path of the loader manifest under `build/<arch>`.
+pub(crate) fn loader_manifest_path(root: &Path, arch: &str) -> PathBuf {
+    root.join("build").join(arch).join(LOADER_MANIFEST)
+}
+
+/// Render the manifest. Pure so host tests cover every field without a toolchain.
+fn loader_manifest_text(arch: &str, revision: &str, bytes: &[u8], sha256: &str) -> String {
+    format!(
+        "# RavenBSD dynamic loader manifest\narch = \"{arch}\"\nrevision = \"{revision}\"\nimage_base = \"0x{:x}\"\ninterpreter = \"{}\"\nsize = {}\ncrc32 = \"{:08x}\"\nsha256 = \"{}\"\n",
+        LOADER_IMAGE_BASE,
+        LOADER_INTERPRETER,
+        bytes.len(),
+        raven_initfs::crc32(bytes),
+        sha256,
+    )
+}
+
+fn manifest_value<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    text.lines().find_map(|line| {
+        let (name, value) = line.split_once('=')?;
+        (name.trim() == key).then(|| value.trim().trim_matches('"'))
+    })
+}
+
+/// Parse the manifest; `None` when a required field is absent or unparseable.
+fn parse_loader_manifest(text: &str) -> Option<LoaderManifest> {
+    Some(LoaderManifest {
+        arch: manifest_value(text, "arch")?.to_string(),
+        revision: manifest_value(text, "revision")?.to_string(),
+        image_base: manifest_value(text, "image_base")?.to_string(),
+        interpreter: manifest_value(text, "interpreter")?.to_string(),
+        size: manifest_value(text, "size")?.parse().ok()?,
+        crc32: manifest_value(text, "crc32")?.to_string(),
+        sha256: manifest_value(text, "sha256")?.to_string(),
+    })
+}
+
+/// Read the loader manifest for `arch`.
+pub(crate) fn read_loader_manifest(root: &Path, arch: &str) -> Option<LoaderManifest> {
+    let text = std::fs::read_to_string(loader_manifest_path(root, arch)).ok()?;
+    parse_loader_manifest(&text)
+}
+
+fn sha256_file(path: &Path) -> String {
+    match Command::new("sha256sum").arg(path).output() {
+        Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+            .split_whitespace()
+            .next()
+            .unwrap_or("unavailable")
+            .to_string(),
+        _ => "unavailable".to_string(),
+    }
+}
+
+fn source_revision(root: &Path) -> String {
+    Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| !revision.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Write the loader manifest next to the freshly linked loader.
+pub(crate) fn write_loader_manifest(root: &Path, arch: &str, loader: &Path) -> Result<()> {
+    let bytes =
+        std::fs::read(loader).with_context(|| format!("cannot read {}", loader.display()))?;
+    let text = loader_manifest_text(arch, &source_revision(root), &bytes, &sha256_file(loader));
+    let path = loader_manifest_path(root, arch);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    std::fs::write(&path, text).with_context(|| format!("cannot write {}", path.display()))?;
+    Ok(())
+}
+
+/// True when the manifest describes the loader currently on disk.
+///
+/// This is the reuse gate: a missing manifest or a different loader size/CRC forces a relink,
+/// so an artifact from another checkout cannot be packed into a release image.
+pub(crate) fn loader_manifest_matches(root: &Path, arch: &str) -> bool {
+    let Some(manifest) = read_loader_manifest(root, arch) else {
+        return false;
+    };
+    let loader = root.join("build").join(arch).join("ld-elf.so.1");
+    let Ok(bytes) = std::fs::read(&loader) else {
+        return false;
+    };
+    manifest.arch == arch
+        && manifest.image_base == format!("0x{:x}", LOADER_IMAGE_BASE)
+        && manifest.interpreter == LOADER_INTERPRETER
+        && manifest.size == bytes.len() as u64
+        && manifest.crc32 == format!("{:08x}", raven_initfs::crc32(&bytes))
+}
+
+/// True when the linked `libc.so.1`/loader DSO stamp matches the current sources and files.
+///
+/// The loader manifest above is the fast reuse check for the loader file; the DSO stamp is
+/// the source gate. A `libc-pack` of changed static sources does not relink the dynamic pair,
+/// so the image path must compare this stamp before staging `libc.so.1`/`ld-elf.so.1`.
+pub(crate) fn dso_stamp_current(root: &Path, arch: &str) -> bool {
+    let args = vec![
+        "--arch".to_string(),
+        arch.to_string(),
+        "--verify".to_string(),
+    ];
+    let Ok(options) = parse(&args) else {
+        return false;
+    };
+    verify_dso_stamp(root, &options).is_ok()
 }
 
 /// Run the K7 part of the mkmap check against the linked `libc.so.1`.
@@ -618,6 +846,7 @@ pub(crate) fn gate_text(text: &str, kind: &str) -> Result<Vec<String>> {
     }
 
     let mut load_count = 0usize;
+    let mut first_load_vaddr = None;
     let mut stack_seen = false;
     for line in text.lines() {
         let trimmed = line.trim();
@@ -625,6 +854,9 @@ pub(crate) fn gate_text(text: &str, kind: &str) -> Result<Vec<String>> {
         match tokens.first().copied() {
             Some("LOAD") => {
                 load_count = load_count.saturating_add(1);
+                if first_load_vaddr.is_none() {
+                    first_load_vaddr = tokens.get(2).and_then(|value| hex(value));
+                }
                 let align = tokens.last().and_then(|value| hex(value));
                 if align != Some(0x1000) {
                     fail(format!("PT_LOAD alignment is not 4096: {trimmed}"));
@@ -681,6 +913,11 @@ pub(crate) fn gate_text(text: &str, kind: &str) -> Result<Vec<String>> {
         fail("libc SONAME is not libc.so.1".to_string());
     }
     if kind == "loader" {
+        if first_load_vaddr != Some(LOADER_IMAGE_BASE) {
+            fail(format!(
+                "loader first PT_LOAD image base is not 0x{LOADER_IMAGE_BASE:x} (found {first_load_vaddr:?})"
+            ));
+        }
         if !text.contains("Library soname: [ld-elf.so.1]") {
             fail("loader SONAME is not ld-elf.so.1".to_string());
         }

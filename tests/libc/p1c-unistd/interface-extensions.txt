@@ -10,7 +10,7 @@
 #
 # Classification source: absent from the Open Group Issue 8 XSH function index
 # (https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html) or an extension family:
-# BSD/legacy (brk, eaccess, euidaccess, getpagesize, lchmod, lutimes, sethostname, timegm),
+# BSD/legacy (brk, eaccess, euidaccess, getpagesize, getpeereid, lchmod, lutimes, sethostname, timegm),
 # Linux (getdents, madvise, mlock2, preadv2, pwritev2, renameat2, syncfs),
 # LFS *_64 aliases, stdio *_unlocked/getw/putw/setbuffer/setlinebuf, C11 strfrom*, and the
 # removed/obsolescent stime/usleep/cuserid/timespec_getres.
@@ -42,6 +42,7 @@ ftruncate64
 fwrite_unlocked
 getdents
 getpagesize
+getpeereid
 getrlimit64
 getw
 getwchar_unlocked

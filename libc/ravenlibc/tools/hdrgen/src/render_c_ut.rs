@@ -14,14 +14,48 @@ fn tables() -> (Tables, validate::Values) {
     (tables, values)
 }
 
-fn files() -> std::collections::BTreeMap<String, String> {
+fn files() -> Option<std::collections::BTreeMap<String, String>> {
+    let resources = resources_or_skip()?;
     let (tables, values) = tables();
-    render_all(&tables, &values, "7813e9119eb5fe681b6750b8a033a0490bca0941").expect("render")
+    let lock = crate::provenance::read_lock(&resources).expect("lock");
+    Some(
+        render_all(
+            &tables,
+            &values,
+            &crate::attribution::Attributions::resolve(&tables, &lock).expect("attribution"),
+        )
+        .expect("render"),
+    )
+}
+
+fn resources_or_skip() -> Option<std::path::PathBuf> {
+    if let Some(value) = std::env::var_os("RAVENBSD_RESOURCES") {
+        let path = std::path::PathBuf::from(value);
+        assert!(
+            path.join("donors.lock").is_file(),
+            "RAVENBSD_RESOURCES has no donors.lock: {}",
+            path.display()
+        );
+        return Some(path);
+    }
+    let here = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    match crate::provenance::discover_resources(&here) {
+        Some(path) => Some(path),
+        None => {
+            eprintln!(
+                "SKIP: ravenbsd-resources/donors.lock is absent; \
+                 set RAVENBSD_RESOURCES to a donor checkout to run this row"
+            );
+            None
+        }
+    }
 }
 
 #[test]
 fn renders_fourteen_headers() {
-    let files = files();
+    let Some(files) = files() else {
+        return;
+    };
     assert_eq!(files.len(), 14);
     for header in [
         "bits/errno.h",
@@ -45,7 +79,10 @@ fn renders_fourteen_headers() {
 
 #[test]
 fn headers_have_a_notice_and_guard() {
-    for (name, text) in files() {
+    let Some(files) = files() else {
+        return;
+    };
+    for (name, text) in files {
         assert!(
             text.starts_with("/*\n * SPDX-License-Identifier: MIT"),
             "{name}"
@@ -61,7 +98,10 @@ fn headers_have_a_notice_and_guard() {
 
 #[test]
 fn errno_header_has_the_values() {
-    let text = &files()["bits/errno.h"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["bits/errno.h"];
     assert!(text.contains("#define EPERM 1\n"));
     assert!(text.contains("#define EWOULDBLOCK EAGAIN\n"));
     assert!(text.contains("#define ENOATTR ENODATA\n"));
@@ -70,7 +110,10 @@ fn errno_header_has_the_values() {
 
 #[test]
 fn fcntl_header_keeps_octal_and_expressions() {
-    let text = &files()["bits/abi_fcntl.h"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["bits/abi_fcntl.h"];
     assert!(text.contains("#define O_CREAT 0100\n"));
     assert!(text.contains("#define O_ACCMODE (03|O_PATH)\n"));
     assert!(text.contains("#define O_LARGEFILE 0\n"));
@@ -80,14 +123,20 @@ fn fcntl_header_keeps_octal_and_expressions() {
 
 #[test]
 fn arch_entries_are_guarded() {
-    let text = &files()["bits/abi_mman.h"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["bits/abi_mman.h"];
     assert!(text.contains("#if defined(__x86_64__)\n"));
     assert!(text.contains("#define MAP_32BIT 0x40\n"));
 }
 
 #[test]
 fn visibility_entries_are_guarded() {
-    let text = &files()["bits/abi_fcntl.h"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["bits/abi_fcntl.h"];
     assert!(text.contains("#if __BSD_VISIBLE\n"));
     assert!(text.contains("#define O_EXLOCK 0x10000000\n"));
     assert!(!text.contains("/* visible: bsd */\n/* visible: bsd */"));
@@ -95,7 +144,10 @@ fn visibility_entries_are_guarded() {
 
 #[test]
 fn signal_header_has_the_frozen_stack_sizes() {
-    let text = &files()["bits/signum.h"];
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["bits/signum.h"];
     assert!(text.contains("#define MINSIGSTKSZ 6144\n"));
     assert!(text.contains("#define SIGSTKSZ 16384\n"));
     assert!(text.contains("#define SIGRTMIN 35\n"));
@@ -104,12 +156,21 @@ fn signal_header_has_the_frozen_stack_sizes() {
 
 #[test]
 fn rendering_is_deterministic() {
-    assert_eq!(files(), files());
+    let Some(first) = files() else {
+        return;
+    };
+    let Some(second) = files() else {
+        return;
+    };
+    assert_eq!(first, second);
 }
 
 #[test]
 fn every_header_ends_with_a_newline() {
-    for (name, text) in files() {
+    let Some(files) = files() else {
+        return;
+    };
+    for (name, text) in files {
         assert!(text.ends_with('\n'), "{name}");
     }
 }

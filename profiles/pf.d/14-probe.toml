@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/b12-netd/netd-probe"
+path = "/sbin/netd-probe"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/pf.d/pf-probe.manifest"
+path = "/etc/services.d/pf-probe.toml"
+
+[[initfs.files]]
+src = "profiles/pf.d/pf.conf"
+path = "/etc/pf.conf"

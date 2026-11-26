@@ -15,6 +15,17 @@ use core::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use raven_abi::errno::Errno;
 use spin::Mutex;
 
+use crate::cmdline::CmdLine;
+use crate::kprintln;
+use crate::memory::paging;
+
+/// K495 rev180 diagnostic gate: the pty gate image boots with `k495-debug=1`.
+fn debug_enabled() -> bool {
+    CmdLine::parse(paging::cmdline())
+        .get("k495-debug")
+        .is_some()
+}
+
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::ipc::SchemeFile;
 #[cfg(target_arch = "x86_64")]
@@ -25,6 +36,9 @@ use super::{Process, group_in_session, group_orphaned, signal_group, status};
 /// One controlling-terminal state, shared by every process in its session.
 pub struct Ctty {
     key: (u64, u64),
+    /// The terminal open-file description. `/dev/tty` opens this live object; FreeBSD keeps the
+    /// controlling vnode alive for the session in the same way.
+    file: Arc<SchemeFile>,
     fg_pgrp: AtomicI64,
     sid: AtomicU64,
     hung: AtomicBool,
@@ -34,6 +48,11 @@ impl Ctty {
     /// The session that owns this terminal.
     pub fn sid(&self) -> u64 {
         self.sid.load(Ordering::Acquire)
+    }
+
+    /// The terminal open-file description for `/dev/tty`.
+    pub fn file(&self) -> &Arc<SchemeFile> {
+        &self.file
     }
 
     /// The foreground process group, or zero when unset.
@@ -56,7 +75,7 @@ pub fn is_tty_file(file: &SchemeFile) -> bool {
         .schemes
         .lock()
         .iter()
-        .any(|scheme| scheme.name == "ttyd" || scheme.name == "tty")
+        .any(|scheme| scheme.name == "ttyd" || scheme.name == "tty" || scheme.name == "pty")
 }
 
 fn find(file: &SchemeFile) -> Option<Arc<Ctty>> {
@@ -72,12 +91,41 @@ fn find(file: &SchemeFile) -> Option<Arc<Ctty>> {
     None
 }
 
-fn get_or_create(file: &SchemeFile) -> Arc<Ctty> {
+/// The live controlling terminal of session `sid`, if any.
+///
+/// A process created by `posix_spawn` starts without its own `ctty` slot but stays in the
+/// parent's session; `/dev/tty` resolves to the session's terminal (FreeBSD `cttyopen` looks up
+/// the session's controlling vnode, not a per-process copy).
+pub fn session(sid: u64) -> Option<Arc<Ctty>> {
+    if sid == 0 {
+        return None;
+    }
+    let debug = debug_enabled();
+    let registry = REGISTRY.lock();
+    for weak in registry.iter() {
+        let Some(ctty) = weak.upgrade() else {
+            continue;
+        };
+        if ctty.sid() == sid {
+            return Some(ctty);
+        }
+        if debug {
+            kprintln!("ctty: registry entry sid={} wanted={}", ctty.sid(), sid);
+        }
+    }
+    if debug {
+        kprintln!("ctty: registry no entry wanted={}", sid);
+    }
+    None
+}
+
+fn get_or_create(file: &Arc<SchemeFile>) -> Arc<Ctty> {
     if let Some(ctty) = find(file) {
         return ctty;
     }
     let ctty = Arc::new(Ctty {
         key: (file.server.id, file.server_id()),
+        file: Arc::clone(file),
         fg_pgrp: AtomicI64::new(0),
         sid: AtomicU64::new(0),
         hung: AtomicBool::new(false),
@@ -90,28 +138,80 @@ fn get_or_create(file: &SchemeFile) -> Arc<Ctty> {
 
 /// `TIOCSCTTY`: acquire `file` as the calling session leader's controlling terminal.
 pub fn acquire(process: &Arc<Process>, file: &Arc<SchemeFile>) -> Result<(), Errno> {
+    let debug = debug_enabled();
+    let ids = *process.ids.lock();
+    if debug {
+        kprintln!(
+            "ctty: acquire pid={} sid={} pgid={} tty={} server={} file={}",
+            process.id,
+            ids.sid,
+            ids.pgid,
+            is_tty_file(file),
+            file.server.id,
+            file.server_id()
+        );
+    }
     if !is_tty_file(file) {
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected ENOTTY (not a tty file)",
+                process.id
+            );
+        }
         return Err(Errno::ENOTTY);
     }
-    let ids = *process.ids.lock();
     if ids.sid != process.id {
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected EPERM (sid={} is not the pid)",
+                process.id,
+                ids.sid
+            );
+        }
         return Err(Errno::EPERM);
     }
     let mut slot = process.ctty.lock();
     if let Some(existing) = slot.as_ref() {
         if existing.key == (file.server.id, file.server_id()) && existing.sid() == ids.sid {
+            if debug {
+                kprintln!(
+                    "ctty: acquire pid={} already owns sid={} ctty_sid={}",
+                    process.id,
+                    ids.sid,
+                    existing.sid()
+                );
+            }
             return Ok(());
+        }
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected EPERM (existing ctty sid={} wanted={})",
+                process.id,
+                existing.sid(),
+                ids.sid
+            );
         }
         return Err(Errno::EPERM);
     }
     let ctty = get_or_create(file);
     if ctty.sid() != 0 && ctty.sid() != ids.sid {
+        if debug {
+            kprintln!(
+                "ctty: acquire pid={} rejected EBUSY (ctty sid={} wanted={})",
+                process.id,
+                ctty.sid(),
+                ids.sid
+            );
+        }
         return Err(Errno::EBUSY);
     }
     ctty.sid.store(ids.sid, Ordering::Release);
     ctty.fg_pgrp.store(ids.pgid as i64, Ordering::Release);
     ctty.hung.store(false, Ordering::Release);
     *slot = Some(Arc::clone(&ctty));
+    if debug {
+        kprintln!("ctty: acquire pid={} ok sid={}", process.id, ids.sid);
+    }
     Ok(())
 }
 

@@ -39,6 +39,10 @@ mod program {
     const CONSOLE_PATH: &str = "console";
     /// Bytes read from a backend per call.
     const READ_CHUNK: usize = 256;
+    /// Consecutive UART backend I/O errors tolerated before the console is closed.
+    const IO_RETRY_LIMIT: u32 = 50;
+    /// Backoff between UART backend I/O retries.
+    const IO_RETRY_DELAY_NS: u64 = 10_000_000;
     /// Reader thread stack.
     const READER_STACK: usize = 32 * 1024;
 
@@ -117,21 +121,42 @@ mod program {
     fn uart_reader(_argument: usize) {
         let mut input = UartInput;
         let mut buffer = [0u8; READ_CHUNK];
+        let mut io_retries = 0u32;
         loop {
             match input.read(&mut buffer) {
-                Ok(0) => continue,
+                Ok(0) => {
+                    io_retries = 0;
+                }
                 Ok(count) => {
+                    io_retries = 0;
                     let count = count.min(buffer.len());
                     let changed = CONSOLE.lock().feed(&buffer[..count]);
                     if changed {
                         publish();
                     }
                 }
-                Err(InputError::WouldBlock) => continue,
-                Err(InputError::EndOfFile | InputError::Closed | InputError::Io) => {
+                Err(InputError::WouldBlock) => {
+                    io_retries = 0;
+                }
+                // A real EOF or closed backend ends the console.
+                Err(InputError::EndOfFile | InputError::Closed) => {
                     CONSOLE.lock().mark_eof();
                     publish();
                     break;
+                }
+                // A transient backend error must not look like a live console forever: retry
+                // briefly, then report the persistent failure and close the console.
+                Err(InputError::Io) => {
+                    io_retries = io_retries.saturating_add(1);
+                    if io_retries > IO_RETRY_LIMIT {
+                        raven_rt::eprintln!(
+                            "consd: uart input: {io_retries} consecutive I/O errors; closing console"
+                        );
+                        CONSOLE.lock().mark_eof();
+                        publish();
+                        break;
+                    }
+                    let _ = raven_rt::nanosleep(IO_RETRY_DELAY_NS);
                 }
             }
         }
@@ -212,22 +237,23 @@ mod program {
             if buffer.is_empty() {
                 return Ok(0);
             }
-            loop {
-                let sequence = SEQ.load(Ordering::Acquire);
-                {
-                    let mut console = CONSOLE.lock();
-                    if console.take_interrupt() {
-                        return Err(Errno::EINTR.into());
-                    }
-                    if console.has_ready() {
-                        return Ok(console.take(buffer));
-                    }
-                    if console.eof() {
-                        return Ok(0);
-                    }
+            // Never sleep inside the single-threaded scheme server: a blocked `read` keeps the
+            // server from dispatching queued `write` requests (the console submit queue fills and
+            // the session output stalls). A caller that wants blocking semantics retries on
+            // `EAGAIN`; the input thread publishes every state change.
+            {
+                let mut console = CONSOLE.lock();
+                if console.take_interrupt() {
+                    return Err(Errno::EINTR.into());
                 }
-                let _ = raven_rt::futex_wait(&SEQ, sequence, None);
+                if console.has_ready() {
+                    return Ok(console.take(buffer));
+                }
+                if console.eof() {
+                    return Ok(0);
+                }
             }
+            Err(Errno::EAGAIN.into())
         }
 
         fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {

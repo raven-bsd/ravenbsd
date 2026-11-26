@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Product programs allowed to read the frozen docs/ tree.
+# Everything else must read RAVEN_MGMT_ROOT; an unlisted reader fails
+# cargo xtask check.
+#
+# path|reason
+scripts/check-mandoc.sh|man-page payload; no mgmt copy; profiles stage docs/man into images
+xtask/src/guard.rs|policy string, not a file read

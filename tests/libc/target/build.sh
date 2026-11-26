@@ -86,6 +86,29 @@ if [ -z "${RAVENLIBC_SYSROOT:-}" ]; then
             exit 2
         fi
     fi
+    # The dynamic runtime is a separate `libc-link` artifact. `libc-pack` only re-stages the
+    # sysroot copy, so a libc change newer than `libc.so.1` would otherwise run the case against
+    # the previous shared library (K438: a mutated recvmsg still passed). Refresh it here.
+    if [ "$link_kind" = dynamic ]; then
+        # Compare the source-of-truth `libc-link` output, not the sysroot copy: `libc-pack`
+        # re-stages the copy (with a fresh mtime) even when the shared library itself is stale.
+        dynamic_libc=$root/build/$arch/libc.so.1
+        dynamic_stale=0
+        if [ ! -f "$dynamic_libc" ]; then
+            dynamic_stale=1
+        elif [ -n "$(find "$root/libc/ravenlibc/crates" "$root/libc/ravenlibc/abi" \
+            "$root/libc/ravenlibc/crt" "$root/libc/ravenlibc/Cargo.toml" \
+            -newer "$dynamic_libc" -print -quit 2>/dev/null)" ]; then
+            dynamic_stale=1
+        fi
+        if [ "$dynamic_stale" -eq 1 ]; then
+            printf 'refresh: generated %s libc.so.1 is missing or older than libc sources\n' "$arch"
+            if ! cargo xtask libc-link --arch "$arch"; then
+                printf 'error: cargo xtask libc-link --arch %s failed\n' "$arch" >&2
+                exit 2
+            fi
+        fi
+    fi
 else
     sysroot=$RAVENLIBC_SYSROOT
 fi
@@ -207,20 +230,29 @@ compile_obj() {
 }
 
 link_static() {
+    # A case may own `_start` (K548's exec-timing entry timestamp). Then crt1.o is not linked:
+    # the case supplies the entry, and the start function it calls is the same one crt1 uses.
+    if [ "${3:-0}" = 1 ]; then
+        crt1=
+    else
+        crt1="$sysroot/usr/lib/crt1.o"
+    fi
     if [ -n "$builtins" ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
-            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            $crt1 "$sysroot/usr/lib/crti.o" \
+            "$sysroot/usr/lib/crtbegin.o" "$1" \
             -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
-            "$sysroot/usr/lib/crtn.o" -o "$2"
+            "$sysroot/usr/lib/crtend.o" "$sysroot/usr/lib/crtn.o" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
-            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            $crt1 "$sysroot/usr/lib/crti.o" \
+            "$sysroot/usr/lib/crtbegin.o" "$1" \
             -L"$sysroot/usr/lib" -lc \
-            "$sysroot/usr/lib/crtn.o" -o "$2"
+            "$sysroot/usr/lib/crtend.o" "$sysroot/usr/lib/crtn.o" -o "$2"
     fi
 }
 
@@ -299,6 +331,20 @@ else
     compile_obj "$src" "$obj"
 fi
 
+# A static case that defines `_start` owns the entry; crt1.o must not be linked beside it.
+own_start=0
+if [ "$link_kind" = static ]; then
+    symbol_tool=
+    if command -v llvm-nm >/dev/null 2>&1; then
+        symbol_tool=llvm-nm
+    elif command -v nm >/dev/null 2>&1; then
+        symbol_tool=nm
+    fi
+    if [ -n "$symbol_tool" ] && "$symbol_tool" "$obj" 2>/dev/null | grep -Eq ' T _start$'; then
+        own_start=1
+    fi
+fi
+
 case $binaries in
     *libc-child*)
         child_src=$root/libc/ravenlibc/tests/c/libc-child.c
@@ -315,7 +361,7 @@ esac
 
 case $link_kind in
     static)
-        link_static "$obj" "$out/libc-test"
+        link_static "$obj" "$out/libc-test" "$own_start"
         : > "$out/libplug.so"
         : > "$out/libc.so.1"
         : > "$out/ld-elf.so.1"

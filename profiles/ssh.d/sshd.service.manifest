@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# OpenSSH server. The binary is the unmodified upstream `sshd` built by
+# addons/ssh/build.sh (DR-65); nothing here implements SSH.
+#
+# -D keeps the listener in the foreground so svcd supervises the real process.
+# -E writes the daemon log to /tmp: services start with no stdio fds, so the log
+#    cannot go to stderr, and the base has no /dev/log daemon.
+# -f pins the target config path: the K200 configure used an absolute
+#    --sysconfdir, so the compiled-in SSHDIR is the build directory, not /etc/ssh.
+# The one-shot ssh-hostkeys service creates the Ed25519 host key under /tmp/ssh
+# before this service starts; the initfs demo's keys are therefore ephemeral.
+#
+# restart = "never", required = false: this is an optional demo daemon. A daemon
+# that exits must stay exited and be visible in the transcript; the host-side
+# ssh-login gate, not a restart loop, is the evidence that login works.
+
+name = "sshd"
+exec = "/sbin/sshd"
+args = ["/sbin/sshd", "-D", "-E", "/tmp/sshd.log", "-f", "/etc/ssh/sshd_config"]
+needs = ["netd", "vfsd", "consd", "ptyd", "ssh-hostkeys"]
+# K566: do not mark the service ready at spawn. sshd logs this exact line only after
+# listen() succeeded, so svcd's first connection cannot race the listener bind. This is
+# the daemon's own readiness signal, not a sleep, and needs no sshd source change.
+readiness = "file"
+ready_file = "/tmp/sshd.log"
+ready_match = "Server listening on 0.0.0.0 port 22."
+ready_timeout_ms = 30_000
+restart = "never"
+max_restarts = 0
+required = false

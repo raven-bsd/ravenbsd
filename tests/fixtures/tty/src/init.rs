@@ -17,6 +17,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_initfs::Initfs;
+    use raven_libc_proc::consts::KERNEL_WCONTINUED;
     use raven_proto_fs::OpenFlags;
     use raven_rt::entry;
     use raven_rt::fs;
@@ -47,9 +48,9 @@ mod program {
     const SIGTTIN: u32 = 21;
     const SIGTTOU: u32 = 22;
     const WUNTRACED: u32 = 2;
-    // Raw `PROC_WAIT_EX` ABI: the kernel continued bit is 4. The public `sys/wait.h` keeps the
+    // Raw `PROC_WAIT_EX` ABI from the libc constant source. The public `sys/wait.h` keeps the
     // musl/Linux value 8 and the libc backend translates it before this syscall.
-    const WCONTINUED: u32 = 4;
+    const WCONTINUED: u32 = KERNEL_WCONTINUED;
 
     const HUNG_BIT: u32 = 0x8000_0000;
     const PROC_HANDLE_INFO: usize = 0x3E;

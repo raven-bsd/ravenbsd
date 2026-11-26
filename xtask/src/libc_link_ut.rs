@@ -20,6 +20,7 @@ fn parse_accepts_arch_set_and_check() {
         "--set".into(),
         "tiny".into(),
         "--check".into(),
+        "--verify".into(),
         "--json".into(),
         "--out".into(),
         "build/alt".into(),
@@ -28,6 +29,7 @@ fn parse_accepts_arch_set_and_check() {
     assert_eq!(options.arch, Arch::Aarch64);
     assert_eq!(options.set, "tiny");
     assert!(options.check);
+    assert!(options.verify);
     assert!(options.json);
     assert_eq!(options.out, PathBuf::from("build/alt"));
 }
@@ -164,4 +166,138 @@ fn the_elf_gate_accepts_a_real_shared_object() {
     }
     // This fixture has no SONAME check for the loader; the gate is a smoke check of the parser.
     let _ = check_elf(&so, "libc");
+}
+
+fn loader_gate_text(base: u64) -> String {
+    let mut text = format!(
+        "Type:                              DYN (Shared object file)\n  \
+         LOAD           0x000000 0x{base:016x} 0x{base:016x} 0x000010 0x000010 R   0x1000\n  \
+         GNU_RELRO      0x000000 0x{base:016x} 0x{base:016x} 0x000010 0x000010 R   0x1\n  \
+         GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10\n  \
+         0x000000000000001e (FLAGS)              BIND_NOW\n  \
+         0x000000000000000e (SONAME)             Library soname: [ld-elf.so.1]\n\
+         Entry point address:               0x1234\n  \
+         1234: 0000000000001234     0 FUNC    GLOBAL DEFAULT    1 _rtld_start\n\
+         Symbol table '.dynsym' contains 17 entries:\n"
+    );
+    for (index, name) in export_names().iter().enumerate() {
+        text.push_str(&format!(
+            "  {index}: 0000000000001000    10 FUNC    GLOBAL DEFAULT    1 {name}@@RAVEN_1.0\n"
+        ));
+    }
+    text
+}
+
+#[test]
+fn the_loader_gate_requires_the_supported_image_base() {
+    assert!(gate_text(&loader_gate_text(LOADER_IMAGE_BASE), "loader").is_ok());
+    let error = gate_text(&loader_gate_text(0), "loader").expect_err("base zero");
+    assert!(format!("{error}").contains("first PT_LOAD image base"));
+}
+
+#[test]
+fn loader_manifest_renders_and_parses_the_contract() {
+    let bytes = b"loader-bytes";
+    let text = loader_manifest_text("x86_64", "abc1234", bytes, "deadbeef");
+    let manifest = parse_loader_manifest(&text).expect("manifest");
+    assert_eq!(manifest.arch, "x86_64");
+    assert_eq!(manifest.revision, "abc1234");
+    assert_eq!(manifest.image_base, "0x1000");
+    assert_eq!(manifest.interpreter, "/libexec/ld-elf.so.1");
+    assert_eq!(manifest.size, bytes.len() as u64);
+    assert_eq!(
+        manifest.crc32,
+        format!("{:08x}", raven_initfs::crc32(bytes))
+    );
+    assert_eq!(manifest.sha256, "deadbeef");
+}
+
+#[test]
+fn a_stale_loader_or_manifest_does_not_match() {
+    let root = std::env::temp_dir().join(format!("k131-manifest-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let loader = root.join("build/x86_64/ld-elf.so.1");
+    std::fs::create_dir_all(loader.parent().unwrap()).unwrap();
+    std::fs::write(&loader, b"fresh").unwrap();
+    let manifest = loader_manifest_path(&root, "x86_64");
+    let text = loader_manifest_text("x86_64", "rev", b"fresh", "sha");
+    std::fs::write(&manifest, &text).unwrap();
+    assert!(loader_manifest_matches(&root, "x86_64"));
+
+    std::fs::write(&loader, b"stale").unwrap();
+    assert!(!loader_manifest_matches(&root, "x86_64"));
+
+    std::fs::write(&loader, b"fresh").unwrap();
+    std::fs::write(&manifest, text.replace("0x1000", "0x0")).unwrap();
+    assert!(!loader_manifest_matches(&root, "x86_64"));
+
+    std::fs::remove_file(&manifest).unwrap();
+    assert!(!loader_manifest_matches(&root, "x86_64"));
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn stage_sysroot_replaces_a_stale_libc_so_with_the_script() {
+    let out = std::env::temp_dir().join(format!("k430-sysroot-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out);
+    let stale = out.join("sysroot/usr/lib/libc.so");
+    std::fs::create_dir_all(stale.parent().unwrap()).unwrap();
+    std::fs::write(&stale, b"stale ELF, not the dynamic libc script").unwrap();
+    let libc = out.join("libc.so.1");
+    let loader = out.join("ld-elf.so.1");
+    std::fs::write(&libc, b"libc").unwrap();
+    std::fs::write(&loader, b"loader").unwrap();
+
+    stage_sysroot(&out, &libc, &loader).expect("stage");
+
+    assert_eq!(
+        std::fs::read(&stale).expect("script"),
+        b"INPUT ( libc.so.1 )\n"
+    );
+    assert_eq!(
+        std::fs::read(out.join("sysroot/lib/libc.so.1")).expect("libc"),
+        b"libc"
+    );
+    assert_eq!(
+        std::fs::read(out.join("sysroot/libexec/ld-elf.so.1")).expect("loader"),
+        b"loader"
+    );
+    std::fs::remove_dir_all(&out).unwrap();
+}
+
+#[test]
+fn dso_stamp_goes_stale_with_the_sources_and_files() {
+    let root = std::env::temp_dir().join(format!("k548-dso-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let source = root.join("libc/ravenlibc/crates/raven-libc/src.rs");
+    std::fs::create_dir_all(source.parent().expect("parent")).expect("mkdir");
+    std::fs::write(&source, b"one").expect("source");
+    let out = root.join("build/x86_64");
+    std::fs::create_dir_all(out.join("sysroot/lib")).expect("lib");
+    std::fs::create_dir_all(out.join("sysroot/libexec")).expect("libexec");
+    for path in [
+        "libc.so.1",
+        "ld-elf.so.1",
+        "sysroot/lib/libc.so.1",
+        "sysroot/libexec/ld-elf.so.1",
+    ] {
+        std::fs::write(out.join(path), path.as_bytes()).expect("file");
+    }
+    let hash = |path: &str| crate::libc_pack::hash_file(&out.join(path)).expect("hash");
+    let sources = crate::libc_pack::source_hash(&root).expect("sources");
+    let text = format!(
+        "format={DSO_STAMP_FORMAT}\narch=x86_64\nset=server\nsources={sources:016x}\nlibc_so={:016x}\nsysroot_libc_so={:016x}\nloader={:016x}\nsysroot_loader={:016x}\n",
+        hash("libc.so.1"),
+        hash("sysroot/lib/libc.so.1"),
+        hash("ld-elf.so.1"),
+        hash("sysroot/libexec/ld-elf.so.1"),
+    );
+    std::fs::write(out.join(DSO_STAMP_FILE), text).expect("stamp");
+    assert!(dso_stamp_current(&root, "x86_64"));
+    std::fs::write(&source, b"two").expect("rewrite");
+    assert!(!dso_stamp_current(&root, "x86_64"));
+    std::fs::write(&source, b"one").expect("restore");
+    std::fs::write(out.join("ld-elf.so.1"), b"changed loader").expect("loader");
+    assert!(!dso_stamp_current(&root, "x86_64"));
+    let _ = std::fs::remove_dir_all(&root);
 }

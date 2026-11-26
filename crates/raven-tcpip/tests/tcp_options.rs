@@ -182,6 +182,59 @@ fn tcp_frame_payload(
     frame
 }
 
+/// One IPv4/TCP frame with an explicit advertised window (FreeBSD window-update tests).
+fn tcp_frame_window(
+    options: &[u8],
+    seq: u32,
+    ack: u32,
+    flags: TcpFlags,
+    window: u16,
+    payload: &[u8],
+) -> Vec<u8> {
+    let header = TcpHeader {
+        src_port: 40_000,
+        dst_port: 80,
+        sequence: seq,
+        acknowledgement: ack,
+        flags,
+        window,
+        urgent_pointer: 0,
+    };
+    let context = ChecksumContext::ipv4(WireIpv4Addr::new(A), WireIpv4Addr::new(B));
+    let padded = (options.len() + 3) & !3;
+    let mut segment = vec![0u8; 20 + padded + payload.len()];
+    {
+        let mut builder =
+            TcpBuilder::new(&mut segment, context, &header, options, payload.len()).expect("tcp");
+        builder.payload_mut().copy_from_slice(payload);
+        builder.finish();
+    }
+    let ip_header = Ipv4Header {
+        id: 3,
+        ttl: 64,
+        protocol: 6,
+        src: WireIpv4Addr::new(A),
+        dst: WireIpv4Addr::new(B),
+        ..Ipv4Header::default()
+    };
+    let mut packet = vec![0u8; 20 + segment.len()];
+    let mut builder = Ipv4Builder::new(&mut packet, &ip_header, segment.len()).expect("ipv4");
+    builder.payload_mut().copy_from_slice(&segment);
+    builder.finish();
+    let mut frame = vec![0u8; 14 + packet.len()];
+    let mut builder = EthernetBuilder::new(
+        &mut frame,
+        MacAddr::new(AMAC),
+        MacAddr::new(BMAC),
+        EtherType::Ipv4,
+        packet.len(),
+    )
+    .expect("ethernet");
+    builder.payload_mut().copy_from_slice(&packet);
+    builder.finish();
+    frame
+}
+
 fn tcp_packets(link: &Link) -> Vec<(TcpFlags, u32, u32, u16, Vec<u8>)> {
     link.trace()
         .entries()
@@ -571,4 +624,68 @@ fn sack_permitted_is_negotiated_on_the_default_handshake() {
     let (sa, sb) = handshake(&mut a, &mut b);
     assert_eq!(a.test_tcp_sack_permitted(sa), Some(true));
     assert_eq!(b.test_tcp_sack_permitted(sb), Some(true));
+}
+
+#[test]
+fn a_small_receive_window_reaches_zero_after_the_buffer_fills() {
+    let (link, mut a, mut b) = pair();
+    b.set_property("tcp.recv_buffer_default", 2048)
+        .expect("recv buffer");
+    let (socket, peer) = handshake(&mut a, &mut b);
+    a.send(socket, &vec![0u8; 8192]).expect("send");
+    drive(&mut a, &mut b, &[210, 260, 310, 360]);
+    let (window, _, _) = a.test_tcp_window(socket).expect("window");
+    let windows: Vec<u16> = tcp_packets(&link).iter().map(|packet| packet.3).collect();
+    assert_eq!(
+        window,
+        0,
+        "the peer advertised a closed window; queued={:?} windows={windows:?}",
+        b.recv_queue_len(peer)
+    );
+}
+
+#[test]
+fn stale_window_update_does_not_overwrite_the_current_window() {
+    let (_link, mut a, mut b) = pair();
+    let (_sa, sb) = handshake(&mut a, &mut b);
+    let rcv_nxt = b.test_tcp_rcv_nxt(sb).expect("rcv_nxt");
+    let (_, _, snd_nxt) = b.test_tcp_window(sb).expect("window");
+    let (snd_scale, ..) = b.test_tcp_options_info(sb).expect("options");
+    let current = u32::from(1000u16) << snd_scale;
+
+    // An in-order data segment with a 1000-byte window is the current update.
+    let frame = tcp_frame_window(&[], rcv_nxt, snd_nxt, TcpFlags::ACK, 1000, b"x");
+    b.test_inject_frame(&frame, Instant::from_millis(300));
+    assert_eq!(
+        b.test_tcp_window(sb).expect("window").0,
+        current,
+        "the current window update"
+    );
+
+    // The same sequence/ACK with a smaller window is a duplicate and must not shrink snd_wnd.
+    let frame = tcp_frame_window(&[], rcv_nxt, snd_nxt, TcpFlags::ACK, 10, &[]);
+    b.test_inject_frame(&frame, Instant::from_millis(301));
+    assert_eq!(
+        b.test_tcp_window(sb).expect("window").0,
+        current,
+        "a stale duplicate ACK must not overwrite snd_wnd"
+    );
+}
+
+#[test]
+fn mss_and_window_scale_are_syn_only_options() {
+    let (_link, mut a, mut b) = pair();
+    let (_sa, sb) = handshake(&mut a, &mut b);
+    let before = b.test_tcp_options_info(sb).expect("options");
+    let rcv_nxt = b.test_tcp_rcv_nxt(sb).expect("rcv_nxt");
+    let (_, _, snd_nxt) = b.test_tcp_window(sb).expect("window");
+
+    // MSS 100 (kind 2, len 4), window scale 14 (kind 3, len 3), EOL.
+    let options = [2u8, 4, 0, 100, 3, 3, 14, 0];
+    let frame = tcp_frame(&options, rcv_nxt, snd_nxt, TcpFlags::ACK);
+    b.test_inject_frame(&frame, Instant::from_millis(300));
+    let after = b.test_tcp_options_info(sb).expect("options");
+
+    assert_eq!(after.4, before.4, "a non-SYN MSS must be ignored");
+    assert_eq!(after.0, before.0, "a non-SYN window scale must be ignored");
 }

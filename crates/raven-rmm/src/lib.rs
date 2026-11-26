@@ -163,6 +163,8 @@ pub enum MapError {
     HugePageConflict,
     /// The caller asked to map physical RAM as device memory (or vice versa).
     NotDeviceMemory,
+    /// A user-accessible mapping was requested outside the user virtual-address half.
+    UserKernelSplit,
 }
 
 impl fmt::Display for MapError {
@@ -176,6 +178,7 @@ impl fmt::Display for MapError {
             MapError::OutOfFrames => f.write_str("out of page-table frames"),
             MapError::HugePageConflict => f.write_str("huge page conflicts with the mapping"),
             MapError::NotDeviceMemory => f.write_str("refusing to map RAM as device memory"),
+            MapError::UserKernelSplit => f.write_str("user mapping outside the user half"),
         }
     }
 }

@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K140: initfs MAP primitive through the ordinary Handle::INITFS path. The fixture maps the
+# archive read-only and RX, proves private COW (including a forked child), exercises the
+# rejected unaligned/shared/W|X/missing-right/PROTECT-write forms, and records the first-touch
+# cost over 3 MiB (768 pages).
+
+name = "initfs-map"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/initfs-map-fixture/build.sh"]
+initfs = "build/fixtures/initfs-map/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^initfs-map: faults pages=768 total_us=\d+ per_page_ns=\d+$'
+
+[[expect]]
+regex = '^initfs-map: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|initfs-map: fail'

@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K473: the exact server-side pty sequence sshd runs, without sshd or the network. The guest case
+# logs each libutil/termios/spawn call with its return, forks+execs itself on the slave, reads
+# /dev/pts/N and 43x120 through the master, exercises ECHO and a completed input line, then closes
+# everything and the pty server must report files=0 pairs=0.
+
+name = "pty-ssh-shape"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-ssh-shape"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: start uid=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=1 call=posix_openpt rv=[0-9]+ errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=2 call=grantpt rv=0 errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=3 call=unlockpt rv=0 errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=4 call=ptsname rv=0 path=/dev/pts/[0-9]+ errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=5 call=open_slave rv=[0-9]+ path=/dev/pts/[0-9]+ errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=6 call=tcsetattr rv=0 errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=7 call=tcsetwinsize rv=0 rows=43 cols=120 errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=8 call=fork_exec rv=0 pid=[0-9]+ errno=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=9 call=read_master rv=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=9 call=child_shape tty=/dev/pts/[0-9]+ rows=43 cols=120$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=9 call=tcgetwinsize_master rv=0 rows=43 cols=120$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=10 call=read_echo rv=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=10 call=read_line rv=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=10 call=child_read rv=2$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=10 call=child_done rv=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=11 call=waitpid rv=[1-9][0-9]* status=0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: step=12 call=close rv=0/0$'
+
+[[expect]]
+regex = '^pty-ssh-shape: ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-ssh-shape: FAIL'

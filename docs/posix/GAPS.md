@@ -1889,10 +1889,10 @@ Traceability rows: 1802; profile rows: 1802.
 
 ## Current tree
 
-- frozen exported symbols: 1749
-- `userland/bin` directories: 105
+- frozen exported symbols: 1757
+- `userland/bin` directories: 111
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, gpart, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, localedef, logger, login, lp, ls, lsblk, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newfs, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, time, times, touch, tput, trace, ulimit, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
+- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, curl, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, gpart, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, localedef, logger, login, lp, ls, lsblk, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newfs, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, poweroff, ps, raven, reboot, renice, rm, rmdir, route, rsh, sed, shutdown, sleep, stat, strings, strip, su, svcctl, talk, tar, tcpdump, time, times, touch, tput, trace, ulimit, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, wget, whoami, write, xargs, yacc, zcat
 
 ## Top gaps
 

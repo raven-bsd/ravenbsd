@@ -1,0 +1,99 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+warning: output filename collision at /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/examples/gen_tables
+  |
+  = note: the example target `gen_tables` in package `raven-linux-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/crates/raven-linux-abi)` has the same output filename as the example target `gen_tables` in package `raven-libc-iconv-cjk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-iconv-cjk)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/examples/gen_tables.dwp
+  |
+  = note: the example target `gen_tables` in package `raven-linux-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/crates/raven-linux-abi)` has the same output filename as the example target `gen_tables` in package `raven-libc-iconv-cjk v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-iconv-cjk)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+   Compiling raven-libc-personality-linux v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-linux)
+warning: unexpected `cfg` condition value: `ravenbsd`
+   --> toolchain/vendor/libc/src/unix/mod.rs:561:21
+    |
+561 |     } else if #[cfg(target_os = "ravenbsd")] {
+    |                     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `target_os` are: `aix`, `amdhsa`, `android`, `cuda`, `cygwin`, `dragonfly`, `emscripten`, `espidf`, `freebsd`, `fuchsia`, `haiku`, `helenos`, `hermit`, `horizon`, `hurd`, `illumos`, `ios`, `l4re`, `linux`, `lynxos178`, `macos`, `managarm`, `motor`, `netbsd`, `none`, `nto`, `nuttx`, `ohos`, `openbsd`, `psp`, `psx`, `qurt`, `redox`, `rtems`, and `solaris` and 16 more
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `ravenbsd`
+    --> toolchain/vendor/libc/src/unix/mod.rs:2485:21
+     |
+2485 |     } else if #[cfg(target_os = "ravenbsd")] {
+     |                     ^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `target_os` are: `aix`, `amdhsa`, `android`, `cuda`, `cygwin`, `dragonfly`, `emscripten`, `espidf`, `freebsd`, `fuchsia`, `haiku`, `helenos`, `hermit`, `horizon`, `hurd`, `illumos`, `ios`, `l4re`, `linux`, `lynxos178`, `macos`, `managarm`, `motor`, `netbsd`, `none`, `nto`, `nuttx`, `ohos`, `openbsd`, `psp`, `psx`, `qurt`, `redox`, `rtems`, and `solaris` and 16 more
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+   Compiling raven-libc-personality-solaris v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-solaris)
+warning: `libc` (lib) generated 2 warnings
+   Compiling raven-libc-personality-bsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-personality-bsd)
+   Compiling raven-libc-net v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-net)
+   Compiling raven-s26-evq v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/fixtures/s26-evq)
+   Compiling raven-s40-teardown v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/fixtures/s40-teardown)
+   Compiling xtask v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/xtask)
+   Compiling raven-libc-pwd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-pwd)
+   Compiling raven-libc-stdlib v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-stdlib)
+   Compiling raven-libc-resolv v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-resolv)
+   Compiling raven-libc-glob v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-glob)
+   Compiling raven-s17-pager v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/fixtures/s17-pager)
+   Compiling posix-misc2-evidence v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/posix/utility/misc2/evidence)
+   Compiling raven-libc-fuzz-replay v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/libc/fuzz/replay)
+   Compiling raven-qtest v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/qtest)
+   Compiling raven-netcore-packetdrill-harness v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/net/packetdrill-harness)
+   Compiling raven-libc-fmt v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-fmt)
+   Compiling rack-pipe-matrix v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/rack-pipe-matrix)
+   Compiling raven-libc-time v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-time)
+   Compiling raven-libc-dtoa v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/libc/ravenlibc/crates/raven-libc-dtoa)
+error[E0152]: found duplicate lang item `panic_impl`
+   --> tests/fixtures/s17-pager/src/lib.rs:221:1
+    |
+221 | / fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
+222 | |     exit(2)
+223 | | }
+    | |_^
+    |
+    = note: the lang item is first defined in crate `raven_rt` (which `raven_s17_pager` depends on)
+    = note: first definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-fa49c12bdbd8f345.rmeta
+    = note: second definition in the local crate (`raven_s17_pager`)
+
+For more information about this error, try `rustc --explain E0152`.
+error: could not compile `raven-s17-pager` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0152]: duplicate lang item in crate `raven_rt` (which `raven_s26_evq` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `std` (which `raven_initfs` depends on)
+  = note: first definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+  = note: second definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-fa49c12bdbd8f345.rmeta
+
+error: could not compile `raven-s26-evq` (lib) due to 1 previous error
+error[E0432]: unresolved import `raven_rt::spawn::spawn`
+   --> tests/fixtures/s40-teardown/src/lib.rs:11:56
+    |
+ 11 | use raven_rt::spawn::{RtSys, SpawnError, SpawnOptions, spawn};
+    |                                                        ^^^^^ no `spawn` in `spawn`
+    |
+note: found an item that was configured out
+   --> userland/rt/src/spawn.rs:118:8
+    |
+117 | #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    |          -------------------------------------------- the item is gated here
+118 | pub fn spawn(
+    |        ^^^^^
+
+error[E0152]: duplicate lang item in crate `raven_rt` (which `raven_s40_teardown` depends on): `panic_impl`
+  |
+  = note: the lang item is first defined in crate `std` (which `raven_initfs` depends on)
+  = note: first definition in `std` loaded from /home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-c64e6e11aa24fc43.rmeta
+  = note: second definition in `raven_rt` loaded from /media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/target/debug/deps/libraven_rt-fa49c12bdbd8f345.rmeta
+
+Some errors have detailed explanations: E0152, E0432.
+For more information about an error, try `rustc --explain E0152`.
+error: could not compile `raven-s40-teardown` (lib) due to 2 previous errors
+Command exited with non-zero status 101
+ELAPSED:13.57

@@ -21,7 +21,7 @@ fn insert_and_get() {
     let index = arena.insert(Handle(7), OfdKind::File, 0, None);
     assert_eq!(index, 1);
     let ofd = arena.get(index).expect("ofd");
-    assert_eq!(ofd.handle, Handle(7));
+    assert_eq!(ofd.handle.get(), Handle(7));
     assert_eq!(ofd.kind, OfdKind::File);
     assert_eq!(ofd.refs.load(core::sync::atomic::Ordering::Relaxed), 1);
 }
@@ -50,7 +50,7 @@ fn release_reuses_the_slot() {
     let first = arena.insert(Handle(1), OfdKind::File, 0, None);
     let _ = arena.drop_ref(first);
     let released = arena.release(first).expect("released");
-    assert_eq!(released.handle, Handle(1));
+    assert_eq!(released.handle.get(), Handle(1));
     let second = arena.insert(Handle(2), OfdKind::File, 0, None);
     assert_eq!(second, first, "the freed slot is reused");
 }
@@ -66,6 +66,30 @@ fn access_mode_helpers() {
     let ofd = Ofd::new(Handle(1), OfdKind::File, 2, None, 1);
     assert!(ofd.readable());
     assert!(ofd.writable());
+}
+
+#[test]
+fn pending_ofd_attaches_once() {
+    let mut ofd = Ofd::new(Handle::NONE, OfdKind::Socket, 0, None, 1);
+    assert_eq!(ofd.handle.get(), Handle::NONE);
+    assert_eq!(ofd.set_handle(Handle(9)), Ok(()));
+    assert_eq!(ofd.handle.get(), Handle(9));
+    assert_eq!(ofd.set_handle(Handle(10)), Err(Errno::EEXIST));
+    let mut ofd = Ofd::new(Handle::NONE, OfdKind::Socket, 0, None, 2);
+    assert_eq!(ofd.set_handle(Handle::NONE), Err(Errno::EINVAL));
+}
+
+#[test]
+fn an_event_handle_becomes_the_poll_source() {
+    let mut ofd = Ofd::new(Handle(4), OfdKind::Socket, 0, None, 1);
+    assert_eq!(ofd.poll_handle(), Handle(4));
+    assert!(!ofd.poll_signaled());
+    assert_eq!(ofd.set_event(Handle(5)), Ok(()));
+    assert_eq!(ofd.poll_handle(), Handle(5));
+    assert!(ofd.poll_signaled());
+    assert_eq!(ofd.set_event(Handle(6)), Err(Errno::EEXIST));
+    let mut plain = Ofd::new(Handle(7), OfdKind::File, 0, None, 2);
+    assert_eq!(plain.set_event(Handle::NONE), Err(Errno::EINVAL));
 }
 
 #[test]

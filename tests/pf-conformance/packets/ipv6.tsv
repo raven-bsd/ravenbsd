@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# scenario: ipv6
+# features: ipv6,stateful,tcp,udp,allow,deny
+# reference: OpenBSD sys/net/pf.c:pf_test6; FreeBSD sys/netpfil/pf/pf.c IPv6 paths; NetBSD sys/net/npf/npf.c
+# support: donor-only (raven-pf at 4adc24a2 is IPv4-only)
+#
+# expect-counters in_pass=1 in_block=2 out_pass=2 out_block=0 states_created=2 states_expired=0 state_hits=1
+# now direction interface proto source sport destination dport length flags expected disposition
+0   in  eth0 tcp 2001:db8::5  40000 2001:db8::10 80   60 S  pass created
+1   out eth0 tcp 2001:db8::10 80    2001:db8::5  40000 60 SA pass existing
+2   in  eth0 tcp 2001:db8::5  40001 2001:db8::10 22   60 S  block -
+3   out eth0 udp 2001:db8::5  53000 2001:db8::53 53   57 -  pass created
+4   in  eth0 tcp 2001:db9::5  40002 2001:db8::10 80   60 S  block -

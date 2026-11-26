@@ -37,6 +37,8 @@ pub enum Readiness {
     Scheme,
     /// Ready when the service exits successfully.
     Exit,
+    /// Ready when `ready_file` contains `ready_match`.
+    File,
     /// No readiness wait.
     #[default]
     None,
@@ -67,6 +69,10 @@ pub struct Manifest {
     pub max_restarts: u32,
     /// Readiness policy.
     pub readiness: Readiness,
+    /// Absolute file path polled by [`Readiness::File`].
+    pub ready_file: String,
+    /// Exact byte string that marks [`Readiness::File`] ready.
+    pub ready_match: String,
     /// How long readiness may take, in milliseconds, `0..=MAX_READY_TIMEOUT_MS`.
     pub ready_timeout_ms: u32,
     /// Whether the service is required for a successful boot.
@@ -95,6 +101,8 @@ impl Default for Manifest {
             restart_delay_ms: 200,
             max_restarts: 5,
             readiness: Readiness::None,
+            ready_file: String::new(),
+            ready_match: String::new(),
             ready_timeout_ms: 5_000,
             required: true,
             window_ms: 60_000,
@@ -158,6 +166,8 @@ impl Manifest {
         let mut restart_delay_ms = 200;
         let mut max_restarts = 5;
         let mut readiness = Readiness::None;
+        let mut ready_file = String::new();
+        let mut ready_match = String::new();
         let mut ready_timeout_ms = 5_000;
         let mut required = true;
         let mut window_ms = 60_000;
@@ -285,9 +295,24 @@ impl Manifest {
                     readiness = match value.as_str() {
                         "scheme" => Readiness::Scheme,
                         "exit" => Readiness::Exit,
+                        "file" => Readiness::File,
                         "none" => Readiness::None,
                         _ => return Err(error(line, ParseErrorKind::InvalidValue("readiness"))),
                     };
+                }
+                "ready_file" => {
+                    let value = string_value(value, line, "ready_file")?;
+                    if !value.starts_with('/') {
+                        return Err(error(line, ParseErrorKind::InvalidValue("ready_file")));
+                    }
+                    ready_file = value;
+                }
+                "ready_match" => {
+                    let value = string_value(value, line, "ready_match")?;
+                    if value.is_empty() {
+                        return Err(error(line, ParseErrorKind::InvalidValue("ready_match")));
+                    }
+                    ready_match = value;
                 }
                 "ready_timeout_ms" => {
                     let value = integer_value(value, line, "ready_timeout_ms")?;
@@ -327,6 +352,14 @@ impl Manifest {
         let Some(exec) = exec else {
             return Err(error(error_line, ParseErrorKind::MissingKey("exec")));
         };
+        if readiness == Readiness::File {
+            if ready_file.is_empty() {
+                return Err(error(error_line, ParseErrorKind::MissingKey("ready_file")));
+            }
+            if ready_match.is_empty() {
+                return Err(error(error_line, ParseErrorKind::MissingKey("ready_match")));
+            }
+        }
         Ok(Self {
             name,
             exec,
@@ -339,6 +372,8 @@ impl Manifest {
             restart_delay_ms,
             max_restarts,
             readiness,
+            ready_file,
+            ready_match,
             ready_timeout_ms,
             required,
             window_ms,

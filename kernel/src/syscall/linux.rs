@@ -277,7 +277,7 @@ fn submit(
     server.scheme_queue.lock().push_back(Arc::clone(request));
     drop(state);
     server.scheme_waiters.wake(server.id, 0, usize::MAX);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(server) as usize as u64);
     Ok(())
 }
 

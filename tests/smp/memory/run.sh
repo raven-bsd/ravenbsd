@@ -78,7 +78,7 @@ esac
 
 image=build/smp-memory/smp-memory.img
 initfs=build/smp-memory/initfs.img
-cmdline='console=ttyS0 test-exit=1 smp_user=on smp-user-trace'
+cmdline='console=ttyS0 test-exit=1 smp_user=on smp-user-trace s24-framecheck'
 out=build/smp-memory/$mode
 
 if [ "$no_build" -eq 0 ]; then
@@ -131,6 +131,41 @@ while [ "$iteration" -le "$iterations" ]; do
     if [ -z "$duration" ]; then
         echo "smp-memory: missing duration in $run_dir/$case_name.json" >&2
         exit 2
+    fi
+    # K475: the s24 evidence line is kernel serial output, so the numeric baseline check lives
+    # here in the runner. `baseline` is the last free-frame line before the first OOM round;
+    # `post1`/`post2` are the last lines before each round's `done` drain marker. The documented
+    # one-time reserve (1,052,672 B from K453) and the test-owned 4 KiB shared barrier page are
+    # allowed; a per-round difference is limited to the documented 32 KiB cache transient.
+    log=$run_dir/$case_name.log
+    baseline=$(awk -F= '/^s24: frames free=/ { value=$2 } /^oom: round=1 children=2/ { print value; exit }' "$log")
+    post1=$(awk -F= '/^s24: frames free=/ { value=$2 } /^oom: round=1 done/ { print value; exit }' "$log")
+    post2=$(awk -F= '/^s24: frames free=/ { value=$2 } /^oom: round=2 done/ { print value; exit }' "$log")
+    for value in "$baseline" "$post1" "$post2"; do
+        case $value in
+            ''|*[!0-9]*)
+                {
+                    echo "smp-memory: FAIL oom-baseline mode=$mode iteration=$iteration log=$log"
+                    echo "smp-memory: baseline=$baseline post1=$post1 post2=$post2 (missing s24 or oom marker)"
+                } | tee "$out/failure.txt" >&2
+                exit 1
+                ;;
+        esac
+    done
+    allowed=$((4096 + 1052672 + 32768))
+    if [ "$post1" -lt $((baseline - allowed)) ]; then
+        {
+            echo "smp-memory: FAIL oom-baseline mode=$mode iteration=$iteration log=$log"
+            echo "smp-memory: baseline=$baseline post1=$post1 delta=$((baseline - post1)) allowed=$allowed"
+        } | tee "$out/failure.txt" >&2
+        exit 1
+    fi
+    if [ "$post2" -lt $((post1 - 32768)) ]; then
+        {
+            echo "smp-memory: FAIL oom-per-attempt mode=$mode iteration=$iteration log=$log"
+            echo "smp-memory: post1=$post1 post2=$post2 delta=$((post1 - post2)) allowed=32768"
+        } | tee "$out/failure.txt" >&2
+        exit 1
     fi
     printf '%s\n' "$duration" >> "$durations"
     cp "$run_dir/$case_name.log" "$out/run-$iteration.log"

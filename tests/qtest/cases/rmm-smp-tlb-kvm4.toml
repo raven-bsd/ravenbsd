@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RM1: the page-table mapper's SMP/TLB integration acceptance. This reuses the existing S101
+# memory fixture (allocator/fault/map/fork and the four-way concurrent unmap/TLB-shootdown
+# barrier) under a KVM -smp 4 boot; the new artifact is this RMM-owned qtest case. The kernel and
+# fixture are unchanged.
+name = "rmm-smp-tlb-kvm4"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/smp/memory/build.sh"]
+initfs = "build/smp-memory/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp-user: cpu [1-9] first user thread pid=\d+ tid=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^smp-memory: start workers=3$'
+
+[[expect]]
+regex = '^smp-memory: tlb map=0x[0-9a-f]+ alias=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^smp-memory: concurrent-shootdown waiters=4$'
+
+[[expect]]
+regex = '^smp-memory: workers ready$'
+
+[[expect]]
+regex = '^smp-memory: summary alloc_ops=\d+ fault_pages=\d+ maps=\d+ forks=4 tlb_rounds=64 tlb_stale=0$'
+
+[[expect]]
+regex = '^smp-memory: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-memory: failed|smp-memory: worker .* failed|stale round|tlb shootdown timeout'

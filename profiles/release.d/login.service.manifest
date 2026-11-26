@@ -6,6 +6,6 @@
 
 name = "getty"
 exec = "/bin/getty"
-needs = ["consd", "vfsd", "ramfsd", "initfsd"]
+needs = ["consd", "vfsd", "ramfsd", "initfsd", "scheme:net"]
 restart = "on-failure"
 grants = ["initfs"]

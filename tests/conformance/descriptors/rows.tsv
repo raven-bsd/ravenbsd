@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S172 descriptor table: name <TAB> requirement <TAB> gate.
+dup-offset	S172-R01	1
+dup2-dupfd	S172-R01	1
+append	S172-R01	1
+open-flags	S172-R01	1
+fd-flags	S172-R01	1
+cloexec	S172-R01	1
+eof	S172-R01	1
+short-read	S172-R01	1
+eintr	S172-R01	1
+nonblock	S172-R01	1
+epipe-sigpipe	S172-R01	1
+fstat-identity	S172-R01	1

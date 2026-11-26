@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "fast-retransmit"
+runner = "tests/net-conformance/loss/run.sh"
+donor = ["FreeBSD sys/netinet/tcp_input.c: three duplicate ACKs", "FreeBSD sys/netinet/tcp_output.c: fast retransmit"]
+rfcs = ["RFC 9293 section 3.8.4 (fast retransmit)"]
+
+[[expect]]
+step = "data segment is withheld and three dup ACKs are sent"
+packet = "ACK"
+assert = "ack=server_isn+1, window=65535, three identical ACKs"
+
+[[expect]]
+step = "the sender recovers before a full RTO"
+packet = "retransmit"
+assert = "same seq and bytes, observed within 1 s of the dup ACKs"

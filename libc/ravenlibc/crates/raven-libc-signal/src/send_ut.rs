@@ -4,6 +4,7 @@
 use super::*;
 use crate::dispositions::{DispTable, Disposition};
 use crate::host_ut::{HostSigKernel, Trace};
+use crate::kernel::SigCaps;
 use crate::mask;
 use crate::sigset::SigSet;
 use raven_libc_abi::structs::Sigval;
@@ -58,9 +59,34 @@ fn raise_while_masked_leaves_it_pending() {
         None,
     )
     .unwrap();
-    let point = kernel.safe_point(&table, None, None);
-    assert!(point.terminated.is_none());
+    kernel
+        .direct(&table, crate::kernel::KICK_CHECK, None)
+        .unwrap();
     assert_eq!(RAISE_COUNT.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn raise_uses_the_thread_directed_provider_and_not_the_table() {
+    let _guard = crate::host_ut::GLOBAL_TEST_LOCK.lock().unwrap();
+    RAISE_COUNT.store(0, Ordering::SeqCst);
+    let kernel = HostSigKernel::with_caps(SigCaps {
+        authoritative: true,
+        ..SigCaps::HOST
+    });
+    let table = DispTable::new();
+    mask::set_mask(&kernel, 0);
+    table.write(
+        10,
+        Disposition::handler(count_handler as *const () as usize),
+    );
+    raise(&kernel, &table, 10).unwrap();
+    assert!(
+        kernel
+            .trace()
+            .contains(&Trace::ThreadSigqueue(u32::MAX, 10))
+    );
+    // The provider delivers; libc must not call the handler itself.
+    assert_eq!(RAISE_COUNT.load(Ordering::SeqCst), 0);
 }
 
 #[test]
@@ -68,7 +94,9 @@ fn raise_validates_the_signal() {
     let _guard = crate::host_ut::GLOBAL_TEST_LOCK.lock().unwrap();
     let kernel = HostSigKernel::new();
     let table = DispTable::new();
-    for sig in [0, -1, 32, 33, 34, 65] {
+    // POSIX raise(0) is the existence check and sends nothing.
+    assert_eq!(raise(&kernel, &table, 0), Ok(()));
+    for sig in [-1, 32, 33, 34, 65] {
         assert_eq!(raise(&kernel, &table, sig), Err(EINVAL_ERR));
     }
 }

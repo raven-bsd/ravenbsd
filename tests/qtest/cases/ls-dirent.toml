@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K172: a directory whose K60 page exceeds the 2048-byte readdir buffer. Short names exercise
+# the 2048/4096 boundaries; a lossy getdents conversion drops entries.
+
+name = "ls-dirent"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 150
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^(raven# )?svcd: all services up$'
+
+[[expect]]
+regex = '103 /tmp/list'
+
+[[expect]]
+regex = '101 /tmp/list'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "mkdir /tmp/dirent\n"
+delay_ms = 100
+
+[[step]]
+send = "touch /tmp/dirent/a /tmp/dirent/b /tmp/dirent/c /tmp/dirent/d /tmp/dirent/e /tmp/dirent/f /tmp/dirent/g /tmp/dirent/h /tmp/dirent/i /tmp/dirent/j /tmp/dirent/k /tmp/dirent/l /tmp/dirent/m /tmp/dirent/n /tmp/dirent/o /tmp/dirent/p /tmp/dirent/q /tmp/dirent/r /tmp/dirent/s /tmp/dirent/t /tmp/dirent/u /tmp/dirent/v /tmp/dirent/w /tmp/dirent/x /tmp/dirent/y /tmp/dirent/z /tmp/dirent/A /tmp/dirent/B /tmp/dirent/C /tmp/dirent/D /tmp/dirent/E /tmp/dirent/F /tmp/dirent/G /tmp/dirent/H /tmp/dirent/I /tmp/dirent/J /tmp/dirent/K /tmp/dirent/L /tmp/dirent/M /tmp/dirent/N /tmp/dirent/O /tmp/dirent/P /tmp/dirent/Q /tmp/dirent/R /tmp/dirent/S /tmp/dirent/T /tmp/dirent/U /tmp/dirent/V /tmp/dirent/W /tmp/dirent/X /tmp/dirent/Y /tmp/dirent/Z /tmp/dirent/0 /tmp/dirent/1 /tmp/dirent/2 /tmp/dirent/3 /tmp/dirent/4 /tmp/dirent/5 /tmp/dirent/6 /tmp/dirent/7 /tmp/dirent/8 /tmp/dirent/9\n"
+delay_ms = 100
+
+[[step]]
+send = "touch /tmp/dirent/aa /tmp/dirent/ab /tmp/dirent/ac /tmp/dirent/ad /tmp/dirent/ae /tmp/dirent/af /tmp/dirent/ag /tmp/dirent/ah /tmp/dirent/ai /tmp/dirent/aj /tmp/dirent/ak /tmp/dirent/al /tmp/dirent/am /tmp/dirent/an /tmp/dirent/ao /tmp/dirent/ap /tmp/dirent/aq /tmp/dirent/ar /tmp/dirent/as /tmp/dirent/at /tmp/dirent/au /tmp/dirent/av /tmp/dirent/aw /tmp/dirent/ax /tmp/dirent/ay /tmp/dirent/az /tmp/dirent/ba /tmp/dirent/bb /tmp/dirent/bc /tmp/dirent/bd /tmp/dirent/be /tmp/dirent/bf /tmp/dirent/bg /tmp/dirent/bh /tmp/dirent/bi /tmp/dirent/bj /tmp/dirent/bk /tmp/dirent/bl\n"
+delay_ms = 100
+
+[[step]]
+send = "touch /tmp/dirent/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+delay_ms = 100
+
+[[step]]
+send = "ls -a /tmp/dirent > /tmp/list\n"
+delay_ms = 100
+
+[[step]]
+send = "wc -l /tmp/list\n"
+delay_ms = 100
+
+[[step]]
+wait = '103 /tmp/list'
+timeout_secs = 15
+
+[[step]]
+send = "ls /tmp/dirent > /tmp/list2\n"
+delay_ms = 100
+
+[[step]]
+send = "wc -l /tmp/list2\n"
+delay_ms = 100
+
+[[step]]
+wait = '101 /tmp/list'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

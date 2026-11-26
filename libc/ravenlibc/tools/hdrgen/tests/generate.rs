@@ -3,29 +3,17 @@
 
 //! Integration tests for `generate` and `check`.
 
+mod support;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+
+use support::{repo_root, require_resources};
 
 const GROUPS: [&str; 14] = [
     "errno", "signal", "fcntl", "mman", "stat", "socket", "netinet", "poll", "time", "resource",
     "limits", "sysconf", "pthread", "misc",
 ];
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..")
-}
-
-fn resources() -> PathBuf {
-    let mut directory = Some(repo_root());
-    while let Some(current) = directory {
-        let candidate = current.join("ravenbsd-resources");
-        if candidate.join("donors.lock").is_file() {
-            return candidate;
-        }
-        directory = current.parent().map(Path::to_path_buf);
-    }
-    panic!("cannot find ravenbsd-resources");
-}
 
 struct Temp {
     path: PathBuf,
@@ -114,7 +102,9 @@ fn generate_twice_is_byte_identical() {
     let abi = temp.copy_tables();
     let rust = temp.rust();
     let root = repo_root();
-    let res = resources();
+    let Some(res) = require_resources("generate") else {
+        return;
+    };
     let args = [
         "generate",
         "--abi",
@@ -149,7 +139,9 @@ fn generate_writes_linux_syscall_numbers() {
     let abi = temp.copy_tables();
     let rust = temp.rust();
     let root = repo_root();
-    let res = resources();
+    let Some(res) = require_resources("generate") else {
+        return;
+    };
     let output = hdrgen(&[
         "generate",
         "--abi",
@@ -181,7 +173,9 @@ fn check_accepts_a_freshly_generated_tree() {
     let abi = temp.copy_tables();
     let rust = temp.rust();
     let root = repo_root();
-    let res = resources();
+    let Some(res) = require_resources("generate") else {
+        return;
+    };
     let args = [
         "generate",
         "--abi",
@@ -218,7 +212,9 @@ fn check_fails_on_an_edited_generated_file() {
     let abi = temp.copy_tables();
     let rust = temp.rust();
     let root = repo_root();
-    let res = resources();
+    let Some(res) = require_resources("generate") else {
+        return;
+    };
     let common = [
         "--abi",
         abi.to_str().unwrap(),
@@ -251,7 +247,9 @@ fn check_fails_on_a_missing_generated_file() {
     let abi = temp.copy_tables();
     let rust = temp.rust();
     let root = repo_root();
-    let res = resources();
+    let Some(res) = require_resources("generate") else {
+        return;
+    };
     let common = [
         "--abi",
         abi.to_str().unwrap(),
@@ -279,7 +277,9 @@ fn check_fails_on_an_extra_generated_file() {
     let abi = temp.copy_tables();
     let rust = temp.rust();
     let root = repo_root();
-    let res = resources();
+    let Some(res) = require_resources("generate") else {
+        return;
+    };
     let common = [
         "--abi",
         abi.to_str().unwrap(),
@@ -303,12 +303,15 @@ fn check_fails_on_an_extra_generated_file() {
 
 #[test]
 fn check_passes_on_the_committed_tree() {
+    let Some(res) = require_resources("check_passes_on_the_committed_tree") else {
+        return;
+    };
     let output = hdrgen(&[
         "check",
         "--root",
         repo_root().to_str().unwrap(),
         "--resources",
-        resources().to_str().unwrap(),
+        res.to_str().unwrap(),
     ]);
     assert!(
         output.status.success(),

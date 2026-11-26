@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K214: closefrom(3) and close_range(3, INT_MAX, 0) must return promptly, close the real
+# descriptors and keep stdio; the CLOSE_RANGE_CLOEXEC form must mark without closing and be
+# bounded the same way. Invalid ranges and unsupported flags stay EINVAL.
+
+name = "closefrom"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/libc/target/build.sh closefrom"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^closefrom: start$'
+
+[[expect]]
+regex = '^closefrom: setup-closefrom ok$'
+
+[[expect]]
+regex = '^closefrom: closefrom-returns ok$'
+
+[[expect]]
+regex = '^closefrom: closefrom-ms=[0-9]+$'
+
+[[expect]]
+regex = '^closefrom: closefrom-closed ok$'
+
+[[expect]]
+regex = '^closefrom: closefrom-keeps-stdio ok$'
+
+[[expect]]
+regex = '^closefrom: setup-range ok$'
+
+[[expect]]
+regex = '^closefrom: range-returns ok$'
+
+[[expect]]
+regex = '^closefrom: range-ms=[0-9]+$'
+
+[[expect]]
+regex = '^closefrom: range-closed ok$'
+
+[[expect]]
+regex = '^closefrom: setup-cloexec ok$'
+
+[[expect]]
+regex = '^closefrom: cloexec-returns ok$'
+
+[[expect]]
+regex = '^closefrom: cloexec-ms=[0-9]+$'
+
+[[expect]]
+regex = '^closefrom: cloexec-open ok$'
+
+[[expect]]
+regex = '^closefrom: cloexec-set ok$'
+
+[[expect]]
+regex = '^closefrom: cleanup-closed ok$'
+
+[[expect]]
+regex = '^closefrom: einval-reversed ok$'
+
+[[expect]]
+regex = '^closefrom: einval-unshare ok$'
+
+[[expect]]
+regex = '^closefrom: einval-unknown ok$'
+
+[[expect]]
+regex = '^closefrom: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|closefrom: FAIL'

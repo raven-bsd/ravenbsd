@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K548 rev343: static-program exec/startup split for Ken's pre-banner bucket. The parent forks and
+# execve's this same static binary; the child's `_start` (raw clock_gettime before libc init),
+# constructor, main and first write, plus the parent's fork/exec_ret/wait, are all CLOCK_MONOTONIC
+# absolute nanoseconds in the guest. The host computes exec_to_start (kernel exec/ELF load/first
+# faults), start_to_ctor (libc init), ctor_to_main and main_to_io. The child prints first, so the
+# ordered expectations start with the child rows; `called=1` proves the constructor actually ran.
+
+name = "exec-timing"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh exec-timing", "sh tests/fixtures/exec-canary/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*EXEC-TIMING child start=[1-9][0-9]* ctor=[1-9][0-9]* main=[0-9]+ pid=[0-9]+ called=1$'
+
+[[expect]]
+regex = '^.*EXEC-TIMING child io=[0-9]+$'
+
+[[expect]]
+regex = '^.*EXEC-TIMING parent fork=[0-9]+ exec_ret=[0-9]+ wait=[0-9]+ pid=[0-9]+ status=0$'
+
+[[expect]]
+regex = '^.*EXEC-TIMING fork_ns=[0-9]+$'
+
+[[expect]]
+regex = '^.*EXEC-TIMING canary fork=ok spawn=ok socket=ok spawnp=ok big=ok inh=ok dup=ok same=ok chdir=ok heap=ok chunks=ok$'
+
+[[expect]]
+regex = '^.*EXEC-CANARY-TOKIO status_ok=true canary_ok=true$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EXEC-TIMING .* FAIL'

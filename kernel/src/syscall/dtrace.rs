@@ -50,7 +50,15 @@ pub fn syscall_probe(frame: &SyscallFrame) {
 }
 
 /// Dispatch one `DTRACE_*` control syscall.
+///
+/// Every state-changing control (`ENABLE`, `DISABLE`, `READ`, `STATS`, `CLEAR`) requires effective
+/// uid 0 before the handler runs, so a denied caller cannot touch probe state or a ring. The
+/// read-only `PROBE_LIST` stays available: it returns static probe ids/providers/names and never
+/// a cross-process record. This mirrors the Illumos `dtrace_ioctl` `PRIV_DTRACE_*` gate.
 pub fn dispatch(number: usize, frame: &SyscallFrame) -> Result<usize, Errno> {
+    if number != PROBE_LIST {
+        super::basic::require_root()?;
+    }
     match number {
         PROBE_LIST => probe_list(frame),
         ENABLE => enable(frame),

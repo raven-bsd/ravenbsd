@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Rev 109: per-CPU cyclic attribution on aarch64 TCG with four vCPUs.
+# Same selftest as the x86_64 KVM row: short, long, cancelled and re-armed timers on every CPU,
+# one load worker per CPU, owner-CPU check and a 100 ms window.
+
+name = "lock-time-cyclic-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 300
+pre = []
+boot_cmdline = "console=ttyAMA0 test-exit=1 selftest=cyclic-smp"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^cyclic-smp: ok cpus=4 expected=12 fired=12 cancelled=4 wrong=0 lost=0 dup=0 early=0 late=0 min_us=\d+ p50_us=\d+ max_us=\d+ load_workers=4 load_hops=\d+ cpu0=3 cpu1=3 cpu2=3 cpu3=3$'
+
+[[forbid]]
+regex = '(?i)cyclic-smp: fail|panic|EXCEPTION'

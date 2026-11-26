@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 DHCP test login: reuse the release getty/login wiring and account files.
+[[initfs.programs]]
+package = "raven-getty"
+path = "/bin/getty"
+
+[[initfs.programs]]
+package = "login"
+path = "/bin/login"
+
+[[initfs.files]]
+src = "profiles/release.d/login.service.manifest"
+path = "/etc/services.d/getty.toml"
+
+[[initfs.files]]
+src = "etc/passwd"
+path = "/etc/passwd"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/group"
+path = "/etc/group"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/shadow"
+path = "/etc/shadow"
+mode = 0o600
+
+[[initfs.files]]
+src = "etc/profile"
+path = "/etc/profile"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/motd"
+path = "/etc/motd"
+mode = 0o644

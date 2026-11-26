@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K532: executable provenance and protected scheme names. A hostile unprivileged scheme
+# serves fake 04755/uid 0 metadata; the trusted initfs setuid path must still work; file/vfs
+# publication is denied to the unprivileged caller before boot registration and after a
+# trusted publisher exits, then reclaimed by a trusted root publisher.
+
+name = "scheme-publisher"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/scheme-publisher/build.sh"]
+initfs = "build/fixtures/scheme-publisher/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^scheme-publisher: initfs ready$'
+
+[[expect]]
+regex = '^scheme-publisher: caller euid=1000 egid=1000$'
+
+[[expect]]
+regex = '^reserved-boot: tty=EPERM net=EPERM$'
+
+[[expect]]
+regex = '^unprivileged-boot: file=EPERM vfs=EPERM$'
+
+[[expect]]
+regex = '^trusted: first file=ok vfs=ok$'
+
+[[expect]]
+regex = '^trusted-first: wait=0$'
+
+[[expect]]
+regex = '^reserved-restart: file=EPERM vfs=EPERM$'
+
+[[expect]]
+regex = '^trusted: second file=ok vfs=ok$'
+
+[[expect]]
+regex = '^trusted-second: wait=0$'
+
+[[expect]]
+regex = '^setuid-child: euid=0 egid=1000$'
+
+[[expect]]
+regex = '^trusted-run: setuid=0$'
+
+[[expect]]
+regex = '^nosuid-child: euid=1000 egid=1000$'
+
+[[expect]]
+regex = '^trusted-run: nosuid=0$'
+
+[[expect]]
+regex = '^fake-server: ready$'
+
+[[expect]]
+regex = '^fake-exec: EPERM child-euid=1000 child-egid=1000$'
+
+[[expect]]
+regex = '^fake-spawn: EPERM$'
+
+[[expect]]
+regex = '^scheme-publisher: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|registered|EEXIST|fake-child|fake-exec: euid0|fake-spawn: euid0|scheme-publisher: fail'

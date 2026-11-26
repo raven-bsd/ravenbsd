@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K498/K547 trace overlay: the release sshd service with maximal debug logging
+# written to /tmp/sshd-trace.log. The binary and the product configuration are
+# unchanged; only the runtime flags and the log path differ, and both live in the
+# test initfs. The K547 harness reads the log with a bounded `tail` on the guest
+# console and with the host tap client result in the same boot.
+
+name = "sshd"
+exec = "/sbin/sshd"
+args = ["/sbin/sshd", "-D", "-ddd", "-E", "/tmp/sshd-trace.log", "-f", "/etc/ssh/sshd_config"]
+needs = ["netd", "vfsd", "consd", "ptyd", "ssh-hostkeys"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

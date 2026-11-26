@@ -35,6 +35,8 @@ use raven_spawn::Sys;
 pub const AT_RAVEN_FDMAP: usize = 0x7003;
 /// Auxiliary-vector key for the `RFDM` entry count.
 pub const AT_RAVEN_FDMAP_N: usize = 0x7004;
+/// Auxiliary-vector key for the child working-directory string (K165).
+pub const AT_RAVEN_CWD: usize = 0x7005;
 /// Auxiliary-vector key for the ABI version when an attribute page is present.
 pub const AT_RAVEN_ABI: usize = 0x7006;
 /// Auxiliary-vector key for the mapped initial signal mask.
@@ -498,6 +500,7 @@ fn to_errno(error: SpawnError) -> Errno {
         SpawnError::TooLarge => Errno::E2BIG,
         SpawnError::NotFound | SpawnError::FileNotFound => Errno::ENOENT,
         SpawnError::BadElf(_) | SpawnError::HasInterpreter => Errno::ENOEXEC,
+        SpawnError::BadCwd => Errno::EINVAL,
     }
 }
 

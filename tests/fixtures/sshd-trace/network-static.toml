@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K547 private tap network. The K431 working tap uses an explicit static
+# drop-in; the release default is DHCP, which has no server on the private
+# bridge. The guest address and gateway match run.sh's 10.0.2.2 bridge.
+
+[network]
+hostname = "raven-trace"
+mode = "static"
+
+[network.static]
+address = "10.0.2.15"
+prefix = 24
+gateway = "10.0.2.2"
+dns = ["10.0.2.2"]

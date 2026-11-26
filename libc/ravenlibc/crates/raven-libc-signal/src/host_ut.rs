@@ -7,9 +7,8 @@
 //! the same words production uses), a `FakeCtx { pc, sp, regs, mask }`, a separate kernel context
 //! area (`mcontext_t`), a scripted process-pending queue, a fault injector, `-EINTR`/timeout
 //! results, a trace and failure injection. `safe_point` is where a real kernel would check the
-//! kick word on the return to user mode: it copies the fake context into the area, calls the Rust
-//! body of `__raven_sigentry` and restores the fake context after `SIGRETURN` (the fake implements
-//! `sigreturn` by unwinding a private payload). No real signal is ever raised.
+//! kick word on the return to user mode: it copies the fake context into the area and runs one
+//! delivery pass. No real signal is ever raised.
 
 use core::sync::atomic::Ordering;
 
@@ -18,7 +17,7 @@ use raven_libc_abi::structs::{McontextT, SiginfoT};
 use raven_libc_tls::tcb::Pthread;
 
 use crate::dispositions::DispTable;
-use crate::entry::{EntryOutcome, signal_entry};
+use crate::entry::EntryOutcome;
 use crate::errors::{ENOSYS_ERR, ETIMEDOUT_ERR};
 use crate::frame;
 use crate::kernel::{FaultRecord, KICK_CHECK, SigCaps, SigKernel};
@@ -78,6 +77,8 @@ pub enum Trace {
     Resend(i32),
     /// procd kill.
     ProcKill(i32, i32),
+    /// A kernel thread-directed send (C19 `THREAD_SIGQUEUE`).
+    ThreadSigqueue(u32, i32),
     /// The wait timed out or blocked.
     Wait(Option<u64>),
     /// A default action terminated the process.
@@ -367,6 +368,17 @@ impl Default for HostSigKernel {
     }
 }
 
+/// Run one simulated kernel-entry delivery; the fake has no kernel `SIGRETURN`, so it unwinds.
+fn signal_entry(
+    kernel: &HostSigKernel,
+    table: &DispTable,
+    bits: u32,
+    fault: Option<FaultRecord>,
+) -> ! {
+    crate::entry::process(kernel, table, bits, fault, true, true);
+    std::panic::resume_unwind(Box::new(SigReturn))
+}
+
 /// `sigreturn` unwinds with this payload.
 pub struct SigReturn;
 
@@ -399,12 +411,6 @@ impl SigKernel for HostSigKernel {
         inner.clock
     }
 
-    fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        let _ = (ctx_area_offset, flags);
-        raw::set_entry_function(entry);
-        Ok(())
-    }
-
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
         if self.failing("kick") {
             return Err(ENOSYS_ERR);
@@ -412,10 +418,6 @@ impl SigKernel for HostSigKernel {
         let _ = handle;
         self.kick_self(bits);
         Ok(())
-    }
-
-    fn sigreturn(&self) -> ! {
-        std::panic::resume_unwind(Box::new(SigReturn))
     }
 
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno> {
@@ -448,6 +450,29 @@ impl SigKernel for HostSigKernel {
             self.kick_self(KICK_CHECK);
         }
         Ok(())
+    }
+
+    fn thread_sigqueue(&self, handle: u32, sig: i32, _value: u64) -> Result<(), Errno> {
+        self.record(Trace::ThreadSigqueue(handle, sig));
+        Ok(())
+    }
+
+    fn pending(&self) -> Result<u64, Errno> {
+        Ok(crate::raw::pending_load(self.pointer()))
+    }
+
+    fn sigprocmask(&self, how: i32, set: Option<u64>) -> Result<u64, Errno> {
+        let tp = self.pointer();
+        let previous = crate::raw::mask_load(tp);
+        if let Some(requested) = set {
+            let next = match how {
+                raven_libc_abi::generated::signal::SIG_BLOCK => previous | requested,
+                raven_libc_abi::generated::signal::SIG_UNBLOCK => previous & !requested,
+                _ => requested,
+            } & crate::sigset::APP_MASK;
+            crate::raw::mask_store(tp, next);
+        }
+        Ok(previous)
     }
 
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {

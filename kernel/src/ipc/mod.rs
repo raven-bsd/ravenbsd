@@ -18,7 +18,33 @@ pub mod protocol;
 pub mod registry;
 pub mod router;
 
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU32, AtomicU64, Ordering};
+
+/// Live in-flight scheme requests (S36b diagnostic).
+static LIVE_REQUESTS: AtomicU64 = AtomicU64::new(0);
+
+/// Number of live `PendingRequest` objects (S36b diagnostic).
+pub fn live_requests() -> u64 {
+    LIVE_REQUESTS.load(Ordering::Acquire)
+}
+
+/// K147 fixed-cost stage trace, enabled by `k147-trace` on the kernel command line.
+///
+/// The first call parses the command line once; every later check is a cached atomic load.
+pub(crate) fn trace_k147() -> bool {
+    static STATE: AtomicU8 = AtomicU8::new(0);
+    match STATE.load(Ordering::Relaxed) {
+        1 => false,
+        2 => true,
+        _ => {
+            let enabled = crate::memory::paging::cmdline()
+                .split_ascii_whitespace()
+                .any(|token| token == "k147-trace");
+            STATE.store(if enabled { 2 } else { 1 }, Ordering::Relaxed);
+            enabled
+        }
+    }
+}
 
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -185,6 +211,7 @@ impl PendingRequest {
             crate::sync::register_thread(&thread);
             thread.tid
         });
+        LIVE_REQUESTS.fetch_add(1, Ordering::Relaxed);
         Arc::new(Self {
             id: packet.request_id,
             client,
@@ -348,6 +375,19 @@ fn pop_request(
     requests.lock().pop()
 }
 
+/// K449 diagnostic: total request entries in the per-process scheme, active and client queues.
+pub fn pending_counts() -> (usize, usize, usize) {
+    let mut queued = 0usize;
+    let mut active = 0usize;
+    let mut client = 0usize;
+    for process in crate::process::processes() {
+        queued = queued.saturating_add(process.scheme_queue.lock().len());
+        active = active.saturating_add(process.active_requests.lock().len());
+        client = client.saturating_add(process.client_requests.lock().len());
+    }
+    (queued, active, client)
+}
+
 /// Fail pending requests and remove the registry entries of an exiting process.
 ///
 /// Called from `process::notify_exit` before the address space is released, so capture mappings
@@ -387,10 +427,18 @@ pub fn on_process_exit(process: &Arc<Process>) {
     }
 
     while let Some(request) = pop_request(&process.client_requests) {
-        if matches!(request.opcode, Opcode::Close | Opcode::Dup) {
-            // One-way notifications must still reach the server after the client is gone: the
-            // server releases the open-file description on the last CLOSE, and DUP updates its
-            // reference count. They are the client's last words, not cancellable work.
+        if request.opcode == Opcode::Dup {
+            // A DUP still in the server queue belonged to a descriptor that died with this
+            // client; remove it and roll the server reference back. A delivered DUP stays with
+            // the server and its reference is released by the CLOSE notification.
+            if router::withdraw_undelivered_dup(&request) {
+                request.fail(Errno::EIO);
+                request.release_captures();
+            }
+            continue;
+        }
+        if request.opcode == Opcode::Close {
+            // The last CLOSE must still reach the server after the client is gone.
             continue;
         }
         request.cancel();
@@ -449,11 +497,26 @@ pub fn on_process_exit(process: &Arc<Process>) {
         .any(|token| token == "s32-capturecheck")
     {
         let stats = crate::memory::frame::stats();
+        // The init is the last process to exit; its line is the end-of-test baseline even when
+        // an intermediate cancelled capture is deliberately still mapped for an in-flight reply.
+        if process.path == "/init" {
+            crate::kprintln!(
+                "s32: final frames={} free_bytes={}",
+                capture::frames_in_use(),
+                stats.free_bytes
+            );
+        }
         crate::kprintln!(
             "s32: capture frames={} free_bytes={}",
             capture::frames_in_use(),
             stats.free_bytes
         );
+    }
+}
+
+impl Drop for PendingRequest {
+    fn drop(&mut self) {
+        LIVE_REQUESTS.fetch_sub(1, Ordering::AcqRel);
     }
 }
 

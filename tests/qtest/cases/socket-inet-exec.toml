@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K231 accepted-socket readiness across fork/exec, the `sshd` shape: the parent listens and
+# accepts a hostfwd connection, forks, and hands the socket to an exec'd session as descriptor 7.
+# The session speaks first (banner + KEXINIT-sized record), switches the socket to non-blocking
+# and waits for the client's 2912-byte record with `read` -> EAGAIN -> `poll(POLLIN)`, then
+# answers. Before K231 the exec'd image had no readiness doorbell and `poll` slept to its
+# timeout with the data already queued; a doorbell that was created after the data arrived, or
+# that was cleared by an earlier wait, did the same in a single process. The parent also checks
+# that closing the accepted socket succeeds (it used to fail with EBADF).
+
+name = "socket-inet-exec"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 300
+initfs = "build/fixtures/socket-inet-exec/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23081-:23081",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = [
+    "sh tests/fixtures/socket-inet-exec/build.sh",
+    "sh tests/fixtures/socket-inet-exec/start-host-client.sh",
+]
+
+[[expect]]
+regex = '^socket-inet-exec: listening port=23081$'
+
+# The accept block is newline-less and can share the getty login prompt.
+[[expect]]
+regex = '^.*socket-inet-exec: accepted fd=[0-9]+ peer=[0-9.]+:[0-9]+$'
+
+[[expect]]
+regex = '^socket-inet-exec-child: hello sent bytes=979$'
+
+[[expect]]
+regex = '^socket-inet-exec-child: client record ok bytes=2912$'
+
+[[expect]]
+regex = '^socket-inet-exec-child: done sent$'
+
+# The real profile also runs getty, so the console login prompt can share the serial line with
+# the fixture's last messages. Keep the exact fixture text, allow the prompt prefix.
+[[expect]]
+regex = '^.*socket-inet-exec: child status=0$'
+
+[[expect]]
+regex = '^.*socket-inet-exec: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)socket-inet-exec(-child)?: (fail|poll timeout|slow wake|spurious)|panic|EXCEPTION'

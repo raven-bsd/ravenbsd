@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "s194-exit-quiesce"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+
+[workspace]
+
+[[bin]]
+name = "s194-exit-quiesce"
+path = "src/main.rs"
+
+[profile.release]
+strip = "symbols"

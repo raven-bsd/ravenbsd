@@ -53,13 +53,6 @@ macro_rules! reserved_command {
 }
 
 reserved_command!(
-    NET,
-    NET_META,
-    "net",
-    "reserved: network control",
-    "raven net <command>"
-);
-reserved_command!(
     LOG,
     LOG_META,
     "log",

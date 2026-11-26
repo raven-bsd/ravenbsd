@@ -19,6 +19,8 @@ pub enum Object {
     Process(usize),
     /// A memory object.
     Memory(usize),
+    /// One end of an in-kernel pipe (`PIPE`/`PIPE2`).
+    Pipe(usize),
     /// A scheme file: owning scheme name, handler file id and access rights.
     SchemeFile {
         /// Scheme name bytes without the colon.

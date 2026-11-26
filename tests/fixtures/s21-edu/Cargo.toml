@@ -21,7 +21,9 @@ path = "src/main.rs"
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-elf = { path = "../../../crates/raven-elf" }
 raven-initfs = { path = "../../../crates/raven-initfs" }
-raven-rt = { path = "../../../userland/rt", default-features = false }
+# `raven-scheme` links `alloc` unconditionally, so the driver fixture needs the runtime
+# allocator even though it never allocates (K463).
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
 
 [lints]
 workspace = true

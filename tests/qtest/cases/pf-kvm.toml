@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K296: the K273 pf stateful allow/block path under KVM, two CPUs. Derived from
+# `pf-core.toml`: same profile (`pf`), same one-shot probe and host UDP echo, same serial
+# expectations; the accelerator and `-smp 2` are the only differences. The appended `-smp 2`
+# overrides the harness's fixed `-smp 4` (S112 pattern). The file is named `pf-kvm.toml` because
+# that is the ticket's acceptance path; the case name is the lane's `pf-kvm2`.
+
+name = "pf-kvm2"
+arch = "x86_64"
+profile = "pf"
+timeout_secs = 300
+pre = [
+    "sh tests/fixtures/b12-netd/build.sh",
+    "sh tests/fixtures/b12-netd/udp_echo_start.sh 47001",
+    "sh tests/qtest/cases/pf-kvm-fixture/nat_echo_start.sh 47004",
+]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-enable-kvm",
+    "-cpu",
+    "host",
+    "-smp",
+    "2",
+    "-nic",
+    "none",
+    "-netdev",
+    "user,id=n0",
+    "-device",
+    "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 2 cpus online$'
+
+[[expect]]
+regex = '^netd: pf loaded rules=3 nat=1$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: ready$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^netd: iface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^pf: allowed flow ok$'
+
+[[expect]]
+regex = '^pf: nat flow ok port=[0-9]+$'
+
+[[expect]]
+regex = '^pf: blocked datagram sent$'
+
+[[expect]]
+regex = '^netd: pf block out eth0 udp 10\.0\.2\.15:7201 -> 10\.0\.2\.2:47002 reason=match$'
+unordered = true
+
+[[expect]]
+regex = '^pf: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

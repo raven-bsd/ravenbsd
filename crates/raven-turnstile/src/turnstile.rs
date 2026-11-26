@@ -5,6 +5,7 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
+use core::hash::{Hash, Hasher};
 
 /// Identifier of a thread in the model.
 pub type ThreadId = u32;
@@ -150,18 +151,12 @@ struct Waiter {
 }
 
 /// One turnstile: the wait queue plus the inheritance link to its owner.
-///
-/// Equality and hashing deliberately ignore the [`LockStats`] counters (when compiled in): the
-/// exhaustive model check deduplicates on the *logical* state, so two reachable states that differ
-/// only in their accumulated statistics must still collapse.
 #[derive(Clone, Debug, Default)]
 struct Turnstile {
     owner: Option<ThreadId>,
     waiters: Vec<Waiter>,
     pi: Option<Priority>,
     next_arrival: u64,
-    #[cfg(feature = "lockstat")]
-    stats: LockStats,
 }
 
 impl PartialEq for Turnstile {
@@ -191,11 +186,36 @@ impl core::hash::Hash for Turnstile {
 /// priority only ever rises (its numeric value falls) toward `0`, the fixed point is unique and is
 /// reached by iterating to stability. This is the transitive inheritance of `R-LCK-6`; the kernel
 /// glue may replace the recomputation with incremental propagation that yields the same value.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default)]
 pub struct Turnstiles {
     threads: BTreeMap<ThreadId, Priority>,
     effective: BTreeMap<ThreadId, Priority>,
     objects: BTreeMap<ObjectId, Turnstile>,
+    /// Per-lock statistics keyed by object id. They outlive the transient turnstile: an idle
+    /// turnstile is reclaimed (FreeBSD `turnstile_free`), while the counters belong to the lock
+    /// object (FreeBSD `lock_profile_object` keyed by `lock_object`; NetBSD `lockdebug` is
+    /// allocated at lock init and freed at lock destroy). Excluded from equality and hashing so
+    /// the exhaustive model check still deduplicates on the logical state.
+    #[cfg(feature = "lockstat")]
+    stats: BTreeMap<ObjectId, LockStats>,
+}
+
+impl PartialEq for Turnstiles {
+    fn eq(&self, other: &Self) -> bool {
+        self.threads == other.threads
+            && self.effective == other.effective
+            && self.objects == other.objects
+    }
+}
+
+impl Eq for Turnstiles {}
+
+impl Hash for Turnstiles {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.threads.hash(state);
+        self.effective.hash(state);
+        self.objects.hash(state);
+    }
 }
 
 impl Turnstiles {
@@ -213,6 +233,76 @@ impl Turnstiles {
         self.threads.insert(thread, base);
         self.effective.insert(thread, base);
         Ok(())
+    }
+
+    /// Unregister a thread that is leaving (FreeBSD `thread_fini`, NetBSD `lwp_dtor`).
+    ///
+    /// Drops the thread's base/effective entries, its wait-queue entry and any object it owns.
+    /// The removal is allocation-free: the effective fixed point is recomputed in place for the
+    /// remaining registered threads, so an exiting thread cannot leave a map entry behind or pin
+    /// the 3072-byte class. An object whose owner exits with waiters stays behind (with no owner)
+    /// until those waiters leave; a reused thread id never inherits it.
+    pub fn unregister(&mut self, thread: ThreadId) -> bool {
+        let was_registered = self.threads.remove(&thread).is_some();
+        self.effective.remove(&thread);
+        for turnstile in self.objects.values_mut() {
+            turnstile.waiters.retain(|waiter| waiter.thread != thread);
+            if turnstile.owner == Some(thread) {
+                turnstile.owner = None;
+            }
+            turnstile.pi = turnstile.waiters.first().map(|waiter| waiter.priority);
+        }
+        self.objects
+            .retain(|_, turnstile| turnstile.owner.is_some() || !turnstile.waiters.is_empty());
+        self.refresh_without_alloc();
+        was_registered
+    }
+
+    /// Recompute every effective priority in place, then re-sort the waiter lists.
+    ///
+    /// [`Turnstiles::refresh`] clones the base map; the thread-exit path cannot allocate. Every
+    /// registered thread has an `effective` entry (`register` and `unregister` maintain the pair),
+    /// so resetting in place is exact and the fixed point is the same as `compute_effective`.
+    fn refresh_without_alloc(&mut self) {
+        for (thread, base) in &self.threads {
+            if let Some(effective) = self.effective.get_mut(thread) {
+                *effective = *base;
+            }
+        }
+        loop {
+            let mut changed = false;
+            for turnstile in self.objects.values() {
+                let Some(owner) = turnstile.owner else {
+                    continue;
+                };
+                let mut pi = Priority::LOWEST;
+                for waiter in &turnstile.waiters {
+                    if let Some(priority) = self.effective.get(&waiter.thread).copied() {
+                        pi = pi.min(priority);
+                    }
+                }
+                if let Some(current) = self.effective.get_mut(&owner)
+                    && pi < *current
+                {
+                    *current = pi;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        for turnstile in self.objects.values_mut() {
+            for waiter in &mut turnstile.waiters {
+                if let Some(priority) = self.effective.get(&waiter.thread).copied() {
+                    waiter.priority = priority;
+                }
+            }
+            turnstile
+                .waiters
+                .sort_by_key(|waiter| (waiter.priority, waiter.arrival));
+            turnstile.pi = turnstile.waiters.first().map(|waiter| waiter.priority);
+        }
     }
 
     /// The thread's base priority, if it is registered.
@@ -314,6 +404,15 @@ impl Turnstiles {
         if woken.is_some() {
             self.stat_wake(object, 1);
         }
+        // FreeBSD `turnstile_free`/NetBSD `turnstile_free`: an idle turnstile does not outlive
+        // the last owner/waiter. The next acquire recreates it from the object id.
+        if self
+            .objects
+            .get(&object)
+            .is_some_and(|t| t.owner.is_none() && t.waiters.is_empty())
+        {
+            self.objects.remove(&object);
+        }
         woken
     }
 
@@ -330,6 +429,14 @@ impl Turnstiles {
         #[cfg(feature = "lockstat")]
         self.stat_wake(object, woken.len() as u64);
         self.refresh();
+        // Reclaim an idle turnstile after the last waiter drains.
+        if self
+            .objects
+            .get(&object)
+            .is_some_and(|t| t.owner.is_none() && t.waiters.is_empty())
+        {
+            self.objects.remove(&object);
+        }
         woken
     }
 
@@ -370,6 +477,14 @@ impl Turnstiles {
         #[cfg(feature = "lockstat")]
         if removed {
             self.stat_cancel(object, effect.is_some_and(InheritEffect::changed));
+        }
+        // Reclaim an idle turnstile when a cancellation leaves no owner or waiter.
+        if self
+            .objects
+            .get(&object)
+            .is_some_and(|t| t.owner.is_none() && t.waiters.is_empty())
+        {
+            self.objects.remove(&object);
         }
         CancelOutcome { removed, effect }
     }
@@ -605,25 +720,49 @@ impl Turnstiles {
     }
 }
 
+/// Upper bound on the per-object lockstat records.
+///
+/// FreeBSD's `LPROF_CACHE_SIZE` profiling cache is fixed too: when it is exhausted it rejects
+/// new objects (`lock_prof_rejected`) instead of growing without bound. Kernel locks that are
+/// created and destroyed per process (the `Process` fields are `Mutex` instances) must not turn
+/// the diagnostic into a new leak; existing records stay valid and new objects are simply not
+/// profiled once the cap is reached.
+#[cfg(feature = "lockstat")]
+const MAX_STATS_OBJECTS: usize = 4096;
+
 #[cfg(feature = "lockstat")]
 impl Turnstiles {
     /// Snapshot the lock statistics for `object` (all zero when it has never been touched).
     #[must_use]
     pub fn stats(&self, object: ObjectId) -> LockStats {
-        self.objects
-            .get(&object)
-            .map_or(LockStats::default(), |turnstile| turnstile.stats)
+        self.stats.get(&object).copied().unwrap_or_default()
+    }
+
+    /// The object ids that have recorded statistics.
+    pub fn stats_objects(&self) -> impl Iterator<Item = ObjectId> + '_ {
+        self.stats.keys().copied()
+    }
+
+    fn stat_entry(&mut self, object: ObjectId) -> Option<&mut LockStats> {
+        if self.stats.len() >= MAX_STATS_OBJECTS && !self.stats.contains_key(&object) {
+            return None;
+        }
+        Some(self.stats.entry(object).or_default())
     }
 
     fn stat_acquire(&mut self, object: ObjectId) {
-        let stats = &mut self.objects.entry(object).or_default().stats;
+        let Some(stats) = self.stat_entry(object) else {
+            return;
+        };
         stats.immediate_acquisitions = stats.immediate_acquisitions.saturating_add(1);
     }
 
     fn stat_block(&mut self, object: ObjectId, owner: ThreadId, changed: bool) {
         let depth = self.waiter_count(object) as u64;
         let chain = 1u64.saturating_add(self.chain_length(owner) as u64);
-        let stats = &mut self.objects.entry(object).or_default().stats;
+        let Some(stats) = self.stat_entry(object) else {
+            return;
+        };
         stats.wait_entries = stats.wait_entries.saturating_add(1);
         stats.max_queue_depth = stats.max_queue_depth.max(depth);
         stats.max_inheritance_depth = stats.max_inheritance_depth.max(chain);
@@ -633,12 +772,16 @@ impl Turnstiles {
     }
 
     fn stat_wake(&mut self, object: ObjectId, count: u64) {
-        let stats = &mut self.objects.entry(object).or_default().stats;
+        let Some(stats) = self.stat_entry(object) else {
+            return;
+        };
         stats.wakes = stats.wakes.saturating_add(count);
     }
 
     fn stat_cancel(&mut self, object: ObjectId, changed: bool) {
-        let stats = &mut self.objects.entry(object).or_default().stats;
+        let Some(stats) = self.stat_entry(object) else {
+            return;
+        };
         stats.cancels = stats.cancels.saturating_add(1);
         if changed {
             stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
@@ -646,7 +789,9 @@ impl Turnstiles {
     }
 
     fn stat_priority_change(&mut self, object: ObjectId) {
-        let stats = &mut self.objects.entry(object).or_default().stats;
+        let Some(stats) = self.stat_entry(object) else {
+            return;
+        };
         stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
     }
 

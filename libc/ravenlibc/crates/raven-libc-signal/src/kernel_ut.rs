@@ -6,9 +6,7 @@ use super::*;
 #[test]
 fn production_capability_matrix_is_all_false() {
     let caps = SigKernel::caps(&SysKernel);
-    assert!(!caps.entry);
     assert!(!caps.kick);
-    assert!(!caps.sigreturn);
     assert!(!caps.resend);
     assert!(!caps.eintr);
     assert!(!caps.proc_kill);
@@ -20,7 +18,7 @@ fn production_capability_matrix_is_all_false() {
 #[test]
 fn host_capability_matrix_is_all_true_but_fp() {
     let caps = SigCaps::HOST;
-    assert!(caps.entry && caps.kick && caps.sigreturn && caps.resend);
+    assert!(caps.kick && caps.resend);
     assert!(caps.eintr && caps.proc_kill && caps.stop);
     assert!(!caps.fp_in_frame);
 }
@@ -29,7 +27,6 @@ fn host_capability_matrix_is_all_true_but_fp() {
 fn missing_kernel_primitives_return_enosys() {
     let kernel = SysKernel::new();
     assert_eq!(kernel.kick(1, KICK_CHECK), Err(ENOSYS_ERR));
-    assert_eq!(kernel.sig_setup(0x1000, 0, 0), Err(ENOSYS_ERR));
     assert_eq!(kernel.resend(1, &SiginfoT::ZERO, 0), Err(ENOSYS_ERR));
     assert_eq!(kernel.proc_kill(1, 15, None), Err(ENOSYS_ERR));
     assert_eq!(kernel.take_process_pending(!0), None);
@@ -80,4 +77,36 @@ fn fault_record_is_repr_c() {
 #[test]
 fn bad_signal_is_einval() {
     assert_eq!(bad_signal(), EINVAL_ERR);
+}
+
+// --- K443: the six-word process record carries the kernel-owned siginfo fields ---
+
+#[test]
+fn process_record_carries_the_sigqueue_payload() {
+    // SI_QUEUE is the C value -1 (stored as 0xffff_ffff).
+    let words = [10, 42, u32::MAX as u64, 1000, 0x5a5a, 0];
+    let (signo, info) = process_siginfo(&words);
+    assert_eq!(signo, 10);
+    assert_eq!(crate::frame::si_code(&info), -1);
+    assert_eq!(crate::frame::si_pid(&info), 42);
+    assert_eq!(crate::frame::si_uid(&info), 1000);
+    assert_eq!(crate::frame::si_value(&info).bytes[0], 0x5a5a);
+}
+
+#[test]
+fn process_record_preserves_the_child_exit_code() {
+    // CLD_EXITED = 1; the kernel, not libc, stamps the SIGCHLD record.
+    let words = [17, 7, 1, 1000, 0, 0];
+    let (signo, info) = process_siginfo(&words);
+    assert_eq!(signo, 17);
+    assert_eq!(crate::frame::si_code(&info), 1);
+    assert_eq!(crate::frame::si_pid(&info), 7);
+}
+
+#[test]
+fn plain_user_signal_is_si_user() {
+    let words = [15, 9, 0, 0, 0, 0];
+    let (signo, info) = process_siginfo(&words);
+    assert_eq!(signo, 15);
+    assert_eq!(crate::frame::si_code(&info), 0);
 }

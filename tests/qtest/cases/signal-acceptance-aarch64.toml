@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S710 aarch64 twin of signal-acceptance-boundary: the real aarch64 sysroot, loader and QEMU
+# flow. The Rust libc acceptance program marshals the public 152-byte struct to the private
+# 40-byte request; guard pages, canaries and the readback flags/mask prove the boundary on
+# aarch64. The libc raise rows remain in the separate acceptance case and are not reclassified
+# here.
+
+name = "signal-acceptance-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/signals/build.sh"]
+initfs = "build/signals/aarch64/boundary-initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal: boundary guard ok flags=0x8000004 mask=1$'
+
+[[expect]]
+regex = '^signal: boundary canary ok flags=0x4 mask=1$'
+
+[[expect]]
+regex = '^signal: boundary procmask ok mask=1$'
+
+[[expect]]
+regex = '^signal: boundary ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|signal: boundary-fail'

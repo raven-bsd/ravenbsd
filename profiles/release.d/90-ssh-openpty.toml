@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K434 S8 test-first fixture. Stages the exact OpenSSH `openpty(..., NULL, ...)` call shape so the
+# S8 boot can show the NULL-name contract failure independently of sshd. It is test tooling built by
+# tests/fixtures/ssh-openpty/build.sh, never base code.
+
+[[initfs.files]]
+src = "build/fixtures/ssh-openpty/{arch}/openpty-null"
+path = "/bin/openpty-null"
+mode = 0o755
+generated = true

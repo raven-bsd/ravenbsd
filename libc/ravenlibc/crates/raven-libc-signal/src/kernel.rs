@@ -3,27 +3,20 @@
 
 //! The kernel seam [`SigKernel`] and the production `SysKernel`.
 //!
-//! The kernel only kicks (PG-7): it never reads a mask or a disposition. Every missing primitive
-//! is represented by a capability flag and a documented fallback; `SysKernel` forwards to
-//! `raven-libc-sys` where a wrapper exists and returns `ENOSYS` otherwise. No syscall number is
-//! invented here: `SIGRETURN` 0x82 and the kick bits are the labelled PROPOSED PG-7 values.
+//! The kernel owns signal dispositions, masks, pending state and the caught-signal frame. Every
+//! missing primitive is represented by a capability flag and a documented fallback; `SysKernel`
+//! forwards to `raven-libc-sys` where a wrapper exists and returns `ENOSYS` otherwise. No syscall
+//! number is invented here: the kick and provider values are the `raven-abi` contract.
 
+pub use raven_abi::signal::{KICK_CANCEL, KICK_CHECK, KICK_KNOWN, KICK_SYNCCALL, KICK_TIMER};
 use raven_libc_abi::errno::Errno;
-use raven_libc_abi::structs::SiginfoT;
+use raven_libc_abi::structs::{SiginfoT, Sigval};
 
 use crate::errors::{EINVAL_ERR, ENOSYS_ERR, ETIMEDOUT_ERR};
 use crate::raw;
 
-/// Kick bit 0: look at the pending sets.
-pub const KICK_CHECK: u32 = 1;
-/// Kick bit 1: cancellation (hand to C57's `on_kick`).
-pub const KICK_CANCEL: u32 = 2;
-/// Kick bit 2: `synccall`.
-pub const KICK_SYNCCALL: u32 = 4;
-/// Kick bit 3: POSIX timer.
-pub const KICK_TIMER: u32 = 8;
-/// Every bit this crate may set (PROPOSED, RD-new 2).
-pub const KICK_KNOWN: u32 = KICK_CHECK | KICK_CANCEL | KICK_SYNCCALL | KICK_TIMER;
+/// `Handle::NONE`: a signal or kick targets the calling thread.
+pub const HANDLE_NONE: u32 = u32::MAX;
 
 /// The synchronous fault kinds of PG-7.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -74,12 +67,8 @@ pub struct FaultRecord {
 /// What the kernel can do today.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SigCaps {
-    /// PG-7 `SIG_SETUP`, `THREAD_KICK`, `SIGRETURN` and the entry stack.
-    pub entry: bool,
     /// PG-7 `THREAD_KICK`.
     pub kick: bool,
-    /// PG-7 `SIGRETURN` (0x82).
-    pub sigreturn: bool,
     /// PG-7 optional `SIGRESEND` (0x84).
     pub resend: bool,
     /// PG-8 `-EINTR` and the sticky kick word.
@@ -90,31 +79,37 @@ pub struct SigCaps {
     pub stop: bool,
     /// PG-12 FP/SIMD state in the frame.
     pub fp_in_frame: bool,
+    /// The C19 kernel signal provider (`THREAD_SIGQUEUE`/`SIGPENDING`/`SIGWAIT`/`SIGPROCMASK`):
+    /// dispositions, masks and pending state are kernel-owned and libc never dispatches a handler
+    /// from its own table.
+    pub authoritative: bool,
 }
 
 impl SigCaps {
-    /// The production capability set: no PG-7, PG-8, PG-10, PG-12 or PG-44 primitive exists.
+    /// The production capability set.
+    ///
+    /// On the Raven target `THREAD_KICK` and the PG-8 interruptible wait exist; `SIGRESEND`,
+    /// stop and FP-in-frame do not. Host unit tests keep every kernel bit false because there is
+    /// no Raven kernel behind them.
     pub const PRODUCTION: Self = Self {
-        entry: false,
-        kick: false,
-        sigreturn: false,
+        kick: cfg!(target_os = "none"),
         resend: false,
-        eintr: false,
-        proc_kill: false,
+        eintr: cfg!(target_os = "none"),
+        proc_kill: cfg!(target_os = "none"),
         stop: false,
         fp_in_frame: false,
+        authoritative: cfg!(target_os = "none"),
     };
 
     /// Every capability available (host fake only).
     pub const HOST: Self = Self {
-        entry: true,
         kick: true,
-        sigreturn: true,
         resend: true,
         eintr: true,
         proc_kill: true,
         stop: true,
         fp_in_frame: false,
+        authoritative: false,
     };
 }
 
@@ -136,22 +131,53 @@ pub trait SigKernel: Sync {
     fn yield_now(&self);
     /// Monotonic nanoseconds.
     fn now_ns(&self) -> u64;
-    /// PG-7 `SIG_SETUP`.
-    fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno>;
     /// PG-7 `THREAD_KICK`.
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno>;
-    /// PG-7 `SIGRETURN`; never returns.
-    fn sigreturn(&self) -> !;
     /// PG-7 optional `SIGRESEND`.
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno>;
     /// PG-44 procd `kill`/`killpg`/`sigqueue`.
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno>;
+    /// C19 `THREAD_SIGQUEUE`: queue `sig` on one thread (`u32::MAX` = the calling thread).
+    fn thread_sigqueue(&self, _handle: u32, _sig: i32, _value: u64) -> Result<(), Errno> {
+        Err(ENOSYS_ERR)
+    }
+    /// C19 `SIGPENDING`: the kernel's authoritative pending word for the calling thread.
+    fn pending(&self) -> Result<u64, Errno> {
+        Err(ENOSYS_ERR)
+    }
+    /// C19 `SIGWAIT`: consume one pending signal with an atomic temporary mask.
+    fn wait_signal(
+        &self,
+        _set: u64,
+        _timeout_ns: u64,
+        _poll: bool,
+    ) -> Result<(i32, [u64; 6]), Errno> {
+        Err(ENOSYS_ERR)
+    }
+    /// C19 `SIGPROCMASK`: read or replace the calling thread's kernel mask.
+    fn sigprocmask(&self, _how: i32, _set: Option<u64>) -> Result<u64, Errno> {
+        Err(ENOSYS_ERR)
+    }
     /// Take one process-directed pending signal whose bit is in `deliverable`.
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)>;
     /// Wait for a kick; `None` waits forever (PG-8).
     fn wait_for_kick(&self, deadline_ns: Option<u64>) -> Result<(), Errno>;
     /// Apply a default terminate/core action; never returns.
     fn terminate(&self, sig: i32, core: bool) -> !;
+}
+
+/// Build the libc `siginfo_t` from the six-word `PROC_SIGRECV_EX` record.
+///
+/// The record is `[signo, sender_pid, si_code, si_uid, si_value, 0]`; the kernel owns those
+/// fields and libc owns the public layout.
+#[must_use]
+pub fn process_siginfo(words: &[u64; 6]) -> (i32, SiginfoT) {
+    let signo = words[0] as i32;
+    let mut info = crate::frame::make_siginfo(signo, words[2] as i32);
+    crate::frame::set_si_pid(&mut info, words[1] as i32);
+    crate::frame::set_si_uid(&mut info, words[3] as u32);
+    crate::frame::set_si_value(&mut info, Sigval { bytes: [words[4]] });
+    (signo, info)
 }
 
 /// The production implementation over `raven-libc-sys`.
@@ -165,6 +191,7 @@ impl SysKernel {
         Self
     }
 
+    #[cfg_attr(target_os = "none", allow(dead_code))]
     fn notify(pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
         let _ = (pid, sig, info);
         Err(ENOSYS_ERR)
@@ -197,21 +224,12 @@ impl SigKernel for SysKernel {
         }
     }
 
-    fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        // PG-7 is absent: remember the address for the shell and report the gap. No number is
-        // fabricated; the shell checks `caps().entry` before calling this.
-        let _ = (ctx_area_offset, flags);
-        raw::set_entry_function(entry);
-        Err(ENOSYS_ERR)
-    }
-
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
-        let _ = (handle, bits);
-        Err(ENOSYS_ERR)
-    }
-
-    fn sigreturn(&self) -> ! {
-        raw::sigreturn()
+        // `Pthread.handle == 0` means the calling thread (the main thread never takes a kernel
+        // object handle). THREAD_KICK spells that `Handle::NONE` (`u32::MAX`); passing 0 would
+        // ask for the process handle and fail with `EBADF` (K443).
+        let handle = if handle == 0 { u32::MAX } else { handle };
+        raw::kick(handle, bits)
     }
 
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno> {
@@ -220,12 +238,103 @@ impl SigKernel for SysKernel {
     }
 
     fn proc_kill(&self, pid: i32, sig: i32, info: Option<&SiginfoT>) -> Result<(), Errno> {
-        Self::notify(pid, sig, info)
+        #[cfg(target_os = "none")]
+        {
+            match info {
+                // `kill`/`killpg` carry no payload: the plain queue entry (`SI_USER`) is enough.
+                None => {
+                    raven_libc_sys::signal::proc_signal(pid, sig).map_err(|error| Errno(error.0))
+                }
+                // `sigqueue` carries `si_value`; the kernel stamps `SI_QUEUE`, the sender pid and
+                // the sender uid, and `PROC_SIGRECV_EX` returns them to the handler.
+                Some(info) => raw::proc_sigqueue(pid, sig, crate::frame::si_value(info).bytes[0]),
+            }
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            Self::notify(pid, sig, info)
+        }
+    }
+
+    fn thread_sigqueue(&self, handle: u32, sig: i32, value: u64) -> Result<(), Errno> {
+        #[cfg(target_os = "none")]
+        {
+            raven_libc_sys::signal::thread_sigqueue(handle, sig, value)
+                .map_err(|error| Errno(error.0))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = (handle, sig, value);
+            Err(ENOSYS_ERR)
+        }
+    }
+
+    fn pending(&self) -> Result<u64, Errno> {
+        #[cfg(target_os = "none")]
+        {
+            let mut word = 0u64;
+            raven_libc_sys::signal::sigpending(&mut word)
+                .map(|_| word)
+                .map_err(|error| Errno(error.0))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            Err(ENOSYS_ERR)
+        }
+    }
+
+    fn wait_signal(&self, set: u64, timeout_ns: u64, poll: bool) -> Result<(i32, [u64; 6]), Errno> {
+        #[cfg(target_os = "none")]
+        {
+            let mut record = [0u64; 6];
+            let flags = if poll {
+                raven_libc_sys::signal::SIGWAIT_POLL
+            } else {
+                0
+            };
+            let signo = raven_libc_sys::signal::sigwait(set, &mut record, timeout_ns, flags)
+                .map_err(|error| Errno(error.0))?;
+            Ok((signo, record))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = (set, timeout_ns, poll);
+            Err(ENOSYS_ERR)
+        }
+    }
+
+    fn sigprocmask(&self, how: i32, set: Option<u64>) -> Result<u64, Errno> {
+        #[cfg(target_os = "none")]
+        {
+            let mut old = 0u64;
+            raven_libc_sys::signal::sigprocmask(how, set, Some(&mut old))
+                .map_err(|error| Errno(error.0))?;
+            Ok(old)
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = (how, set);
+            Err(ENOSYS_ERR)
+        }
     }
 
     fn take_process_pending(&self, deliverable: u64) -> Option<(i32, SiginfoT)> {
-        let _ = deliverable;
-        None
+        #[cfg(target_os = "none")]
+        {
+            // The kernel selects only a signal whose bit is in `deliverable` and leaves every
+            // masked signal queued (no pop/requeue window). The six-word record carries the
+            // kernel-owned `siginfo_t` fields, including a `sigqueue` payload.
+            let mut words = [0u64; 6];
+            if raw::proc_sigrecv_ex(&mut words, deliverable).ok()? <= 0 {
+                return None;
+            }
+            Some(process_siginfo(&words))
+        }
+        #[cfg(not(target_os = "none"))]
+        {
+            let _ = deliverable;
+            None
+        }
     }
 
     fn wait_for_kick(&self, deadline_ns: Option<u64>) -> Result<(), Errno> {

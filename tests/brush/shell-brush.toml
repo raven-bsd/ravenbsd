@@ -66,6 +66,9 @@ regex = '^status:1$'
 regex = '^ps1:raven#'
 
 [[expect]]
+regex = '^enable-ok$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
@@ -158,6 +161,18 @@ timeout_secs = 30
 [[step]]
 wait = '^raven# $'
 timeout_secs = 60
+
+[[step]]
+send = "/bin/brush --norc -c 'brushctl events enable unimp; echo enable-ok'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^enable-ok$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
 
 [[step]]
 send = "exit 0\n"

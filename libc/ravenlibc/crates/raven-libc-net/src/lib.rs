@@ -42,6 +42,8 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use raven_libc_abi::errno::Errno;
+use raven_libc_platform::Handle;
+use raven_libc_platform::fd::{InheritedSocket, SocketEndpoint, SocketMeta};
 use raven_proto_net::{Call, Endpoint, IfaceRequest, IfaceResponse};
 
 pub mod addr;
@@ -55,6 +57,7 @@ pub mod flags;
 pub mod iface;
 pub mod ifnames;
 pub mod itoa;
+pub mod mptcp;
 pub mod msg;
 pub mod netdb;
 pub mod opts;
@@ -177,6 +180,13 @@ pub trait NetBackend {
         let first = self.iface(IfaceRequest::List)?;
         Ok(alloc::vec![first])
     }
+
+    /// Send one encoded `SOL_MPTCP` control request and receive the raw reply.
+    ///
+    /// The default rejects the request; a backend that speaks the MPTCP opcode overrides it.
+    fn mptcp_control(&self, _s: Sock, _request: &[u8], _reply: &mut [u8]) -> Result<usize, Errno> {
+        Err(Errno::ENOPROTOOPT)
+    }
 }
 
 /// The adapter over the C55 fd table.
@@ -185,10 +195,19 @@ pub trait SocketFds {
     fn install(&self, s: Option<Sock>, cloexec: bool, nonblock: bool) -> Result<i32, Errno>;
     /// Attach the kernel handle to a pending socket.
     fn attach(&self, ofd: u32, s: Sock);
+    /// Attach the notification event that makes the socket `poll`-ready. Backends without an
+    /// event source keep the default no-op.
+    fn event(&self, _ofd: u32, _s: Sock) {}
     /// Resolve a libc fd.
     fn resolve(&self, fd: i32) -> Result<FdInfo, Errno>;
     /// The last reference to an OFD went away.
     fn release(&self, ofd: u32);
+    /// Socket identities restored from the `execve` inheritance block.
+    fn inherited(&self) -> Vec<InheritedSocket> {
+        Vec::new()
+    }
+    /// Record the socket identity for the next `execve` inheritance block.
+    fn set_meta(&self, _ofd: u32, _meta: SocketMeta) {}
 }
 
 /// One resolved fd.
@@ -230,15 +249,90 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv> Net<B, F, E, NoUnix> {
 }
 
 impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
+    /// Re-resolve every socket record's cached handle after `fork`.
+    ///
+    /// The child's `fork_child_inherit` gives each socket OFD a fresh scheme handle. The
+    /// `SocketRec.sock` cache is used by later `CALL`s (including the `Call::Event` attach); if
+    /// it keeps the parent's handle, those calls can hit the server file after its parent handle
+    /// was released (EBADF). The fd's OFD is the authority.
+    pub fn refresh_handles(&self) {
+        let fds = &self.fds;
+        for (_, rec) in self.table.borrow_mut().iter_mut() {
+            if let Ok(info) = fds.resolve(rec.fd)
+                && info.sock.is_some()
+            {
+                rec.sock = info.sock;
+            }
+        }
+    }
     /// Build a net layer with an optional `AF_UNIX` backend.
     pub fn with_unix(backend: B, fds: F, env: E, unix: Option<U>) -> Self {
-        Self {
+        let net = Self {
             backend,
             fds,
             env,
             unix,
             table: RefCell::new(SocketTable::new()),
             dns: RefCell::new(dnsio::DnsState::default()),
+        };
+        net.rehydrate_inherited();
+        net
+    }
+
+    /// Rebuild the socket records for sockets inherited across `execve`.
+    ///
+    /// The generic fd table restored the OFD, handle and event; this adds the metadata the
+    /// socket layer needs (`domain`, `type`, `proto`, state) so `recvmsg`/`sendmsg` and
+    /// `getsockopt(SO_TYPE)` work on the inherited descriptor.
+    fn rehydrate_inherited(&self) {
+        for inherited in self.fds.inherited() {
+            let meta = inherited.socket;
+            let mut rec = SocketRec::new(
+                meta.domain,
+                meta.ty,
+                meta.proto,
+                SocketState::from_code(meta.state),
+                inherited.fd,
+            );
+            rec.sock = (inherited.handle != Handle::NONE).then_some(Sock(inherited.handle.0));
+            rec.nonblock = inherited.status & raven_libc_abi::fcntl::O_NONBLOCK as u32 != 0;
+            rec.local = meta.local.map(|endpoint| Endpoint {
+                ip: endpoint.ip,
+                port: endpoint.port,
+            });
+            rec.peer = meta.peer.map(|endpoint| Endpoint {
+                ip: endpoint.ip,
+                port: endpoint.port,
+            });
+            let _ = self.table.borrow_mut().insert(inherited.ofd, rec);
+        }
+    }
+
+    /// Publish every live socket's identity to the platform OFD for the next `execve`.
+    ///
+    /// The table key is the OFD, which is the lifetime the metadata belongs to. Resolving the
+    /// recorded fd would lose a socket whose original descriptor was closed after `dup2` onto
+    /// stdio (the OpenSSH re-exec shape): the OFD still lives on the duplicated fd, but the
+    /// original number is gone.
+    pub fn sync_meta(&self) {
+        for (ofd, rec) in self.table.borrow().iter() {
+            self.fds.set_meta(
+                *ofd,
+                SocketMeta {
+                    domain: rec.domain,
+                    ty: rec.ty,
+                    proto: rec.proto,
+                    state: rec.state.code(),
+                    local: rec.local.map(|endpoint| SocketEndpoint {
+                        ip: endpoint.ip,
+                        port: endpoint.port,
+                    }),
+                    peer: rec.peer.map(|endpoint| SocketEndpoint {
+                        ip: endpoint.ip,
+                        port: endpoint.port,
+                    }),
+                },
+            );
         }
     }
 

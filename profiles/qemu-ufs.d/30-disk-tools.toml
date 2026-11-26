@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K193: the bootable UFS demo carries the same static disk tools as the S99
+# ufs-demo. The static fixtures are produced by `scripts/ufs-demo.sh
+# --prepare-tools`; `scripts/qemu-ufs.sh` runs that step before the image build.
+
+[[initfs.files]]
+src = "build/fixtures/ufs-demo/tools/lsblk"
+path = "/bin/lsblk"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/ufs-demo/tools/newfs"
+path = "/sbin/newfs"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/ufs-demo/tools/gpart"
+path = "/sbin/gpart"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "docs/man1/lsblk.1"
+path = "/usr/share/man/man1/lsblk.1"
+
+[[initfs.files]]
+src = "docs/man8/newfs.8"
+path = "/usr/share/man/man8/newfs.8"
+
+[[initfs.files]]
+src = "docs/man8/gpart.8"
+path = "/usr/share/man/man8/gpart.8"

@@ -34,6 +34,24 @@ pub const SIGRESEND: usize = 0x84;
 
 /// `SIG_SETUP` flag: enter with the interrupted `sp` instead of a fresh `sp - 128` frame.
 pub const ENTRY_SP: u32 = 1;
+/// `SIG_SETUP` flag: the second argument is an absolute user context address, not a TLS-relative
+/// offset. Used for a thread whose context area is a dedicated page (K443).
+pub const SIG_SETUP_ABS: u32 = 2;
+
+/// `THREAD_KICK` bit 0: inspect the pending sets.
+///
+/// The bit set is the PG-7/PG-8 contract; `raven_abi::syscall::THREAD_KICK` carries it. A kick
+/// without a registered `SIG_SETUP` entry is a bare wake, so only a registered thread treats the
+/// bit as an interruptable signal check.
+pub const KICK_CHECK: u32 = 1;
+/// `THREAD_KICK` bit 1: cancellation (handed to the thread pool's `on_kick`).
+pub const KICK_CANCEL: u32 = 2;
+/// `THREAD_KICK` bit 2: `synccall`.
+pub const KICK_SYNCCALL: u32 = 4;
+/// `THREAD_KICK` bit 3: POSIX timer.
+pub const KICK_TIMER: u32 = 8;
+/// Every kick bit this ABI defines.
+pub const KICK_KNOWN: u32 = KICK_CHECK | KICK_CANCEL | KICK_SYNCCALL | KICK_TIMER;
 
 /// Fault kind: page fault with no mapping (`SIGSEGV`/`SEGV_MAPERR`).
 pub const FAULT_PAGE_NOMAP: u32 = 1;

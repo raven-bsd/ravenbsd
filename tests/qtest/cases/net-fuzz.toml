@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "net-fuzz"
+arch = "x86_64"
+profile = "network-config-test"
+# The pre-step owns the bounded fuzz run (55 s cap) and stages a `test-exit=1` copy of the same
+# listener image.  This case logs in and exits, so the boot budget is the step timeout, not an
+# artificial wait for a timeout.
+timeout_secs = 75
+pre = ["timeout 900 sh tests/net-conformance/fuzz.sh"]
+image = "build/qtest/net-fuzz.img"
+qemu_extra = ["-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0,disable-legacy=on,mac=52:54:00:12:34:56"]
+expect_exit = "success"
+
+[[step]]
+wait = '^netconf: listening port=23090$'
+timeout_secs = 45
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 45
+[[step]]
+send = "root\n"
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 10
+[[step]]
+send = "raven\n"
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+[[step]]
+send = "exit 0\n"
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

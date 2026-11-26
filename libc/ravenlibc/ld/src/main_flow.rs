@@ -157,6 +157,35 @@ pub fn register_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf:
     phnum: u16,
     name: &[u8],
 ) -> Result<ObjId, LoadError> {
+    let id = register_object(loader, phdr, phnum, name)?;
+    loader.scope.main = id;
+    Ok(id)
+}
+
+/// Register a pre-mapped library (K139 libc) without making it the main program.
+///
+/// The spawner maps the library from the initfs zero-copy and passes its `PT_PHDR`; this records
+/// the same `LoadedObject` shape as a `DT_NEEDED` load, so `by_name` satisfies the dependency
+/// without a file-server copy.
+pub fn register_premapped<
+    P: Platform,
+    M: raven_libc_elf::MemView,
+    A: raven_libc_elf::RelocApplier,
+>(
+    loader: &mut Loader<P, M, A>,
+    phdr: u64,
+    phnum: u16,
+    name: &[u8],
+) -> Result<ObjId, LoadError> {
+    register_object(loader, phdr, phnum, name)
+}
+
+fn register_object<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier>(
+    loader: &mut Loader<P, M, A>,
+    phdr: u64,
+    phnum: u16,
+    name: &[u8],
+) -> Result<ObjId, LoadError> {
     let bias = main_bias(&loader.mem, phdr, phnum)
         .ok_or(LoadError::Elf(raven_libc_elf::ElfError::BadEntry))?;
     let link_phdr = phdr
@@ -200,7 +229,6 @@ pub fn register_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf:
     object.add_name(b"");
     object.add_name(name);
     let id = loader.insert(object).ok_or(LoadError::TooManyObjects)?;
-    loader.scope.main = id;
     Ok(id)
 }
 

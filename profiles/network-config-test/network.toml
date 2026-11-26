@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 static network drop-in for the network-config qtest.
+[network]
+hostname = "raven-static"
+mode = "static"
+
+[network.static]
+address = "10.0.2.15"
+prefix = 24
+gateway = "10.0.2.2"
+dns = ["10.0.2.3"]

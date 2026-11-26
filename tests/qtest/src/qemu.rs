@@ -93,11 +93,21 @@ pub(crate) fn program_for(arch: &str) -> Result<String, String> {
 }
 
 /// Build the fixed QEMU arguments from `architecture/02` section 6 plus the case extras.
+fn image_drive(image: &Path, disk_if: Option<&str>, disk_format: Option<&str>) -> String {
+    let format = disk_format.unwrap_or("raw");
+    match disk_if {
+        Some(interface) => format!("if={interface},format={format},file={}", image.display()),
+        None => format!("format={format},file={}", image.display()),
+    }
+}
+
 pub(crate) fn qemu_command(
     arch: &str,
     image: &Path,
     firmware: &Firmware,
     extra: &[String],
+    disk_if: Option<&str>,
+    disk_format: Option<&str>,
 ) -> Result<QemuCommand, String> {
     let program = program_for(arch)?;
     let mut args: Vec<String> = Vec::new();
@@ -131,7 +141,7 @@ pub(crate) fn qemu_command(
                 firmware.vars.display()
             ));
             args.push("-drive".to_string());
-            args.push(format!("format=raw,file={}", image.display()));
+            args.push(image_drive(image, disk_if, disk_format));
             args.push("-device".to_string());
             args.push("isa-debug-exit,iobase=0xf4,iosize=0x04".to_string());
         }
@@ -162,7 +172,7 @@ pub(crate) fn qemu_command(
                 firmware.vars.display()
             ));
             args.push("-drive".to_string());
-            args.push(format!("format=raw,file={}", image.display()));
+            args.push(image_drive(image, disk_if, disk_format));
         }
         other => return Err(format!("no QEMU command line for arch `{other}`")),
     }
@@ -229,8 +239,15 @@ mod tests {
     fn x86_command_matches_the_contract() {
         let temp = TempDir::new("qemu-x86");
         let firmware = firmware(&temp);
-        let command =
-            qemu_command("x86_64", Path::new("build/qtest/case.img"), &firmware, &[]).unwrap();
+        let command = qemu_command(
+            "x86_64",
+            Path::new("build/qtest/case.img"),
+            &firmware,
+            &[],
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(command.program, "qemu-system-x86_64");
         assert_eq!(
             command.args,
@@ -268,11 +285,39 @@ mod tests {
     }
 
     #[test]
+    fn a_case_image_can_be_a_virtio_qcow2() {
+        let temp = TempDir::new("qemu-virtio");
+        let firmware = firmware(&temp);
+        let command = qemu_command(
+            "x86_64",
+            Path::new("build/qtest/case.qcow2"),
+            &firmware,
+            &[],
+            Some("virtio"),
+            Some("qcow2"),
+        )
+        .unwrap();
+        assert!(
+            command
+                .args
+                .iter()
+                .any(|arg| { arg == "if=virtio,format=qcow2,file=build/qtest/case.qcow2" })
+        );
+    }
+
+    #[test]
     fn aarch64_command_matches_the_contract() {
         let temp = TempDir::new("qemu-arm");
         let firmware = firmware(&temp);
-        let command =
-            qemu_command("aarch64", Path::new("build/qtest/case.img"), &firmware, &[]).unwrap();
+        let command = qemu_command(
+            "aarch64",
+            Path::new("build/qtest/case.img"),
+            &firmware,
+            &[],
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(command.program, "qemu-system-aarch64");
         assert_eq!(
             command.args,
@@ -313,6 +358,8 @@ mod tests {
             Path::new("build/qtest/case.img"),
             &firmware,
             &extra,
+            None,
+            None,
         )
         .unwrap();
         assert_eq!(&command.args[command.args.len() - 2..], extra.as_slice());

@@ -110,6 +110,7 @@ pub fn validate(file: &Path, node: &Node) -> Result<(), ConfigError> {
             "services" => validate_services(file, value)?,
             "status" => validate_status(file, value)?,
             "secrets" => validate_secrets(file, value)?,
+            "network" => crate::network::validate_node(file, value)?,
             other => {
                 return Err(ConfigError::file(file, "unknown configuration key").with_key(other));
             }

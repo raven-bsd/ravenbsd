@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 DHCP drop-in for the network-config-dhcp qtest. The static table is a sentinel:
+# it must be validated and ignored, and 10.0.9.9 must never appear on eth0.
+[network]
+hostname = "raven-dhcp"
+mode = "dhcp"
+
+[network.static]
+address = "10.0.9.9"
+prefix = 24
+gateway = "10.0.9.1"
+dns = ["10.0.9.2"]

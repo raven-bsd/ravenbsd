@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-pf-conformance-fixtures"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# The fixture harness is deliberately outside the product workspace: it is a
+# test-only consumer of raven-pf and must not become a product crate.
+[workspace]
+
+[dependencies]
+raven-pf = { path = "../../../crates/raven-pf" }

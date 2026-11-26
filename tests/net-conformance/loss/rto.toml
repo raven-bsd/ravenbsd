@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "rto"
+runner = "tests/net-conformance/loss/run.sh"
+donor = ["FreeBSD sys/netinet/tcp_timer.c: tcp_timer_rexmt", "FreeBSD sys/netinet/tcp_timer.c: TCPTV_MIN and backoff"]
+rfcs = ["RFC 9293 section 3.8.3 (retransmission timeout)"]
+
+[[expect]]
+step = "first data segment is dropped"
+packet = "data"
+assert = "44-byte segment at server_isn+1 is not acknowledged"
+
+[[expect]]
+step = "the retransmit waits for the RTO"
+packet = "retransmit"
+assert = "same seq and bytes; observed no sooner than 1 s after the first segment"

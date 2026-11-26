@@ -29,6 +29,15 @@ regex = "^(raven# )?complete -W 'help exit' raven-test$"
 regex = '^(raven# )?no-rsh$'
 
 [[expect]]
+regex = '^(raven# )?command-status:0$'
+
+[[expect]]
+regex = '^(raven# )?ls-status:0$'
+
+[[expect]]
+regex = '^(raven# )?still-alive$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
@@ -79,6 +88,30 @@ delay_ms = 100
 
 [[step]]
 wait = '^(raven# )?no-rsh$'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/true; echo command-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?command-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/ls /; echo ls-status:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?ls-status:0$'
+timeout_secs = 60
+
+[[step]]
+send = "echo still-alive\n"
+delay_ms = 100
+
+[[step]]
+wait = '^(raven# )?still-alive$'
 timeout_secs = 30
 
 [[step]]

@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Standalone fixture crate (its own workspace): the K203 loopback DNS server is built for the
+# RavenBSD target by tests/fixtures/ping-dns/build.sh, not as a root workspace member.
+
+[package]
+name = "raven-ping-dnsd"
+version = "0.1.0"
+description = "Deterministic loopback DNS fixture for the K203 ping-dns qtest."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[workspace]
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-proto-net = { path = "../../../../crates/raven-proto-net" }
+raven-rt = { path = "../../../../userland/rt", features = ["alloc"] }
+raven-scheme = { path = "../../../../crates/raven-scheme" }

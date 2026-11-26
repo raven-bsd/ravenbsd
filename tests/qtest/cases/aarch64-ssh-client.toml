@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K434 rev209: the exact aarch64 `/bin/ssh -V` child from the release image. The shell starts
+# `/bin/true` (ordinary static child) and `/bin/ssh -V` (the OpenSSH client the tap row hangs on)
+# and each must print its marker. `spawn-debug` turns on the temporary kernel thread entry/exit
+# trace used to name the child stop.
+
+name = "aarch64-ssh-client"
+arch = "aarch64"
+profile = "release"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 test-exit=1 spawn-debug"
+qemu_extra = ["-nic", "none"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^SPAWN-TRUE:0$'
+
+[[expect]]
+regex = '^OpenSSH_[0-9]'
+
+[[expect]]
+regex = '^SSHTOOL:0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fatal runtime error|process: user fault'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/true; echo SPAWN-TRUE:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^SPAWN-TRUE:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ssh -V 2>&1; echo SSHTOOL:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^SSHTOOL:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

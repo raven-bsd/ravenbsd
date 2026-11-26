@@ -18,13 +18,16 @@ path = "/bin/login"
 src = "profiles/release.d/login.service.manifest"
 path = "/etc/services.d/getty.toml"
 
+# K195: the release account database includes the uid/gid 74 `sshd`
+# privilege-separation account that upstream OpenSSH requires when it runs as
+# root; the files live in profiles/ssh.d/ with the other SSH service data.
 [[initfs.files]]
-src = "etc/passwd"
+src = "profiles/ssh.d/passwd"
 path = "/etc/passwd"
 mode = 0o644
 
 [[initfs.files]]
-src = "etc/group"
+src = "profiles/ssh.d/group"
 path = "/etc/group"
 mode = 0o644
 

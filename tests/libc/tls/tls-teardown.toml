@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S183: the static std TLS-teardown discriminator. The normal mode sets a thread_local! with a
+# destructor, spawns a thread that reads it, joins, and exits 0. The destructor-read child is the
+# std AccessError control. If the normal mode panics, std/libc teardown owns the defect; if it is
+# clean, the shell owns it and this case is the regression discriminator.
+
+name = "tls-teardown"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 180
+pre = ["sh tests/libc/tls/build.sh x86_64 normal"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^TLS183: start$'
+
+[[expect]]
+regex = '^TLS183: thread read$'
+
+[[expect]]
+regex = '^TLS183: drop thread$'
+unordered = true
+
+[[expect]]
+regex = '^TLS183: join ok$'
+
+[[expect]]
+regex = '^TLS183: clean$'
+

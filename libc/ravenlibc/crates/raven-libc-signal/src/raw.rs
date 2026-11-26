@@ -12,11 +12,48 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::{JmpBuf, McontextT, SiginfoT, UcontextT};
 use raven_libc_tls::raw as tls_raw;
 use raven_libc_tls::tcb;
 
 use crate::critical::SigThreadState;
+#[cfg(not(target_os = "none"))]
+use crate::errors::ENOSYS_ERR;
+#[cfg(target_os = "none")]
+use raven_abi::syscall::{PROC_SIGQUEUE, PROC_SIGRECV_DELIVERABLE, PROC_SIGRECV_EX, THREAD_KICK};
+
+/// Receive one queued process signal, selecting only a deliverable one.
+///
+/// The kernel leaves every signal outside `deliverable` queued, so a masked signal is never
+/// consumed by this thread (K443). The six words are
+/// `[signo, sender_pid, si_code, si_uid, si_value, 0]`.
+#[cfg(target_os = "none")]
+pub fn proc_sigrecv_ex(words: &mut [u64; 6], deliverable: u64) -> Result<i32, Errno> {
+    // SAFETY: the kernel writes exactly six u64 words into `words`; the other arguments are
+    // scalars.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall3(
+            PROC_SIGRECV_EX,
+            words.as_mut_ptr() as usize,
+            (raven_libc_sys::signal::WNOHANG | PROC_SIGRECV_DELIVERABLE) as usize,
+            deliverable as usize,
+        )
+    };
+    raven_libc_sys::errno::ret_i32(result).map_err(|error| Errno(error.0))
+}
+
+/// Queue `value` with `sig` for `pid` through the kernel's `SI_QUEUE` record.
+#[cfg(target_os = "none")]
+pub fn proc_sigqueue(pid: i32, sig: i32, value: u64) -> Result<(), Errno> {
+    // SAFETY: PROC_SIGQUEUE takes three scalar arguments and the kernel validates the target.
+    let result = unsafe {
+        raven_libc_sys::arch::syscall3(PROC_SIGQUEUE, pid as usize, sig as usize, value as usize)
+    };
+    raven_libc_sys::errno::ret(result)
+        .map(|_| ())
+        .map_err(|error| Errno(error.0))
+}
 
 #[cfg(target_arch = "aarch64")]
 mod context_aarch64;
@@ -28,13 +65,6 @@ mod context_riscv64;
 mod context_riscv64_handler;
 #[cfg(target_arch = "x86_64")]
 mod context_x86_64;
-
-#[cfg(target_arch = "aarch64")]
-mod entry_aarch64;
-#[cfg(target_arch = "riscv64")]
-mod entry_riscv64;
-#[cfg(target_arch = "x86_64")]
-mod entry_x86_64;
 
 #[cfg(target_arch = "aarch64")]
 mod setjmp_aarch64;
@@ -59,8 +89,97 @@ pub const JMP_SS_SCRATCH: usize = 272;
 /// Offset of our `__ss[2]`, the mask-word pointer saved by `sigsetjmp`.
 pub const JMP_SS_MASK_PTR: usize = 280;
 
-/// The context area is registered at `tp + SIG_CTX_AREA_OFFSET` (PROPOSED, RD-new 3).
+/// The default context area offset (PROPOSED, RD-new 3).
+///
+/// The shell registers the offset returned by [`signal_context_area`] at run time; this
+/// constant is the host/fixture default.
 pub const SIG_CTX_AREA_OFFSET: usize = 4096;
+/// `SIG_SETUP` flag: the second argument is an absolute address (K443).
+pub use raven_abi::signal::SIG_SETUP_ABS;
+/// The ABI page size used for a dedicated context window.
+const CONTEXT_PAGE: usize = 4096;
+
+/// Where one thread's kernel signal context window lives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContextArea {
+    /// The unused tail of the builtin TLS page (TLS-relative).
+    Relative {
+        /// The context address inside the builtin buffer.
+        context: usize,
+        /// `context - tp`.
+        offset: usize,
+    },
+    /// A dedicated page, registered by absolute address.
+    Absolute {
+        /// The page address.
+        context: usize,
+    },
+}
+
+impl ContextArea {
+    /// The address of the `mcontext_t` window.
+    #[must_use]
+    pub const fn context(self) -> usize {
+        match self {
+            Self::Relative { context, .. } | Self::Absolute { context } => context,
+        }
+    }
+
+    /// The second `SIG_SETUP` argument (offset or absolute address).
+    #[must_use]
+    pub const fn argument(self) -> usize {
+        match self {
+            Self::Relative { offset, .. } => offset,
+            Self::Absolute { context } => context,
+        }
+    }
+
+    /// The `SIG_SETUP` flags.
+    #[must_use]
+    pub const fn flags(self) -> u32 {
+        match self {
+            Self::Relative { .. } => 0,
+            Self::Absolute { .. } => SIG_SETUP_ABS,
+        }
+    }
+}
+
+/// Locate the kernel context window for a thread whose TLS pointer is `tp`.
+///
+/// The builtin TLS buffer is one page and the TCB is placed inside it. The bytes after the TCB
+/// are unused padding, so the `mcontext_t` + `FaultRecord` window can live there without
+/// overwriting `SigThreadState` (which occupies `Pthread.sig_private`).
+///
+/// A thread with its own TLS mapping (a `pthread_create` stack, or a main thread whose static
+/// layout exceeds the builtin page) has no such tail: its TLS block ends at the TCB and the TSD
+/// array follows. For that case the function maps a dedicated read-write page and returns it as
+/// an absolute area. The kernel validates and registers the address; the page is per registered
+/// thread (K443).
+#[must_use]
+pub fn signal_context_area(tp: usize) -> Option<ContextArea> {
+    let needed = core::mem::size_of::<McontextT>()
+        .checked_add(core::mem::size_of::<crate::kernel::FaultRecord>())?;
+    let base = raven_libc_tls::raw::BUILTIN_TLS.as_ptr() as usize;
+    let end = base.checked_add(raven_libc_tls::raw::BUILTIN_TLS.capacity())?;
+    if let Some((context, offset)) = builtin_context(tp, base, end, needed) {
+        return Some(ContextArea::Relative { context, offset });
+    }
+    let len = needed.checked_add(CONTEXT_PAGE - 1)? & !(CONTEXT_PAGE - 1);
+    let page = raven_libc_sys::pages::SysPageProvider::new().map_pages(len, 16, 3)?;
+    Some(ContextArea::Absolute { context: page })
+}
+
+/// The builtin-page plan for `tp`, or `None` when `tp` is not inside the builtin buffer.
+fn builtin_context(tp: usize, base: usize, end: usize, needed: usize) -> Option<(usize, usize)> {
+    let context = tp
+        .checked_add(core::mem::size_of::<tcb::Pthread>())?
+        .checked_add(15)?
+        & !15;
+    if tp < base || context.checked_add(needed)? > end {
+        return None;
+    }
+    Some((context, context.checked_sub(tp)?))
+}
 
 /// `Pthread` size sanity: the private signal block is 32 words.
 const _: () = assert!(tcb::SIG_PRIVATE_BYTES == 256);
@@ -243,6 +362,17 @@ pub fn set_ctx_area(tp: usize, address: usize) {
     with_state(tp, |state| state.set_ctx_area(address));
 }
 
+/// Reset the per-thread signal delivery state for a fork child.
+///
+/// C19 has no user entry to re-register; the child keeps the inherited mask and the process-wide
+/// kernel dispositions, while the thread-directed pending and deferred records are cleared. The
+/// return value stays `false` for the caller that historically re-registered an entry.
+pub fn reset_after_fork(tp: usize) -> bool {
+    with_state(tp, |state| state.reset_for_fork());
+    pending_store(tp, 0);
+    false
+}
+
 /// COPY-IN: copy the kernel area into a `ucontext_t`.
 pub fn copy_ctx_in(tp: usize, context: &mut UcontextT) {
     let source = ctx_area(tp) as *const u8;
@@ -419,12 +549,8 @@ unsafe extern "C" {
         arg2: usize,
         arg3: usize,
     ) -> usize;
-    fn __rl_sigreturn_stub() -> !;
-    fn __raven_sigentry();
     fn __rl_start_context();
     fn __rl_current_sp() -> usize;
-    /// The function pointer the `__raven_sigentry` stub calls.
-    static __rl_entry_fn: AtomicUsize;
 }
 
 /// Save the callee-saved context into `buffer`.
@@ -502,29 +628,26 @@ pub fn call_handler(stack: usize, handler: usize, arg1: usize, arg2: usize, arg3
     unsafe { __rl_call_handler(stack, handler, arg1, arg2, arg3) }
 }
 
-/// `SIGRETURN` (syscall 0x82, PROPOSED PG-7).
-pub fn sigreturn() -> ! {
-    // SAFETY: the kernel contract restores the context area and never returns here.
-    unsafe { __rl_sigreturn_stub() }
-}
-
-/// Set the C-ABI function the `__raven_sigentry` stub calls (the shell's entry body).
-pub fn set_entry_function(function: usize) {
-    // SAFETY: the cell is defined by the linked asm object with the same type.
-    unsafe { __rl_entry_fn.store(function, Ordering::Release) };
-}
-
-/// The registered entry function address (0 until the shell installs it).
-#[must_use]
-pub fn entry_function() -> usize {
-    // SAFETY: as `set_entry_function`; the load is atomic.
-    unsafe { __rl_entry_fn.load(Ordering::Acquire) }
-}
-
-/// The address of the assembly entry stub the kernel resumes at.
-#[must_use]
-pub fn sigentry_address() -> usize {
-    __raven_sigentry as *const () as usize
+/// Set the calling thread's sticky kick word and wake an interruptible wait.
+///
+/// # Errors
+///
+/// The kernel's `EINVAL` for unknown bits, `EBADF`/`ESRCH` for a bad thread handle.
+pub fn kick(handle: u32, bits: u32) -> Result<(), Errno> {
+    #[cfg(target_os = "none")]
+    {
+        // SAFETY: THREAD_KICK takes two scalar words; the kernel validates the handle and bits.
+        let result =
+            unsafe { raven_libc_sys::arch::syscall2(THREAD_KICK, handle as usize, bits as usize) };
+        raven_libc_sys::errno::ret(result)
+            .map(|_| ())
+            .map_err(|error| Errno(error.0))
+    }
+    #[cfg(not(target_os = "none"))]
+    {
+        let _ = (handle, bits);
+        Err(ENOSYS_ERR)
+    }
 }
 
 /// The address of the `makecontext` start stub.

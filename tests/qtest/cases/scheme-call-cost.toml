@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K147: fixed per-call scheme IPC cost. A null CALL, a 4 KiB PREAD, a 64 KiB PREAD and a 1 MiB
+# read through one registered scheme; 100+ samples with a p50/p90 table. The raw per-sample
+# lines are kept in the captured serial log.
+
+name = "scheme-call-cost"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/scheme-call-cost/build.sh"]
+initfs = "build/fixtures/scheme-call-cost/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^scheme-call-cost: server ready$'
+
+[[expect]]
+regex = '^scheme-call-cost: null n=128 p50_ns=\d+ p90_ns=\d+$'
+
+[[expect]]
+regex = '^scheme-call-cost: pread4k n=128 p50_ns=\d+ p90_ns=\d+$'
+
+[[expect]]
+regex = '^scheme-call-cost: pread64k n=128 p50_ns=\d+ p90_ns=\d+$'
+
+[[expect]]
+regex = '^scheme-call-cost: read1m n=100 p50_ns=\d+ p90_ns=\d+$'
+
+[[expect]]
+regex = '^scheme-call-cost: done$'
+
+[[expect]]
+regex = '^scheme-call-cost: controller ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|scheme-call-cost: fail'

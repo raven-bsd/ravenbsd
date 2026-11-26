@@ -6,8 +6,14 @@
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{Scheme, control, doctor_checks, parse, read_service, read_services};
+use super::{
+    Globals, Scheme, control, doctor_checks, parse, read_service, read_services, run_users_at,
+};
 use raven_proto_svc::Op;
 
 #[derive(Default)]
@@ -140,4 +146,90 @@ fn only_the_admin_commands_are_dispatched() {
     assert!(parse(&[OsString::from("frobnicate")]).is_none());
     assert!(parse(&[OsString::from("--help")]).is_none());
     assert!(parse(&[OsString::from("config"), OsString::from("check")]).is_none());
+}
+
+const ROOT_HASH: &str = "$6$rounds=5000$G3aRZtaEHFI9mxqPo3H6$NWDGRfLCpNbICW5P.FtjRWkSeV2R0JxL7QOLj/As2KydiD3R3HfBVGeHPfXTfAgrbrIlubqza9MTtpRUfXjv8.";
+
+static NEXT: AtomicUsize = AtomicUsize::new(1);
+
+fn users_root() -> PathBuf {
+    let root = std::env::temp_dir().join(format!(
+        "raven-admin-users-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let write = |relative: &str, text: &str, mode: u32| {
+        let path = root.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+    };
+    write(
+        "etc/passwd",
+        "root:x:0:0:root:/root:/bin/rsh\nalice:x:1000:1000:Alice:/home/alice:/bin/rsh\n",
+        0o644,
+    );
+    write(
+        "etc/shadow",
+        &format!("root:{ROOT_HASH}:0:0:99999:7:0:0:0\nalice:{ROOT_HASH}:0:0:99999:7:0:0:0\n"),
+        0o600,
+    );
+    write("etc/group", "root:x:0:root\nalice:x:1000:\n", 0o644);
+    write(
+        "etc/raven/autologin.toml",
+        "[console]\nuser = \"alice\"\nenabled = true\n",
+        0o644,
+    );
+    for directory in ["root", "home/alice"] {
+        fs::create_dir_all(root.join(directory)).unwrap();
+    }
+    write("bin/rsh", "#!/bin/rsh\n", 0o755);
+    root
+}
+
+fn run_users_json(root: &Path, args: &[&str]) -> (i32, String, String) {
+    let globals = Globals {
+        json: true,
+        quiet: false,
+    };
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let args: Vec<String> = args.iter().map(|arg| (*arg).to_string()).collect();
+    let code = run_users_at(root, &globals, &args, &mut out, &mut err);
+    (
+        code,
+        String::from_utf8(out).unwrap(),
+        String::from_utf8(err).unwrap(),
+    )
+}
+
+#[test]
+fn users_list_json_reads_the_account_files() {
+    let root = users_root();
+    let (code, out, err) = run_users_json(&root, &["list"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(out.contains("\"schema\":1,\"kind\":\"user\""));
+    assert!(out.contains("\"name\":\"root\""));
+    assert!(out.contains("\"name\":\"alice\""));
+    assert!(out.contains("\"autologin\":true"));
+    assert!(!out.contains(ROOT_HASH));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn users_show_and_check_json_report_the_account() {
+    let root = users_root();
+    let (code, out, err) = run_users_json(&root, &["show", "alice"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(out.contains("\"name\":\"alice\""));
+    assert!(out.contains("\"home\":\"/home/alice\""));
+    assert!(out.contains("\"shell\":\"/bin/rsh\""));
+    assert!(!out.contains(ROOT_HASH));
+    let (code, out, err) = run_users_json(&root, &["check"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(out.contains("\"status\":\"ok\""));
+    assert!(out.contains("\"users\":2"));
+    let _ = fs::remove_dir_all(root);
 }

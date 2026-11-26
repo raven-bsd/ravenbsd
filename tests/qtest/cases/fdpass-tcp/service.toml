@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K438 fdpass-tcp service: runs after netd publishes the net scheme, accepts one hostfwd
+# connection, and passes that accepted TCP descriptor to a forked child over an AF_UNIX
+# SCM_RIGHTS message. The test-only svcd.conf exits init with this service's status.
+
+name = "fdpass-tcp"
+exec = "/bin/fdpass"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

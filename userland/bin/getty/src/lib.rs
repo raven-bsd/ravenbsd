@@ -36,7 +36,10 @@ use alloc::vec::Vec;
 use login::{Profile, normalize_username};
 
 /// Printed once before the first prompt.
-pub const BANNER: &str = "RavenBSD 0.1 (x86_64) (tty:console)\n";
+///
+/// The boot orchestrator now prints the styled title, rules, timed table and `Welcome` line;
+/// getty only owns the `login: ` prompt, so its own banner is empty.
+pub const BANNER: &str = "";
 /// The username prompt; printed again after every failed attempt.
 pub const PROMPT: &[u8] = b"login: ";
 /// A rejected user name that getty answers without spawning `login`.
@@ -56,6 +59,15 @@ impl core::fmt::Display for SessionError {
     }
 }
 
+/// One account's console session fields.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Account {
+    /// Home directory.
+    pub home: String,
+    /// Login shell.
+    pub shell: String,
+}
+
 /// Console and spawn operations the loop needs.
 pub trait Session {
     /// Write bytes to the console.
@@ -66,6 +78,8 @@ pub trait Session {
     fn run_login(&mut self, username: &str) -> Result<i32, SessionError>;
     /// Run the session shell with `args` and the profile `env`.
     fn run_shell(&mut self, shell: &str, args: &[&str], env: &[&str]) -> Result<i32, SessionError>;
+    /// The session fields for an authenticated account.
+    fn account(&mut self, username: &str) -> Option<Account>;
 }
 
 /// The environment handed to the session shell.
@@ -73,13 +87,13 @@ pub trait Session {
 /// `LOGNAME` is part of the login contract; the flat `/etc/profile` parser does not carry it, so
 /// getty derives it from the account that authenticated.
 #[must_use]
-pub fn profile_env(profile: &Profile, shell: &str) -> Vec<String> {
+pub fn profile_env(profile: &Profile, user: &str, home: &str, shell: &str) -> Vec<String> {
     let mut env = Vec::with_capacity(7);
     env.push(format!("PATH={}", profile.path));
-    env.push(format!("HOME={}", profile.home));
+    env.push(format!("HOME={home}"));
     env.push(format!("TERM={}", profile.term));
-    env.push(format!("USER={}", profile.user));
-    env.push(format!("LOGNAME={}", profile.user));
+    env.push(format!("USER={user}"));
+    env.push(format!("LOGNAME={user}"));
     env.push(format!("SHELL={shell}"));
     env.push(String::from("PWD=/"));
     env
@@ -100,13 +114,25 @@ pub fn shell_args(shell: &str) -> &'static [&'static str] {
 
 /// Run the banner, the retried login attempt and the session shell.
 ///
-/// A bad user name, a rejected password or a failed `login` spawn loops back to the prompt. Only
-/// a zero status from `login` reaches the shell; the shell's status is getty's exit status.
-pub fn run_session<S: Session + ?Sized>(session: &mut S, profile: &Profile, shell: &str) -> i32 {
+/// An enabled console autologin starts its account's shell immediately, without a password. A
+/// bad user name, a rejected password or a failed `login` spawn loops back to the prompt. Only a
+/// zero status from `login` reaches the shell; the shell's status is getty's exit status. The
+/// passwd home/shell are used for a non-root account; `default_shell` covers a missing field.
+pub fn run_session<S: Session + ?Sized>(
+    session: &mut S,
+    profile: &Profile,
+    default_shell: &str,
+    autologin: Option<&str>,
+) -> i32 {
     if session.write(BANNER.as_bytes()).is_err() {
         return 1;
     }
-    loop {
+    if let Some(user) = autologin
+        && let Some(account) = session.account(user)
+    {
+        return run_user(session, profile, user, &account, default_shell);
+    }
+    let username = loop {
         if session.write(PROMPT).is_err() {
             return 1;
         }
@@ -121,7 +147,7 @@ pub fn run_session<S: Session + ?Sized>(session: &mut S, profile: &Profile, shel
             continue;
         };
         match session.run_login(username) {
-            Ok(0) => break,
+            Ok(0) => break String::from(username),
             Ok(_) => continue,
             Err(_) => {
                 if session.write(LOGIN_ERROR).is_err() {
@@ -130,8 +156,32 @@ pub fn run_session<S: Session + ?Sized>(session: &mut S, profile: &Profile, shel
                 continue;
             }
         }
-    }
-    let env = profile_env(profile, shell);
+    };
+    let account = session.account(&username).unwrap_or_else(|| Account {
+        home: profile.home.clone(),
+        shell: String::from(default_shell),
+    });
+    run_user(session, profile, &username, &account, default_shell)
+}
+
+fn run_user<S: Session + ?Sized>(
+    session: &mut S,
+    profile: &Profile,
+    user: &str,
+    account: &Account,
+    default_shell: &str,
+) -> i32 {
+    let shell = if account.shell.is_empty() {
+        default_shell
+    } else {
+        account.shell.as_str()
+    };
+    let home = if account.home.is_empty() {
+        profile.home.as_str()
+    } else {
+        account.home.as_str()
+    };
+    let env = profile_env(profile, user, home, shell);
     let env: Vec<&str> = env.iter().map(String::as_str).collect();
     match session.run_shell(shell, shell_args(shell), &env) {
         Ok(status) => status,

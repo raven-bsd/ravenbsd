@@ -9,9 +9,10 @@
 //! syscall-return path installs the new entry/stack. Any failure drops the temporary space and
 //! returns the error with the old image and registers intact.
 //!
-//! The loader is the kernel's existing `raven-elf` plan/copy path (`load_segments`) and the C8
-//! stack builder used by `/init`; the runtime reads the file with `raven-spawn`'s shared image
-//! reader and passes the bytes here.
+//! The loader uses the kernel's `raven-elf` planner and the C8 stack builder used by `/init`.
+//! Only the ELF header, program headers and `PT_INTERP` string are copied into kernel memory;
+//! each `PT_LOAD` page is copied directly from the caller's still-live image, so the 4 MiB kernel
+//! heap never holds the multi-MiB image.
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -24,21 +25,18 @@ use raven_elf::Elf;
 use super::handle::Object;
 use super::{AddressSpace, Process, ProcessError, ProcessState, UserAddressSpace};
 
-/// Largest image copied into kernel memory for one exec.
+/// Largest exec image accepted from the caller.
 ///
-/// The kernel heap is 4 MiB and the image is a temporary copy; the release user programs are
-/// about 200 KiB. A larger image is rejected with `EFBIG` until the loader can map directly from
-/// the caller's memory object.
-pub const MAX_EXEC_IMAGE: usize = 1024 * 1024;
+/// The image stays in the caller's address space; the kernel copies only the ELF header,
+/// program-header table and `PT_INTERP` string (bounded separately) and streams each `PT_LOAD`
+/// segment into fresh frames. The bound covers the staged 8.3 MiB OpenSSH helpers with headroom;
+/// it is an input limit, not a kernel-heap allocation.
+pub const MAX_EXEC_IMAGE: usize = 16 * 1024 * 1024;
 
 /// `ET_EXEC`: a fixed-address executable.
 const ET_EXEC: u16 = 2;
 /// `ET_DYN`: a position-independent executable or shared object.
 const ET_DYN: u16 = 3;
-/// Load bias for an `ET_DYN` main image; matches `raven-spawn`'s `MAIN_PIE_BASE`.
-const MAIN_PIE_BASE: u64 = 0x0000_1000_0000_0000;
-/// Load bias for a `PT_INTERP` image; matches `raven-spawn`'s `INTERP_BASE`.
-const INTERP_BASE: u64 = 0x0000_2000_0000_0000;
 /// Largest `PT_INTERP` image read from the initfs for one exec.
 const MAX_INTERP_IMAGE: usize = 2 * 1024 * 1024;
 
@@ -51,20 +49,29 @@ pub struct ExecContext {
     pub stack: u64,
 }
 
-/// Replace `caller`'s image with `image`.
+/// Replace `caller`'s image from the still-live user range.
 ///
-/// `argv`/`envp` are already copied into kernel storage; `path` is the `AT_EXECFN` spelling.
-/// `close` is the caller's CLOEXEC handle list; pipe ends created with `O_CLOEXEC` are added
-/// automatically.
-pub fn replace_image(
+/// `header` contains the ELF header, the complete program-header table and any `PT_INTERP`
+/// string; `image_base`/`image_len` name the caller's full image. Segments are copied directly
+/// from that range. `argv`/`envp` are already copied into kernel storage; `path` is the
+/// `AT_EXECFN` spelling. `close` is the caller's CLOEXEC handle list; pipe ends created with
+/// `O_CLOEXEC` are added automatically.
+// `PROC_EXEC` supplies eight distinct inputs (caller, header, image range, path, argv, envp and
+// the close list) and has one caller in `kernel/src/syscall/exec.rs`. Grouping them into a context
+// would change that cross-module API, which is outside K418's Owns; the ticket permits this
+// narrowly scoped exception. No other lint is suppressed.
+#[allow(clippy::too_many_arguments)]
+pub fn replace_image_from_user(
     caller: &Arc<Process>,
-    image: &[u8],
+    header: &[u8],
+    image_base: u64,
+    image_len: u64,
     path: &[u8],
     argv: &[Vec<u8>],
     envp: &[Vec<u8>],
     close: &[Handle],
 ) -> Result<(), Errno> {
-    if image.is_empty() || image.len() > MAX_EXEC_IMAGE {
+    if header.is_empty() || image_len == 0 || image_len > MAX_EXEC_IMAGE as u64 {
         return Err(Errno::EFBIG);
     }
     // The current thread must be the only thread: this slice has no scheduler-side thread list
@@ -78,16 +85,17 @@ pub fn replace_image(
     }
     let thread = crate::sched::current_thread().ok_or(Errno::ESRCH)?;
 
-    let kind = elf_type(image).ok_or(Errno::ENOEXEC)?;
+    let kind = elf_type(header).ok_or(Errno::ENOEXEC)?;
     let range = if kind == ET_DYN {
         0..super::USER_END
     } else {
         super::USER_MIN..super::USER_END
     };
-    let elf = Elf::parse(image, super::TARGET_MACHINE, range).map_err(|_| Errno::ENOEXEC)?;
+    let elf = Elf::parse_with_len(header, image_len, super::TARGET_MACHINE, range)
+        .map_err(|_| Errno::ENOEXEC)?;
     let main_bias = match kind {
         ET_EXEC => 0,
-        ET_DYN => MAIN_PIE_BASE,
+        ET_DYN => crate::memory::aslr::pie_bias(),
         _ => return Err(Errno::ENOEXEC),
     };
     let main_entry = elf.entry().checked_add(main_bias).ok_or(Errno::ENOEXEC)?;
@@ -113,7 +121,7 @@ pub fn replace_image(
         None => (None, None),
     };
     let interpreter_bias = if interpreter.is_some() {
-        INTERP_BASE
+        crate::memory::aslr::interp_bias()
     } else {
         0
     };
@@ -143,7 +151,8 @@ pub fn replace_image(
         super::load_segments(&mut new_space, interp, data, interpreter_bias)
             .map_err(process_errno)?;
     }
-    super::load_segments(&mut new_space, &elf, image, main_bias).map_err(process_errno)?;
+    super::load_segments_from_user(&mut new_space, &elf, image_base, image_len, main_bias)
+        .map_err(process_errno)?;
     let argv_refs: Vec<&[u8]> = argv.iter().map(Vec::as_slice).collect();
     let envp_refs: Vec<&[u8]> = envp.iter().map(Vec::as_slice).collect();
     let stack = super::build_stack(&mut new_space, path, &argv_refs, &envp_refs, &ids, aux)
@@ -157,10 +166,12 @@ pub fn replace_image(
         .map_err(|_| Errno::ENOMEM)?;
     to_close.extend_from_slice(close);
     caller.handles.lock().for_each_live(|handle, object, _, _| {
-        if let Object::Pipe(end) = object
-            && end.is_cloexec()
-            && !to_close.contains(&handle)
-        {
+        let cloexec = match object {
+            Object::Pipe(end) => end.is_cloexec(),
+            Object::Duplex(end) => end.is_cloexec(),
+            _ => false,
+        };
+        if cloexec && !to_close.contains(&handle) {
             to_close.push(handle);
         }
     });
@@ -198,6 +209,28 @@ pub fn replace_image(
         let _ = crate::event::close_handle(caller, handle);
     }
     caller.pending_signals.lock().clear();
+    // C19/FreeBSD `execsigs`: caught handlers reset to SIG_DFL (ignored stay ignored), the
+    // alternate stack is disabled, and no handler/entry from the old image survives. The signal
+    // mask is preserved across exec (FreeBSD keeps `td_sigmask`).
+    caller.sigacts.lock().exec_reset();
+    if let Some(thread) = crate::sched::current_thread() {
+        thread.signal_entry.store(0, Ordering::Release);
+        thread.signal_ctx_offset.store(0, Ordering::Release);
+        thread.signal_ctx_abs.store(0, Ordering::Release);
+        thread.signal_flags.store(0, Ordering::Release);
+        thread.signal_active_ctx.store(0, Ordering::Release);
+        thread.signal_depth.store(0, Ordering::Release);
+        thread.signal_mask.store(0, Ordering::Release);
+        thread.resend.store(false, Ordering::Release);
+        thread.kick_bits.store(0, Ordering::Release);
+        thread.sig_alt_sp.store(0, Ordering::Release);
+        thread.sig_alt_size.store(0, Ordering::Release);
+        thread
+            .sig_alt_flags
+            .store(crate::process::SS_DISABLE, Ordering::Release);
+        thread.sig_on_altstack.store(false, Ordering::Release);
+    }
+    caller.exec_done.store(true, Ordering::Release);
     let command = super::command_from_argv(argv, path);
     *caller.command.lock() = command;
     caller.pending_exec.lock().replace(ExecContext {

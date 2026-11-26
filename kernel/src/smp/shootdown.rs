@@ -19,9 +19,12 @@
 //!   shooter waits with interrupts enabled, so a target that is spinning on an address-space
 //!   lock can still take the TLB IPI. The guard masks interrupts only while publishing/clearing
 //!   the active request and restores the caller's original IF on drop.
-//! * A missing acknowledgement is a timeout after 100 ms.  The per-CPU pending slot is cleared so
-//!   a late IPI is ignored, the timeout is logged, and `false` is returned; the caller decides how
-//!   to react.  No frame or slot is allocated, so a timeout cannot leak.
+//! * Every online target must acknowledge before the shooter proceeds. The NMI is the fast path
+//!   for a target in an IF=0 section; a fixed TLB IPI is sent with it and stays pending in the
+//!   target's local APIC if the NMI is blocked or lost, so a lost NMI cannot lose the
+//!   invalidation. The 100 ms deadline is diagnostic only: a late acknowledgement is still
+//!   waited for and the pending sequence is not cleared. The `s34-tlb-fail` fault injection
+//!   keeps the historical bounded-timeout failure path for its mutation test.
 //!
 //! Memory ordering: the shooter stores the range and the per-CPU pending sequence with
 //! `SeqCst` before sending the IPI; the handler loads the pending sequence and the range with
@@ -33,8 +36,9 @@
 //! # Fault injection
 //!
 //! The `s34-tlb-fail` boot flag arms a one-shot injection: the next shootdown skips one remote
-//! IPI, waits out the normal deadline, logs the timeout and returns `false`.  It exists to test
-//! the timeout path under SMP load; it never fires unless the flag is present.
+//! delivery (both NMI and fixed IPI), waits out the normal deadline, logs the timeout and
+//! returns `false`.  It exists to test the timeout path under SMP load; it never fires unless
+//! the flag is present.
 
 #![allow(clippy::indexing_slicing)]
 
@@ -89,11 +93,38 @@ static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static PENDING: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static ACKED: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static LAST: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+static LAST_TIME: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static FLUSHES: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+/// Selftest hook: skip the NMI for one target, leaving the fixed IPI as the only delivery.
+static DROP_NMI: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
+/// Selftest hook: delay one target's acknowledgement inside the NMI handler.
+static ACK_DELAY_NS: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 
 /// Arm the one-shot timeout injection used by the `concurrency-stress` test.
 pub fn set_failure_injection(enabled: bool) {
     INJECT_FAILURE.store(usize::from(enabled), Ordering::Release);
+}
+
+/// Selftest hook: drop the NMI delivery to `cpu` once, so only the fixed IPI can complete it.
+pub fn arm_nmi_drop(cpu: usize) {
+    if let Some(slot) = DROP_NMI.get(cpu) {
+        slot.store(true, Ordering::Release);
+    }
+}
+
+/// Selftest hook: delay `cpu`'s acknowledgement by `delay_ns` inside the next handler.
+pub fn arm_ack_delay(cpu: usize, delay_ns: u64) {
+    if let Some(slot) = ACK_DELAY_NS.get(cpu) {
+        slot.store(delay_ns, Ordering::Release);
+    }
+}
+
+/// The pending sequence for `cpu`, or zero when no request is published.
+pub fn pending_sequence(cpu: usize) -> u64 {
+    PENDING
+        .get(cpu)
+        .map(|slot| slot.load(Ordering::SeqCst))
+        .unwrap_or(0)
 }
 
 /// Invalidate `addr..addr + len` on every online CPU.
@@ -102,6 +133,10 @@ pub fn set_failure_injection(enabled: bool) {
 /// executing the invalidation. A missing acknowledgement is reported and does not hang the
 /// system forever.
 pub fn flush_range(addr: u64, len: u64) -> bool {
+    debug_assert!(
+        !percpu::unmap_lock_held(),
+        "TLB shootdown while holding the address-space lock"
+    );
     if len == 0 {
         return true;
     }
@@ -114,6 +149,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
 
     let _guard = ActiveGuard::acquire();
     let inject = INJECT_FAILURE.swap(0, Ordering::AcqRel) != 0;
+    let start = time::now_ns();
     let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
     ADDRESS.store(addr, Ordering::SeqCst);
     LENGTH.store(len, Ordering::SeqCst);
@@ -133,7 +169,12 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
             if inject && !skipped {
                 skipped = true;
             } else {
-                ipi::send_tlb(cpu);
+                if !DROP_NMI[cpu].swap(false, Ordering::AcqRel) {
+                    ipi::send_tlb(cpu);
+                }
+                // The fixed IPI stays pending in the target's local APIC while NMI is blocked
+                // or the target is not running, so a lost NMI cannot lose the invalidation.
+                ipi::send_tlb_ipi(cpu);
             }
         }
         cpu = cpu.saturating_add(1);
@@ -142,9 +183,10 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
     // The caller may be inside a syscall or page fault with IF clear. Re-enable interrupts only
     // while waiting so a target that is spinning on the address-space lock can still take the
     // IPI. `ActiveGuard::drop` restores the caller's original IF.
-    let deadline = time::now_ns().saturating_add(100_000_000);
+    let deadline = start.saturating_add(100_000_000);
     ap_start::enable_local_interrupts();
     let mut all_acked = true;
+    let mut warned = false;
     cpu = 0;
     while cpu < online {
         if cpu != me {
@@ -152,28 +194,27 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
                 && LAST[cpu].load(Ordering::SeqCst) != sequence
             {
                 if time::now_ns() > deadline {
-                    // Reset the mailbox so a late IPI is ignored instead of acknowledging a
-                    // stale sequence; the next shootdown publishes a fresh one.
-                    PENDING[cpu].store(0, Ordering::SeqCst);
-                    let (state, last_irq, last_state) = percpu::snapshot(cpu);
-                    let (in_syscall, user_flags, syscall_number) = percpu::syscall_state(cpu);
-                    let page_fault = percpu::page_fault_active(cpu);
-                    let page_fault_phase = percpu::page_fault_phase(cpu);
-                    let wait_phase = percpu::wait_phase(cpu);
-                    let now = time::now_ns();
-                    kprintln!(
-                        "smp: tlb shootdown timeout on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} pf={page_fault} pfp={page_fault_phase} wq={wait_phase} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={}",
-                        LAST[cpu].load(Ordering::SeqCst),
-                        flush_count(cpu),
-                        (user_flags >> 9) & 1,
-                        now.saturating_sub(last_irq) / 1_000_000,
-                        now.saturating_sub(last_state) / 1_000_000
-                    );
-                    all_acked = false;
-                    break;
+                    if inject {
+                        // Fault injection only: reproduce the historical lost-ack failure.
+                        // The mailbox is cleared so a late IPI is ignored; production never
+                        // reaches this path.
+                        report_stall("timeout", cpu, sequence, start);
+                        PENDING[cpu].store(0, Ordering::SeqCst);
+                        all_acked = false;
+                        break;
+                    }
+                    if !warned {
+                        // Still waiting: the target has not acknowledged within the diagnostic
+                        // window. Keep the request published and do not proceed without the ack.
+                        report_stall("ack delay", cpu, sequence, start);
+                        warned = true;
+                    }
                 }
                 core::hint::spin_loop();
             }
+        }
+        if !all_acked {
+            break;
         }
         cpu = cpu.saturating_add(1);
     }
@@ -181,19 +222,53 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
     all_acked
 }
 
+/// Print the bounded diagnostic for a target that has not acknowledged within 100 ms.
+fn report_stall(kind: &str, cpu: usize, sequence: u64, start: u64) {
+    let (state, last_irq, last_state) = percpu::snapshot(cpu);
+    let (in_syscall, user_flags, syscall_number) = percpu::syscall_state(cpu);
+    let page_fault = percpu::page_fault_active(cpu);
+    let page_fault_phase = percpu::page_fault_phase(cpu);
+    let wait_phase = percpu::wait_phase(cpu);
+    let now = time::now_ns();
+    let ack_time = LAST_TIME[cpu].load(Ordering::SeqCst);
+    kprintln!(
+        "smp: tlb shootdown {kind} on cpu {cpu} seq={sequence} last={} flushes={} state={state} syscall={in_syscall} pf={page_fault} pfp={page_fault_phase} wq={wait_phase} nr={syscall_number:#x} user_if={} irq_age_ms={} state_age_ms={} ack_after_ms={} ack_age_ms={}",
+        LAST[cpu].load(Ordering::SeqCst),
+        flush_count(cpu),
+        (user_flags >> 9) & 1,
+        now.saturating_sub(last_irq) / 1_000_000,
+        now.saturating_sub(last_state) / 1_000_000,
+        if ack_time >= start {
+            ack_time.saturating_sub(start) / 1_000_000
+        } else {
+            u64::MAX
+        },
+        now.saturating_sub(ack_time) / 1_000_000
+    );
+}
+
 /// Handle a TLB IPI on the current CPU.
-pub fn handle_ipi() {
+///
+/// Returns true when a pending shootdown was found and acknowledged. The NMI handler uses the
+/// result to distinguish a shootdown from an unexpected non-maskable interrupt.
+pub fn handle_ipi() -> bool {
     let cpu = percpu::this_cpu();
+    let delay = ACK_DELAY_NS[cpu].swap(0, Ordering::AcqRel);
+    if delay != 0 {
+        time::delay_ns(delay);
+    }
     let sequence = PENDING[cpu].load(Ordering::SeqCst);
     if sequence == 0 || LAST[cpu].load(Ordering::SeqCst) == sequence {
-        return;
+        return false;
     }
     let addr = ADDRESS.load(Ordering::SeqCst);
     let len = LENGTH.load(Ordering::SeqCst);
     ap_start::flush_range_local(addr, len);
     FLUSHES[cpu].fetch_add(1, Ordering::SeqCst);
     LAST[cpu].store(sequence, Ordering::SeqCst);
+    LAST_TIME[cpu].store(time::now_ns(), Ordering::SeqCst);
     ACKED[cpu].store(sequence, Ordering::SeqCst);
+    true
 }
 
 /// Number of TLB IPIs handled by `cpu` (self-test diagnostics).

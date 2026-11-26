@@ -520,13 +520,10 @@ fn mss_floor_clamps_a_small_peer_mss() {
     let (_link, mut _a, mut b) = pair();
     set(&mut b, "tcp.syn_cookies_enable", 0);
     b.tcp_listen(80, 8).expect("listen");
-    inject_segment(&mut b, A, B, 40000, 80, 100, 0, TcpFlags::SYN, &[]);
-    let half_open = b
-        .sockets()
-        .find(|socket| *socket != raven_tcpip::SocketId(1))
-        .expect("half open");
-    let info = b.socket_info(half_open).expect("info");
-    assert!(info.mss >= 536, "mss {}", info.mss);
+    inject_segment(&mut b, A, B, 40_000, 80, 100, 0, TcpFlags::SYN, &[]);
+    b.poll(Instant::ZERO);
+    let mss = b.test_syncache_peer_mss(40_000).expect("syncache entry");
+    assert!(mss >= 536, "mss {mss}");
 }
 
 #[test]

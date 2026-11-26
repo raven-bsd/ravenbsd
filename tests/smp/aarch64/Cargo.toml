@@ -17,6 +17,10 @@ target = "none"
 name = "raven-smp-aarch64-init"
 path = "src/main.rs"
 
+[[bin]]
+name = "raven-smp-aarch64-memory-init"
+path = "src/memory.rs"
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }

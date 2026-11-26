@@ -17,8 +17,8 @@ use linux_corpus::runner::{RunOptions, run_corpus};
 const USAGE: &str = "\
 usage:
   linux-corpus run [--corpus tools/linux-corpus/corpus.toml] [--out tools/linux-corpus/out] [--only <id>...]
-  linux-corpus merge [--out tools/linux-corpus/out] [--json docs/linux-syscall-coverage.json]
-                     [--md docs/linux-syscall-coverage.md] [--implemented <file>]
+  linux-corpus merge [--out tools/linux-corpus/out] [--json RAVEN_MGMT_ROOT/architecture/product-data/linux-syscall-coverage.json]
+                     [--md RAVEN_MGMT_ROOT/architecture/product-data/linux-syscall-coverage.md] [--implemented <file>]
   linux-corpus missing --implemented <file> [--out tools/linux-corpus/out]";
 
 fn main() -> ExitCode {
@@ -115,11 +115,29 @@ fn run_corpus_command(args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
+fn mgmt_root() -> Result<PathBuf> {
+    let raw = env::var("RAVEN_MGMT_ROOT")
+        .ok()
+        .filter(|value| !value.is_empty());
+    let path = raw
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("..").join("ravenbsd-prjmgmt"));
+    if !path.is_dir() {
+        bail!(
+            "RAVEN_MGMT_ROOT: management root {} is not a directory; set RAVEN_MGMT_ROOT to the \
+             ravenbsd-prjmgmt checkout (no product docs fallback)",
+            path.display()
+        );
+    }
+    Ok(path)
+}
+
 fn merge_command(args: &[String]) -> Result<u8> {
+    let mgmt = mgmt_root()?;
     let mut options = MergeOptions {
         out: PathBuf::from("tools/linux-corpus/out"),
-        json: PathBuf::from("docs/linux-syscall-coverage.json"),
-        md: PathBuf::from("docs/linux-syscall-coverage.md"),
+        json: mgmt.join("architecture/product-data/linux-syscall-coverage.json"),
+        md: mgmt.join("architecture/product-data/linux-syscall-coverage.md"),
         implemented: None,
     };
     let mut index = 0;

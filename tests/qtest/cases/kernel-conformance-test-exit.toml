@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# CONTRACTS C5 success path: with `test-exit=1`, PID 1 exits with code 0, the kernel prints
+# `init exited (0)` and writes 0x10 to port 0xf4. QEMU maps that byte to status 33, which the
+# harness reads as `expect_exit = "success"`. The 0x11 failure byte is the separate
+# kernel-conformance-test-exit-failure case; the port/byte mapping is also asserted from source
+# by tests/host/kernel-conformance/src/lib.rs.
+
+name = "kernel-conformance-test-exit"
+arch = "x86_64"
+profile = "base"
+# OVMF plus the kernel bring-up; same margin as boot-uname.
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

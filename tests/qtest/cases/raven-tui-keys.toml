@@ -1,0 +1,316 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K233: raw-key console gate. The UFS demo carries the target `/usr/sbin/raven`; the TUI is
+# forced on with RAVEN_TUI=1 and uses the console handle (RAVEN_TUI_RAW=1). Arrows/Tab/Enter/Esc
+# are sent as raw bytes WITHOUT a trailing newline, so a canonical line discipline would never
+# deliver them; the waits on the selected module/form prove raw mode and the `>` marker. The case
+# runs on a case-specific copy of the demo qcow2 (the shared image must stay clean for
+# raven-users), then adds a user on the raw console, saves passwd/shadow/group, and logs in.
+name = "raven-tui-keys"
+arch = "x86_64"
+profile = "qemu-ufs"
+timeout_secs = 300
+pre = [
+    "sh tests/fixtures/modern-admin/build.sh",
+    "sh scripts/qemu-ufs.sh --build-only >/dev/null && mkdir -p build/fixtures/raven-tui-keys && cp build/x86_64/ravenbsd-ufs-demo/ravenbsd-ufs-demo.qcow2 build/fixtures/raven-tui-keys/raven-tui-keys.qcow2",
+]
+image = "build/fixtures/raven-tui-keys/raven-tui-keys.qcow2"
+disk_if = "virtio"
+disk_format = "qcow2"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-global", "virtio-blk-pci.disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: root pivoted to UFS at /$'
+
+[[expect]]
+regex = '^ufs: on /$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|command not found'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 240
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 120
+
+[[step]]
+send = "mount\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ufs: on /$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "export NO_COLOR=1 RAVEN_TUI=1 RAVEN_TUI_RAW=1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+wait = '> Network'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b[B"
+delay_ms = 150
+
+[[step]]
+wait = '> Users \(add\)'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b[B"
+delay_ms = 150
+
+[[step]]
+wait = '> Users: root'
+timeout_secs = 30
+
+[[step]]
+send = "\r"
+delay_ms = 150
+
+[[step]]
+wait = 'raven config: module=Users: root'
+timeout_secs = 30
+
+[[step]]
+send = "\t"
+delay_ms = 150
+
+[[step]]
+wait = '> UID:'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b\u0000"
+delay_ms = 150
+
+[[step]]
+wait = 'status: Module list'
+timeout_secs = 30
+
+[[step]]
+send = "q"
+delay_ms = 150
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "/users\n"
+delay_ms = 100
+
+[[step]]
+wait = 'raven config: module=Users \(add\)'
+timeout_secs = 30
+
+[[step]]
+send = "\u0003"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven --color always config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "q"
+delay_ms = 150
+
+[[step]]
+wait = '^raven config: cancelled$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/usr/sbin/raven config\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config: TUI$'
+timeout_secs = 30
+
+[[step]]
+send = "\u001b[B"
+delay_ms = 150
+
+[[step]]
+wait = '> Users \(add\)'
+timeout_secs = 30
+
+[[step]]
+send = "\r"
+delay_ms = 150
+
+[[step]]
+wait = 'raven config: module=Users \(add\)'
+timeout_secs = 30
+
+[[step]]
+send = "consoleuser\t\t\t\t/bin/rsh\ttui-pass\ttui-pass\n"
+delay_ms = 150
+
+[[step]]
+wait = '^raven config: saved /etc/passwd$'
+timeout_secs = 60
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/passwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^consoleuser:x:1001:1001::/home/consoleuser:/bin/rsh$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/shadow\n"
+delay_ms = 100
+
+[[step]]
+wait = '^consoleuser:\$6\$[^:]+:'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /etc/group\n"
+delay_ms = 100
+
+[[step]]
+wait = '^consoleuser:x:1001:$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "if [ -d /home/consoleuser ]; then echo home-ok; fi\n"
+delay_ms = 100
+
+[[step]]
+wait = '^home-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/login consoleuser\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "tui-pass\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD 0\.1\.0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/rsh -c 'echo console-shell-ok'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^console-shell-ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^\s*(raven#|root@raven:/#) $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

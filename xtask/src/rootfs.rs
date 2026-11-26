@@ -315,14 +315,17 @@ pub(crate) fn build_sd_root(
             );
         }
     }
+    let mut spec_seen = BTreeSet::new();
     for file in &spec.files {
-        if !seen.insert(file.path.clone()) {
+        if !spec_seen.insert(file.path.clone()) {
             bail!(
                 "{}: duplicate rootfs path `{}`",
                 spec_path.display(),
                 file.path
             );
         }
+        // A spec file may overlay a profile file (for example the post-pivot
+        // /etc/mounts); it is staged after the profile below.
     }
 
     let staging = root

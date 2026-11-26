@@ -100,9 +100,17 @@ impl Drop for File {
     }
 }
 
-/// Return `PWD` or `/` when it is absent or empty.
+/// Return the loader-provided `AT_RAVEN_CWD`, else `PWD`, else `/`.
+///
+/// The spawner publishes the parent's working directory as `AT_RAVEN_CWD`; a child that reads
+/// only `PWD` inherits the wrong directory when the shell exports a stale value.
 pub fn cwd() -> String {
     let args = crate::args::current();
+    if let Some(path) = args.aux_string(crate::spawn_attrs::AT_RAVEN_CWD)
+        && path.starts_with('/')
+    {
+        return path.to_string();
+    }
     match args.env_get("PWD") {
         Some(value) if !value.is_empty() => value.to_string(),
         _ => "/".to_string(),

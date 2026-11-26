@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K548: minimal static std program. It builds a HashMap (prints the table key pointer), forces a
+# rehash, then spawns itself through std::process::Command. A null HashMap table or a dead child
+# reproduces the brush console fault without brush; a clean run puts the defect in brush.
+
+name = "std-spawn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/std-spawn/build.sh"]
+initfs = "build/fixtures/std-spawn/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+# The release base starts blockd/fsd-ufs; give them the 1 MiB UFS2 disk the ufs-durability
+# fixture leaves behind so the boot plan reaches vfsd. The probe does not use the disk.
+qemu_extra = [
+    "-drive", "if=none,id=probe,format=raw,file=build/fixtures/ufs-durability/disk.img",
+    "-device", "virtio-blk-pci,drive=probe,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^.*stdprobe: start$'
+
+# A valid table allocation is non-null and the two inserts are present.
+[[expect]]
+regex = '^.*stdprobe: hashmap len=2 cap=[0-9]+ key_ptr=0x[0-9a-f]+$'
+
+# 128 more inserts force RawTable::reserve_rehash.
+[[expect]]
+regex = '^.*stdprobe: rehash ok len=130 cap=[0-9]+$'
+
+# Step 1: the libc posix_spawn return (pid/handle) and the raw waitpid/status.
+[[expect]]
+regex = '^.*stdprobe: raw posix_spawn rc=0 pid=[0-9]+$'
+
+[[expect]]
+regex = '^.*stdprobe: raw waitpid rc=[0-9]+ errno=Some\(0\) status=0x[0-9a-f]+ slot=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^.*stdprobe: raw from_raw success=true code=Some\(0\)$'
+
+# Step 2: the std spawn path. Its result pointer is the null one (QEMU RBX=0), not the libc pid
+# or the raw wait status; the run then hits the forbidden fault below. This case is expected-red.
+[[expect]]
+regex = '^.*stdprobe: std spawn next$'
+
+[[forbid]]
+regex = '(?i)panic|killed by page fault'

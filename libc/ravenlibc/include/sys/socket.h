@@ -152,6 +152,9 @@ int accept4(int, struct sockaddr *__restrict, socklen_t *__restrict, int);
 
 int getsockname (int, struct sockaddr *__restrict, socklen_t *__restrict);
 int getpeername (int, struct sockaddr *__restrict, socklen_t *__restrict);
+#if __BSD_VISIBLE
+int getpeereid (int, uid_t *, gid_t *);
+#endif
 
 ssize_t send (int, const void *, size_t, int);
 ssize_t recv (int, void *, size_t, int);

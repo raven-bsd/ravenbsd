@@ -7,7 +7,7 @@ profile = "base"
 timeout_secs = 300
 pre = ["sh tests/fixtures/smp-user/build.sh"]
 initfs = "build/fixtures/smp-user/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace"
+boot_cmdline = "console=ttyS0 test-exit=1 smp-user-trace"
 qemu_extra = []
 expect_exit = "success"
 

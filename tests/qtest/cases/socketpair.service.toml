@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One one-shot libc socketpair probe.
+name = "socketpair"
+exec = "/bin/libc-socketpair"
+args = []
+readiness = "exit"
+restart = "never"
+max_restarts = 0

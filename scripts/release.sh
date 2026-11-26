@@ -6,6 +6,7 @@
 #
 # Usage:
 #   scripts/release.sh --check       verify the release inputs (default)
+#   scripts/release.sh --dry-run     alias for --check; build nothing
 #   scripts/release.sh --candidate   build a development candidate image (base profile)
 #   scripts/release.sh --build       build the release image and manifest (requires --check)
 #   scripts/release.sh --verify      verify the files recorded in SHA256SUMS
@@ -27,6 +28,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 . "$ROOT/scripts/lib.sh"
+. "$ROOT/scripts/lib/mgmt.sh"
 cd "$ROOT"
 
 VERSION=${VERSION:-0.1.0}
@@ -38,9 +40,10 @@ MODE=check
 
 usage() {
 	cat <<'EOF'
-usage: scripts/release.sh [--check|--candidate|--build|--verify]
+usage: scripts/release.sh [--check|--dry-run|--candidate|--build|--verify]
 
   --check      verify the release profile, notes, QEMU/Pi 4 gates and provenance inputs
+  --dry-run    alias for --check; no build
   --candidate  build a base-profile development candidate with a manifest and hash
   --build      build the release image (requires --check) and write SHA256SUMS + manifest
   --verify     verify the hashes in the output directory
@@ -51,7 +54,7 @@ EOF
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		--check) MODE=check ;;
+		--check|--dry-run) MODE=check ;;
 		--candidate) MODE=candidate ;;
 		--build) MODE=build ;;
 		--verify) MODE=verify ;;
@@ -79,24 +82,35 @@ need_file() {
 	fi
 }
 
+need_mgmt() {
+	if ! path=$(mgmt_path "$1" 2>/dev/null); then
+		missing="$missing RAVEN_MGMT_ROOT"
+		return
+	fi
+	if [ ! -f "$path" ]; then
+		missing="$missing mgmt:$1"
+	fi
+}
+
 check_inputs() {
 	missing=""
 	need_file "PROVENANCE.toml"
-	need_file "docs/releases/$VERSION.md"
 	need_file "profiles/$PROFILE.toml"
 
+	# Release notes and gate pages are management data (RAVEN_MGMT_ROOT).
+	need_mgmt "architecture/product-data/release-$VERSION.md"
 	# REL2b: automated QEMU login transcript.
 	need_file "scripts/qemu-release.sh"
-	need_file "docs/release-qemu.md"
+	need_mgmt "architecture/product-data/release-qemu.md"
 	# REL3: Pi 4 release image and serial gate.
 	need_file "scripts/pi4-release.sh"
-	need_file "docs/pi4-release.md"
+	need_mgmt "architecture/product-data/pi4-release.md"
 	# REL4: Pi 4 GENET link/DHCP/ping evidence.
 	need_file "scripts/pi4-net-evidence.sh"
-	need_file "docs/pi4-net.md"
+	need_mgmt "architecture/product-data/pi4-net.md"
 	# REL8: independent clean-clone verification.
 	need_file "scripts/release-verify.sh"
-	need_file "docs/release-verify.md"
+	need_mgmt "architecture/product-data/release-verify.md"
 
 	if git rev-parse HEAD >/dev/null 2>&1 && [ -n "$(git status --porcelain)" ]; then
 		warn "working tree is dirty; a release build requires a clean tree"
@@ -132,7 +146,8 @@ build_image() {
 	image_hash=$(sha256_file "$image")
 	provenance_hash=$(sha256_file PROVENANCE.toml)
 	rustc_version=$(rustc -Vv | sed -n 's/^release: //p')
-	notes="$ROOT/docs/releases/$VERSION.md"
+	notes=$(mgmt_require_file "architecture/product-data/release-$VERSION.md") ||
+		die "release notes are not in RAVEN_MGMT_ROOT"
 	cp "$notes" "$(dirname "$image")/$(basename "$VERSION").md" 2>/dev/null || true
 	{
 		printf 'version=%s\n' "$VERSION"

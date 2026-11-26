@@ -459,19 +459,66 @@ pub fn epoll_create<B: SysBackend, L: Lock>(
     crate::poll::epoll_create1(platform, 0)
 }
 
+/// The live pty pair behind `fd`, and whether it is the master endpoint.
+///
+/// A descriptor inherited across exec has no `ofd.path` (the kernel keeps no name for it). The
+/// pty service still knows the live pair: FreeBSD `ttyname_r` names the device from the file
+/// identity (`fdevname_r` -> `fstat` + `devname`), and Raven's wire `Stat` has no `st_rdev`, so
+/// ptyd reports the endpoint in `st_ino` (slave `2N+2`, master `2N+1`; `docs/pty.md`,
+/// `pairs.rs`). A console answers `GET_TERMIOS` with `ENOSYS`, so it is never named as a pty.
+pub fn pty_pair<B: SysBackend, L: Lock>(platform: &Platform<B, L>, fd: i32) -> Option<(u64, bool)> {
+    let (kind, handle) = {
+        let reference = platform.get(fd).ok()?;
+        (reference.kind(), reference.handle())
+    };
+    // A v1 spawn entry has no kind; the endpoint itself still answers the termios request. A
+    // regular file, pipe or console fails it, so this cannot name a non-pty descriptor.
+    if kind == OfdKind::Unknown {
+        let mut request = [0u8; raven_proto_tty::TERMIOS_LEN];
+        raven_proto_tty::encode_get_termios_request(&mut request);
+        let mut response = [0u8; raven_proto_tty::TERMIOS_LEN];
+        if platform
+            .backend()
+            .call(handle, &request, &mut response)
+            .is_err()
+        {
+            return None;
+        }
+    } else if kind != OfdKind::Tty || !crate::ioctl::tty::is_pty_endpoint(platform, fd) {
+        return None;
+    }
+    let stat = platform.fstat(fd).ok()?;
+    if stat.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFCHR {
+        return None;
+    }
+    let ino = stat.st_ino;
+    if ino >= 2 && ino % 2 == 0 {
+        Some(((ino - 2) / 2, false))
+    } else if ino >= 1 {
+        Some(((ino - 1) / 2, true))
+    } else {
+        None
+    }
+}
+
 /// `ttyname`; the shell copies the returned bytes into its per-thread buffer.
 pub fn ttyname<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     fd: i32,
 ) -> Result<Vec<u8>, Errno> {
     let reference = platform.get(fd)?;
-    if reference.kind() != OfdKind::Tty {
+    let kind = reference.kind();
+    if kind != OfdKind::Tty && kind != OfdKind::Unknown {
         return Err(Errno::ENOTTY);
     }
-    reference
-        .path()
-        .map(|path| path.to_vec())
-        .ok_or(Errno::ENOTTY)
+    if let Some(path) = reference.path() {
+        return Ok(path.to_vec());
+    }
+    drop(reference);
+    match pty_pair(platform, fd) {
+        Some((pair, false)) => Ok(alloc::format!("/dev/pts/{pair}").into_bytes()),
+        _ => Err(Errno::ENOTTY),
+    }
 }
 
 /// `ttyname_r`.
@@ -630,9 +677,17 @@ pub fn getdents<B: SysBackend, L: Lock>(
 ) -> Result<usize, Errno> {
     // The file servers return the packed K60 entry format. `readdir` expects the Linux
     // `struct dirent` records (20-byte header, NUL-terminated name, 8-byte reclen), so decode the
-    // server page and re-encode it into the caller's buffer. One server page is at most 4 KiB.
+    // server page and re-encode it into the caller's buffer. Read only what the caller buffer can
+    // represent: a K60 record is 16+name (8-aligned) and a Linux record is 20+name (8-aligned),
+    // so the worst expansion is 4/3 (names 7-8 bytes). Reading 3/4 of the caller buffer keeps the
+    // converted records inside it; the old 4 KiB read advanced the server cursor past records
+    // that did not fit and silently dropped them.
+    if buf.len() < 280 {
+        return Err(Errno::EINVAL);
+    }
+    let raw_len = (buf.len().saturating_mul(3) / 4).clamp(272, 4096);
     let mut raw = [0u8; 4096];
-    let length = platform.read(fd, &mut raw)?;
+    let length = platform.read(fd, &mut raw[..raw_len])?;
     let mut written = 0usize;
     for item in raven_proto_fs::DirEntryIter::new(&raw[..length]) {
         let entry = item.map_err(|_| Errno::EPROTO)?;

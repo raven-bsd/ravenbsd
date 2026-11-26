@@ -18,6 +18,7 @@ workspace = true
 default = []
 
 [dependencies]
+raven-abi = { path = "../../../../crates/raven-abi", default-features = false }
 raven-libc-abi = { path = "../raven-libc-abi" }
 raven-libc-tls = { path = "../raven-libc-tls" }
 raven-libc-sys = { path = "../raven-libc-sys" }

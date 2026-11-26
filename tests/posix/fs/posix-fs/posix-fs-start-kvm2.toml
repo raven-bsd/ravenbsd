@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S139: bounded KVM2 regression for the posix-fs-smp setup-to-worker transition.
+# The fixture starts the three VFS services, runs the stress setup, then creates all eight
+# workers and waits for every one to enter its entry function. The fixture bounds that wait to
+# 10 s and the case bounds the whole run to 30 s, so a transition stall fails with the pending
+# worker indexes instead of being killed silently by the closeout cell cap.
+
+name = "posix-fs-start-kvm2"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+pre = ["sh tests/posix/fs/posix-fs/build-smp.sh"]
+initfs = "build/fixtures/posix-fs-start/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "2"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 2 cpus online$'
+
+[[expect]]
+regex = '^smp-start: services ok$'
+
+[[expect]]
+regex = '^smp-start: setup ok$'
+
+[[expect]]
+regex = '^smp-start: workers started workers=8$'
+
+[[expect]]
+regex = '^smp-start: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-start: failed'

@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone package: the K529 capability qtest fixture, not part of the product workspace.
+[workspace]
+
+[package]
+name = "raven-capability"
+version = "0.1.0"
+description = "K529 fixture: CLOCK_SET and DTrace control authority for uid 1000 and root."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_capability"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-capability-init"
+path = "src/init.rs"
+
+[[bin]]
+name = "raven-capability-child"
+path = "src/child.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"

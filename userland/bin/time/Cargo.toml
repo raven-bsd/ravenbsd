@@ -2,9 +2,12 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 [package]
-name = "time"
+name = "raven-time"
 version = "0.1.0"
 description = "RavenBSD time: report the real time of a utility."
+# SC2: first-party crate name, so cargo-audit does not match the upstream `time`
+# crate advisories by package name (the binary stays `time`).
+publish = false
 edition.workspace = true
 license.workspace = true
 authors.workspace = true

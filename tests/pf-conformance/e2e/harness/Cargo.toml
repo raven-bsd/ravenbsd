@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-pf-e2e"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# The e2e harness is test-only and deliberately outside the product workspace:
+# it drives the three product libraries (pf, pfctl, tcpdump) end to end.
+[workspace]
+
+[dependencies]
+raven-pf = { path = "../../../../crates/raven-pf" }
+raven-pfctl = { path = "../../../../userland/bin/pfctl" }
+raven-tcpdump = { path = "../../../../userland/bin/tcpdump" }

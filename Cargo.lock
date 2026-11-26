@@ -190,6 +190,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "cc-model-audit"
+version = "0.1.0"
+dependencies = [
+ "cc-model",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -299,6 +313,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "261af4dc7a06ea8a527a8717d8cbba3417530d6ea14e1edb3de6b67806be474f"
 dependencies = [
  "cmov",
+]
+
+[[package]]
+name = "curl"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-http",
+ "raven-http-net",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tls",
 ]
 
 [[package]]
@@ -805,6 +833,7 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-netcore",
+ "raven-pf",
  "raven-proto-fs",
  "raven-proto-net",
  "raven-rt",
@@ -984,6 +1013,170 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "rack-acceptance"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-replay",
+]
+
+[[package]]
+name = "rack-audit-log-bbr"
+version = "0.1.0"
+
+[[package]]
+name = "rack-audit-misc-transport"
+version = "0.1.0"
+
+[[package]]
+name = "rack-audit-models"
+version = "0.1.0"
+
+[[package]]
+name = "rack-audit-output-retransmit"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+]
+
+[[package]]
+name = "rack-audit-replay-union"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-replay",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-audit-sack-sockopt"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-audit-state-pipe"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-bbr-model"
+version = "0.1.0"
+
+[[package]]
+name = "rack-coverage"
+version = "0.1.0"
+
+[[package]]
+name = "rack-flags"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-loss-model"
+version = "0.1.0"
+
+[[package]]
+name = "rack-misc-matrix"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-output-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-pipe-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-loss-model",
+ "rack-recovery-model",
+ "rack-tlp-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-recovery-model"
+version = "0.1.0"
+dependencies = [
+ "rack-tlp-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-register"
+version = "0.1.0"
+dependencies = [
+ "rack-acceptance",
+ "rack-coverage",
+]
+
+[[package]]
+name = "rack-replay"
+version = "0.1.0"
+dependencies = [
+ "rack-bbr-model",
+ "rack-coverage",
+ "rack-loss-model",
+ "rack-recovery-model",
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-sack-matrix"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-sockopt"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-timer-model"
+version = "0.1.0"
+
+[[package]]
+name = "rack-tlp-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-transport-matrix"
+version = "0.1.0"
+dependencies = [
+ "rack-coverage",
+ "rack-tlp-model",
+ "rack-vtable-model",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "rack-vtable-model"
+version = "0.1.0"
+
+[[package]]
 name = "raven"
 version = "0.1.0"
 dependencies = [
@@ -995,11 +1188,24 @@ dependencies = [
  "raven-proto-svc",
  "raven-rt",
  "raven-scheme",
+ "raven-tty",
+ "raven-tui",
 ]
 
 [[package]]
 name = "raven-abi"
 version = "0.1.0"
+
+[[package]]
+name = "raven-abi-completeness"
+version = "0.1.0"
+
+[[package]]
+name = "raven-abi-coverage"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
 
 [[package]]
 name = "raven-at-fixture"
@@ -1229,8 +1435,12 @@ name = "raven-cli"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "raven-abi",
  "raven-config",
  "raven-output",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-scheme",
  "raven-theme",
  "serde_json",
 ]
@@ -1251,6 +1461,7 @@ dependencies = [
 name = "raven-config"
 version = "0.1.0"
 dependencies = [
+ "raven-auth",
  "raven-svc-manifest",
  "serde_json",
  "toml",
@@ -1288,6 +1499,14 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "raven-tty-core",
+]
+
+[[package]]
+name = "raven-console-input"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1341,6 +1560,17 @@ dependencies = [
  "raven-fdt-lite",
  "raven-initfs",
  "raven-proto-dev",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-devfs-nodes"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
@@ -1404,6 +1634,14 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-dtrace-user"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-duplex-matrix"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -1646,6 +1884,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-init-worker-eintr"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-init",
+ "raven-initfs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-svc-manifest",
+]
+
+[[package]]
 name = "raven-initfs"
 version = "0.1.0"
 
@@ -1688,6 +1938,19 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
 ]
+
+[[package]]
+name = "raven-ipc-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-ipiq"
+version = "0.1.0"
 
 [[package]]
 name = "raven-irq-dist"
@@ -1842,6 +2105,7 @@ dependencies = [
  "raven-handles",
  "raven-initfs",
  "raven-iommu",
+ "raven-ipiq",
  "raven-kmem",
  "raven-mem",
  "raven-pager",
@@ -1857,6 +2121,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-kernel-conformance"
+version = "0.1.0"
+
+[[package]]
 name = "raven-kill"
 version = "0.1.0"
 dependencies = [
@@ -1869,6 +2137,23 @@ name = "raven-kmem"
 version = "0.1.0"
 dependencies = [
  "raven-vmem",
+]
+
+[[package]]
+name = "raven-kstat"
+version = "0.1.0"
+dependencies = [
+ "raven-dtrace-user",
+]
+
+[[package]]
+name = "raven-kstat-cli"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-dtrace-user",
+ "raven-kstat",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1940,6 +2225,26 @@ name = "raven-libc-ctype"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-direct"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-compat",
+ "raven-libc-dtoa",
+ "raven-libc-elf",
+ "raven-libc-fts",
+ "raven-libc-iconv-cjk",
+ "raven-libc-locale",
+ "raven-libc-m",
+ "raven-libc-malloc",
+ "raven-libc-rtld",
+ "raven-libc-signal",
+ "raven-libc-stdio",
+ "raven-libc-str",
+ "raven-tcpip",
 ]
 
 [[package]]
@@ -2208,6 +2513,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-robust"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-fmt",
+ "raven-libc-net",
+ "raven-libc-platform",
+ "raven-libc-proc",
+ "raven-libc-signal",
+ "raven-libc-stdlib",
+]
+
+[[package]]
 name = "raven-libc-rtld"
 version = "0.1.0"
 dependencies = [
@@ -2220,6 +2538,7 @@ dependencies = [
 name = "raven-libc-signal"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-libc-abi",
  "raven-libc-sys",
  "raven-libc-tls",
@@ -2428,6 +2747,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-mptcp"
+version = "0.1.0"
+
+[[package]]
+name = "raven-mptcp-vectors"
+version = "0.1.0"
+dependencies = [
+ "raven-mptcp",
+]
+
+[[package]]
 name = "raven-msi"
 version = "0.1.0"
 
@@ -2559,6 +2889,15 @@ name = "raven-pf"
 version = "0.1.0"
 
 [[package]]
+name = "raven-pfctl"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-pi4"
 version = "0.1.0"
 dependencies = [
@@ -2623,6 +2962,7 @@ name = "raven-ping"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-http-net",
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
@@ -2678,6 +3018,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-poweroff"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-shutdown",
+]
+
+[[package]]
 name = "raven-prng"
 version = "0.1.0"
 
@@ -2718,11 +3066,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-orphan"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-pgrp"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-primitives"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-reboot"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 
@@ -2735,11 +3109,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-rlimit"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-rss"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-spawn-attrs"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-times"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 
@@ -2880,6 +3279,24 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-random-pool"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-reboot"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-shutdown",
 ]
 
 [[package]]
@@ -3040,6 +3457,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s166-mask"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-s17-pager"
 version = "0.1.0"
 dependencies = [
@@ -3188,7 +3613,9 @@ dependencies = [
  "raven-abi",
  "raven-elf",
  "raven-initfs",
+ "raven-proto-fs",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -3259,6 +3686,14 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s44-action"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 
@@ -3375,6 +3810,17 @@ name = "raven-shell-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-shutdown"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-sleep"
 version = "0.1.0"
 dependencies = [
@@ -3487,6 +3933,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-syscall-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sysd"
 version = "0.1.0"
 dependencies = [
@@ -3497,12 +3951,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tar"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-tcpdump"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tcpip-wire",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-tcpip"
 version = "0.1.0"
 dependencies = [
  "hmac",
  "md-5",
  "raven-abi",
+ "raven-mptcp",
  "raven-prng",
  "raven-tcpip-sim",
  "raven-tcpip-wire",
@@ -3552,6 +4026,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
 name = "raven-tcpip-oracle"
 version = "0.1.0"
 dependencies = [
@@ -3594,6 +4076,16 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-time"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -3665,6 +4157,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tty"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-tty-core"
 version = "0.1.0"
 
@@ -3674,6 +4176,7 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-libc-proc",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
@@ -3690,8 +4193,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tui"
+version = "0.1.0"
+dependencies = [
+ "raven-config",
+]
+
+[[package]]
 name = "raven-turnstile"
 version = "0.1.0"
+
+[[package]]
+name = "raven-ufs-durability-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-umount"
@@ -4074,22 +4594,89 @@ dependencies = [
 ]
 
 [[package]]
-name = "tar"
+name = "tcp-ecn-model"
 version = "0.1.0"
 dependencies = [
- "raven-proto-fs",
- "raven-rt",
- "raven-tool-core",
+ "raven-tcpip",
 ]
 
 [[package]]
-name = "time"
+name = "tcp-input-model"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
- "raven-initfs",
- "raven-rt",
- "raven-tool-core",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
+name = "tcp-loss-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
+name = "tcp-output-stress"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
+name = "tcp-paws-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-wire",
+]
+
+[[package]]
+name = "tcp-sack-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+]
+
+[[package]]
+name = "tcp-teardown-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
+name = "tcp-timer-conformance"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+]
+
+[[package]]
+name = "tcp-usrreq-model"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+]
+
+[[package]]
+name = "tcp-window-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
 ]
 
 [[package]]
@@ -4378,6 +4965,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "wget"
+version = "0.1.0"
+dependencies = [
+ "curl",
+ "raven-abi",
+ "raven-http",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "whoami"
 version = "0.1.0"
 dependencies = [
@@ -4419,6 +5017,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "fatfs",
+ "raven-elf",
  "raven-initfs",
  "serde",
  "toml",

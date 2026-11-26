@@ -8,6 +8,15 @@ Status: **OBSERVED** on `origin/master` `8a591ccf` (S117). Scope: every Redox-de
 No code is removed by this audit; the classifications below are the decommission decision for the
 owners named in the ticket.
 
+## 0. Identity (DR-63)
+
+"Redox-derived" is a **provenance statement, not the project identity** (DR-63). RavenBSD is a
+Rust microkernel with its own design and ABI. The only remaining footprint is the
+`crates/raven-rmm` page-table mapper below; keep the MIT notices and `PROVENANCE.toml`, do not
+claim "no Redox code" until the mapper is replaced, and do not rewrite the working critical mapper
+just to remove a label. Replace on touch per this list, or as a separately approved post-0.1.0
+task if zero Redox code is required.
+
 ## 1. Result in one table
 
 | Item | Count | Class |

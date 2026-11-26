@@ -1,0 +1,17 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling raven-abi v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-abi)
+   Compiling raven-initfs v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-initfs)
+   Compiling raven-elf v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-elf)
+   Compiling raven-trace-core v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-trace-core)
+error[E0463]: can't find crate for `core`
+  |
+  = note: the `aarch64-unknown-none` target may not be installed
+  = help: consider downloading the target with `rustup target add aarch64-unknown-none`
+
+For more information about this error, try `rustc --explain E0463`.
+error: could not compile `raven-elf` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `raven-initfs` (lib) due to 1 previous error
+error: could not compile `raven-abi` (lib) due to 1 previous error
+error: could not compile `raven-trace-core` (lib) due to 1 previous error

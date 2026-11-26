@@ -35,3 +35,41 @@ fn sending_past_the_old_high_water_mark_moves_it() {
     c.snd_nxt = 6_000;
     assert_eq!(c.highest_sent(), 6_000);
 }
+
+fn syn_segment(wscale: Option<u8>) -> Segment<'static> {
+    Segment {
+        seq: 100,
+        ack: 0,
+        flags: TcpFlags::SYN,
+        ecn: 0,
+        window: 65_535,
+        urgent: 0,
+        mss: None,
+        wscale,
+        tsval: None,
+        tsecr: None,
+        sack_permitted: false,
+        sack_blocks: Vec::new(),
+        payload: &[],
+    }
+}
+
+#[test]
+fn apply_syn_options_without_ws_does_not_negotiate() {
+    let mut c = connection();
+    c.offer_wscale = true;
+    c.snd_wscale = 0;
+    c.negotiated_wscale = None;
+    apply_syn_options(&mut c, &syn_segment(None), Instant::ZERO);
+    assert_eq!(c.snd_wscale, 0);
+    assert_eq!(c.negotiated_wscale, None);
+}
+
+#[test]
+fn apply_syn_options_with_ws_negotiates_the_peer_scale() {
+    let mut c = connection();
+    c.offer_wscale = true;
+    apply_syn_options(&mut c, &syn_segment(Some(7)), Instant::ZERO);
+    assert_eq!(c.snd_wscale, 7);
+    assert_eq!(c.negotiated_wscale, Some(7));
+}

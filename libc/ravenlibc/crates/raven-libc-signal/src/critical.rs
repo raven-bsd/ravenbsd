@@ -101,6 +101,25 @@ impl SigThreadState {
         self.ctx_area.load(Ordering::Acquire)
     }
 
+    /// Clear the per-thread delivery state after `fork`.
+    ///
+    /// The child's kernel thread is new even though it inherits this TCB, so it has no
+    /// `SIG_SETUP` entry. The mask and the process-wide dispositions stay inherited; the
+    /// registered context area, deferred record and kick must not, so the next signal operation
+    /// registers the entry for the new thread (FreeBSD `fork1` starts the child with an empty
+    /// `p_siglist`/`p_sigqueue` and copies only the signal actions).
+    pub(crate) fn reset_for_fork(&mut self) {
+        self.critical.store(0, Ordering::Release);
+        self.defer.store(0, Ordering::Release);
+        self.deferred_bits.store(0, Ordering::Release);
+        self.deferred_info = SiginfoT::ZERO;
+        self.deferred_mask.store(0, Ordering::Release);
+        self.in_handler.store(0, Ordering::Release);
+        self.saved_errno.store(0, Ordering::Release);
+        self.ctx_area.store(0, Ordering::Release);
+        self.kick.store(0, Ordering::Release);
+    }
+
     /// The sticky kick word used until PG-8 exists.
     #[must_use]
     pub fn kick(&self) -> u32 {

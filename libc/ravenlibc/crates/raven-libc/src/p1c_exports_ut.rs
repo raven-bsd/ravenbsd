@@ -101,7 +101,7 @@ fn select_with_no_descriptors_returns_zero() {
 }
 
 #[test]
-fn ppoll_and_pselect_report_enosys_until_the_signal_swap_lands() {
+fn ppoll_empty_request_returns_zero() {
     let _guard = TestLock::acquire();
     errno::set_raw(0);
     // SAFETY: NULL records/timeout/mask are the empty request.
@@ -113,9 +113,13 @@ fn ppoll_and_pselect_report_enosys_until_the_signal_swap_lands() {
             core::ptr::null(),
         )
     };
-    assert_eq!(result, -1);
-    assert_eq!(errno::get(), ENOSYS);
+    assert_eq!(result, 0);
+    assert_eq!(errno::get(), 0);
+}
 
+#[test]
+fn pselect_empty_request_is_enosys_until_the_signal_swap_lands() {
+    let _guard = TestLock::acquire();
     errno::set_raw(0);
     // SAFETY: NULL sets/timeout/mask are the empty request.
     let result = unsafe {

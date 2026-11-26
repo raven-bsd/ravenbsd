@@ -970,7 +970,7 @@ fn apply_overlay(
             &claim.id,
             area,
             Verdict::Fail,
-            "docs/posix/evidence".to_string(),
+            "mgmt posix/evidence".to_string(),
             claim.reason.clone(),
         );
     }

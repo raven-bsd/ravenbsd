@@ -1,0 +1,4 @@
+set skip on lo0
+ext_if = "em0"
+pass out on em0 all flags any keep state
+pass in all flags any keep state

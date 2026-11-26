@@ -224,9 +224,14 @@ pub struct ConstFile {
     /// Default print base.
     #[serde(default = "default_base")]
     pub base: String,
-    /// musl-relative source files; empty for a first-party group.
+    /// Donor source files. A bare path is musl-relative; a `<donor>:<path>` prefix names
+    /// another pinned donor and requires the matching `donor` lease.
     #[serde(default)]
     pub source: Vec<String>,
+    /// Explicit donor lease for a non-musl table. Absent means the group is musl-derived or
+    /// first-party (bare sources).
+    #[serde(default)]
+    pub donor: Option<DonorSpec>,
     /// Prefixes used by the completeness scan.
     #[serde(default)]
     pub prefixes: Vec<String>,
@@ -236,6 +241,18 @@ pub struct ConstFile {
     /// The constants.
     #[serde(default)]
     pub consts: Vec<ConstDef>,
+}
+
+/// The donor lease of one constant table.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DonorSpec {
+    /// Pinned donor name (`musl`, `freebsd`).
+    pub name: String,
+    /// Revision the table was reviewed at; must equal `donors.lock`.
+    pub revision: String,
+    /// Per-file licence of the reviewed source.
+    pub license: String,
 }
 
 fn default_rust_type() -> String {

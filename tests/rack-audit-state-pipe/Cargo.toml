@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "rack-audit-state-pipe"
+version = "0.1.0"
+description = "Independent host-only audit of the merged K332/K333 RACK state and pipe groups."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-tcpip = { path = "../../crates/raven-tcpip" }

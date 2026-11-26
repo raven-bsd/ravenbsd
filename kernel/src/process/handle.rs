@@ -341,6 +341,20 @@ impl Drop for MemObject {
     }
 }
 
+/// Live thread handles across all processes (S36 timeout-retention diagnostic).
+pub fn thread_handles() -> u64 {
+    let mut total = 0u64;
+    for process in super::processes() {
+        let handles = process.handles.lock();
+        handles.for_each_live(|_, object, _, _| {
+            if matches!(object, Object::Thread(_)) {
+                total = total.saturating_add(1);
+            }
+        });
+    }
+    total
+}
+
 /// A device-memory window a driver can map (`MMIO_CREATE`). Immutable after creation.
 pub struct MmioRegion {
     /// Physical start address (page aligned).
@@ -427,6 +441,8 @@ pub enum Object {
     SchemeRequest(Arc<PendingRequest>),
     /// One end of an in-kernel pipe (`PIPE`/`PIPE2`).
     Pipe(Arc<crate::process::pipe::PipeEnd>),
+    /// One end of a kernel duplex endpoint pair (`DUPLEX_PAIR`).
+    Duplex(Arc<crate::process::duplex::DuplexEnd>),
 }
 
 /// The kernel's handle table type.
@@ -458,7 +474,13 @@ pub fn revoke_descendants(target: &Arc<LineageNode>, mask: Rights) {
     };
     for node in nodes {
         if !Arc::ptr_eq(&node, target) && node.is_descendant_of(target) {
-            node.revoke(mask);
+            // Contract C17: only a bit this lineage actually held can be "revoked" (EPERM).
+            // A descendant that never granted the bit keeps EACCES, so propagate the granted
+            // subset instead of marking the whole mask.
+            let propagated = node.granted().intersect(mask);
+            if propagated != Rights::NONE {
+                node.revoke(propagated);
+            }
         }
     }
 }
@@ -466,6 +488,32 @@ pub fn revoke_descendants(target: &Arc<LineageNode>, mask: Rights) {
 /// Live lineage nodes (S16 churn evidence).
 pub fn lineage_nodes() -> u64 {
     raven_handles::live_lineage_nodes()
+}
+
+/// Count handles that still point at a torn-down process (S36b diagnostic).
+///
+/// Returns `(total, top_holder_pid, top_holder_count)`. A growing total while the pid registry is
+/// flat means a long-lived process retains dead children through process handles.
+pub fn dead_process_handles() -> (usize, u64, usize) {
+    let mut total = 0usize;
+    let mut top_pid = 0u64;
+    let mut top_count = 0usize;
+    for holder in crate::process::processes() {
+        let mut count = 0usize;
+        holder.handles.lock().for_each_live(|_, object, _, _| {
+            if let Object::Process(target) = object
+                && target.torn_down.load(core::sync::atomic::Ordering::Acquire)
+            {
+                count = count.saturating_add(1);
+            }
+        });
+        total = total.saturating_add(count);
+        if count > top_count {
+            top_count = count;
+            top_pid = holder.id;
+        }
+    }
+    (total, top_pid, top_count)
 }
 
 /// Install the well-known handles 0, 1 and 2 (and 3 for the first process) in a fresh process.
@@ -492,3 +540,7 @@ pub fn install_initial(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "handle_ut.rs"]
+mod tests;

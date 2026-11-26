@@ -186,3 +186,105 @@ fn monitor() {
     kprintln!("selftest: sched failed");
     boot::exit_qemu(0x11)
 }
+
+// --- K527: run-queue saturation -------------------------------------------------------------
+
+/// More runnable threads than the historic 64-slot level, all at one priority.
+///
+/// A dropped runnable thread shows up here as a missing completion; the monitor fails with the
+/// lost count instead of exiting success.
+const SATURATION_WORKERS: u32 = 80;
+/// Schedules per worker; 128 workers x 100 yields is a 12,800-schedule stress.
+const SATURATION_YIELDS: u32 = 256;
+/// Saturation monitor timeout.
+const SATURATION_TIMEOUT_NS: u64 = 30_000_000_000;
+/// Minimum schedules the monitor expects (the 10k stress).
+const SATURATION_MIN_SWITCHES: u64 = 10_000;
+
+static SATURATION_INDEX: AtomicU32 = AtomicU32::new(0);
+static SATURATION_DONE: AtomicU32 = AtomicU32::new(0);
+
+/// Run the K527 saturation self-test; on success this never returns.
+///
+/// Boot with `selftest=sched-saturation`. Every worker is enqueued at `PRIORITY_DEFAULT` before
+/// the scheduler starts, then sleeps for the first few iterations (the wake boundary) and yields
+/// through 100 schedules. The monitor requires every worker to complete and the switch counter to
+/// pass the 10k stress bound.
+pub fn run_saturation() -> ! {
+    if let Err(error) = crate::sched::init() {
+        kprintln!("sched-saturation: setup failed: {error:?}");
+        boot::exit_qemu(0x11);
+    }
+    let mut spawned = 0u32;
+    while spawned < SATURATION_WORKERS {
+        if let Err(error) = crate::sched::spawn_kernel("sched-sat-worker", saturation_worker) {
+            kprintln!(
+                "sched-saturation: spawn {spawned}/{} failed: {error:?}",
+                SATURATION_WORKERS
+            );
+            boot::exit_qemu(0x11);
+        }
+        spawned = spawned.saturating_add(1);
+    }
+    if let Err(error) = crate::sched::spawn_kernel("sched-sat-monitor", saturation_monitor) {
+        kprintln!("sched-saturation: monitor spawn failed: {error:?}");
+        boot::exit_qemu(0x11);
+    }
+    kprintln!(
+        "sched-saturation: spawned={SATURATION_WORKERS} cap={}",
+        raven_sched_core::MAX_THREADS
+    );
+    crate::sched::start()
+}
+
+fn saturation_worker() {
+    let index = SATURATION_INDEX.fetch_add(1, Ordering::SeqCst);
+    let mut iteration = 0u32;
+    while iteration < SATURATION_YIELDS {
+        // The first iterations sleep so all workers are blocked at once: the timer's wake path
+        // then enqueues the whole batch at one priority (the wake-at-full boundary).
+        if iteration < 8 {
+            sleep::sleep_ns(500_000);
+        }
+        crate::sched::yield_now();
+        iteration = iteration.saturating_add(1);
+    }
+    if index >= SATURATION_WORKERS {
+        kprintln!("sched-saturation: worker index {index} over the bound");
+        boot::exit_qemu(0x11);
+    }
+    SATURATION_DONE.fetch_add(1, Ordering::SeqCst);
+    crate::sched::exit_thread(0)
+}
+
+fn saturation_monitor() {
+    let start = sleep::now_ns();
+    loop {
+        let done = SATURATION_DONE.load(Ordering::SeqCst);
+        if done >= SATURATION_WORKERS {
+            break;
+        }
+        if sleep::now_ns().saturating_sub(start) > SATURATION_TIMEOUT_NS {
+            kprintln!(
+                "sched-saturation: FAIL done={done} lost={}",
+                SATURATION_WORKERS.saturating_sub(done)
+            );
+            boot::exit_qemu(0x11);
+        }
+        sleep::sleep_ns(1_000_000);
+    }
+    let switches = crate::sched::switch_count();
+    kprintln!(
+        "sched-saturation: done={} lost=0 switches={switches}",
+        SATURATION_WORKERS
+    );
+    if switches < SATURATION_MIN_SWITCHES {
+        kprintln!(
+            "sched-saturation: FAIL switches={switches} < {}",
+            SATURATION_MIN_SWITCHES
+        );
+        boot::exit_qemu(0x11);
+    }
+    kprintln!("CONTRACT K527 PASS switches={switches}");
+    boot::exit_qemu(0x10)
+}

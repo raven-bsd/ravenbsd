@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "rack-replay"
+version = "0.1.0"
+description = "Host-only RACK full-port replay and group-report union audit."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+rack-bbr-model = { path = "../rack-bbr-model" }
+rack-coverage = { path = "../rack-coverage" }
+rack-loss-model = { path = "../rack-loss-model" }
+rack-recovery-model = { path = "../rack-recovery-model" }
+rack-tlp-model = { path = "../rack-tlp-model" }
+rack-vtable-model = { path = "../rack-vtable-model" }
+raven-tcpip = { path = "../../crates/raven-tcpip" }
+
+[lints]
+workspace = true

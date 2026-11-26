@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K462 raw pre-enum dispatch list. `raw-check.sh` parses
+# kernel/src/syscall/mod.rs between `fn dispatch_inner` and
+# `match Syscall::from_usize(number)` and requires exactly these expressions, the numeric value at
+# the named definition line, a `RAW_<name>` reference in src/main.rs for every fuzz/child row, and
+# no `RAW_<name>` reference for every exclude row. Format:
+#   expression <TAB> number <TAB> definition-file:line <TAB> disposition <TAB> dispatch <TAB> name
+process_ctl::PROC_FORK	0x39	kernel/src/syscall/process_ctl.rs:76	fuzz	direct	PROC_FORK
+raven_abi::syscall::PROC_REBOOT	0x46	crates/raven-abi/src/syscall.rs:189	exclude	direct	PROC_REBOOT	exits the machine (poweroff/halt/reset); no bounded non-destructive variant
+raven_abi::syscall::PROC_CHROOT	0x0d	crates/raven-abi/src/syscall.rs:223	fuzz	direct	PROC_CHROOT
+ipc::PREAD	0x6b	kernel/src/syscall/ipc.rs:24	fuzz	direct	PREAD
+ipc::PWRITE	0x6c	kernel/src/syscall/ipc.rs:26	fuzz	direct	PWRITE
+ipc::SEEK	0x6d	kernel/src/syscall/ipc.rs:28	fuzz	direct	SEEK
+raven_abi::syscall::MSYNC	0x44	crates/raven-abi/src/syscall.rs:231	fuzz	direct	MSYNC
+exec::PROC_EXEC	0x6a	kernel/src/syscall/exec.rs:22	fuzz	direct	PROC_EXEC
+duplex::DUPLEX_PAIR	0x110	kernel/src/syscall/duplex.rs:24	fuzz	direct	DUPLEX_PAIR
+duplex::DUPLEX_SHUTDOWN	0x111	kernel/src/syscall/duplex.rs:39	fuzz	direct	DUPLEX_SHUTDOWN
+duplex::DUPLEX_SENDMSG	0x112	kernel/src/syscall/duplex.rs:41	fuzz	direct	DUPLEX_SENDMSG
+duplex::DUPLEX_RECVMSG	0x113	kernel/src/syscall/duplex.rs:43	fuzz	direct	DUPLEX_RECVMSG
+duplex::DUPLEX_PEERCRED	0x114	kernel/src/syscall/duplex.rs:45	fuzz	direct	DUPLEX_PEERCRED
+pipe::PIPE	0x6e	kernel/src/syscall/pipe.rs:19	fuzz	direct	PIPE
+pipe::PIPE2	0x6f	kernel/src/syscall/pipe.rs:21	fuzz	direct	PIPE2
+priority::GETPRIORITY	0x78	kernel/src/syscall/priority.rs:23	fuzz	direct	GETPRIORITY
+priority::SETPRIORITY	0x79	kernel/src/syscall/priority.rs:25	fuzz	direct	SETPRIORITY
+priority::NICE	0x7a	kernel/src/syscall/priority.rs:27	fuzz	direct	NICE
+priority::SCHED_GET_PRIORITY_MAX	0x7b	kernel/src/syscall/priority.rs:29	fuzz	direct	SCHED_GET_PRIORITY_MAX
+priority::SCHED_GET_PRIORITY_MIN	0x7c	kernel/src/syscall/priority.rs:31	fuzz	direct	SCHED_GET_PRIORITY_MIN
+priority::SCHED_SETSCHEDULER	0x7d	kernel/src/syscall/priority.rs:33	fuzz	direct	SCHED_SETSCHEDULER
+priority::SCHED_GETSCHEDULER	0x7e	kernel/src/syscall/priority.rs:35	fuzz	direct	SCHED_GETSCHEDULER
+tty::PROC_CTTY_SET	0x1e0	kernel/src/syscall/tty.rs:26	fuzz	direct	PROC_CTTY_SET
+tty::PROC_CTTY_GET	0x1e1	kernel/src/syscall/tty.rs:28	fuzz	direct	PROC_CTTY_GET
+tty::PROC_CTTY_SET_FG	0x1e2	kernel/src/syscall/tty.rs:30	fuzz	direct	PROC_CTTY_SET_FG
+tty::PROC_CTTY_HANDLE	0x1e3	kernel/src/syscall/tty.rs:32	fuzz	direct	PROC_CTTY_HANDLE
+process_ctl::PROC_SELF_INFO	0x35	kernel/src/syscall/process_ctl.rs:158	fuzz	direct	PROC_SELF_INFO
+process_ctl::PROC_SETPGID	0x36	kernel/src/syscall/process_ctl.rs:160	fuzz	direct	PROC_SETPGID
+process_ctl::PROC_SETSID	0x37	kernel/src/syscall/process_ctl.rs:162	fuzz	direct	PROC_SETSID
+process_ctl::PROC_SETCRED	0x38	kernel/src/syscall/process_ctl.rs:164	fuzz	direct	PROC_SETCRED
+process_ctl::PROC_PID_INFO	0x3a	kernel/src/syscall/process_ctl.rs:166	fuzz	direct	PROC_PID_INFO
+process_ctl::PROC_SET_COMMAND	0x45	kernel/src/syscall/process_ctl.rs:168	fuzz	direct	PROC_SET_COMMAND
+process_ctl::PROC_SETCRED_EX	0x3b	kernel/src/syscall/process_ctl.rs:172	fuzz	direct	PROC_SETCRED_EX
+process_ctl::PROC_HANDLE_INFO	0x3e	kernel/src/syscall/process_ctl.rs:178	fuzz	direct	PROC_HANDLE_INFO
+process_ctl::PROC_EXEC_CRED	0x3f	kernel/src/syscall/process_ctl.rs:180	fuzz	direct	PROC_EXEC_CRED
+process_ctl::PROC_CRED_INFO	0x3c	kernel/src/syscall/process_ctl.rs:174	fuzz	direct	PROC_CRED_INFO
+process_ctl::PROC_GETGROUPS	0x3d	kernel/src/syscall/process_ctl.rs:176	fuzz	direct	PROC_GETGROUPS
+process_ctl::PROC_WAIT_EX	0x48	kernel/src/syscall/process_ctl.rs:182	fuzz	direct	PROC_WAIT_EX
+process_ctl::PROC_GETPGID	0x49	kernel/src/syscall/process_ctl.rs:184	fuzz	direct	PROC_GETPGID
+process_ctl::PROC_SIGNAL	0x4a	kernel/src/syscall/process_ctl.rs:186	fuzz	direct	PROC_SIGNAL
+process_ctl::PROC_SIGRECV	0x4b	kernel/src/syscall/process_ctl.rs:188	fuzz	direct	PROC_SIGRECV
+process_ctl::PROC_SIGRECV_EX	0x85	kernel/src/syscall/process_ctl.rs:190	fuzz	direct	PROC_SIGRECV_EX
+process_ctl::PROC_SIGQUEUE	0x86	kernel/src/syscall/process_ctl.rs:192	fuzz	direct	PROC_SIGQUEUE
+process_ctl::PROC_TIMES	0x4c	kernel/src/syscall/process_ctl.rs:196	fuzz	direct	PROC_TIMES
+process_ctl::PROC_GETRUSAGE	0x4d	kernel/src/syscall/process_ctl.rs:198	fuzz	direct	PROC_GETRUSAGE
+process_ctl::PROC_GETRLIMIT	0x4e	kernel/src/syscall/process_ctl.rs:200	fuzz	direct	PROC_GETRLIMIT
+process_ctl::PROC_SETRLIMIT	0x4f	kernel/src/syscall/process_ctl.rs:202	fuzz	direct	PROC_SETRLIMIT
+raven_abi::syscall::PROC_SET_PERSONALITY	0x34	crates/raven-abi/src/syscall.rs:242	fuzz	direct	PROC_SET_PERSONALITY
+raven_abi::syscall::THREAD_SET_TLS	0x23	crates/raven-abi/src/syscall.rs:250	fuzz	direct	THREAD_SET_TLS
+raven_abi::syscall::THREAD_KICK	0x81	crates/raven-abi/src/syscall.rs:258	fuzz	direct	THREAD_KICK
+raven_abi::syscall::THREAD_SELF	0x24	crates/raven-abi/src/syscall.rs:279	fuzz	direct	THREAD_SELF
+raven_abi::syscall::ROBUST_LIST_SET	0x26	crates/raven-abi/src/syscall.rs:285	fuzz	direct	ROBUST_LIST_SET
+raven_abi::syscall::HANDLE_COPY	0x54	crates/raven-abi/src/syscall.rs:291	fuzz	direct	HANDLE_COPY
+raven_abi::syscall::HANDLE_TRANSFER_FILE	0x55	crates/raven-abi/src/syscall.rs:301	fuzz	direct	HANDLE_TRANSFER_FILE
+raven_abi::syscall::THREAD_EXIT_EX	0x25	crates/raven-abi/src/syscall.rs:307	fuzz	direct	THREAD_EXIT_EX
+raven_abi::signal::SIG_SETUP	0x80	crates/raven-abi/src/signal.rs:18	fuzz	direct	SIG_SETUP
+raven_abi::signal::SIGRESEND	0x84	crates/raven-abi/src/signal.rs:33	fuzz	direct	SIGRESEND
+basic::GETRANDOM	0x08	kernel/src/syscall/basic.rs:27	fuzz	direct	GETRANDOM
+basic::CLOCK_SET	0x09	kernel/src/syscall/basic.rs:29	fuzz	direct	CLOCK_SET
+raven_abi::syscall::TRACE_SET	0x0b	crates/raven-abi/src/syscall.rs:207	fuzz	direct	TRACE_SET
+raven_abi::syscall::RECORD_LOCK	0x0c	crates/raven-abi/src/syscall.rs:216	fuzz	direct	RECORD_LOCK
+dtrace::PROBE_LIST	0x90	kernel/src/syscall/dtrace.rs:26	fuzz	is_control	PROBE_LIST
+dtrace::ENABLE	0x91	kernel/src/syscall/dtrace.rs:28	fuzz	is_control	ENABLE
+dtrace::DISABLE	0x92	kernel/src/syscall/dtrace.rs:30	fuzz	is_control	DISABLE
+dtrace::READ	0x93	kernel/src/syscall/dtrace.rs:32	fuzz	is_control	READ
+dtrace::STATS	0x94	kernel/src/syscall/dtrace.rs:34	fuzz	is_control	STATS
+dtrace::CLEAR	0x95	kernel/src/syscall/dtrace.rs:36	fuzz	is_control	CLEAR
+linux::trap	-	kernel/src/syscall/mod.rs:85	child	personality	LINUX_TRAP

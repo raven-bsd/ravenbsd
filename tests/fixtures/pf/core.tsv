@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# direction interface proto source sport destination dport length tcp-flags fragment expected
+# tcp-flags: S A F R or - ; fragment: frag or - ; expected: pass or block
+in  lo    tcp   10.0.0.1         1234  10.0.0.2         9999  60  S  -    pass
+in  eth0  udp   10.0.0.1         5353  192.0.2.10       53    40  -  -    block
+in  eth0  tcp   10.0.0.5         40000 192.0.2.10       443   60  S  -    pass
+out eth0  tcp   192.0.2.10       443   10.0.0.5         40000 60  SA -    pass
+in  eth0  tcp   10.0.0.5         40000 192.0.2.12       443   60  S  -    block
+out eth0  tcp   10.0.0.6         40001 8.8.8.8          53    60  S  -    pass
+out eth0  tcp   2001:db8::5      40002 2001:db8:1::10   443   60  S  -    pass
+in  eth0  tcp   2001:db8:1::10   443   2001:db8::5      40002 60  SA -    pass
+in  eth0  icmp6 2001:db8::5      0     2001:db8::1      0     28  -  -    pass
+in  eth0  tcp   10.0.0.5         40003 192.0.2.10       443   60  -  frag block
+in  eth0  tcp   192.0.2.99       40004 192.0.2.10       443   60  S  -    block
+in  eth0  tcp   10.0.0.5         40005 192.0.2.10       80    60  S  -    block

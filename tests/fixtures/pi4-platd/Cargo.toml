@@ -16,6 +16,9 @@ target = "none"
 [[bin]]
 name = "pi4-platd-client"
 path = "src/bin/client.rs"
+# Platform fixture: `raven_rt::entry!` supplies `_start` for the target binary. A host test
+# harness would link its own `Scrt1.o` `_start` and fail; the platform qtest is the real test.
+test = false
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }

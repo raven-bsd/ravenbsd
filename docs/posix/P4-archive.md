@@ -57,7 +57,7 @@ the row as present. `util.pax` already had a profile row and is now backed by it
 
 ```
 sh tests/posix/utility/run-archive.sh
-cargo nextest run -p ar -p pax -p tar -p uuencode -p uudecode
+cargo nextest run -p ar -p pax -p raven-tar -p uuencode -p uudecode
 cargo xtask posix-check --profile posix --arch x86_64
 make check-fast
 ```

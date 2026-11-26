@@ -133,7 +133,10 @@ fn readable_transition_is_emitted_once_per_edge() {
 #[test]
 fn writable_transition_is_emitted_once() {
     let mut stack = stack();
-    let socket = tcp(&mut stack, 40000);
+    let listener = stack.tcp_listen(40000, 4).expect("listen");
+    let socket = stack
+        .test_pending_connection(listener)
+        .expect("established connection");
     stack.poll(Instant::ZERO);
     let first: Vec<_> = stack.take_events().collect();
     assert_eq!(

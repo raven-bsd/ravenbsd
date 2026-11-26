@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K466 row 8: a write that must fail returns ENOSPC, the acknowledged bytes stay
+# readable and the free-block count reaches the documented floor instead of
+# wrapping. The 1 MiB disk is filled from the guest through the mounted UFS.
+
+name = "ufs-enospc"
+arch = "x86_64"
+profile = "ufs-demo"
+timeout_secs = 420
+pre = ["sh tests/fixtures/ufs-durability/build.sh 1m"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/fixtures/ufs-durability/disk.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{80}$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^k466: enospc errno=28 chunk=[0-9]+ wrote=[0-9]+$'
+
+[[expect]]
+regex = '^k466: enospc prefix=ok last=ok hash=[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^k466: enospc blocks=[0-9]+ free_blocks=[0-9]+ free_files=[0-9]+ floor_ok=1$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
+
+[[forbid]]
+regex = '(?i)short write|not full after'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "mount ufs: /mnt && echo mount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mount-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "/mnt/bin/ufs-probe enospc; echo probe=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k466: enospc errno=28 chunk=[0-9]+ wrote=[0-9]+$'
+timeout_secs = 300
+
+[[step]]
+wait = '^probe=0$'
+timeout_secs = 120
+
+[[step]]
+send = "umount /mnt && echo umount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^umount-ok$'
+timeout_secs = 120
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

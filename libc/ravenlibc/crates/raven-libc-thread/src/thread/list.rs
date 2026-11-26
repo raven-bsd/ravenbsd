@@ -91,6 +91,56 @@ pub fn owner() -> i32 {
     LIST_LOCK.load(Ordering::Acquire)
 }
 
+/// Unlink `target` by walking from the main TCB, not by trusting `target.prev`.
+///
+/// The caller holds the list lock. A thread that is already absent is a no-op; the forward
+/// links of the walk and the target's successor are enough to remove the node even when its
+/// own back link is stale (the S132 1-CPU `Pthread.prev` fault).
+pub fn unlink(target: &raven_libc_tls::Pthread) {
+    let head = crate::libc_state::LIBC.main_tcb();
+    if head != 0 {
+        let _ = unlink_from(head, target as *const raven_libc_tls::Pthread as usize);
+    }
+}
+
+/// Remove `target` from the circular list rooted at `head`; returns whether it was found.
+fn unlink_from(head: usize, target: usize) -> bool {
+    if head == 0 || target == 0 {
+        return false;
+    }
+    if head == target
+        && raw::next_thread(raw::tcb(head)) as *const raven_libc_tls::Pthread as usize == head
+    {
+        return false;
+    }
+    let target_ref = raw::tcb(target);
+    let successor = raw::next_thread(target_ref) as *const raven_libc_tls::Pthread as usize;
+    if successor == target {
+        return false;
+    }
+    let mut node = head;
+    loop {
+        let next = raw::next_thread(raw::tcb(node)) as *const raven_libc_tls::Pthread as usize;
+        if next == target {
+            raw::set_links(
+                raw::tcb(node),
+                raw::prev_thread(raw::tcb(node)) as *const raven_libc_tls::Pthread as usize,
+                successor,
+            );
+            raw::set_links(
+                raw::tcb(successor),
+                node,
+                raw::next_thread(raw::tcb(successor)) as *const raven_libc_tls::Pthread as usize,
+            );
+            return true;
+        }
+        node = next;
+        if node == head {
+            return false;
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "list_ut.rs"]
 mod tests;

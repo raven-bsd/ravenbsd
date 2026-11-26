@@ -3,29 +3,17 @@
 
 //! Negative controls: every verification must fail, naming the mutated item.
 
+mod support;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+
+use support::{repo_root, require_resources};
 
 const GROUPS: [&str; 14] = [
     "errno", "signal", "fcntl", "mman", "stat", "socket", "netinet", "poll", "time", "resource",
     "limits", "sysconf", "pthread", "misc",
 ];
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..")
-}
-
-fn resources() -> PathBuf {
-    let mut directory = Some(repo_root());
-    while let Some(current) = directory {
-        let candidate = current.join("ravenbsd-resources");
-        if candidate.join("donors.lock").is_file() {
-            return candidate;
-        }
-        directory = current.parent().map(Path::to_path_buf);
-    }
-    panic!("cannot find ravenbsd-resources");
-}
 
 struct Temp {
     path: PathBuf,
@@ -84,6 +72,11 @@ impl Drop for Temp {
     }
 }
 
+fn setup(tag: &str) -> Option<(Temp, PathBuf)> {
+    let resources = require_resources("mutation")?;
+    Some((Temp::new(tag), resources))
+}
+
 fn run(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_raven-libc-hdrgen"))
         .args(args)
@@ -91,9 +84,8 @@ fn run(args: &[&str]) -> Output {
         .expect("run raven-libc-hdrgen")
 }
 
-fn generate(temp: &Temp) -> Output {
+fn generate(temp: &Temp, resources: &Path) -> Output {
     let root = repo_root();
-    let res = resources();
     run(&[
         "generate",
         "--abi",
@@ -103,13 +95,12 @@ fn generate(temp: &Temp) -> Output {
         "--root",
         root.to_str().unwrap(),
         "--resources",
-        res.to_str().unwrap(),
+        resources.to_str().unwrap(),
     ])
 }
 
-fn verify(temp: &Temp) -> Output {
+fn verify(temp: &Temp, resources: &Path) -> Output {
     let root = repo_root();
-    let res = resources();
     run(&[
         "verify",
         "--target",
@@ -119,7 +110,7 @@ fn verify(temp: &Temp) -> Output {
         "--root",
         root.to_str().unwrap(),
         "--resources",
-        res.to_str().unwrap(),
+        resources.to_str().unwrap(),
     ])
 }
 
@@ -133,28 +124,32 @@ fn skip(output: &Output) -> bool {
 
 #[test]
 fn a_flipped_offset_fails_generate_and_names_the_field() {
-    let temp = Temp::new("offset");
+    let Some((temp, resources)) = setup("offset") else {
+        return;
+    };
     temp.mutate(
         "structs.toml",
         "{ name = \"st_size\", ty = \"i64\", off = 48 }",
         "{ name = \"st_size\", ty = \"i64\", off = 56 }",
     );
-    let output = generate(&temp);
+    let output = generate(&temp, &resources);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("st_size"), "{}", stderr(&output));
 }
 
 #[test]
 fn a_flipped_constant_fails_verify_and_names_the_item() {
-    let temp = Temp::new("constant");
+    let Some((temp, resources)) = setup("constant") else {
+        return;
+    };
     temp.mutate(
         "errno.toml",
         "{ name = \"EPERM\", value = 1 }",
         "{ name = \"EPERM\", value = 2 }",
     );
-    let generated = generate(&temp);
+    let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp);
+    let output = verify(&temp, &resources);
     if skip(&output) {
         return;
     }
@@ -164,15 +159,17 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
 
 #[test]
 fn a_changed_opaque_size_fails_verify_and_names_the_type() {
-    let temp = Temp::new("opaque");
+    let Some((temp, resources)) = setup("opaque") else {
+        return;
+    };
     temp.mutate(
         "structs.toml",
         "size = 392\nalign = 8",
         "size = 400\nalign = 8",
     );
-    let generated = generate(&temp);
+    let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp);
+    let output = verify(&temp, &resources);
     if skip(&output) {
         return;
     }
@@ -182,15 +179,17 @@ fn a_changed_opaque_size_fails_verify_and_names_the_type() {
 
 #[test]
 fn an_undocumented_musl_difference_fails_verify() {
-    let temp = Temp::new("undocumented");
+    let Some((temp, resources)) = setup("undocumented") else {
+        return;
+    };
     temp.mutate(
         "socket.toml",
         "{ name = \"SOMAXCONN\", value = 4096",
         "{ name = \"SOMAXCONN\", value = 8192",
     );
-    let generated = generate(&temp);
+    let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp);
+    let output = verify(&temp, &resources);
     if skip(&output) {
         return;
     }
@@ -200,15 +199,17 @@ fn an_undocumented_musl_difference_fails_verify() {
 
 #[test]
 fn a_flipped_shift_fails_verify_and_names_the_item() {
-    let temp = Temp::new("shift");
+    let Some((temp, resources)) = setup("shift") else {
+        return;
+    };
     temp.mutate(
         "mman.toml",
         "{ name = \"MAP_HUGE_16KB\", shl = [14, 26] }",
         "{ name = \"MAP_HUGE_16KB\", shl = [15, 26] }",
     );
-    let generated = generate(&temp);
+    let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp);
+    let output = verify(&temp, &resources);
     if skip(&output) {
         return;
     }
@@ -222,15 +223,17 @@ fn a_flipped_shift_fails_verify_and_names_the_item() {
 
 #[test]
 fn a_stale_deviation_row_fails_verify() {
-    let temp = Temp::new("stale");
+    let Some((temp, resources)) = setup("stale") else {
+        return;
+    };
     temp.mutate(
         "fcntl.toml",
         "{ name = \"O_LARGEFILE\", value = 0",
         "{ name = \"O_LARGEFILE\", value = 4096",
     );
-    let generated = generate(&temp);
+    let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp);
+    let output = verify(&temp, &resources);
     if skip(&output) {
         return;
     }
@@ -244,15 +247,17 @@ fn a_stale_deviation_row_fails_verify() {
 
 #[test]
 fn an_undocumented_bsd_family_value_fails_verify() {
-    let temp = Temp::new("route");
+    let Some((temp, resources)) = setup("route") else {
+        return;
+    };
     temp.mutate(
         "socket.toml",
         "{ name = \"AF_ROUTE\", value = 128",
         "{ name = \"AF_ROUTE\", value = 129",
     );
-    let generated = generate(&temp);
+    let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp);
+    let output = verify(&temp, &resources);
     if skip(&output) {
         return;
     }
@@ -262,13 +267,15 @@ fn an_undocumented_bsd_family_value_fails_verify() {
 
 #[test]
 fn a_bad_header_name_fails_generate() {
-    let temp = Temp::new("header");
+    let Some((temp, resources)) = setup("header") else {
+        return;
+    };
     temp.mutate(
         "errno.toml",
         "c_header = \"bits/errno.h\"",
         "c_header = \"bits/wrong.h\"",
     );
-    let output = generate(&temp);
+    let output = generate(&temp, &resources);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("c_header"), "{}", stderr(&output));
 }

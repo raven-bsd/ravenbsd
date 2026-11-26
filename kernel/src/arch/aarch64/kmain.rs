@@ -93,6 +93,12 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+    // K166: route the PL011 receive line before interrupts are enabled, so DEBUG_READ and
+    // consd's UART reader can receive login input on aarch64.
+    match fdt::uart_irq(&platform) {
+        Some(uart_irq) => crate::arch::aarch64::console::init(uart_irq),
+        None => kprintln!("console: no PL011 interrupt id; DEBUG_READ stays empty"),
+    }
     let frequency = match timer::init(platform.timer_ppi) {
         Ok(frequency) => frequency,
         Err(error) => {

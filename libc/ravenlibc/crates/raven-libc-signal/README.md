@@ -4,8 +4,8 @@
 # raven-libc-signal
 
 Everything signal-shaped in ravenlibc except the kernel: the 128-byte `sigset_t` and its name
-table, the process disposition table behind `sigaction`/`signal`/the legacy calls, per-thread
-masks, the interposed entry path, the illumos-inspired deferral of signals in critical sections,
+table, the process disposition mirror behind `sigaction`/`signal`/the legacy calls, per-thread
+masks, the illumos-inspired deferral of signals in critical sections,
 `raise`/`kill`/`wait`/`sigaltstack`/`psig*`/`sig2str`/`str2sig`, the `setjmp` family and
 `getcontext`/`setcontext`/`makecontext`/`swapcontext` for x86-64, AArch64 and RISC-V.
 
@@ -14,44 +14,43 @@ Design: `architecture/raven-libc/donor-map/09-threads-tls-signals.md` sections 3
 files named by the ticket were read for behaviour only; no illumos code, identifier or structure is
 present.
 
-## The twelve-step entry path
+## Delivery
 
-1. The per-architecture `__raven_sigentry` asm stub aligns `sp`, reads the shell-installed entry
-   function cell and calls it with the kick bits and the optional fault record.
-2. `signal_entry` saves `errno` and COPY-INs the kernel-saved `mcontext_t` area into a
-   `ucontext_t` on the current stack. The area is free from that moment.
-3. Kick bit `CANCEL`: the C57 hook (`CancelHook`) may rewrite `pc` inside the `syscall_cp` window.
-4. Kick bit `SYNCCALL`: the C57 `synccall` callback runs.
-5. `deliverable = (thread_pending | process_pending) & !mask & APP_MASK`; a synchronous fault maps
-   to one signal and ignores the mask.
-6. Inside a critical section the lowest deliverable signal is recorded and `SIGRETURN` returns to
-   the interrupted code; the handler is never called from `critical_exit`.
-7. The lowest signal wins (standard before real-time; procd keeps FIFO per number), its pending bit
-   is cleared and the disposition is read through the lock-free seqlock.
-8. `SIG_IGN` drops it; `SIG_DFL` applies the table (terminate, core, ignore, stop-as-ignore,
-   continue); a function handler is delivered.
-9. The handler stack is chosen (`SA_ONSTACK` + an enabled alternate stack, else the interrupted
-   `sp` minus the x86-64 red zone), `siginfo_t` and `ucontext_t` are built, `sa_mask` is applied as
-   `old | sa_mask | (sig unless SA_NODEFER)`, and `SA_RESETHAND` writes `SIG_DFL` **before** the
-   call.
-10. The handler runs through `__rl_call_handler` with 16-byte alignment.
-11. The mask is restored from the possibly handler-modified `uc_sigmask`, and the loop returns to
-    step 5.
-12. `errno` is restored, the (possibly modified) machine context is COPY-OUT to the kernel area,
-    and `SIGRETURN` (0x82, the labelled PROPOSED PG-7 number) restores the interrupted context.
+C19 owns the caught-signal frame, the sigcode trampoline and `SIGRETURN`; libc registers no user
+entry. `sigaction`, `sigprocmask` and `sigaltstack` are thin wrappers over the kernel
+`SIGACTION`/`SIGPROCMASK`/`SIGALTSTACK` provider, and the libc disposition table is only a mirror
+for the legacy getters. The kernel derives the handler arguments, applies the mask and default
+action, and resumes the interrupted context through the sigcode.
 
-COPY-IN/COPY-OUT is what makes nested kicks and `siglongjmp` out of a handler safe with one kernel
-area: once copied in, the area may be reused; the handler's `ucontext_t` is a live stack object.
+The libc direct path remains only for a synchronous wait that cannot use the kernel entry
+(`ppoll` with a temporary mask): it saves `errno`, computes the deliverable set, honours the
+critical-section deferral, applies the default action or calls the handler on the selected stack,
+and restores the mask. The handler stack is the alternate stack for `SA_ONSTACK`, else the caller's
+stack below the x86-64 red zone. `call_handler` enters the function with 16-byte alignment.
 
 ## Capability matrix (production today)
 
-`SysKernel::caps()` is all false: no PG-7 (`SIG_SETUP`, `THREAD_KICK`, `SIGRETURN`,
-`SIGRESEND`), no PG-8 (`-EINTR`/sticky kick), no PG-10 (stop), no PG-12 (FP in the frame), no
-PG-44 (procd kill). Consequences: `sigaction` stores dispositions; `raise` and self-targeted
-`pthread_kill` run the handler through the libc-only direct entry when unmasked; `kill` to another
-process is `ENOSYS`; asynchronous delivery and `SIGSTOP` are absent; no FP/SIMD state is saved
-(PG-12/PG-50). The kick bits `CHECK=1, CANCEL=2, SYNCCALL=4, TIMER=8` are PROPOSED (RD-new 2) and
+On the Raven target (`cfg!(target_os = "none")`) `SysKernel::caps()` reports the committed PG-8
+interruptible wait; the host build keeps every kernel bit false because the unit tests have no
+Raven kernel behind them.
+
+| Capability | Target | Host | Meaning |
+|---|---|---|---|
+| `kick` | yes | no | `THREAD_KICK` sets the sticky word and wakes an interruptible wait |
+| `eintr` | yes | no | an interruptible wait returns `-EINTR` for a deliverable signal |
+| `proc_kill` | yes | no | `kill`/`killpg`/`sigqueue` through the process signal queue |
+| `resend` | no | no | no `SIGRESEND`; a deferred replay uses restore-mask + pending bit + self kick |
+| `stop` | no | no | no PG-10 stop/continue |
+| `fp_in_frame` | no | no | no PG-12 FP/SIMD state in the signal frame |
+
+A blocked signal stays in the kernel queue; `sigprocmask` re-checks with a fresh kick after an
+unblock. The kick bits `CHECK=1, CANCEL=2, SYNCCALL=4, TIMER=8` are PROPOSED (RD-new 2) and
 nothing else is set.
+
+The on-target `libc-signal-chld` case (`tests/libc/c/libc-signal-chld.c`, qtest
+`tests/qtest/cases/libc-signal-chld.toml`) proves the entry: a blocked SIGCHLD is delivered when
+the mask is restored, and a child exit interrupts a blocking `waitpid` with `EINTR` while the
+handler runs and the retried wait reaps.
 
 ## Soft-float
 
@@ -76,7 +75,7 @@ registers, nested levels, `sigsetjmp` with/without the mask, a getcontext/setcon
 makecontext with 0..6 arguments and both `uc_link` cases, a 1,000-iteration `swapcontext`
 ping-pong and `call_handler` on a separate stack. **AArch64 and RISC-V were only built**, not
 executed: the reference machine has no `qemu-aarch64`/`qemu-riscv64` (only `qemu-system-*`); the
-`llvm-objdump -d` text of every entry symbol is in `tests/golden/`.
+`llvm-objdump -d` text of every signal assembly symbol is in `tests/golden/`.
 
 `data/async-signal-safe.txt` carries a `VERIFIED:`/`UNVERIFIED:` mark on every line; the source
 for the verified rows is the local `man-pages-5.10 signal-safety(7)` page plus the POSIX.1-2024

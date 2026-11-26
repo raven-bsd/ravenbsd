@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "listener-backlog"
+port = 24006
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario listener-backlog"
+donor = [
+  "NetBSD sys/netinet/tcp_input.c:tcp_input (listener SYN queue)",
+  "NetBSD sys/kern/uipc_socket2.c:sonewconn (accept queue limits)",
+]
+rfcs = ["RFC 9293 section 3.8 (listen backlog)"]
+
+[[expect]]
+step = "listener backlog=1, syncookies off, peer sends five SYNs without accepting"
+packet = "SYN"
+assert = "at least one and no more than three SYN-ACKs; the remainder are dropped"
+
+[[expect]]
+step = "no application accept during the flood"
+packet = "SYN-ACK"
+assert = "the backlog, not an accept loop, limits the completed handshakes"

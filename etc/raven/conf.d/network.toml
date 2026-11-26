@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 default network drop-in. A missing file keeps the image default; this file documents
+# the installed shape and is replaced atomically by `raven net apply` (K197).
+[network]
+hostname = "raven"
+mode = "dhcp"

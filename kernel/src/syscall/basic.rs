@@ -5,6 +5,7 @@
 
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
@@ -12,7 +13,6 @@ use raven_abi::types::{Handle, Timespec, clock};
 use raven_abi::uname::Uname;
 use raven_usercopy::UserSlice;
 
-use crate::arch::serial;
 use crate::cmdline::CmdLine;
 use crate::process;
 use crate::syscall::SyscallFrame;
@@ -70,7 +70,7 @@ fn debug_write(pointer: u64, length: u64) -> Result<usize, Errno> {
     let destination = buffer.get_mut(..length).ok_or(Errno::EINVAL)?;
     copy_from_user(destination, source)?;
     let written = buffer.get(..length).ok_or(Errno::EINVAL)?;
-    serial::write_bytes(written);
+    crate::log::write_bytes(written);
     Ok(length)
 }
 
@@ -99,10 +99,26 @@ fn clock_get(clock_id: u32, pointer: u64) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// Require the caller's effective uid to be 0.
+///
+/// The 0.1.0 authority model is `euid == 0`; a delegable `CAP_TIME`/`CAP_DTRACE` is
+/// post-0.1.0. A missing current process is `ESRCH`, a non-root caller `EPERM`.
+pub(crate) fn require_root() -> Result<(), Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    if caller.ids.lock().euid == 0 {
+        Ok(())
+    } else {
+        Err(Errno::EPERM)
+    }
+}
+
 /// `CLOCK_SET`: set the wall clock from a user `Timespec`.
 ///
 /// Only `clock::REALTIME` is settable; a non-positive or out-of-range value is `EINVAL`. The
-/// monotonic clock is unaffected.
+/// monotonic clock is unaffected. The write requires effective uid 0 (FreeBSD
+/// `kern_clock_settime` `priv_check(PRIV_CLOCK_SETTIME)`, NetBSD `settime1` `KAUTH_SYSTEM_TIME`);
+/// the check is after the copy/validation and before the clock write, so a denied caller cannot
+/// change the clock.
 pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
     let clock_id = frame.rdi as u32;
     if clock_id != clock::REALTIME {
@@ -126,16 +142,18 @@ pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let seconds = u64::try_from(timespec.tv_sec).map_err(|_| Errno::EINVAL)?;
     let nanos = u64::try_from(timespec.tv_nsec).map_err(|_| Errno::EINVAL)?;
+    require_root()?;
     time::set_realtime_ns(seconds.saturating_mul(1_000_000_000).saturating_add(nanos));
     Ok(0)
 }
 
-/// `GETRANDOM`: fill a user buffer from the kernel entropy pool.
+/// `GETRANDOM`: fill a user buffer from the boot-seeded ChaCha20 pool.
 ///
-/// Never blocks. The pool is seeded on first use from a hardware source or timer jitter; when
-/// neither can be sampled the call returns `EAGAIN`. `flags` is accepted and ignored (the kernel
-/// does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is capped at
-/// `0x1FFF_FFFF` like Linux.
+/// The pool is seeded once at boot from RDRAND/RNDR; timer jitter is never cryptographic input.
+/// If the platform has no hardware source (or `entropy=none` disabled it) the pool stays unseeded
+/// and the call returns `EAGAIN`; it never serves a predictable fallback. `flags` is accepted and
+/// ignored (the kernel does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is
+/// capped at `0x1FFF_FFFF` like Linux.
 pub fn getrandom(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let flags = frame.rdx as u32;
@@ -198,10 +216,10 @@ fn uname(pointer: u64) -> Result<usize, Errno> {
 
 fn handle_close(raw: u32) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
-    process.handles.lock().close(Handle(raw))?;
-    // Deregistration is observable only after the close commits: a failed close (stale
-    // generation, empty slot) must leave every event-queue registration untouched.
-    crate::event::on_handle_close(&process, Handle(raw));
+    // The single close primitive: it commits the table close, cancels an IRQ waiter, removes
+    // event registrations, and fails/releases a server-side `SchemeRequest` that can no longer
+    // receive its reply.
+    crate::event::close_handle(&process, Handle(raw))?;
     Ok(0)
 }
 
@@ -232,5 +250,25 @@ fn handle_revoke(raw: u32, mask: u32) -> Result<usize, Errno> {
         handles.revoke_target(Handle(raw), raven_abi::types::Rights(mask))?
     };
     crate::process::handle::revoke_descendants(&node, applied);
+    let request = {
+        let handles = process.handles.lock();
+        match handles.get(Handle(raw), raven_abi::types::Rights::NONE) {
+            Ok(crate::process::handle::Object::SchemeRequest(request)) => Some(Arc::clone(request)),
+            _ => None,
+        }
+    };
+    if let Some(request) = request
+        && applied.contains(raven_abi::types::Rights::WRITE)
+    {
+        // The server can no longer send the reply. Fail the client and release the capture now;
+        // the handle may stay open, so a later close must not be the only release path.
+        request.fail(Errno::EIO);
+        request
+            .server
+            .active_requests
+            .lock()
+            .retain(|item| !Arc::ptr_eq(item, &request));
+        request.release_captures();
+    }
     Ok(0)
 }

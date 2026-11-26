@@ -25,11 +25,15 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod trace;
 
+mod chunk;
+mod pivot;
+
 #[cfg(target_os = "none")]
 mod program {
     use alloc::collections::BTreeMap;
     use alloc::format;
     use alloc::string::{String, ToString};
+    use alloc::vec;
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
@@ -38,7 +42,7 @@ mod program {
     use raven_proto_fs::{
         ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
         DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
-        OpenFlags, S_IFDIR, S_IFMT, Stat, WIRE_OPEN_DIRECTORY, normalize_request,
+        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
@@ -52,10 +56,20 @@ mod program {
     const READ: u32 = 1;
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
-    const BUFFER: usize = 4096;
+    /// Directory-page staging buffer; directory entries are small and stay at one page.
+    const DIR_BUFFER: usize = 4096;
+    /// Proxy read/write chunk. The client read size is the upper bound; a 64 KiB chunk removes
+    /// the 4 KiB nested-call storm for large file reads without a 64 KiB stack array.
+    const PROXY_CHUNK: usize = 64 * 1024;
     const PAGE: usize = 4096;
     /// Budget for proxy open-file descriptions.
-    const MAX_OPEN_FILES: usize = 256;
+    ///
+    /// The caller's `RLIMIT_NOFILE` soft limit is the per-process bound; this aggregate budget must
+    /// not be lower than the maximum any process may set. The kernel handle table is 65,536
+    /// (`raven-handles::MAX_HANDLES`), the same shape as FreeBSD `maxfilesperproc`, NetBSD
+    /// `maxfiles` and Linux `sysctl_nr_open`; the old 256 constant refused valid opens before the
+    /// caller's limit.
+    const MAX_OPEN_FILES: usize = 65_536;
 
     /// S11 `Opcode::Open` wire value.
     const OPEN_OPCODE: u16 = 1;
@@ -71,17 +85,31 @@ mod program {
 
     #[derive(Clone, Copy)]
     struct PagerRegion {
+        file: u64,
         target: Handle,
         offset: u64,
         shared: bool,
+        object: Handle,
     }
 
     struct Proxy {
         target: Handle,
         path: String,
+        /// The caller's process root captured at open time; path CALLs must stay under it.
+        root: String,
         root_listing: bool,
         merged: Option<Vec<u8>>,
         mount_generation: u32,
+    }
+
+    #[derive(Clone, Copy)]
+    struct DiagEntry {
+        op: u8,
+        file: u64,
+        offset: u64,
+        len: u64,
+        request: u32,
+        accepted: bool,
     }
 
     struct VfsHandler {
@@ -91,6 +119,8 @@ mod program {
         mount_generation: u32,
         probe: crate::trace::Probe,
         trace: bool,
+        diag: [Option<DiagEntry>; 16],
+        diag_len: usize,
     }
 
     impl VfsHandler {
@@ -102,7 +132,51 @@ mod program {
                 mount_generation: 1,
                 probe: crate::trace::Probe::server(),
                 trace,
+                diag: [None; 16],
+                diag_len: 0,
             }
+        }
+
+        fn note_diag(
+            &mut self,
+            op: u8,
+            file: u64,
+            offset: u64,
+            len: u64,
+            request: u32,
+            accepted: bool,
+        ) {
+            let index = self.diag_len % 16;
+            if let Some(slot) = self.diag.get_mut(index) {
+                *slot = Some(DiagEntry {
+                    op,
+                    file,
+                    offset,
+                    len,
+                    request,
+                    accepted,
+                });
+                self.diag_len = self.diag_len.saturating_add(1);
+            }
+        }
+
+        fn dump_diag(&self) {
+            println!("vfsd-diag: begin entries={}", self.diag_len.min(16));
+            let start = self.diag_len.saturating_sub(16);
+            for index in start..self.diag_len {
+                if let Some(entry) = self.diag.get(index % 16).copied().flatten() {
+                    println!(
+                        "vfsd-diag: op={} file={} off={} len={} req={} accepted={}",
+                        entry.op,
+                        entry.file,
+                        entry.offset,
+                        entry.len,
+                        entry.request,
+                        entry.accepted
+                    );
+                }
+            }
+            println!("vfsd-diag: end");
         }
 
         fn bump_mounts(&mut self) {
@@ -164,6 +238,166 @@ mod program {
             }
         }
 
+        fn target_readlink(&self, scheme: &str, suffix: &str) -> Result<String, Errno> {
+            let client = Client::new();
+            let root = client.open(scheme, READ)?;
+            let request = CallRequest::new(Call::Readlink {
+                path: suffix.as_bytes(),
+            });
+            let mut response = [0u8; MAX_PATH + 8];
+            let result = client.call_typed(root, &request, &mut response);
+            let _ = client.close(root);
+            let length = result?;
+            match CallResponse::decode(request.op(), &response[..length]) {
+                Ok(CallResponse::Readlink { status: 0, target }) => core::str::from_utf8(target)
+                    .map(String::from)
+                    .map_err(|_| Errno::EINVAL),
+                Ok(CallResponse::Status(status))
+                | Ok(CallResponse::Stat { status, .. })
+                | Ok(CallResponse::Readlink { status, .. })
+                | Ok(CallResponse::StatFs { status, .. })
+                | Ok(CallResponse::StatVfs { status, .. }) => Err(errno_from_status(status)),
+                Err(_) => Err(Errno::EPROTO),
+            }
+        }
+
+        fn normalize_under_root(
+            &self,
+            root: &str,
+            base: &str,
+            target: &str,
+        ) -> Result<String, Errno> {
+            if root == "/" {
+                return Ok(target.to_string());
+            }
+            let combined = if target.starts_with('/') {
+                format!("{root}{target}")
+            } else if base == "/" {
+                format!("/{target}")
+            } else {
+                format!("{base}/{target}")
+            };
+            if combined != root && !combined.starts_with(&format!("{root}/")) {
+                return Err(Errno::ENOENT);
+            }
+            let root_parts: Vec<&str> = root.split('/').filter(|part| !part.is_empty()).collect();
+            let mut parts: Vec<String> = root_parts.iter().map(|part| part.to_string()).collect();
+            let rest = combined.strip_prefix(root).unwrap_or("");
+            for part in rest.split('/') {
+                match part {
+                    "" | "." => {}
+                    ".." => {
+                        if parts.len() > root_parts.len() {
+                            parts.pop();
+                        }
+                    }
+                    _ => parts.push(part.to_string()),
+                }
+            }
+            Ok(format!("/{}", parts.join("/")))
+        }
+
+        /// Resolve every symlink in `path` while keeping the result below `root`.
+        fn resolve_rooted(
+            &self,
+            path: &str,
+            root: &str,
+            follow_final: bool,
+        ) -> Result<String, Errno> {
+            if root == "/" {
+                return Ok(path.to_string());
+            }
+            if path != root && !path.starts_with(&format!("{root}/")) {
+                return Err(Errno::ENOENT);
+            }
+            let mut current = root.to_string();
+            let mut components: Vec<String> = path
+                .strip_prefix(root)
+                .unwrap_or("")
+                .split('/')
+                .filter(|part| !part.is_empty())
+                .map(String::from)
+                .collect();
+            let mut index = 0usize;
+            let mut links = 0usize;
+            while index < components.len() {
+                let component = components[index].clone();
+                if component == "." {
+                    index += 1;
+                    continue;
+                }
+                if component == ".." {
+                    if current != root {
+                        current = current
+                            .rsplit_once('/')
+                            .map(|(parent, _)| if parent.is_empty() { "/" } else { parent })
+                            .unwrap_or("/")
+                            .to_string();
+                    }
+                    index += 1;
+                    continue;
+                }
+                let candidate = if current == "/" {
+                    format!("/{component}")
+                } else {
+                    format!("{current}/{component}")
+                };
+                let (mount_id, suffix) = self.table.resolve(&candidate)?;
+                let scheme = self
+                    .table
+                    .get(mount_id)
+                    .ok_or(Errno::ENOENT)?
+                    .scheme
+                    .clone();
+                match self.target_lstat(&scheme, suffix) {
+                    Ok(stat) if stat.mode & S_IFMT == S_IFLNK => {
+                        if !follow_final && index + 1 == components.len() {
+                            return Err(Errno::ELOOP);
+                        }
+                        links += 1;
+                        if links > 40 {
+                            return Err(Errno::ELOOP);
+                        }
+                        let target = self.target_readlink(&scheme, suffix)?;
+                        if target.is_empty() {
+                            return Err(Errno::ENOENT);
+                        }
+                        let base = if target.starts_with('/') {
+                            root.to_string()
+                        } else {
+                            candidate
+                                .rsplit_once('/')
+                                .map(|(parent, _)| if parent.is_empty() { "/" } else { parent })
+                                .unwrap_or("/")
+                                .to_string()
+                        };
+                        let resolved = self.normalize_under_root(root, &base, &target)?;
+                        components = resolved
+                            .strip_prefix(root)
+                            .unwrap_or("")
+                            .split('/')
+                            .filter(|part| !part.is_empty())
+                            .map(String::from)
+                            .collect();
+                        index = 0;
+                        current = root.to_string();
+                    }
+                    Ok(stat) => {
+                        if index + 1 < components.len() && stat.mode & S_IFMT != S_IFDIR {
+                            return Err(Errno::ENOTDIR);
+                        }
+                        current = candidate;
+                        index += 1;
+                    }
+                    Err(Errno::ENOENT) if index + 1 == components.len() => {
+                        return Ok(candidate);
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Ok(current)
+        }
+
         fn mmap_call(
             &mut self,
             file: u64,
@@ -171,6 +405,7 @@ mod program {
             len: u64,
             shared: bool,
         ) -> HandlerResult<CallReply> {
+            self.note_diag(4, file, offset, len, 0, true);
             if self.trace {
                 println!(
                     "vfsd-trace: mmap file={file} offset={offset} len={len} shared={shared} open={}",
@@ -220,9 +455,11 @@ mod program {
             self.pagers.insert(
                 object.0,
                 PagerRegion {
+                    file,
                     target,
                     offset,
                     shared,
+                    object,
                 },
             );
             let mut reply = CallReply::new(0);
@@ -347,10 +584,16 @@ mod program {
             flags: OpenFlags,
         ) -> Result<(), Errno> {
             if flags.create() {
-                self.check_parent(scheme, suffix, creds)?;
+                // Check the target before its parent: a mount root has an empty suffix, and its
+                // parent lives outside the mounted scheme. `open("/dev/null", O_CREAT)` must
+                // treat the existing device as the target instead of testing `null:` as a
+                // directory.
                 match self.target_stat(scheme, suffix) {
                     Ok(stat) => return check_stat_access(creds, stat, flags),
-                    Err(Errno::ENOENT) => return Ok(()),
+                    Err(Errno::ENOENT) => {
+                        self.check_parent(scheme, suffix, creds)?;
+                        return Ok(());
+                    }
                     Err(error) => return Err(error),
                 }
             }
@@ -362,7 +605,7 @@ mod program {
         fn build_root_listing(&self, target: Handle) -> Result<Vec<u8>, Errno> {
             let client = Client::new();
             let mut entries: BTreeMap<String, (u64, u8)> = BTreeMap::new();
-            let mut buffer = [0u8; BUFFER];
+            let mut buffer = [0u8; DIR_BUFFER];
             loop {
                 let length = client.read(target, 0, &mut buffer)?;
                 if length == 0 {
@@ -472,15 +715,28 @@ mod program {
             Ok(written)
         }
 
+        /// Resolve a path CALL against the caller's root captured at open time.
+        ///
+        /// Absolute payload paths must not be resolved against the global mount table: a process
+        /// that chrooted keeps its root on every path CALL through the already-open description.
+        fn call_path(&self, root: &str, base: &str, path: &str) -> Result<String, Errno> {
+            if root == "/" {
+                self.absolute(base, path)
+            } else {
+                self.normalize_under_root(root, base, path)
+            }
+        }
+
         fn forward_one(
             &self,
             call: Call<'_>,
             base: &str,
+            root: &str,
             response: &mut [u8],
             creds: &Credentials,
         ) -> Result<usize, Errno> {
             let raw = single_path(&call).ok_or(Errno::EINVAL)?;
-            let path = self.absolute(base, &bytes_to_string(raw)?)?;
+            let path = self.call_path(root, base, &bytes_to_string(raw)?)?;
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
                 .table
@@ -666,27 +922,19 @@ mod program {
         offset: Option<u64>,
         buffer: &mut [u8],
     ) -> Result<usize, Errno> {
-        let mut scratch = [0u8; BUFFER];
-        let mut done = 0usize;
-        while done < buffer.len() {
-            let capacity = (buffer.len() - done).min(scratch.len());
-            let read = match offset {
-                Some(base) => {
-                    let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
-                    client.pread(target, position, &mut scratch[..capacity])?
-                }
-                None => client.read(target, 0, &mut scratch[..capacity])?,
-            };
-            if read > capacity {
-                return Err(Errno::EPROTO);
+        let mut scratch = vec![0u8; PROXY_CHUNK];
+        let result = crate::chunk::copy_chunks(buffer, &mut scratch, |done, chunk| match offset {
+            Some(base) => {
+                let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
+                client.pread(target, position, chunk)
             }
-            buffer[done..done + read].copy_from_slice(&scratch[..read]);
-            done += read;
-            if read < capacity {
-                break;
-            }
+            None => client.read(target, 0, chunk),
+        });
+        match result {
+            Ok(count) => Ok(count),
+            Err(crate::chunk::ChunkError::Io(error)) => Err(error),
+            Err(crate::chunk::ChunkError::Overrun) => Err(Errno::EPROTO),
         }
-        Ok(done)
     }
 
     /// Forward a write through a local buffer; see [`copy_read`].
@@ -696,7 +944,7 @@ mod program {
         offset: Option<u64>,
         buffer: &[u8],
     ) -> Result<usize, Errno> {
-        let mut scratch = [0u8; BUFFER];
+        let mut scratch = vec![0u8; PROXY_CHUNK];
         let mut done = 0usize;
         while done < buffer.len() {
             let capacity = (buffer.len() - done).min(scratch.len());
@@ -806,11 +1054,26 @@ mod program {
             _mode: u32,
             ctx: &Ctx,
         ) -> HandlerResult<Opened> {
+            if path == "__diag__" || path == "/__diag__" {
+                self.dump_diag();
+                return Err(Errno::EINVAL.into());
+            }
             self.probe.record(ctx.trace_id, OPEN_OPCODE);
             let (path, requires_dir) = self.normalize_request_path(path)?;
             let directory = requires_dir || flags.directory();
             let target_flags = OpenFlags::from_wire(flags.to_wire() & !WIRE_OPEN_DIRECTORY)
                 .map_err(|_| Errno::EINVAL)?;
+            let mut path = path;
+            let mut root = String::from("/");
+            if let Ok(root_len) = usize::try_from(ctx.root_len)
+                && root_len > 0
+            {
+                let open_root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
+                if open_root != "/" {
+                    path = self.resolve_rooted(&path, &open_root, !target_flags.nofollow())?;
+                }
+                root = open_root;
+            }
             let (mount_id, suffix) = self.table.resolve(&path)?;
             let scheme = self
                 .table
@@ -850,6 +1113,7 @@ mod program {
                     target,
                     root_listing: path == "/",
                     path,
+                    root,
                     merged: None,
                     mount_generation: self.mount_generation,
                 },
@@ -861,6 +1125,7 @@ mod program {
                     path_for_trace, target_handle, ctx.trace_id, ctx.request.0
                 );
             }
+            self.note_diag(1, u64::from(target_handle), 0, 0, ctx.request.0, true);
             Ok(Opened::File(id))
         }
 
@@ -886,6 +1151,14 @@ mod program {
             buffer: &mut [u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
+            self.note_diag(
+                2,
+                file,
+                offset,
+                u64::try_from(buffer.len()).unwrap_or(0),
+                ctx.request.0,
+                true,
+            );
             self.probe.record(ctx.trace_id, READ_OPCODE);
             if !self.trace {
                 return self.read(file, offset, buffer);
@@ -931,6 +1204,14 @@ mod program {
             buffer: &[u8],
             ctx: &Ctx,
         ) -> HandlerResult<usize> {
+            self.note_diag(
+                3,
+                file,
+                offset,
+                u64::try_from(buffer.len()).unwrap_or(0),
+                ctx.request.0,
+                true,
+            );
             if !self.trace {
                 return self.write(file, offset, buffer);
             }
@@ -1036,7 +1317,11 @@ mod program {
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
             if let Some(proxy) = self.opens.close(file)? {
-                let _ = Client::new().close(proxy.target);
+                let target = proxy.target;
+                let _ = Client::new().close(target);
+                // The target is the last duplicate of this open, so no page can be supplied
+                // through it anymore; return the pager handles now.
+                self.retire_pagers(file, target);
             }
             Ok(())
         }
@@ -1079,6 +1364,24 @@ mod program {
     }
 
     impl VfsHandler {
+        /// Drop the pager keys created from `file`/`target`.
+        ///
+        /// The client's mappings keep the object alive, and when the client unmaps/closes it the
+        /// frames are freed; without this the server's pager key holds every mapped page for the
+        /// life of vfsd (the S36 rev103 red row and C18 truncate lifetime).
+        fn retire_pagers(&mut self, file: u64, target: Handle) {
+            let objects: Vec<Handle> = self
+                .pagers
+                .iter()
+                .filter(|(_, region)| region.file == file || region.target == target)
+                .map(|(_, region)| region.object)
+                .collect();
+            for object in objects {
+                self.pagers.remove(&object.0);
+                let _ = raven_rt::sys::handle_close(object);
+            }
+        }
+
         fn call_checked(
             &mut self,
             file: u64,
@@ -1086,9 +1389,13 @@ mod program {
             response: &mut [u8],
             creds: &Credentials,
         ) -> HandlerResult<usize> {
-            let (target, base) = {
+            let (target, base, root) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
-                (entry.file.target, entry.file.path.clone())
+                (
+                    entry.file.target,
+                    entry.file.path.clone(),
+                    entry.file.root.clone(),
+                )
             };
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
             match decoded.call {
@@ -1100,16 +1407,20 @@ mod program {
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
                     let before = self.mount_generation;
-                    let result = self.table.mount(&path, &scheme);
-                    if self.trace {
-                        println!(
-                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result={}",
-                            result.is_ok()
-                        );
+                    if path == "/" {
+                        // K176: a mount at `/` is the live root pivot. Open files keep their
+                        // targets; the replacement table keeps /dev, /tmp and every other
+                        // non-root mount.
+                        let replacement = crate::pivot::pivot_root(&self.table, &scheme)?;
+                        self.table = replacement;
+                    } else {
+                        self.table.mount(&path, &scheme)?;
                     }
-                    result?;
                     self.bump_mounts();
                     if self.trace {
+                        println!(
+                            "vfsd-trace: mount path={path} scheme={scheme} gen={before} result=true"
+                        );
                         println!("vfsd-trace: mount-bump gen={}", self.mount_generation);
                     }
                     status(response, Ok(()))
@@ -1153,47 +1464,52 @@ mod program {
                     }
                     status(response, Ok(()))
                 }
-                Call::Statfs => {
-                    let (mount_id, _) = self.table.resolve("/")?;
-                    let scheme = self
-                        .table
-                        .get(mount_id)
-                        .ok_or(Errno::ENOENT)?
-                        .scheme
-                        .clone();
-                    let client = Client::new();
-                    let root = client.open(&scheme, READ)?;
-                    let result = proxy_call(&client, root, &decoded, response);
-                    let _ = client.close(root);
-                    Ok(result?)
-                }
-                Call::Truncate { .. } | Call::Fchown { .. } => {
+                Call::Statfs => match proxy_call(&Client::new(), target, &decoded, response) {
+                    Ok(written) => Ok(written),
+                    Err(Errno::ENOSYS) => {
+                        // Device schemes such as null:, zero: and rand: do not account for
+                        // blocks or inodes. Report zero capacity instead of resolving another
+                        // mount (previously `/`/initfs) and inheriting its 41 MiB numbers.
+                        let statfs = StatFs::default();
+                        Ok(CallResponse::StatFs { status: 0, statfs }
+                            .encode(response)
+                            .map_err(|_| HandlerError::Errno(Errno::EPROTO))?)
+                    }
+                    Err(error) => Err(error.into()),
+                },
+                Call::Truncate { size } => {
                     let stat = Client::new().fstat(target)?;
-                    if matches!(decoded.call, Call::Truncate { .. })
-                        && !creds.permitted(
-                            (stat.mode & 0o7777) as u16,
-                            stat.uid,
-                            stat.gid,
-                            ACCESS_WRITE,
-                        )
-                    {
+                    if !creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        ACCESS_WRITE,
+                    ) {
                         return Err(Errno::EACCES.into());
                     }
-                    Ok(proxy_call(&Client::new(), target, &decoded, response)?)
+                    let result = proxy_call(&Client::new(), target, &decoded, response)?;
+                    // A shrink invalidates the pages past the new length. Retire the pager keys
+                    // created from this open; the client's mappings keep the object alive until
+                    // it unmaps/closes it. A grow or same-size truncate keeps the keys.
+                    if size < stat.size {
+                        self.retire_pagers(file, target);
+                    }
+                    Ok(result)
                 }
+                Call::Fchown { .. } => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Statvfs => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Link { path, target } => {
-                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
-                    let target = self.absolute(&base, &bytes_to_string(target)?)?;
+                    let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;
+                    let target = self.call_path(&root, &base, &bytes_to_string(target)?)?;
                     Ok(self.forward_link(&path, &target, response, creds)?)
                 }
                 Call::Rename { from, to } => {
-                    let from = self.absolute(&base, &bytes_to_string(from)?)?;
-                    let to = self.absolute(&base, &bytes_to_string(to)?)?;
+                    let from = self.call_path(&root, &base, &bytes_to_string(from)?)?;
+                    let to = self.call_path(&root, &base, &bytes_to_string(to)?)?;
                     Ok(self.forward_rename(&from, &to, response, creds)?)
                 }
                 Call::Access { mode, path } => {
-                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
+                    let path = self.call_path(&root, &base, &bytes_to_string(path)?)?;
                     let (mount_id, suffix) = self.table.resolve(&path)?;
                     let scheme = self
                         .table
@@ -1223,7 +1539,7 @@ mod program {
                 | Call::Mknod { .. }
                 | Call::Utimens { .. }
                 | Call::Lstat { .. } => {
-                    Ok(self.forward_one(decoded.call, &base, response, creds)?)
+                    Ok(self.forward_one(decoded.call, &base, &root, response, creds)?)
                 }
                 Call::Mmap { .. } => status(response, Err(Errno::EINVAL)),
             }

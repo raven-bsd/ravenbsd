@@ -40,6 +40,7 @@ pub(crate) fn fork<B: ProcBackend>(backend: &B) -> Result<i32, ProcErrno> {
         sp: 0,
         arg: 0,
         fork_flags: 0,
+        tp: 0,
     })
 }
 

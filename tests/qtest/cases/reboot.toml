@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K235: /sbin/reboot resets the guest through the kernel ACPI/FADT reset path and QEMU boots the
+# same image again. The case logs in a second time and then powers off. `-action reboot=reset`
+# follows the harness's test-only -no-reboot and makes the reset observable.
+
+name = "reboot"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 240
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-action", "reboot=reset",
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "any"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^shutdown: reboot$'
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^shutdown: poweroff$'
+
+[[expect]]
+regex = '^power: poweroff$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|shutdown: .*not permitted'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/sbin/reboot\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power: reboot$'
+timeout_secs = 60
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/sbin/poweroff\n"
+delay_ms = 100
+
+[[step]]
+wait = '^power: poweroff$'
+timeout_secs = 120

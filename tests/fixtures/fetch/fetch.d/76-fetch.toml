@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K199 temporary staging fragment. profiles/** is outside K199's Owns list; copy this file to
+# profiles/release.d/76-fetch.toml (or the K193 UFS profile) as the one-line staging handoff.
+# It stages the base HTTP tools; the TLS add-on build is a separate artifact.
+
+[[initfs.programs]]
+package = "curl"
+path = "/bin/curl"
+
+[[initfs.programs]]
+package = "wget"
+path = "/bin/wget"

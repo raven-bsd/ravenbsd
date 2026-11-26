@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-use crate::case::Case;
+use crate::case::{Case, ExpectExit};
 use crate::dialogue::Dialogue;
 use crate::exitmap::{self, ExitKind};
 use crate::matcher;
@@ -34,6 +34,8 @@ pub struct ExecuteOptions {
     pub runner: Option<Vec<String>>,
     /// Do not invoke `cargo xtask image`; require the image to exist already.
     pub no_build: bool,
+    /// Do not run the case's `pre` commands; the image/fixture must already exist.
+    pub no_pre: bool,
 }
 
 impl ExecuteOptions {
@@ -47,6 +49,7 @@ impl ExecuteOptions {
             ovmf_vars: None,
             runner: None,
             no_build: false,
+            no_pre: false,
         }
     }
 }
@@ -60,6 +63,23 @@ impl Default for ExecuteOptions {
 enum PrepareError {
     Skipped(String),
     Error(String),
+}
+
+/// A prepared QEMU command plus the per-run artifacts that must be released afterwards.
+struct Prepared {
+    program: String,
+    args: Vec<String>,
+    cleanup: Vec<PathBuf>,
+}
+
+/// Remove per-run artifacts that are safe to discard once QEMU is reaped.
+///
+/// The case image is deliberately kept: `--no-build` runs reuse it, and QEMU no longer holds it
+/// after the process group is killed. Only the OVMF/AAVMF vars copy belongs to this run.
+fn remove_run_artifacts(paths: &[PathBuf]) {
+    for path in paths {
+        let _ = fs::remove_file(path);
+    }
 }
 
 /// Everything produced by one case execution, including host-side oracle reports.
@@ -132,13 +152,21 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
             Some(reason.clone()),
             ResultKind::Skipped,
             started,
+            false,
         );
     }
 
-    if let Err(reason) = run_pre_commands(case, &arch) {
-        return finish(report, Vec::new(), Some(reason), ResultKind::Error, started);
+    if !options.no_pre
+        && let Err(error) = run_pre_commands(case, &arch)
+    {
+        let (reason, kind) = match error {
+            PrepareError::Skipped(reason) => (reason, ResultKind::Skipped),
+            PrepareError::Error(reason) => (reason, ResultKind::Error),
+        };
+        return finish(report, Vec::new(), Some(reason), kind, started, false);
     }
 
+    let mut cleanup = Vec::new();
     let (program, args) = match &options.runner {
         Some(runner) if runner.is_empty() => {
             return finish(
@@ -147,11 +175,15 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
                 Some("--runner needs a command".to_string()),
                 ResultKind::Error,
                 started,
+                options.no_pre,
             );
         }
         Some(runner) => (runner[0].clone(), runner[1..].to_vec()),
         None => match prepare_external(case, &arch, options) {
-            Ok(command) => command,
+            Ok(prepared) => {
+                cleanup = prepared.cleanup;
+                (prepared.program, prepared.args)
+            }
             Err(PrepareError::Skipped(reason)) => {
                 return finish(
                     report,
@@ -159,10 +191,18 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
                     Some(reason),
                     ResultKind::Skipped,
                     started,
+                    options.no_pre,
                 );
             }
             Err(PrepareError::Error(reason)) => {
-                return finish(report, Vec::new(), Some(reason), ResultKind::Error, started);
+                return finish(
+                    report,
+                    Vec::new(),
+                    Some(reason),
+                    ResultKind::Error,
+                    started,
+                    options.no_pre,
+                );
             }
         },
     };
@@ -172,12 +212,20 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
         program,
         args,
         timeout,
+        keep_ansi: case.spec.keep_ansi,
     };
+    // Only real QEMU runs need the incremental evidence log; fake `--runner` tests stay
+    // side-effect free.
+    let log_path = options
+        .runner
+        .is_none()
+        .then(|| options.out_dir.join(format!("{}.log", case.spec.name)));
     let mut dialogue = Dialogue::from_case(case);
     let run = match dialogue.as_mut() {
-        Some(active) => runner::run_dialogue(&spec, active),
-        None => runner::run(&spec),
+        Some(active) => runner::run_watched(&spec, Some(active), case, log_path.as_deref()),
+        None => runner::run_watched(&spec, None, case, log_path.as_deref()),
     };
+    remove_run_artifacts(&cleanup);
     let run = match run {
         Ok(run) => run,
         Err(error) => {
@@ -187,6 +235,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
                 Some(format!("could not start case: {error:#}")),
                 ResultKind::Error,
                 started,
+                options.no_pre,
             );
         }
     };
@@ -199,14 +248,20 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     report.unmatched = matches.unmatched;
     report.forbidden_hits = matches.forbidden_hits;
 
+    // QEMU occasionally stays alive after the guest's final marker. The harness reaps it after a
+    // short grace; the complete expectation set then stands in for the exit status, exactly as
+    // the ticket requires. Failure/timeout expectations keep their stricter meaning.
+    let forced_completion = run.completed && run.status.is_none();
     let exit_ok = if run.timed_out {
         exitmap::timeout_matches(case.spec.expect_exit)
+    } else if forced_completion {
+        matches!(case.spec.expect_exit, ExpectExit::Success | ExpectExit::Any)
     } else {
         exitmap::expected_matches(case.spec.expect_exit, exit)
     };
     let passed = exit_ok && report.unmatched.is_empty() && report.forbidden_hits.is_empty();
     let step_failure = run.step_failure;
-    let result = if step_failure.is_some() {
+    let result = if step_failure.is_some() || run.forbidden_failure {
         ResultKind::Fail
     } else if passed {
         ResultKind::Pass
@@ -222,14 +277,14 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
         None if passed => None,
         None => Some(describe_failure(case, &report, run.timed_out, exit)),
     };
-    finish(report, run.lines, detail, result, started)
+    finish(report, run.lines, detail, result, started, options.no_pre)
 }
 
 fn prepare_external(
     case: &Case,
     arch: &str,
     options: &ExecuteOptions,
-) -> Result<(String, Vec<String>), PrepareError> {
+) -> Result<Prepared, PrepareError> {
     let image = prepare_image(case, arch, options)?;
     let firmware = qemu::resolve_firmware(
         arch,
@@ -257,13 +312,25 @@ fn prepare_external(
             vars.display()
         ))
     })?;
+    let vars_path = vars.clone();
     let firmware = qemu::Firmware {
         code: firmware.code,
         vars,
     };
-    let command = qemu::qemu_command(arch, &image, &firmware, &case.spec.qemu_extra)
-        .map_err(PrepareError::Error)?;
-    Ok((command.program, command.args))
+    let command = qemu::qemu_command(
+        arch,
+        &image,
+        &firmware,
+        &case.spec.qemu_extra,
+        case.spec.disk_if.as_deref(),
+        case.spec.disk_format.as_deref(),
+    )
+    .map_err(PrepareError::Error)?;
+    Ok(Prepared {
+        program: command.program,
+        args: command.args,
+        cleanup: vec![vars_path],
+    })
 }
 
 fn prepare_image(
@@ -279,6 +346,16 @@ fn prepare_image(
             )));
         }
         return Ok(image.clone());
+    }
+    if let Some(image) = &case.spec.image {
+        let path = PathBuf::from(image);
+        if !path.is_file() {
+            return Err(PrepareError::Error(format!(
+                "case image not found: {} (set by `image`; the pre step must build it)",
+                path.display()
+            )));
+        }
+        return Ok(path);
     }
     fs::create_dir_all(&options.out_dir).map_err(|error| {
         PrepareError::Error(format!(
@@ -337,15 +414,19 @@ fn last_line(text: &str) -> Option<&str> {
 /// Run the case's `pre` commands in order with `sh -c`.
 ///
 /// They run from the harness working directory (the repository root for `cargo xtask qtest`)
-/// and before the image build. A non-zero exit turns the case into `error`.
-fn run_pre_commands(case: &Case, arch: &str) -> Result<(), String> {
+/// and before the image build. Exit 77 is the preflight's waiting-for-window signal and maps to
+/// `skipped`; any other non-zero exit is an error. Exit 77 is deliberately distinct so a
+/// latency-row preflight cannot silently turn into a pass or a product failure.
+fn run_pre_commands(case: &Case, arch: &str) -> Result<(), PrepareError> {
     for (index, command) in case.spec.pre.iter().enumerate() {
         let output = Command::new("sh")
             .arg("-c")
             .arg(command)
             .env("RAVEN_QT_ARCH", arch)
             .output()
-            .map_err(|error| format!("pre[{index}] `{command}` could not start: {error}"))?;
+            .map_err(|error| {
+                PrepareError::Error(format!("pre[{index}] `{command}` could not start: {error}"))
+            })?;
         if output.status.success() {
             continue;
         }
@@ -354,10 +435,15 @@ fn run_pre_commands(case: &Case, arch: &str) -> Result<(), String> {
         let message = last_line(&stderr)
             .or_else(|| last_line(&stdout))
             .unwrap_or("no output");
-        return Err(format!(
+        let reason = format!(
             "pre[{index}] `{command}` failed with {}: {message}",
             output.status
-        ));
+        );
+        return Err(if output.status.code() == Some(77) {
+            PrepareError::Skipped(reason)
+        } else {
+            PrepareError::Error(reason)
+        });
     }
     Ok(())
 }
@@ -419,7 +505,16 @@ fn finish(
     detail: Option<String>,
     result: ResultKind,
     started: Instant,
+    pre_skipped: bool,
 ) -> CaseOutcome {
+    let detail = if pre_skipped {
+        Some(match detail {
+            Some(existing) => format!("{existing}; pre skipped: --no-pre"),
+            None => "pre skipped: --no-pre".to_string(),
+        })
+    } else {
+        detail
+    };
     report.result = result;
     report.duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     CaseOutcome {
@@ -430,247 +525,5 @@ fn finish(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::testutil::TempDir;
-
-    fn case(timeout: u64, expect_exit: &str, expects: &str) -> Case {
-        let text = format!(
-            "name = \"unit\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = {timeout}\n\
-             expect_exit = \"{expect_exit}\"\n{expects}"
-        );
-        Case::parse(&text).unwrap()
-    }
-
-    fn runner(script: &str) -> ExecuteOptions {
-        let mut options = ExecuteOptions::new();
-        options.runner = Some(vec!["sh".to_string(), "-c".to_string(), script.to_string()]);
-        options
-    }
-
-    #[test]
-    fn runner_pass() {
-        let case = case(5, "success", "[[expect]]\nregex = \"^hello$\"\n");
-        let outcome = execute(&case, &runner("printf 'hello\\n'; exit 33"));
-        assert_eq!(outcome.report.result, ResultKind::Pass);
-        assert_eq!(outcome.report.exit_status, Some(33));
-        assert_eq!(outcome.report.matched, vec!["^hello$"]);
-        assert!(outcome.detail.is_none());
-    }
-
-    #[test]
-    fn unmatched_expectation_fails() {
-        let case = case(5, "success", "[[expect]]\nregex = \"^missing$\"\n");
-        let outcome = execute(&case, &runner("printf 'other\\n'; exit 33"));
-        assert_eq!(outcome.report.result, ResultKind::Fail);
-        assert_eq!(outcome.report.unmatched, vec!["^missing$"]);
-        assert!(outcome.detail.unwrap().contains("unmatched"));
-    }
-
-    #[test]
-    fn expected_failure_passes() {
-        let case = case(5, "failure", "");
-        let outcome = execute(&case, &runner("exit 35"));
-        assert_eq!(outcome.report.result, ResultKind::Pass);
-        assert_eq!(outcome.report.exit_status, Some(35));
-    }
-
-    #[test]
-    fn expected_timeout_passes() {
-        let case = case(1, "timeout", "");
-        let outcome = execute(&case, &runner("sleep 5"));
-        assert_eq!(outcome.report.result, ResultKind::Pass);
-        assert!(outcome.report.duration_ms < 3000);
-    }
-
-    #[test]
-    fn unexpected_timeout_is_reported() {
-        let case = case(1, "success", "");
-        let outcome = execute(&case, &runner("sleep 5"));
-        assert_eq!(outcome.report.result, ResultKind::Timeout);
-        assert!(outcome.detail.unwrap().contains("timed out"));
-    }
-
-    #[test]
-    fn crash_is_reported() {
-        let case = case(5, "success", "");
-        let outcome = execute(&case, &runner("exit 7"));
-        assert_eq!(outcome.report.result, ResultKind::Crash);
-        assert_eq!(outcome.report.exit_status, Some(7));
-    }
-
-    #[test]
-    fn any_accepts_a_crash() {
-        let case = case(5, "any", "");
-        let outcome = execute(&case, &runner("exit 7"));
-        assert_eq!(outcome.report.result, ResultKind::Pass);
-    }
-
-    #[test]
-    fn forbid_hit_fails() {
-        let case = case(5, "success", "[[forbid]]\nregex = \"panic\"\n");
-        let outcome = execute(&case, &runner("printf 'panic\\n'; exit 33"));
-        assert_eq!(outcome.report.result, ResultKind::Fail);
-        assert_eq!(outcome.report.forbidden_hits, vec!["panic"]);
-    }
-
-    #[test]
-    fn missing_firmware_skips() {
-        let temp = TempDir::new("execute-skip");
-        let image = temp.path().join("dummy.img");
-        std::fs::write(&image, b"image").unwrap();
-        let case = Case::parse(
-            "name = \"skip\"\narch = \"riscv64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
-             expect_exit = \"success\"\n",
-        )
-        .unwrap();
-        let mut options = ExecuteOptions::new();
-        options.image = Some(image);
-        let outcome = execute(&case, &options);
-        assert_eq!(outcome.report.result, ResultKind::Skipped);
-        assert!(outcome.detail.unwrap().contains("firmware"));
-    }
-
-    #[test]
-    fn missing_prebuilt_image_is_an_error() {
-        let temp = TempDir::new("execute-nobuild");
-        let case = Case::parse(
-            "name = \"nobuild\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
-             expect_exit = \"success\"\n",
-        )
-        .unwrap();
-        let mut options = ExecuteOptions::new();
-        options.out_dir = temp.path().to_path_buf();
-        options.no_build = true;
-        let outcome = execute(&case, &options);
-        assert_eq!(outcome.report.result, ResultKind::Error);
-        assert!(outcome.detail.unwrap().contains("--no-build"));
-    }
-
-    #[test]
-    fn missing_explicit_image_is_an_error() {
-        let temp = TempDir::new("execute-image");
-        let case = Case::parse(
-            "name = \"image\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
-             expect_exit = \"success\"\n",
-        )
-        .unwrap();
-        let mut options = ExecuteOptions::new();
-        options.image = Some(temp.path().join("missing.img"));
-        let outcome = execute(&case, &options);
-        assert_eq!(outcome.report.result, ResultKind::Error);
-        assert!(outcome.detail.unwrap().contains("image not found"));
-    }
-
-    #[test]
-    fn arch_override_is_recorded() {
-        let case = case(5, "success", "");
-        let outcome = execute(&case, &runner("exit 33"));
-        assert_eq!(outcome.report.arch, "x86_64");
-        let mut options = runner("exit 33");
-        options.arch = Some("aarch64".to_string());
-        let outcome = execute(&case, &options);
-        assert_eq!(outcome.report.arch, "aarch64");
-        assert_eq!(outcome.report.result, ResultKind::Pass);
-    }
-
-    #[test]
-    fn a_skipped_case_does_not_run() {
-        let text = "name = \"skipped\"\narch = \"x86_64\"\nprofile = \"base\"\n\
-                    timeout_secs = 5\nexpect_exit = \"success\"\n\
-                    skip = \"needs S27 (DEBUG_READ)\"\n";
-        let case = Case::parse(text).unwrap();
-        let outcome = execute(&case, &runner("printf 'must not run\\n'; exit 1"));
-        assert_eq!(outcome.report.result, ResultKind::Skipped);
-        assert!(outcome.lines.is_empty());
-        assert!(outcome.detail.unwrap().contains("S27"));
-    }
-
-    #[test]
-    fn steps_run_against_the_fake_runner() {
-        let case = case(
-            5,
-            "success",
-            "[[expect]]\nregex = \"^got: uname$\"\n\
-             [[step]]\nwait = \"^ready$\"\nsend = \"uname\\n\"\ndelay_ms = 0\n",
-        );
-        let outcome = execute(
-            &case,
-            &runner("printf 'ready\\n'; read line; printf 'got: %s\\n' \"$line\"; exit 33"),
-        );
-        assert_eq!(
-            outcome.report.result,
-            ResultKind::Pass,
-            "{:?}",
-            outcome.detail
-        );
-    }
-
-    #[test]
-    fn a_step_failure_fails_the_case_and_reports_the_step() {
-        let case = case(
-            5,
-            "success",
-            "[[step]]\nwait = \"^never$\"\ntimeout_secs = 1\n",
-        );
-        let outcome = execute(&case, &runner("printf 'started\\n'; sleep 5"));
-        assert_eq!(outcome.report.result, ResultKind::Fail);
-        let detail = outcome.detail.expect("detail");
-        assert!(detail.contains("step 1"), "{detail}");
-        assert!(detail.contains("^never$"), "{detail}");
-        assert!(detail.contains("started"), "{detail}");
-    }
-
-    #[test]
-    fn pre_commands_run_in_order() {
-        let temp = TempDir::new("execute-pre");
-        let marker = temp.path().join("order.txt");
-        let text = format!(
-            "name = \"pre\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
-             expect_exit = \"success\"\n\
-             pre = [\"echo one >> {}\", \"echo two >> {}\"]\n",
-            marker.display(),
-            marker.display()
-        );
-        let case = Case::parse(&text).unwrap();
-        let outcome = execute(&case, &runner("exit 33"));
-        assert_eq!(
-            outcome.report.result,
-            ResultKind::Pass,
-            "{:?}",
-            outcome.detail
-        );
-        assert_eq!(std::fs::read_to_string(&marker).unwrap(), "one\ntwo\n");
-    }
-
-    #[test]
-    fn a_failing_pre_command_is_an_error() {
-        let temp = TempDir::new("execute-pre-fail");
-        let marker = temp.path().join("ran.txt");
-        let text = "name = \"pre-fail\"\narch = \"x86_64\"\nprofile = \"base\"\n\
-                    timeout_secs = 5\nexpect_exit = \"success\"\n\
-                    pre = [\"echo broken >&2; exit 7\"]\n";
-        let case = Case::parse(text).unwrap();
-        let outcome = execute(&case, &runner(&format!("touch {}", marker.display())));
-        assert_eq!(outcome.report.result, ResultKind::Error);
-        let detail = outcome.detail.expect("detail");
-        assert!(detail.contains("pre[0]"), "{detail}");
-        assert!(detail.contains("broken"), "{detail}");
-        assert!(!marker.exists(), "the runner must not start");
-    }
-
-    #[test]
-    fn a_skipped_case_does_not_run_pre_commands() {
-        let temp = TempDir::new("execute-skip-pre");
-        let marker = temp.path().join("ran.txt");
-        let text = format!(
-            "name = \"skip-pre\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
-             expect_exit = \"success\"\nskip = \"later\"\npre = [\"touch {}\"]\n",
-            marker.display()
-        );
-        let case = Case::parse(&text).unwrap();
-        let outcome = execute(&case, &runner("exit 33"));
-        assert_eq!(outcome.report.result, ResultKind::Skipped);
-        assert!(!marker.exists(), "a skipped case must not run pre commands");
-    }
-}
+#[path = "execute_ut.rs"]
+mod tests;

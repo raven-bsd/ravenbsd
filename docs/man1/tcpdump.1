@@ -1,0 +1,88 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 21, 2026
+.Dt TCPDUMP 1
+.Os RavenBSD
+.Sh NAME
+.Nm tcpdump
+.Nd decode and filter classic pcap capture files
+.Sh SYNOPSIS
+.Nm
+.Op Fl nnStv
+.Op Fl c Ar count
+.Op Fl i Ar interface
+.Op Fl r Ar file
+.Op Fl w Ar file
+.Op Ar filter
+.Sh DESCRIPTION
+.Nm
+reads a classic pcap savefile and prints one line per packet in the format used
+by the K277 fixture matrix.
+It decodes Ethernet II, ARP, IPv4, IPv6, TCP, UDP, ICMPv4 and ICMPv6, including
+the DNS query/answer subset on ports 53 and 5353.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl c Ar count
+Stop after
+.Ar count
+packets that pass the filter.
+.It Fl i Ar interface
+Select a live capture interface.
+This userspace build has no BPF capture device, so
+.Fl i
+is rejected with a clear error; use
+.Fl r .
+.It Fl n , Fl nn
+Print numeric addresses and ports.
+This is the only implemented mode.
+.It Fl r Ar file
+Read
+.Ar file
+as a classic pcap savefile.
+.It Fl S
+Print absolute TCP sequence numbers instead of sequence numbers relative to
+the initial sequence number observed in the capture.
+.It Fl t , Fl tt
+With
+.Fl t
+suppress the timestamp; with
+.Fl tt
+print seconds since the Unix epoch and the savefile fraction.
+.It Fl v , Fl vv
+Print the verbose IP header and IPv4 header-checksum marker.
+.Fl vv
+also prints TCP sequence numbers for empty segments.
+.It Fl w Ar file
+Write the packets that pass the filter as a little-endian classic pcap.
+.El
+.Pp
+The trailing
+.Ar filter
+is a BPF-style expression.
+The supported grammar is documented in
+.Pa docs/tcpdump.md :
+protocol primitives
+.Pq tcp , udp , icmp , icmp6 , ip , ip6 , arp ,
+.Cm host
+and
+.Cm port
+qualifiers,
+.Cm and , or , not ,
+and protocol-relative byte tests such as
+.Li tcp[tcpflags] & tcp-syn != 0
+or
+.Li ip[6:2] & 0x1fff != 0 .
+.Pp
+A malformed savefile, an unsupported link type or a filter that does not
+compile is an error and the tool exits non-zero.
+A packet with a bad IPv4 header checksum is decoded with a visible
+.Dq bad cksum
+marker in verbose mode.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr ifconfig 1 ,
+.Xr netstat 1
+.Sh STANDARDS
+RavenBSD.

@@ -13,8 +13,19 @@ use core::ffi::{c_int, c_void};
 /// `stream` is a FILE.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn flockfile(stream: *mut c_void) {
-    if let Some(file) = super::file(stream) {
-        raven_libc_stdio::flockfile(file);
+    let Some(file) = super::file(stream) else {
+        return;
+    };
+    loop {
+        if raven_libc_stdio::ftrylockfile(file) == 0 {
+            return;
+        }
+        // S138: the generic `flockfile` blocks in the stdio `Lock::wait`, and this shell's
+        // implementation of that wait is a pure user-space spin (`ffi::env::ShellEnv::wait`).
+        // On KVM2 the eight-thread `smp-libc-concurrency` case can then starve the owner until
+        // the 30 s cap, with the CPU found at `ShellEnv::wait`. Poll the non-blocking
+        // acquisition and yield the vCPU so the owner is scheduled and can release the stream.
+        let _ = raven_libc_sys::sys::yield_now();
     }
 }
 

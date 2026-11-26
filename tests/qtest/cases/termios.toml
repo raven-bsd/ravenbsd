@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K444: the OpenSSH pty-req termios contract. The guest applies an exact RFC 4254 section 8
+# SSH-style mode word with tcsetattr(TCSANOW), asserts every field comes back unchanged on the
+# slave and that the master sees the same record, then applies a second tcsetattr(TCSADRAIN)
+# with output queued and proves no byte was lost. Any field mismatch prints a FAIL line.
+
+name = "termios"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh termios"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^termios: start uid=0$'
+
+[[expect]]
+regex = '^termios: slave-open fd=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^termios: tcsetattr=0$'
+
+[[expect]]
+regex = '^termios: slave iflag=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: slave oflag=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: slave cflag=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: slave lflag=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: slave line=0+ ok$'
+
+[[expect]]
+regex = '^termios: slave ispeed=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: slave ospeed=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: slave c_cc=ok$'
+
+[[expect]]
+regex = '^termios: master=ok$'
+
+[[expect]]
+regex = '^termios: tcsadrain=0$'
+
+[[expect]]
+regex = '^termios: drain=ok$'
+
+[[expect]]
+regex = '^termios: drain iflag=0?[0-7]+ ok$'
+
+[[expect]]
+regex = '^termios: drain c_cc=ok$'
+
+[[expect]]
+regex = '^termios: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|termios: .*FAIL'

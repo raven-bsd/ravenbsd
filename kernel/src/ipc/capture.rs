@@ -33,6 +33,11 @@ const PAGE: u64 = 4096;
 /// Kernel-owned capture frames currently in use (debug leak probe).
 static CAPTURE_FRAMES: AtomicU64 = AtomicU64::new(0);
 
+/// K147 stage-trace counters (first 64 captures each way).
+static K147_CREATE: AtomicU64 = AtomicU64::new(0);
+static K147_DROP: AtomicU64 = AtomicU64::new(0);
+static K147_COPYBACK: AtomicU64 = AtomicU64::new(0);
+
 /// Number of capture frames currently owned by live captures.
 pub fn frames_in_use() -> u64 {
     CAPTURE_FRAMES.load(Ordering::Acquire)
@@ -213,8 +218,11 @@ impl CaptureSlots {
         None
     }
 
-    /// Release a page range. Releasing an already-free range is a no-op, so a double drop
-    /// cannot underflow the counters or hand the same pages to another capture.
+    /// Release a page range.
+    ///
+    /// Releasing an already-free range is a programming error: a `Capture` must release its
+    /// range exactly once. In release builds a second release is a no-op, so a latent double
+    /// drop cannot underflow the counters or hand the same pages to another capture.
     fn release(&mut self, range: SlotRange) {
         let pages = usize::try_from(range.pages).unwrap_or(usize::MAX);
         let mut released = 0usize;
@@ -374,6 +382,8 @@ impl Capture {
             return;
         }
         self.copy_back_pending = false;
+        let trace = crate::ipc::trace_k147() && K147_COPYBACK.fetch_add(1, Ordering::Relaxed) < 64;
+        let trace_start = if trace { crate::time::now_ns() } else { 0 };
         let mut space = self.client.address_space.lock();
         let Some(space) = space.as_mut() else {
             return;
@@ -440,6 +450,13 @@ impl Capture {
             }
             page = page.saturating_add(1);
         }
+        if trace {
+            crate::kprintln!(
+                "k147 copyback pages={} total={}",
+                self.pages,
+                crate::time::now_ns().saturating_sub(trace_start)
+            );
+        }
     }
 
     /// A cancelled client no longer wants the data; keep the mapping for the server but never
@@ -465,6 +482,8 @@ fn trace_s40() -> bool {
 
 impl Drop for Capture {
     fn drop(&mut self) {
+        let trace = crate::ipc::trace_k147() && K147_DROP.fetch_add(1, Ordering::Relaxed) < 64;
+        let trace_start = if trace { crate::time::now_ns() } else { 0 };
         let mut released = true;
         if self.mapped && self.pages > 0 {
             let mut space = self.server.address_space.lock();
@@ -489,6 +508,7 @@ impl Drop for Capture {
                 }
             }
         }
+        let trace_unmap = if trace { crate::time::now_ns() } else { 0 };
         if self.mapped && self.pages > 0 {
             let size = self.pages.saturating_mul(PAGE);
             let flushed = released && crate::sched::smp::shootdown::flush_range(self.base, size);
@@ -507,12 +527,23 @@ impl Drop for Capture {
                 self.frames.leak();
             }
         }
+        let trace_flush = if trace { crate::time::now_ns() } else { 0 };
         if let Some(slot) = self.slot.take() {
             self.server.capture_slots.lock().release(SlotRange {
                 slot,
                 page: self.slot_page,
                 pages: self.pages,
             });
+        }
+        if trace {
+            let trace_end = crate::time::now_ns();
+            crate::kprintln!(
+                "k147 cap drop pages={} unmap={} flush={} total={}",
+                self.pages,
+                trace_unmap.saturating_sub(trace_start),
+                trace_flush.saturating_sub(trace_unmap),
+                trace_end.saturating_sub(trace_start)
+            );
         }
     }
 }
@@ -563,6 +594,8 @@ pub fn create(
         });
     }
 
+    let trace = crate::ipc::trace_k147() && K147_CREATE.fetch_add(1, Ordering::Relaxed) < 64;
+    let trace_start = if trace { crate::time::now_ns() } else { 0 };
     let start = client_addr & !(PAGE - 1);
     let offset = client_addr.saturating_sub(start);
     let span = offset
@@ -639,6 +672,7 @@ pub fn create(
         }
         page = page.saturating_add(1);
     }
+    let trace_copy = if trace { crate::time::now_ns() } else { 0 };
 
     let allocation = match server.capture_slots.lock().acquire(pages) {
         Some(allocation) => allocation,
@@ -671,6 +705,7 @@ pub fn create(
     };
     let slot = allocation.slot;
     let slot_page = allocation.page;
+    let trace_slot = if trace { crate::time::now_ns() } else { 0 };
     let base = capture_window::BASE
         .saturating_add((slot as u64).saturating_mul(capture_window::SLOT_SIZE))
         .saturating_add((slot_page as u64).saturating_mul(PAGE));
@@ -749,6 +784,17 @@ pub fn create(
             }
             mapped = mapped.saturating_add(1);
         }
+    }
+    let trace_map = if trace { crate::time::now_ns() } else { 0 };
+    if trace {
+        crate::kprintln!(
+            "k147 cap create pages={} copy={} slot={} map={} total={}",
+            pages,
+            trace_copy.saturating_sub(trace_start),
+            trace_slot.saturating_sub(trace_copy),
+            trace_map.saturating_sub(trace_slot),
+            trace_map.saturating_sub(trace_start)
+        );
     }
 
     Ok(Capture {

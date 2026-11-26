@@ -177,6 +177,40 @@ pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
     Ok(saved)
 }
 
+/// Account the user-mode interval that ends now, then clear the entry stamp.
+fn account_user_time(thread: &Thread) {
+    if !thread.user {
+        return;
+    }
+    let start = thread.user_enter_ns.swap(0, Ordering::AcqRel);
+    if start != 0 {
+        let elapsed = crate::time::now_ns().saturating_sub(start);
+        if elapsed != 0 {
+            thread.process.user_ns.fetch_add(elapsed, Ordering::AcqRel);
+        }
+    }
+}
+
+/// Start a user-mode interval when the thread is about to run in ring 3.
+fn start_user_time(thread: &Thread) {
+    if thread.user {
+        thread
+            .user_enter_ns
+            .store(crate::time::now_ns(), Ordering::Release);
+    }
+}
+
+/// True while a user thread is inside a syscall (its FP state is parked).
+#[cfg(target_arch = "x86_64")]
+fn thread_in_syscall(thread: &Thread) -> bool {
+    thread.user && thread.fpu_saved.load(Ordering::Acquire)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn thread_in_syscall(_thread: &Thread) -> bool {
+    false
+}
+
 /// Switch from `from` to `to`.
 ///
 /// # Safety
@@ -222,14 +256,20 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     // its user state is already parked in the thread area by `sched_syscall_enter`. Restore the
     // incoming state unless that thread is in a syscall too; its state is restored on syscall
     // exit. A new thread gets its FINIT/MXCSR defaults from `FpuArea::new`.
-    let from_in_syscall = from.user && from.fpu_saved.load(Ordering::Acquire);
+    let from_in_syscall = thread_in_syscall(from);
+    if !from_in_syscall {
+        account_user_time(from);
+    }
     if !from_in_syscall {
         // SAFETY: the scheduler owns the CPU state and the thread's area is live.
         unsafe {
             fpu::save(from.fpu_area_ptr());
         }
     }
-    let to_in_syscall = to.user && to.fpu_saved.load(Ordering::Acquire);
+    let to_in_syscall = thread_in_syscall(to);
+    if !to_in_syscall {
+        start_user_time(to);
+    }
     if !to_in_syscall {
         // SAFETY: same ownership; `to` is alive for the switch.
         unsafe {
@@ -619,6 +659,18 @@ pub extern "C" fn sched_syscall_enter(frame: *const crate::arch::x86_64::trapfra
     if !thread.user {
         return;
     }
+    if !frame.is_null() {
+        // SAFETY: the syscall stub passes its live trap frame in `rdi`; this call owns it.
+        let number = unsafe { (*frame).rax };
+        // SAFETY: `frame` is the live trap frame the syscall stub passed in `rdi`; the
+        // enclosing `!frame.is_null()` check proves it is non-null, and the stub keeps the
+        // frame alive for the duration of this call.
+        let pc = unsafe { (*frame).rip };
+        thread.process.last_syscall.store(number, Ordering::Relaxed);
+        thread.process.last_pc.store(pc, Ordering::Relaxed);
+        thread.process.in_syscall.fetch_add(1, Ordering::Relaxed);
+    }
+    account_user_time(&thread);
     if !thread.fpu_saved.swap(true, Ordering::AcqRel) {
         // SAFETY: the syscall entry path owns the CPU and the thread is current.
         unsafe {
@@ -678,12 +730,19 @@ pub extern "C" fn sched_syscall_exit() {
     if !thread.user {
         return;
     }
+    let _ = thread
+        .process
+        .in_syscall
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            Some(value.saturating_sub(1))
+        });
     if thread.fpu_saved.swap(false, Ordering::AcqRel) {
         // SAFETY: the syscall return path owns the CPU and the thread is current.
         unsafe {
             fpu::restore(thread.fpu_area_const_ptr());
         }
     }
+    start_user_time(&thread);
 }
 
 /// Read the current stack pointer.

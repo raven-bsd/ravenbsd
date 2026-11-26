@@ -17,5 +17,19 @@ path = "/etc/brush-compat.sh"
 mode = 0o755
 
 [[initfs.files]]
+src = "etc/brush/brushrc"
+path = "/etc/brush/brushrc"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/brush/bobtheshell.sh"
+path = "/etc/brush/bobtheshell.sh"
+mode = 0o644
+
+[[initfs.programs]]
+package = "ed"
+path = "/bin/ed"
+
+[[initfs.files]]
 src = "etc/services.d/rsh.toml"
 path = "/etc/services.d/rsh.toml"

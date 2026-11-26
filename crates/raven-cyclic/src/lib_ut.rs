@@ -107,9 +107,29 @@ fn cancel_is_idempotent_and_safe() {
     assert!(cyc.cancel(id));
     assert!(!cyc.cancel(id)); // already cancelled
     assert!(!cyc.cancel(999)); // unknown
-    // The cancelled cyclic is reclaimed on fire and never fires.
+    // The cancelled cyclic is unlinked immediately and never fires.
     assert_eq!(fire_into(&mut cyc, 10), Vec::<CyclicId>::new());
     assert!(cyc.is_empty());
+}
+
+#[test]
+fn cancel_reclaims_the_last_entry_immediately() {
+    let mut cyc = Cyclics::new(RecordingBackend::new(0));
+    let mut ids = Vec::new();
+    // A cancelled timer that is the last entry disarms the backend. If it is retained, no
+    // interrupt ever reaches its original deadline, so the heap grows without bound.
+    for step in 0..1000u64 {
+        let id = cyc.add(spec(1_000_000_000 + step));
+        assert!(cyc.cancel(id));
+        ids.push(id);
+    }
+    assert_eq!(cyc.len(), 0, "cancelled cyclics retained");
+    assert!(cyc.is_empty());
+    assert_eq!(cyc.next_deadline(), None);
+    // The backend must not stay armed for a cancelled deadline.
+    assert_eq!(cyc.backend().programmed.last(), Some(&None));
+    // Cancellation stays idempotent after the entry is gone.
+    assert!(!cyc.cancel(ids[0]));
 }
 
 #[test]

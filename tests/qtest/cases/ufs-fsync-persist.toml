@@ -1,0 +1,95 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K466 row 9, write half: create the file, directory entry and rename, sync twice
+# after each step, then stop without unmounting. The case ends at its timeout and
+# the harness kills QEMU: that is the power cut. `ufs-fsync-check` boots the same
+# image and verifies every byte.
+
+name = "ufs-fsync-persist"
+arch = "x86_64"
+profile = "ufs-demo"
+timeout_secs = 180
+pre = ["sh tests/fixtures/ufs-durability/build.sh 4m"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-drive", "if=none,id=ufs,format=raw,file=build/fixtures/ufs-durability/disk.img",
+    "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
+]
+expect_exit = "timeout"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{80}$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^k466: persist write bytes=65536 checksum=[0-9a-f]{16} sync=ok$'
+
+[[expect]]
+regex = '^k466: persist dir=ok$'
+
+[[expect]]
+regex = '^k466: persist rename=ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange'
+
+[[forbid]]
+regex = '^init exited'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "mount ufs: /mnt && echo mount-ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mount-ok$'
+timeout_secs = 60
+
+[[step]]
+send = "/mnt/bin/ufs-probe persist-write; echo probe=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^k466: persist rename=ok$'
+timeout_secs = 60
+
+[[step]]
+wait = '^probe=0$'
+timeout_secs = 30

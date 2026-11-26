@@ -1,0 +1,20 @@
+
+   Compiling raven-s39-parity v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/tests/fixtures/s39-parity)
+error[E0432]: unresolved import `raven_rt::spawn::spawn`
+   --> tests/fixtures/s39-parity/src/lib.rs:13:37
+    |
+ 13 | use raven_rt::spawn::{SpawnOptions, spawn};
+    |                                     ^^^^^ no `spawn` in `spawn`
+    |
+note: found an item that was configured out
+   --> userland/rt/src/spawn.rs:118:8
+    |
+117 | #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+    |          -------------------------------------------- the item is gated here
+118 | pub fn spawn(
+    |        ^^^^^
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `raven-s39-parity` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `raven-s39-parity` (lib test) due to 1 previous error

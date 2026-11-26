@@ -17,12 +17,24 @@ fn a_record_round_trips() {
 }
 
 #[test]
-fn empty_numbers_are_zero() {
+fn empty_numbers_follow_shadow_defaults() {
     let entry = ShadowEntry::parse("bob:!:19000::7::::", 1).expect("bob");
     assert_eq!(entry.min, 0);
-    assert_eq!(entry.inactive, 0);
-    assert_eq!(entry.expire, 0);
+    assert_eq!(entry.inactive, -1);
+    assert_eq!(entry.expire, -1);
     assert_eq!(entry.reserved, 0);
+}
+
+#[test]
+fn a_new_locked_record_renders_minus_one() {
+    let entry = ShadowEntry::locked("bob");
+    assert_eq!(entry.inactive, -1);
+    assert_eq!(entry.expire, -1);
+    assert!(entry.render().ends_with(":0:0:99999:7:-1:-1:0"));
+    let parsed = ShadowEntry::parse(&entry.render(), 1).expect("round trip");
+    assert_eq!(parsed.inactive, -1);
+    assert_eq!(parsed.expire, -1);
+    assert_eq!(parsed.render(), entry.render());
 }
 
 #[test]
@@ -30,6 +42,7 @@ fn negative_or_non_numeric_fields_are_rejected() {
     for line in [
         "bob:!:19000:-1:7:0:0:0:0",
         "bob:!:19000:x:7:0:0:0:0",
+        "bob:!:19000:0:7:0:-2:0:0",
         "bob:plain:1:2:3:4:5:6:7",
     ] {
         assert!(ShadowEntry::parse(line, 1).is_err(), "{line}");

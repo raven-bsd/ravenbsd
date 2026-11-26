@@ -17,7 +17,11 @@ mod program {
 
     entry!(main);
 
-    fn main(_args: raven_rt::Args) -> i32 {
+    fn main(args: raven_rt::Args) -> i32 {
+        raven_init::configure_boot_plain(
+            args.env_get("NO_COLOR").is_some(),
+            args.env_get("TERM") == Some("dumb"),
+        );
         raven_init::run()
     }
 }

@@ -23,7 +23,7 @@ awk -F: '
 	END { exit bad }
 ' tests/user/useradd-carol.group
 
-grep -q '^carol:!:0:0:99999:7:0:0:0$' tests/user/useradd-carol.shadow
+grep -q '^carol:!:0:0:99999:7:-1:-1:0$' tests/user/useradd-carol.shadow
 grep -q '^alice:\$6\$testsalt\$.*:19001:0:99999:7:0:0:0$' tests/user/passwd-alice.shadow
 grep -q '^staff:x:1002:$' tests/user/groupadd-staff.group
 

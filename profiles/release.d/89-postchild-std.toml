@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K495 rev167 test-only /bin/postchild-std. The release shell already ships the uutils /bin/tty;
+# this stages only the post-child std fixture built by tests/fixtures/postchild-std/build.sh.
+
+[[initfs.files]]
+src = "build/fixtures/postchild-std/{arch}/postchild-std"
+path = "/bin/postchild-std"
+mode = 0o755
+generated = true

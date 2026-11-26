@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K182: bootstrap initfs for the Pi 4 fake-card UFS `/` pivot. It stages only the
+# scheme servers, the host EMMC2 test card, blockd, fsd-ufs, vfsd and the pivot
+# marker; the release userland comes from the UFS root.
+
+name = "pi4-root-pivot-boot"
+extends = "base"
+
+[initfs]
+release = true
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

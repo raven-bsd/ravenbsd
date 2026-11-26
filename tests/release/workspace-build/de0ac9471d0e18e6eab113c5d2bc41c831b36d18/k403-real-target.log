@@ -1,0 +1,11 @@
+   Compiling raven-uname v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/userland/bin/uname)
+   Compiling raven-driver v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-driver)
+   Compiling raven-svc-manifest v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-svc-manifest)
+   Compiling raven-fdt-lite v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-fdt-lite)
+   Compiling raven-proto-svc v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-proto-svc)
+   Compiling raven-proto-dev v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/crates/raven-proto-dev)
+   Compiling raven-pi4-platd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/tests/fixtures/pi4-platd)
+   Compiling raven-devd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/userland/servers/devd)
+   Compiling raven-platd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/userland/servers/platd)
+   Compiling raven-init v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/jerry/ravenbsd/userland/init)
+    Finished `release` profile [optimized] target(s) in 2.03s

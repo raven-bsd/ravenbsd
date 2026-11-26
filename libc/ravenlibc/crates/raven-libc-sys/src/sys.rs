@@ -21,6 +21,31 @@ use crate::arch;
 /// Number of typed wrappers in this module; must equal `Syscall::ALL.len()`.
 pub const WRAPPER_COUNT: usize = 47;
 
+/// Raw `PROC_CHROOT` (`0x0D`): set the calling process's root from a bounded path.
+pub fn proc_chroot(path: &[u8]) -> Result<(), Errno> {
+    // SAFETY: `path` is a live byte slice; the kernel copies it through the fault-safe user
+    // layer and validates the length before resolving it.
+    let raw = unsafe {
+        arch::syscall2(
+            raven_abi::syscall::PROC_CHROOT,
+            path.as_ptr() as usize,
+            path.len(),
+        )
+    };
+    crate::errno::ret(raw).map(|_| ())
+}
+
+/// Raw `PROC_EXEC` (`0x6a`): replace the caller's image from an 88-byte flat request.
+///
+/// The request layout is owned by the kernel/`raven-libc-proc`; this wrapper only checks the
+/// pointer it passes. On success the kernel does not return to this code.
+pub fn proc_exec(request: &[u8; 88]) -> Result<usize, Errno> {
+    // SAFETY: `request` is a live 88-byte array and the kernel validates every pointer and
+    // length inside it through the fault-safe user-copy layer.
+    let raw = unsafe { arch::syscall1(0x6a, request.as_ptr() as usize) };
+    crate::errno::ret(raw)
+}
+
 /// User-visible event record written by `EVQ_WAIT`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -507,6 +532,22 @@ pub fn scheme_register(name: &[u8]) -> Result<(), Errno> {
     .map(|_| ())
 }
 
+/// Raw `PIPE2` syscall number (`pipe2(fds, flags)`); owned by the kernel because
+/// `crates/raven-abi` is a contract crate and does not expose the raw pipe numbers.
+const PIPE2: usize = 0x6f;
+
+/// `pipe2(fds, flags)`: create an in-kernel pipe and return its two handles.
+///
+/// The kernel validates the flags (`O_CLOEXEC`/`O_NONBLOCK`) and writes two handle ids into the
+/// caller's 8-byte buffer. This wrapper is the only safe entry point for the platform crate.
+pub fn pipe2(flags: u32) -> Result<(Handle, Handle), Errno> {
+    let mut fds = [0u32; 2];
+    // SAFETY: PIPE2 writes exactly two u32 handle ids into the live 8-byte buffer.
+    crate::errno::ret(unsafe { arch::syscall2(PIPE2, fds.as_mut_ptr() as usize, flags as usize) })?;
+    let [read, write] = fds;
+    Ok((Handle(read), Handle(write)))
+}
+
 /// Open `path` (bytes, no NUL, no UTF-8 requirement at this layer).
 pub fn open(path: &[u8], flags: u32) -> Result<Handle, Errno> {
     // SAFETY: OPEN reads `path.len()` bytes from the valid slice.
@@ -559,6 +600,15 @@ pub fn dup(handle: Handle, rights: u32) -> Result<Handle, Errno> {
     handle_from_ret(unsafe {
         arch::syscall2(Syscall::DUP as usize, handle.0 as usize, rights as usize)
     })
+}
+
+/// A new handle for the caller's controlling terminal.
+///
+/// Native `PROC_CTTY_HANDLE` (kernel `syscall/tty.rs`, `0x1e3`). `/dev/tty` names this live
+/// terminal, not a VFS node.
+pub fn ctty_handle() -> Result<Handle, Errno> {
+    // SAFETY: no arguments and no user pointer.
+    handle_from_ret(unsafe { arch::syscall0(0x1e3) })
 }
 
 /// Read the 64-byte `FSTAT` record.

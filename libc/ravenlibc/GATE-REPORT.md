@@ -36,8 +36,8 @@ below.
 | 4 hardening | 4.3 hardened malloc default | MET | build/libc-gate-audit/4.3.txt | hardened backend selected; tiny not in libc.so.1 (C74hj) |
 | 4 hardening | 4.4 ENTROPY_WEAK status (H-5) | INFO | build/libc-gate-audit/4.4.txt | ENTROPY_WEAK UNVERIFIED (C74hj); PG-52 release blocker, not a libc-gate blocker |
 | 5 on-target | 5.1 on-target libc cases (C12) | STALE | (not run) | no QEMU this round (24 h soak owns it); committed C74u/C74ae evidence, local path absent (C74da round 3) |
-| 5 on-target | 5.2.core-servers core-servers regression | STALE | (not run) | no QEMU this round; committed C74n evidence (minimal `core-servers` profile, 36-77 s) (C74da round 3) |
-| 5 on-target | 5.2.file-tools file-tools regression | STALE | (not run) | no QEMU this round; committed C74v evidence (minimal `core-servers-files`, `tooltest: ok`) (C74da round 3) |
+| 5 on-target | 5.2.core-servers core-servers regression | MET | build/libc-gate/5.2.core-servers.txt | in-tree qtest on `6af246ac`: 31.3 s, `coretest: ok`, `svcd: settled`, `init exited (0)` (C74n) |
+| 5 on-target | 5.2.file-tools file-tools regression | MET | build/libc-gate/5.2.file-tools.txt | in-tree qtest on `6af246ac`: 53.3 s, `tooltest: ok`, `svcd: settled`, `init exited (0)` (C74n) |
 | 5 on-target | 5.3 second architecture | INFO | (not run) | aarch64 target not delivered (C73 open item); no QEMU this round (C74da round 3) |
 | 6 documentation | 6.1 page coverage | MET | build/libc-gate-audit/6.1.txt | exit 0 (C74hj) |
 | 6 documentation | 6.2 render lint | MET | build/libc-gate-audit/6.2.txt | reader MET; the mandoc 1.14.6-1 transcript is C74ai (local transcript absent) |
@@ -52,8 +52,8 @@ Verdict: NOT MET
 
 Rows 1.2 (G1) and 3.1 (size) are NOT MET. Row 2 (portability) is BLOCKED.
 Rows 1.4 (differential), 1.6 (Miri), 1.7 (lints), 4.2 (soak) and 6.2/6.3 (mandoc/docs) are MET.
-5.1/5.2 are **STALE** this round: no QEMU (the 24 h soak owns it); the committed evidence was not
-re-run and no local target file is present.
+5.1 is **STALE** this round (no QEMU; the 24 h soak owns it); 5.2 was re-run and is **MET**
+(`core-servers` 31.3 s, `file-tools` 53.3 s, both exit 0; C74n).
 MET checks: symbol coverage, the packed symbol list, the target-case symbol audit, the 27-family
 differential oracle, the 31 host unit-test crates, the bounded Miri row (721 tests, 6/6 pass), the
 lint sweep (4288 files clean), fuzz replay and the 14-target soak, the hardened allocator default,
@@ -105,9 +105,9 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
 * 5.1: **STALE this round**. No QEMU (the 24 h soak owns it); the committed C74u/C74ae evidence
   has `libc-hello`, `libc-stdio`, `libc-time` and the dynamic/signals/spawn/threads cases green.
   No local evidence file was produced by C74da round 3.
-* 5.2: **STALE this round**. No QEMU; the committed C74n/C74v evidence has the minimal
-  `core-servers`/`core-servers-files` profiles, `df` reading `/etc/mounts` and `tooltest: ok`.
-  No local evidence file was produced by C74da round 3.
+* 5.2: **MET on `6af246ac`**. In-tree runs: `core-servers` 31.3 s (`coretest: ok`, `svcd:
+  settled`, `init exited (0)`) and `file-tools` 53.3 s (`tooltest: ok`, `svcd: settled`,
+  `init exited (0)`); evidence `build/libc-gate/5.2.*.txt` (C74n).
 * 6.2 mandoc: **MET**. mandoc 1.14.6-1 lints and renders the 17 gate pages; the reproducible
   command is `sh scripts/check-mandoc.sh` (lint at `-Wwarning` plus `-Tutf8`).
 
@@ -174,8 +174,8 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
   not applied. No budget was raised.
 * 4.2: MET, 14 targets soaked >= 3600 s with zero crashes (`inet_text` 3601 s, 261,966,448
   runs); C74k/C74hj.
-* 5.1/5.2: **STALE this round** (no QEMU); committed C74u/C74ae/C74n/C74v evidence remains green,
-  but no local evidence file was produced.
+* 5.1: **STALE this round** (no QEMU); committed C74u/C74ae evidence remains green. 5.2 is
+  **MET** from the local C74n runs (`core-servers` 31.3 s, `file-tools` 53.3 s).
 * 6.2: MET, `build/libc-gate/6.2.txt` (mandoc 1.14.6-1 on the 17 gate pages).
 
 ## 6. C74da round 3 evidence refresh (OBSERVED, origin/master `02152587`)
@@ -192,7 +192,7 @@ C74u/C74ae later closed them and 5.1 is MET per the committed evidence.
 | 3.1 size | `cargo xtask libc-size --check` | exit 1; 63 pass, 13 fail, 65 known, 99 skipped, 0 budget-only; all three DSO budgets pass; 10 static invariants + P7 riscv64 server B + 2 riscv64 P9 static rows (C74da round 3) |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | MET: 2026-11-17 one-hour `inet_text` soak, 3601 s, 261,966,448 runs, 0 crashes (C74k) |
 | 5.1 target | qtest JSON from `eval` | **STALE** this round (no QEMU); committed C74u/C74ae evidence is green (C74da round 3) |
-| 5.2 kernel | `qtest core-servers` / `qtest file-tools` | **STALE** this round (no QEMU); committed C74n/C74v evidence is green (C74da round 3) |
+| 5.2 kernel | `qtest core-servers` / `qtest file-tools` | **MET**: 31.3 s / 53.3 s in-tree on `6af246ac` (C74n) |
 | 6.2 mandoc | `scripts/check-mandoc.sh` + `libc-gate eval --only 6.2` | exit 0; 17 pages lint clean with mandoc 1.14.6-1 → MET |
 
 ## 7. C74hj audit (OBSERVED, origin/master `b89e291b`, 2026-11-18)
@@ -209,9 +209,8 @@ Result: `libc gate: NOT MET` (exit 1).
 * NOT MET: 1.2, 3.1.
 * BLOCKED: 2.1, 2.2.
 * INFO: 1.3, 3.2, 4.4, 5.3.
-* 5.1/5.2: **STALE this round** (no QEMU). The committed C74u/C74ae/C74n/C74v evidence remains
-  green; the round-3 audit did not re-run QEMU and `verdict` reports the target rows missing
-  locally because no local evidence file exists.
+* 5.1: **STALE this round** (no QEMU); committed C74u/C74ae evidence remains green. 5.2 is
+  **MET**: local `core-servers` and `file-tools` evidence exists from C74n.
 
 Stale items flagged (gate-row/source edits are out of scope):
 
@@ -220,8 +219,8 @@ Stale items flagged (gate-row/source edits are out of scope):
   `inet_text` crash (current 14 targets/0 crashes), 5.1 has P1b failures (current MET per
   committed evidence), 6.2 has no mandoc (current reader MET), and 2.1/2.2 name a missing
   `tools/libc-world/Cargo.toml` (the file exists; the missing item is `results/x86_64/world.json`).
-* 5.1/5.2 and the C74ai 6.2 transcript have no local evidence file; 6.2's audit evidence is a
-  reader status without a command line.
+* 5.1 and the C74ai 6.2 transcript have no local evidence file; 5.2 now has local evidence from
+  C74n, and 6.2's audit evidence is a reader status without a command line.
 * 3.1 moved from 10 fail/102 skip to 12 fail/101 skip in the C74hj audit; C74ht then rebuilt the
   dynamic rows, and C74ia added the riscv64 DSO budget: 64 pass/13 fail/65 known/99 skipped. C74ib
   tested the aarch64 DSO size options and found no safe in-Owns reduction; the 13 are the 10

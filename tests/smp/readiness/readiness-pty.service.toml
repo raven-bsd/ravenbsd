@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K495 rev156: one one-shot pty-master ppoll/SIGCHLD discriminator.
+name = "readiness-pty"
+exec = "/bin/readiness-pty"
+args = []
+needs = ["scheme:pty", "vfsd", "initfsd", "ramfsd"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

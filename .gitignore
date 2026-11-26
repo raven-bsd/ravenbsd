@@ -5,6 +5,14 @@
 /out/
 /artifacts/
 /tmp/
+# The generated distributable toolchain (make toolchain-dist); a ~194 MiB tarball, not source
+/toolchain/dist/
+
+# Generated demo profiles (ravenbsd-demos); they are not source
+/profiles/demo-login.toml
+/profiles/demo-login.d/
+/profiles/demo-add-program.toml
+/profiles/demo-add-program.d/
 *.o
 *.a
 *.so

@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# devd launches the matched virtio-blk function in production mode. blockd
-# depends on the disk: scheme; the network services are staged but disabled in
-# this storage demo (release-login is the network gate).
+# devd launches every matched virtio function in one pass. MSI-X needs the devd-only
+# `platform-root` capability (ADMIN on the root device) so devd can create one vector per
+# function; the grant lands at handle 3. blockd consumes disk:; the network services stay
+# disabled in this demo and are started explicitly by the multi-driver qtest.
 name = "devd"
 exec = "/sbin/devd"
 args = ["devd"]
@@ -13,3 +14,4 @@ readiness = "scheme"
 ready_timeout_ms = 60_000
 restart = "never"
 max_restarts = 0
+grants = ["platform-root"]

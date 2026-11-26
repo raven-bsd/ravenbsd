@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K382 TX-ring stress service. Runs after netd publishes the net scheme; the host peer drives
+# 32 KiB in and expects 32 echoes back before it sends the final ack.
+
+name = "virtio-tx"
+exec = "/bin/virtio-tx"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

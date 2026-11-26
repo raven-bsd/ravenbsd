@@ -1,0 +1,10 @@
+
+   Compiling raven-ramfsd v0.1.0 (/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd/userland/servers/ramfsd)
+error[E0063]: missing field `root_len` in initializer of `raven_scheme::Ctx`
+  --> userland/servers/ramfsd/src/handler_ut.rs:29:5
+   |
+29 |     Ctx {
+   |     ^^^ missing `root_len`
+
+For more information about this error, try `rustc --explain E0063`.
+error: could not compile `raven-ramfsd` (bin "raven-ramfsd" test) due to 1 previous error

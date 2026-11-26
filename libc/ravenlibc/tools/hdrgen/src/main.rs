@@ -8,6 +8,8 @@
 
 #![forbid(unsafe_code)]
 
+mod attribution;
+mod freebsd;
 mod layout;
 mod model;
 mod probe;
@@ -28,8 +30,9 @@ const USAGE: &str = "\
 usage:
   raven-libc-hdrgen generate   [--abi DIR] [--rust DIR] [--root DIR] [--resources DIR]
   raven-libc-hdrgen check      [--abi DIR] [--rust DIR] [--root DIR] [--resources DIR]
-  raven-libc-hdrgen verify     [--target x86_64|aarch64|riscv64|all] [--resources DIR]
-                               [--clang CLANG] [--sed SED] [--root DIR]
+  raven-libc-hdrgen verify     [--profile musl|freebsd] [--target ARCH|all]
+                               [--families F1,F2|all] [--freebsd DIR] [--report FILE]
+                               [--resources DIR] [--clang CLANG] [--sed SED] [--root DIR]
   raven-libc-hdrgen provenance --date YYYY-MM-DD [--resources DIR] [--root DIR]
 ";
 
@@ -107,6 +110,10 @@ struct Options {
     clang: Option<String>,
     sed: Option<String>,
     date: Option<String>,
+    profile: Option<String>,
+    families: Option<String>,
+    freebsd: Option<PathBuf>,
+    report: Option<PathBuf>,
 }
 
 impl Options {
@@ -130,6 +137,10 @@ impl Options {
                 "--clang" => options.clang = Some(value(&mut index)?),
                 "--sed" => options.sed = Some(value(&mut index)?),
                 "--date" => options.date = Some(value(&mut index)?),
+                "--profile" => options.profile = Some(value(&mut index)?),
+                "--families" => options.families = Some(value(&mut index)?),
+                "--freebsd" => options.freebsd = Some(PathBuf::from(value(&mut index)?)),
+                "--report" => options.report = Some(PathBuf::from(value(&mut index)?)),
                 other => bail!("unknown option {other:?}"),
             }
             index += 1;
@@ -189,7 +200,11 @@ fn generated_rust(
     lock: &provenance::Lock,
     rust_dir: &Path,
 ) -> Result<Vec<(PathBuf, String)>> {
-    let files = render_rust::render_all(tables, values, &lock.musl)?;
+    let files = render_rust::render_all(
+        tables,
+        values,
+        &attribution::Attributions::resolve(tables, lock)?,
+    )?;
     Ok(files
         .into_iter()
         .map(|(name, text)| (rust_dir.join(name), text))
@@ -203,7 +218,11 @@ fn generated_headers(
     abi: &Path,
 ) -> Result<Vec<(PathBuf, String)>> {
     let mut files = Vec::new();
-    for (name, text) in render_c::render_all(tables, values, &lock.musl)? {
+    for (name, text) in render_c::render_all(
+        tables,
+        values,
+        &attribution::Attributions::resolve(tables, lock)?,
+    )? {
         files.push((abi.join("generated/include").join(name), text));
     }
     for (name, text) in syscall::render_all(&lock.linux_raw_sys)? {
@@ -315,6 +334,65 @@ fn walk_headers(directory: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
 }
 
 fn verify(options: &Options) -> Result<u8> {
+    match options.profile.as_deref().unwrap_or("musl") {
+        "musl" => verify_musl(options),
+        "freebsd" => verify_freebsd(options),
+        other => bail!("unknown --profile {other:?}; expected musl or freebsd"),
+    }
+}
+
+fn verify_freebsd(options: &Options) -> Result<u8> {
+    let (tables, lock) = load(options)?;
+    let values = validate::validate(&tables)?;
+    let clang = options.clang.clone().unwrap_or_else(|| "clang".to_string());
+    if !probe::tool_exists(&clang) {
+        let reason = format!("missing required tool: clang ({clang})");
+        if probe::required() {
+            bail!("{reason} and RL_ABI_REQUIRED=1");
+        }
+        eprintln!("SKIP: {reason}");
+        return Ok(77);
+    }
+    let donor = match &options.freebsd {
+        Some(path) => path.clone(),
+        None => options.resources()?.join("freebsd"),
+    };
+    let families = options
+        .families
+        .clone()
+        .unwrap_or_else(|| "all".to_string());
+    let report = freebsd::verify(
+        &tables,
+        &values,
+        &freebsd::Options {
+            donor: &donor,
+            revision: &lock.freebsd,
+            root: &options.root()?,
+            abi: &options.abi()?,
+            target: options.target.as_deref().unwrap_or("all"),
+            families: &families,
+            clang: &clang,
+            report: options.report.as_deref(),
+        },
+    )?;
+    for line in &report.lines {
+        println!("{line}");
+    }
+    if !report.failures.is_empty() {
+        for failure in &report.failures {
+            eprintln!("FAIL: {failure}");
+        }
+        eprintln!(
+            "raven-libc-hdrgen: verify failed ({} failure(s))",
+            report.failures.len()
+        );
+        return Ok(1);
+    }
+    eprintln!("raven-libc-hdrgen: verify ok (freebsd profile)");
+    Ok(0)
+}
+
+fn verify_musl(options: &Options) -> Result<u8> {
     let (tables, _lock) = load(options)?;
     let values = validate::validate(&tables)?;
     let clang = options.clang.clone().unwrap_or_else(|| "clang".to_string());
@@ -360,7 +438,7 @@ fn provenance(options: &Options) -> Result<u8> {
         .context("provenance needs --date YYYY-MM-DD")?;
     provenance::validate_date(&date)?;
     let (tables, lock) = load(options)?;
-    let entries = provenance::import_entries(&tables, &date, &lock);
+    let entries = provenance::import_entries(&tables, &date, &lock)?;
     let mut out = String::new();
     for (index, entry) in entries.iter().enumerate() {
         if index > 0 {

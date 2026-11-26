@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "std-spawn"
+version = "0.1.0"
+edition = "2024"
+
+# Standalone fixture crate: it is built with the ravenbsd toolchain like brush, not as a
+# member of the product workspace.
+[workspace]
+
+[dependencies]

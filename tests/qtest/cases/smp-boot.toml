@@ -18,6 +18,27 @@ regex = '^selftest: smp tlb ok cpus=4$'
 regex = '^selftest: smp counter ok cpus=4 counter=800$'
 
 [[expect]]
+regex = '^selftest: smp ipiq ok messages=400 wrap=1 xindex=400$'
+
+[[expect]]
+regex = '^selftest: smp ipiq calls ok sent=32 fifo=32 mailbox=1 elapsed_us=\d+$'
+
+[[expect]]
+regex = '^selftest: smp tlb gs ok absent=1 invalid=1$'
+
+[[expect]]
+regex = '^selftest: smp tlb swapgs ok elapsed_ms=\d+$'
+
+[[expect]]
+regex = '^selftest: smp tlb nested ok rounds=32$'
+
+[[expect]]
+regex = '^selftest: smp sleeper-close cycles=8 sleepers=0 live=0 queued=0 reap=0 ok$'
+
+[[expect]]
+regex = '^selftest: smp donation-close cycles=8 registered=\d+ base=\d+ ok$'
+
+[[expect]]
 regex = '^selftest: smp ok cpus=4 switches=\d+$'
 
 [[forbid]]

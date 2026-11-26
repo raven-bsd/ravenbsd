@@ -46,6 +46,19 @@ const PAGE: usize = 4096;
 const READ_WRITE: u32 = 3;
 const MS_SYNC: usize = 4;
 const DATA_LEN: usize = 512;
+/// Bound the setup-to-worker transition so a scheduling stall is reported before the KVM cell
+/// cap hides it behind a silent serial log.
+const WORKER_START_DEADLINE_NS: u64 = 10_000_000_000;
+/// Emit pending worker phases while the run is in progress; a cap kill then preserves where the
+/// workers were instead of only `setup ok`.
+const WORKER_PROGRESS_NS: u64 = 5_000_000_000;
+/// Total worker deadline: measured 151 s green run, 44/50 iterations at 180 s under the
+/// K391 trace, so a 240 s bound is the measured p99 + margin. A true hang is caught by the
+/// per-worker no-progress bound below, not by widening this cap.
+const WORKER_DEADLINE_NS: u64 = 240_000_000_000;
+/// A worker that does not advance its (iteration, phase) for this long is a stall, not a slow
+/// TCG sample. This keeps the deadline honest when a single worker is wedged.
+const WORKER_STALL_NS: u64 = 120_000_000_000;
 
 const OP_CREATE: usize = 0;
 const OP_WRITE: usize = 1;
@@ -72,6 +85,57 @@ static LAT: [[[AtomicU64; ITERATIONS]; OP_COUNT]; FILE_WORKERS] =
     [const { [const { [const { AtomicU64::new(0) }; ITERATIONS] }; OP_COUNT] }; FILE_WORKERS];
 static MOUNT_LAT: [[AtomicU64; ITERATIONS]; MOUNT_WORKERS] =
     [const { [const { AtomicU64::new(0) }; ITERATIONS] }; MOUNT_WORKERS];
+static INITFSD_PID: AtomicU64 = AtomicU64::new(0);
+static VFSD_PID: AtomicU64 = AtomicU64::new(0);
+static RAMFSD_PID: AtomicU64 = AtomicU64::new(0);
+
+const PROC_PID_INFO: usize = 0x3A;
+const PROC_HANDLE_INFO: usize = 0x3E;
+const PROC_INFO_WORDS: usize = 61;
+
+fn handle_pid(handle: Handle) -> Option<u64> {
+    // SAFETY: PROC_HANDLE_INFO reads one scalar from the live handle value.
+    let result = unsafe { sys::syscall1(PROC_HANDLE_INFO, handle.0 as usize) };
+    (result >= 0).then(|| u64::try_from(result).unwrap_or(0))
+}
+
+fn dump_proc_info(label: &str, pid: u64) {
+    let mut words = [0u64; PROC_INFO_WORDS];
+    // SAFETY: the kernel writes at most PROC_INFO_WORDS u64 words to this live array.
+    let result = unsafe {
+        sys::syscall3(
+            PROC_PID_INFO,
+            pid as usize,
+            words.as_mut_ptr() as usize,
+            PROC_INFO_WORDS,
+        )
+    };
+    if result < 0 {
+        println!("smp-fs: proc-info {label} pid={pid} error={result}");
+        return;
+    }
+    println!(
+        "smp-fs: proc-info {label} pid={pid} state={} runnable={} syscall={:#x} pc={:#x} wait={:#x} in_syscall={}",
+        words[41], words[42], words[43], words[44], words[45], words[46]
+    );
+    println!(
+        "smp-fs: proc-req {label} submit={} recv={} send={} client={} queue={} active={} waiters={} key={:#x}",
+        words[47], words[48], words[49], words[50], words[51], words[52], words[53], words[54]
+    );
+    println!(
+        "smp-fs: proc-wake {label} fail={} detail={:#x} pending={} last_cpu={} rq_need={} rq_len={}",
+        words[55],
+        words[56],
+        words[57],
+        if words[58] == u64::from(u32::MAX) {
+            "resumed".to_string()
+        } else {
+            words[58].to_string()
+        },
+        words[59],
+        words[60]
+    );
+}
 
 #[repr(align(16))]
 struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);
@@ -553,8 +617,16 @@ fn start_services() -> Result<(), String> {
         } else {
             &[]
         };
-        spawn(&initfs, path, &SpawnOptions { args: &[], env })
+        let handle = spawn(&initfs, path, &SpawnOptions { args: &[], env })
             .map_err(|_| format!("spawn {path}"))?;
+        if let Some(pid) = handle_pid(handle) {
+            match path {
+                "/sbin/initfsd" => INITFSD_PID.store(pid, Ordering::Release),
+                "/sbin/ramfsd" => RAMFSD_PID.store(pid, Ordering::Release),
+                "/sbin/vfsd" => VFSD_PID.store(pid, Ordering::Release),
+                _ => {}
+            }
+        }
         let scheme = match path {
             "/sbin/initfsd" => "initfs:",
             "/sbin/ramfsd" => "ramfs:",
@@ -578,20 +650,54 @@ fn wait_scheme(scheme: &str) -> Result<(), String> {
 
 fn setup() -> Result<(), String> {
     for dir in [START, "/tmp/smp-fs/work", "/tmp/smp-fs/race"] {
+        println!("smp-fs: setup mkdir {dir}");
         match fs::mkdir(dir, 0o755) {
             Ok(()) | Err(Errno::EEXIST) => {}
             Err(error) => return Err(format!("mkdir {dir}: {}", error.description())),
         }
+        println!("smp-fs: setup mkdir ok {dir}");
     }
     for index in 0..MOUNT_WORKERS {
         let dir = format!("{START}/mnt{index}");
+        println!("smp-fs: setup mkdir {dir}");
         match fs::mkdir(&dir, 0o755) {
             Ok(()) | Err(Errno::EEXIST) => {}
             Err(error) => return Err(format!("mkdir {dir}: {}", error.description())),
         }
+        println!("smp-fs: setup mkdir ok {dir}");
     }
     println!("smp-fs: setup ok");
     Ok(())
+}
+
+fn pending_started() -> Vec<String> {
+    STARTED
+        .iter()
+        .enumerate()
+        .filter(|(_, flag)| !flag.load(Ordering::Acquire))
+        .map(|(index, _)| {
+            format!(
+                "{index}:{}:{}",
+                PHASES[index].load(Ordering::Relaxed),
+                CURRENT[index].load(Ordering::Relaxed)
+            )
+        })
+        .collect()
+}
+
+fn pending_workers() -> Vec<String> {
+    FINISHED
+        .iter()
+        .enumerate()
+        .filter(|(_, flag)| !flag.load(Ordering::Acquire))
+        .map(|(index, _)| {
+            format!(
+                "{index}:{}:{}",
+                PHASES[index].load(Ordering::Relaxed),
+                CURRENT[index].load(Ordering::Relaxed)
+            )
+        })
+        .collect()
 }
 
 fn start_workers() -> Result<(), String> {
@@ -613,32 +719,71 @@ fn start_workers() -> Result<(), String> {
         )
         .map_err(|error| format!("mount thread {index}: {}", error.description()))?;
     }
-    for spin in 0..1_000_000usize {
+    let deadline = now_ns().saturating_add(WORKER_START_DEADLINE_NS);
+    loop {
         if STARTED.iter().all(|flag| flag.load(Ordering::Acquire)) {
             GO.store(1, Ordering::Release);
             return Ok(());
         }
-        if spin % 1024 == 0 {
-            let _ = sys::nanosleep(200_000);
+        if now_ns() > deadline {
+            let pending = pending_started();
+            println!("smp-fs: worker start timeout pending={pending:?}");
+            return Err(format!("worker start timeout pending={pending:?}"));
         }
+        let _ = sys::nanosleep(200_000);
     }
-    Err("worker start timeout".to_string())
+}
+
+fn dump_vfs_diagnostics() {
+    dump_proc_info("vfsd", VFSD_PID.load(Ordering::Acquire));
+    dump_proc_info("ramfsd", RAMFSD_PID.load(Ordering::Acquire));
+    dump_proc_info("initfsd", INITFSD_PID.load(Ordering::Acquire));
+    dump_proc_info("self", 0);
+    println!("smp-fs: diag request start");
+    let _ = fs::open(&file_path("__diag__"), O_RDONLY);
+    println!("smp-fs: diag request done");
 }
 
 fn wait_workers() -> Result<(), String> {
-    let deadline = now_ns().saturating_add(180_000_000_000);
+    let deadline = now_ns().saturating_add(WORKER_DEADLINE_NS);
+    let mut next_progress = now_ns().saturating_add(WORKER_PROGRESS_NS);
+    let mut last_state = [usize::MAX; WORKERS];
+    let mut last_seen = [0u64; WORKERS];
     loop {
         if FINISHED.iter().all(|flag| flag.load(Ordering::Acquire)) {
             return Ok(());
         }
-        if now_ns() > deadline {
-            let pending: Vec<String> = FINISHED
-                .iter()
-                .enumerate()
-                .filter(|(_, flag)| !flag.load(Ordering::Acquire))
-                .map(|(index, _)| format!("{index}:{}", PHASES[index].load(Ordering::Relaxed)))
-                .collect();
+        let now = now_ns();
+        if now > deadline {
+            let pending = pending_workers();
+            dump_vfs_diagnostics();
             return Err(format!("worker timeout pending={pending:?}"));
+        }
+        for slot in 0..WORKERS {
+            if FINISHED[slot].load(Ordering::Acquire) {
+                continue;
+            }
+            let state =
+                (CURRENT[slot].load(Ordering::Relaxed) << 8) | PHASES[slot].load(Ordering::Relaxed);
+            if state != last_state[slot] {
+                last_state[slot] = state;
+                last_seen[slot] = now;
+            } else if now.saturating_sub(last_seen[slot]) > WORKER_STALL_NS {
+                let pending = pending_workers();
+                dump_vfs_diagnostics();
+                return Err(format!(
+                    "worker stall slot={slot} state={state:#x} pending={pending:?}"
+                ));
+            }
+        }
+        if now >= next_progress {
+            let finished = FINISHED
+                .iter()
+                .filter(|flag| flag.load(Ordering::Acquire))
+                .count();
+            let pending = pending_workers();
+            println!("smp-fs: progress finished={finished}/{WORKERS} pending={pending:?}");
+            next_progress = now.saturating_add(WORKER_PROGRESS_NS);
         }
         let _ = sys::nanosleep(10_000_000);
     }
@@ -726,6 +871,7 @@ fn run() -> Result<(), String> {
     start_services()?;
     setup()?;
     start_workers()?;
+    println!("smp-fs: workers started workers={WORKERS}");
     let wait = wait_workers();
     report_latencies();
     if let Err(error) = wait {

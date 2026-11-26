@@ -15,6 +15,7 @@ use serde::Deserialize;
 pub(crate) struct Profile {
     pub(crate) name: String,
     pub(crate) initfs: Initfs,
+    pub(crate) image: Image,
     pub(crate) boot: Boot,
 }
 
@@ -38,6 +39,19 @@ pub(crate) struct Initfs {
     /// service; additive across `extends`/fragments like `release`.
     #[serde(default)]
     pub(crate) dynamic: bool,
+}
+
+/// Image build options for the kernel and loader.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Image {
+    /// Build the kernel and loader with the release profile for this image.
+    ///
+    /// Additive across `extends` and `*.d` fragments: once a parent or fragment enables it, the
+    /// resolved profile keeps it. The release image names are release by default; this field is
+    /// the explicit switch for demo and test profiles.
+    #[serde(default)]
+    pub(crate) release: bool,
 }
 
 /// One program entry in a profile.
@@ -82,6 +96,8 @@ struct ProfileFile {
     extends: Option<String>,
     #[serde(default)]
     initfs: Initfs,
+    #[serde(default)]
+    image: Image,
     boot: Option<Boot>,
 }
 
@@ -90,6 +106,8 @@ struct ProfileFile {
 struct Fragment {
     #[serde(default)]
     initfs: Initfs,
+    #[serde(default)]
+    image: Image,
 }
 
 impl Profile {
@@ -138,21 +156,27 @@ fn load_profile(root: &Path, name: &str, stack: &mut Vec<String>) -> Result<Prof
     };
     stack.pop();
     entries.add(parsed.initfs, relative(&path, root))?;
+    entries.image_release |= parsed.image.release;
     for fragment_path in fragment_paths(root, name)? {
         let text = fs::read_to_string(&fragment_path)
             .with_context(|| format!("cannot read fragment {}", fragment_path.display()))?;
         let fragment: Fragment = toml::from_str(&text)
             .with_context(|| format!("cannot parse fragment {}", fragment_path.display()))?;
         entries.add(fragment.initfs, relative(&fragment_path, root))?;
+        entries.image_release |= fragment.image.release;
     }
     let boot = parsed
         .boot
         .ok_or_else(|| anyhow::anyhow!("profile `{name}` has no [boot] section"))?;
     validate_boot(name, &boot)?;
     entries.validate_files(root, name)?;
+    let image = Image {
+        release: entries.image_release,
+    };
     Ok(Profile {
         name: name.to_string(),
         initfs: entries.into_initfs(),
+        image,
         boot,
     })
 }
@@ -164,15 +188,18 @@ struct EntrySet {
     paths: BTreeMap<String, String>,
     release: bool,
     dynamic: bool,
+    image_release: bool,
 }
 
 impl EntrySet {
     fn from_profile(profile: Profile, source: String) -> Self {
         let release = profile.initfs.release;
         let dynamic = profile.initfs.dynamic;
+        let image_release = profile.image.release;
         let mut entries = Self {
             release,
             dynamic,
+            image_release,
             ..Self::default()
         };
         for program in profile.initfs.programs {
@@ -307,9 +334,9 @@ fn relative(path: &Path, root: &Path) -> String {
 
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
-        && name
-            .chars()
-            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_')
+        && name.chars().all(|ch| {
+            ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_' || ch == '.'
+        })
 }
 
 /// Repository-relative allowlist of services that may keep a restartable policy in a one-shot

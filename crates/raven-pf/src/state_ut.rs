@@ -4,11 +4,12 @@
 //! Host tests for the bounded state table and pf timeouts.
 
 use super::*;
-use crate::address::Ipv4Addr;
+use crate::address::{Ipv4Addr, Ipv6Addr};
 use crate::ast::tcp_flag;
 
 const A: Ipv4Addr = Ipv4Addr::new(10, 0, 0, 1);
 const B: Ipv4Addr = Ipv4Addr::new(192, 0, 2, 1);
+const NATIP: Ipv4Addr = Ipv4Addr::new(203, 0, 113, 7);
 
 fn syn() -> Packet<'static> {
     Packet::tcp(Direction::In, "eth0", A, 1234, B, 80, tcp_flag::SYN, 60)
@@ -28,6 +29,10 @@ fn pf_default_timeouts_match_the_reference_table() {
     assert_eq!(timeouts.udp_multiple, 60);
     assert_eq!(timeouts.icmp_first, 20);
     assert_eq!(timeouts.icmp_error, 10);
+    assert_eq!(timeouts.fragment, 60);
+    assert_eq!(timeouts.other_first, 60);
+    assert_eq!(timeouts.other_single, 30);
+    assert_eq!(timeouts.other_multiple, 60);
 }
 
 #[test]
@@ -121,6 +126,79 @@ fn interface_binding_and_floating_states() {
 }
 
 #[test]
+fn ipv6_connections_are_tracked() {
+    let mut table = StateTable::new(Timeouts::default());
+    let source = Ipv6Addr::parse("2001:db8::1").unwrap();
+    let destination = Ipv6Addr::parse("2001:db8::2").unwrap();
+    let syn = Packet::tcp(
+        Direction::In,
+        "eth0",
+        source,
+        1234,
+        destination,
+        443,
+        tcp_flag::SYN,
+        60,
+    );
+    assert_eq!(table.establish(0, &syn, None, 0), StateDisposition::Created);
+    let reply = Packet::tcp(
+        Direction::Out,
+        "eth0",
+        destination,
+        443,
+        source,
+        1234,
+        tcp_flag::SYN | tcp_flag::ACK,
+        60,
+    );
+    let hit = table.lookup(&reply, 1).unwrap();
+    assert_eq!(hit.orientation, Orientation::Reverse);
+    assert_eq!(hit.tcp, TcpState::Opening);
+}
+
+#[test]
+fn a_translated_connection_matches_its_wire_reply() {
+    let outbound = Packet::tcp(Direction::Out, "eth0", A, 1234, B, 80, tcp_flag::SYN, 60);
+    let translation = Translation {
+        rule: 0,
+        source: crate::address::IpAddr::V4(NATIP),
+        source_port: 50001,
+        destination: crate::address::IpAddr::V4(B),
+        destination_port: 80,
+    };
+    let mut table = StateTable::new(Timeouts::default());
+    assert_eq!(
+        table.establish_with(0, &outbound, Some("eth0"), Some(translation), 0),
+        StateDisposition::Created
+    );
+    let reply = Packet::tcp(
+        Direction::In,
+        "eth0",
+        B,
+        80,
+        NATIP,
+        50001,
+        tcp_flag::ACK,
+        40,
+    );
+    let hit = table.lookup(&reply, 1).unwrap();
+    assert_eq!(hit.orientation, Orientation::Reverse);
+    // The reply is rewritten back to the pre-translation tuple (donor `sk`).
+    assert_eq!(
+        hit.translation,
+        Some(Translation {
+            rule: 0,
+            source: crate::address::IpAddr::V4(B),
+            source_port: 80,
+            destination: crate::address::IpAddr::V4(A),
+            destination_port: 1234,
+        })
+    );
+    assert!(table.in_use(crate::address::IpAddr::V4(NATIP), 50001));
+    assert!(!table.in_use(crate::address::IpAddr::V4(NATIP), 50002));
+}
+
+#[test]
 fn orientation_checks_protocol_and_endpoints() {
     let key = StateKey::from_packet(&syn(), Some("eth0"));
     let wrong_proto = Packet::udp(Direction::In, "eth0", A, 1234, B, 80, 40);
@@ -144,20 +222,31 @@ fn expire_removes_dead_entries_and_lookup_drops_one() {
 }
 
 #[test]
-fn the_limit_evicts_the_earliest_expiry() {
+fn a_full_table_fails_closed_instead_of_evicting() {
+    // Donor pf_create_state(): `if (pf_status.states >= pf_status.max_states) { PFRES_MAXSTATES;
+    // PF_DROP; }` — a live connection is never evicted silently.
     let mut table = StateTable::with_limit(2, Timeouts::default());
     let first = Packet::udp(Direction::Out, "eth0", A, 1, B, 53, 40);
     let second = Packet::udp(Direction::Out, "eth0", A, 2, B, 53, 40);
     let third = Packet::udp(Direction::Out, "eth0", A, 3, B, 53, 40);
-    table.establish(0, &first, None, 0);
-    table.establish(1, &second, None, 10);
-    table.establish(2, &third, None, 20);
+    assert_eq!(
+        table.establish(0, &first, None, 0),
+        StateDisposition::Created
+    );
+    assert_eq!(
+        table.establish(1, &second, None, 10),
+        StateDisposition::Created
+    );
+    assert_eq!(
+        table.establish(2, &third, None, 20),
+        StateDisposition::Rejected
+    );
     assert_eq!(table.len(), 2);
     assert!(
         table
             .entries()
             .iter()
-            .all(|entry| entry.key.source_port != 1)
+            .all(|entry| entry.key.source_port != 3)
     );
     assert_eq!(table.limit(), 2);
 }

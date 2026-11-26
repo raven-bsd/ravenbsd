@@ -6,6 +6,7 @@
 //! S08 has one thread per process. The process owns its address space and handle table; the
 //! single thread owns the kernel stack used by syscall and trap entry.
 
+pub mod duplex;
 pub mod exec;
 pub mod handle;
 pub mod pipe;
@@ -33,6 +34,7 @@ use raven_abi::types::{Handle, prot};
 use raven_elf::{Elf, ElfError, LoadMode, Machine, MapStep, StepKind};
 use raven_handles::HandleTable;
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
+use raven_usercopy::UserSlice;
 use raven_vma::Backing;
 use spin::Mutex;
 
@@ -56,10 +58,15 @@ use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
 use crate::memory::{frame, paging};
+use crate::sched::thread::Thread;
 use crate::sched::wait::WaitQueue;
+use crate::usercopy::copy_from_user;
+
+/// `THREAD_KICK` bit 0: inspect the pending signal state (PG-7).
+const KICK_CHECK: u32 = 1;
 
 use self::handle::Object;
-use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
+use self::status::{DefaultAction, RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
 
 /// Page size used by the user loader and stack.
 const PAGE: u64 = 4096;
@@ -67,10 +74,291 @@ const PAGE: u64 = 4096;
 ///
 /// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
 /// and headroom. The first process gets the same 256 KiB mapping.
-const USER_STACK_SIZE: u64 = 256 * 1024;
-/// Guard page at the top of the user range.
-const USER_GUARD: u64 = 4096;
+const USER_STACK_SIZE: u64 = crate::memory::aslr::STACK_SIZE;
+/// Fixed user VA of the kernel-installed sigcode page.
+///
+/// C19 installs the return trampoline at exec, read-only+exec; every handler's frame return
+/// address points here, so a new image can never inherit an entry address from the old one.
+///
+/// The page sits immediately below the lowest randomized kernel-built stack
+/// (`USER_END - STACK_WINDOW - STACK_SIZE - STACK_GUARD`). It must not use the top stack page:
+/// a userspace-spawned image places its initial stack near `USER_END`, and mapping the
+/// trampoline there leaves the handler's return address non-executable. `raven_rt::spawn`
+/// does not call the kernel stack builder, so the page is also installed lazily on the first
+/// caught-signal delivery ([`Process::ensure_sigcode_page`]).
+#[cfg(target_arch = "x86_64")]
+pub const SIGCODE_BASE: u64 = raven_abi::layout::x86_64::USER_END
+    - crate::memory::aslr::STACK_WINDOW
+    - crate::memory::aslr::STACK_SIZE
+    - crate::memory::aslr::STACK_GUARD
+    - PAGE;
+/// `mov eax, SIGRETURN; syscall; ud2`: the only job of the sigcode trampoline.
+#[cfg(target_arch = "x86_64")]
+pub const SIGCODE: [u8; 9] = [
+    0xB8,
+    raven_abi::signal::SIGRETURN as u8,
+    0,
+    0,
+    0,
+    0x0F,
+    0x05,
+    0x0F,
+    0x0B,
+];
+/// Fixed user VA of the aarch64 sigcode page (below the randomized stack window, same as
+/// x86_64; see the x86_64 comment for the spawn-stack collision).
+#[cfg(target_arch = "aarch64")]
+pub const SIGCODE_BASE: u64 = USER_END
+    - crate::memory::aslr::STACK_WINDOW
+    - crate::memory::aslr::STACK_SIZE
+    - crate::memory::aslr::STACK_GUARD
+    - PAGE;
+/// `mov x8, #SIGRETURN; svc #0`: the aarch64 sigcode trampoline.
+#[cfg(target_arch = "aarch64")]
+pub const SIGCODE: [u8; 8] = crate::arch::aarch64::signal::SIGCODE;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+/// S36 vfsd map/unmap baseline (`frame::stats().allocated_bytes` at the exit-88 marker).
+static S36_MAP_BASE: AtomicU64 = AtomicU64::new(0);
+/// S36 lock/time churn baseline (`frame::stats().allocated_bytes` at the exit-90 marker).
+static S36_LOCK_BASE: AtomicU64 = AtomicU64::new(0);
+/// Process objects currently alive (S36 diagnostic).
+static LIVE_PROCESSES: AtomicU64 = AtomicU64::new(0);
+
+/// Count a newly created process object (S36 diagnostic).
+fn note_process_created() {
+    LIVE_PROCESSES.fetch_add(1, Ordering::Relaxed);
+}
+
+/// Number of live `Process` allocations (S36 diagnostic).
+pub fn live_processes() -> u64 {
+    LIVE_PROCESSES.load(Ordering::Acquire)
+}
+
+/// Every process ever created, weakly (S36b leaked-reference diagnostic only).
+static ALL_PROCESSES: Mutex<Vec<Weak<Process>>> = Mutex::new(Vec::new());
+
+/// Remember a new process so the diagnostic can inspect leaked objects after the pid registry
+/// dropped them (S36b only).
+fn note_process_weak(process: &Arc<Process>) {
+    let mut registry = ALL_PROCESSES.lock();
+    // A Weak keeps the ArcInner allocation alive after the Process value is dropped. This
+    // diagnostic registry must not retain the block of every exited process: drop dead entries
+    // before adding the new one, so it tracks live processes only (the ALL_THREADS pattern).
+    registry.retain(|weak| weak.strong_count() > 0);
+    registry.push(Arc::downgrade(process));
+}
+
+/// Live scheme requests held by each process list, including leaked processes (S36b diagnostic).
+///
+/// Returns `(client_total, active_total, queued_total, top_client_pid, top_client_total,
+/// top_queue_pid, top_queued_total)`.
+pub fn request_holder_stats() -> [u64; 7] {
+    let mut stats = [0u64; 7];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        let client = process.client_requests.lock().len() as u64;
+        let active = process.active_requests.lock().len() as u64;
+        let queued = process.scheme_queue.lock().len() as u64;
+        stats[0] = stats[0].saturating_add(client);
+        stats[1] = stats[1].saturating_add(active);
+        stats[2] = stats[2].saturating_add(queued);
+        if client > stats[4] {
+            stats[4] = client;
+            stats[3] = process.id;
+        }
+        if queued > stats[6] {
+            stats[6] = queued;
+            stats[5] = process.id;
+        }
+    }
+    stats
+}
+
+/// Opcode histogram of the largest server request queue (S36b diagnostic).
+///
+/// Returns `(close, dup, open, other, top_queue_pid)`. It names the request kind that is
+/// accumulating on the server that does not drain its queue.
+pub fn queue_opcode_stats() -> [u64; 5] {
+    let mut top_pid = 0u64;
+    let mut top_len = 0usize;
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        let len = process.scheme_queue.lock().len();
+        if len > top_len {
+            top_len = len;
+            top_pid = process.id;
+        }
+    }
+    let mut stats = [0u64; 5];
+    stats[4] = top_pid;
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if process.id != top_pid {
+            continue;
+        }
+        for request in process.scheme_queue.lock().iter() {
+            match request.opcode {
+                crate::ipc::protocol::Opcode::Close => stats[0] = stats[0].saturating_add(1),
+                crate::ipc::protocol::Opcode::Dup => stats[1] = stats[1].saturating_add(1),
+                crate::ipc::protocol::Opcode::Open => stats[2] = stats[2].saturating_add(1),
+                _ => stats[3] = stats[3].saturating_add(1),
+            }
+        }
+    }
+    stats
+}
+
+/// State of the largest server request queue's owner (S36b diagnostic).
+pub fn queue_owner_state() -> [u64; 6] {
+    let top_pid = queue_opcode_stats()[4];
+    for weak in ALL_PROCESSES.lock().iter() {
+        let Some(process) = weak.upgrade() else {
+            continue;
+        };
+        if process.id != top_pid {
+            continue;
+        }
+        let state = match *process.state.lock() {
+            ProcessState::Created => 0,
+            ProcessState::Running => 1,
+            ProcessState::Exited => 2,
+        };
+        return [
+            top_pid,
+            state,
+            process.last_syscall.load(Ordering::Acquire),
+            u64::from(process.in_syscall.load(Ordering::Acquire)),
+            process.wait_object.load(Ordering::Acquire),
+            process.threads.load(Ordering::Acquire) as u64,
+        ];
+    }
+    [0; 6]
+}
+
+/// Leaked-process reference histogram (S36b diagnostic).
+///
+/// Returns `(leaked, external_refs_1, external_refs_2, external_refs_3plus, self_handles,
+/// dead_handles_in_all_processes, leaked_threads)`. The `external` count excludes the
+/// diagnostic's temporary upgrade, so it is the number of real owners still holding the
+/// torn-down process.
+pub fn leaked_process_stats() -> [u64; 15] {
+    let mut stats = [0u64; 15];
+    let processes: alloc::vec::Vec<Arc<Process>> = ALL_PROCESSES
+        .lock()
+        .iter()
+        .filter_map(Weak::upgrade)
+        .collect();
+    stats[10] = processes.len() as u64;
+    for (index, process) in processes.iter().enumerate() {
+        if !processes[..index]
+            .iter()
+            .any(|previous| Arc::ptr_eq(previous, process))
+        {
+            stats[11] = stats[11].saturating_add(1);
+        }
+    }
+    for process in &processes {
+        if !process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        stats[0] = stats[0].saturating_add(1);
+        stats[6] = stats[6].saturating_add(u64::from(process.threads.load(Ordering::Acquire)));
+        let external = Arc::strong_count(process).saturating_sub(1);
+        match external {
+            0 => {}
+            1 => stats[1] = stats[1].saturating_add(1),
+            2 => stats[2] = stats[2].saturating_add(1),
+            _ => stats[3] = stats[3].saturating_add(1),
+        }
+        process.handles.lock().for_each_live(|_, object, _, _| {
+            if let crate::process::handle::Object::Process(target) = object {
+                if Arc::ptr_eq(target, process) {
+                    stats[4] = stats[4].saturating_add(1);
+                }
+                if target.torn_down.load(Ordering::Acquire) {
+                    stats[5] = stats[5].saturating_add(1);
+                }
+            }
+            if let crate::process::handle::Object::Thread(thread) = object
+                && thread.process.torn_down.load(Ordering::Acquire)
+            {
+                stats[9] = stats[9].saturating_add(1);
+            }
+        });
+        for holder in &processes {
+            holder.handles.lock().for_each_live(|_, object, _, _| {
+                if let crate::process::handle::Object::SchemeFile(file) = object
+                    && Arc::ptr_eq(&file.server, process)
+                {
+                    stats[7] = stats[7].saturating_add(1);
+                }
+            });
+            let mut check = |request: &Arc<crate::ipc::PendingRequest>| {
+                if Arc::ptr_eq(&request.server, process)
+                    || request
+                        .file
+                        .as_ref()
+                        .is_some_and(|file| Arc::ptr_eq(&file.server, process))
+                {
+                    stats[8] = stats[8].saturating_add(1);
+                }
+                if Arc::ptr_eq(&request.client, process) {
+                    stats[12] = stats[12].saturating_add(1);
+                }
+            };
+            for request in holder.scheme_queue.lock().iter() {
+                check(request);
+            }
+            for request in holder.active_requests.lock().iter() {
+                check(request);
+            }
+            for request in holder.client_requests.lock().iter() {
+                check(request);
+            }
+            if holder
+                .ctty
+                .lock()
+                .as_ref()
+                .is_some_and(|ctty| Arc::ptr_eq(&ctty.file().server, process))
+            {
+                stats[13] = stats[13].saturating_add(1);
+            }
+        }
+        if ZOMBIES
+            .lock()
+            .iter()
+            .any(|zombie| Arc::ptr_eq(zombie, process))
+        {
+            stats[14] = stats[14].saturating_add(1);
+        }
+    }
+    stats
+}
+
+impl Drop for Process {
+    fn drop(&mut self) {
+        LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// S36 timeout-retention baseline: live non-idle Threads at exit 90.
+static S36_TIMEOUT_LIVE: AtomicU64 = AtomicU64::new(0);
+/// S36 timeout-retention baseline: queued timeout sleepers at exit 90.
+static S36_TIMEOUT_SLEEPERS: AtomicU64 = AtomicU64::new(0);
+/// S36 timeout-retention gate, parsed once at boot so the exit path does not re-parse the
+/// command line on a small kernel stack.
+static S36_TIMEOUTCHECK: AtomicBool = AtomicBool::new(false);
+
+/// Record the boot-time S36 gate flags before any process can exit.
+pub fn configure_gates(cmdline: &CmdLine) {
+    S36_TIMEOUTCHECK.store(cmdline.get("s36-timeoutcheck").is_some(), Ordering::Release);
+}
 
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
@@ -123,6 +411,13 @@ pub struct ProcessIds {
 /// Maximum supplementary groups stored by this slice.
 pub const MAX_GROUPS: usize = 16;
 
+/// `si_code` of a child status change (`CLD_EXITED`).
+pub const CLD_EXITED_CODE: u32 = 1;
+/// `si_code` of a plain user signal (`SI_USER`).
+pub const SI_USER_CODE: u32 = 0;
+/// `si_code` of a queued signal (`SI_QUEUE`; the C value is `-1`).
+pub const SI_QUEUE_CODE: u32 = u32::MAX;
+
 /// One queued process signal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PendingSignal {
@@ -130,6 +425,151 @@ pub struct PendingSignal {
     pub signo: u32,
     /// Sender pid.
     pub sender: u64,
+    /// `si_code` (`SI_USER`, `SI_QUEUE` or `CLD_EXITED`).
+    pub code: u32,
+    /// Sender real uid (`si_uid`).
+    pub uid: u32,
+    /// Queued `sigval` payload (`si_value`).
+    pub value: u64,
+}
+
+/// `sigaction` handler value: the default action (`SIG_DFL`).
+pub const SIG_DFL: u64 = 0;
+/// `sigaction` handler value: ignore the signal (`SIG_IGN`).
+pub const SIG_IGN: u64 = 1;
+
+/// `SA_NOCLDSTOP` (`bits/signum.h`, System V amd64).
+pub const SA_NOCLDSTOP: u32 = 1;
+/// `SA_NOCLDWAIT` (`bits/signum.h`).
+pub const SA_NOCLDWAIT: u32 = 2;
+/// `SA_SIGINFO` (`bits/signum.h`).
+pub const SA_SIGINFO: u32 = 4;
+/// `SA_ONSTACK` (`bits/signum.h`).
+pub const SA_ONSTACK: u32 = 0x0800_0000;
+/// `SA_RESTART` (`bits/signum.h`).
+pub const SA_RESTART: u32 = 0x1000_0000;
+/// `SA_NODEFER` (`bits/signum.h`).
+pub const SA_NODEFER: u32 = 0x4000_0000;
+/// `SA_RESETHAND` (`bits/signum.h`).
+pub const SA_RESETHAND: u32 = 0x8000_0000;
+/// The flags `sigaction` stores (the donor `kern_sigaction` accepted set).
+pub const SA_SUPPORTED: u32 =
+    SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO | SA_ONSTACK | SA_RESTART | SA_NODEFER | SA_RESETHAND;
+
+/// `SIG_BLOCK` (`sigprocmask`).
+pub const SIG_BLOCK: i32 = 0;
+/// `SIG_UNBLOCK` (`sigprocmask`).
+pub const SIG_UNBLOCK: i32 = 1;
+/// `SIG_SETMASK` (`sigprocmask`).
+pub const SIG_SETMASK: i32 = 2;
+
+/// `SS_ONSTACK`: the thread is currently on its alternate stack.
+pub const SS_ONSTACK: u32 = 1;
+/// `SS_DISABLE`: no alternate stack.
+pub const SS_DISABLE: u32 = 2;
+/// `SS_AUTODISARM`: accepted and stored as a plain flag.
+pub const SS_AUTODISARM: u32 = 0x8000_0000;
+/// Minimum alternate stack size (`MINSIGSTKSZ`, `bits/signum.h`).
+pub const MINSIGSTKSZ: u64 = 6144;
+
+/// One per-process signal disposition (the FreeBSD `struct sigacts` fields Raven models).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SigAction {
+    /// `SIG_DFL`, `SIG_IGN` or a user handler address.
+    pub handler: u64,
+    /// Signals blocked while this handler runs (signal 1 is bit 0).
+    pub mask: u64,
+    /// `SA_*` flags.
+    pub flags: u32,
+}
+
+impl SigAction {
+    /// The initial disposition: default action, no mask, no flags.
+    pub const fn default_action() -> Self {
+        Self {
+            handler: SIG_DFL,
+            mask: 0,
+            flags: 0,
+        }
+    }
+
+    /// True when a user handler catches the signal.
+    pub const fn is_caught(&self) -> bool {
+        self.handler > SIG_IGN
+    }
+}
+
+/// Mask bit for signal `signo` (signal 1 is bit 0).
+pub const fn signal_bit(signo: u32) -> u64 {
+    if signo == 0 || signo > status::SIG_MAX {
+        0
+    } else {
+        1u64 << (signo - 1)
+    }
+}
+
+/// Per-process signal dispositions (C19; FreeBSD `p_sigacts`).
+///
+/// The table is per process because a handler installed before `fork` is shared by the child,
+/// while `execsigs` resets caught handlers and keeps `SIG_IGN` (FreeBSD `execsigs`). Index zero
+/// is unused; signals are `1..=status::SIG_MAX`.
+#[derive(Clone)]
+pub struct SigActs {
+    actions: Vec<SigAction>,
+}
+
+impl SigActs {
+    /// A fresh table with every signal at `SIG_DFL`.
+    ///
+    /// The table lives on the heap: `Process` is built as a large stack temporary in the create
+    /// path, and a 65-entry inline array pushed that frame into the kernel stack guard during the
+    /// `signal-fault` child teardown.
+    pub fn new() -> Self {
+        Self {
+            actions: vec![SigAction::default_action(); status::SIG_MAX as usize + 1],
+        }
+    }
+
+    /// One disposition; an out-of-range signal reads as `SIG_DFL`.
+    pub fn get(&self, signo: u32) -> SigAction {
+        self.actions
+            .get(signo as usize)
+            .copied()
+            .unwrap_or_else(SigAction::default_action)
+    }
+
+    /// Store one disposition.
+    pub fn set(&mut self, signo: u32, action: SigAction) {
+        if let Some(slot) = self.actions.get_mut(signo as usize) {
+            *slot = action;
+        }
+    }
+
+    /// `execsigs`: caught handlers reset to `SIG_DFL`; `SIG_IGN` stays ignored.
+    pub fn exec_reset(&mut self) {
+        for action in self.actions.iter_mut().skip(1) {
+            if action.handler != SIG_IGN {
+                *action = SigAction::default_action();
+            }
+        }
+    }
+}
+
+/// Per-thread signal state a forked child's first thread inherits.
+///
+/// This is the `fork1` half that belongs to the thread, not the process: the blocked mask and the
+/// alternate-stack registration (`td_sigmask`, `td_sigstk`). Transient handler state is not
+/// copied; the child's first thread starts outside any handler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ForkSignalState {
+    /// Blocked mask inherited from the forking thread.
+    pub mask: u64,
+    /// Alternate-stack base, or zero when disabled.
+    pub alt_sp: u64,
+    /// Alternate-stack size.
+    pub alt_size: u64,
+    /// Alternate-stack flags (`SS_DISABLE` when disabled).
+    pub alt_flags: u32,
 }
 
 impl ProcessIds {
@@ -166,6 +606,35 @@ impl ProcessIds {
             group_count: parent.group_count,
         }
     }
+}
+
+/// Resolve a client path against a per-process root.
+///
+/// Both `root` and `path` are lexical: `.` is dropped, `..` pops but clamps at the root, and
+/// the result is absolute and free of a trailing slash. A root of `/` is the unrooted view.
+pub(crate) fn resolve_root_path(root: &str, path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    let mut result = String::new();
+    if root != "/" {
+        result.push_str(root);
+    }
+    for part in parts {
+        result.push('/');
+        result.push_str(part);
+    }
+    if result.is_empty() {
+        result.push('/');
+    }
+    result
 }
 
 /// Maximum command-name bytes stored in a process record.
@@ -218,6 +687,8 @@ pub struct Process {
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// Live threads created for this process (weak; the scheduler owns the strong reference).
+    pub threads_live: Mutex<Vec<Weak<Thread>>>,
     /// True once the process is terminal: none of its threads may run user code again.
     pub exiting: AtomicBool,
     /// True once the one-shot teardown has released the address space and handle table.
@@ -233,6 +704,8 @@ pub struct Process {
     pub waiters: WaitQueue,
     /// Visible scheme names (per-process namespace).
     pub namespace: Mutex<Namespace>,
+    /// Per-process root, normalized absolute and without a trailing slash (`"/"` is unrooted).
+    pub root: Mutex<String>,
     /// Scheme names registered by this process.
     pub schemes: Mutex<alloc::vec::Vec<Arc<SchemeServer>>>,
     /// Packets waiting for this process's `RECV`.
@@ -249,8 +722,19 @@ pub struct Process {
     pub personality: Mutex<PersonalityState>,
     /// Signals queued for this process.
     pub pending_signals: Mutex<VecDeque<PendingSignal>>,
+    /// Per-process handler dispositions (C19 `sigaction`).
+    pub sigacts: Mutex<SigActs>,
+    /// Signal state a forked child's first thread inherits.
+    ///
+    /// FreeBSD `fork1` copies the new process's `p_sigacts` and the forking thread's
+    /// `td_sigmask`/`td_sigstk`. Raven creates the child's first thread later from the parent
+    /// (`PROC_FORK` + `THREAD_CREATE`), so the per-thread part is carried here and consumed by
+    /// that thread's creation. New threads in a process that was not forked do not see it.
+    pub fork_signal: Mutex<Option<ForkSignalState>>,
     /// A successful exec's new user context, applied on syscall return.
     pub pending_exec: Mutex<Option<exec::ExecContext>>,
+    /// True once an exec has replaced this process image; a child then refuses `setpgid`.
+    pub exec_done: AtomicBool,
     /// Threads blocked in `PROC_SIGRECV`.
     pub signal_waiters: WaitQueue,
     /// Parents blocked in `PROC_WAIT_EX` on this process's children.
@@ -267,6 +751,28 @@ pub struct Process {
     pub limits: Mutex<[Rlimit; RLIMIT_COUNT]>,
     /// Process start time in nanoseconds.
     pub start_ns: u64,
+    /// Last syscall number entered by a thread of this process (K391 diagnostic).
+    pub last_syscall: AtomicU64,
+    /// User PC at the last syscall entry of this process (K391 diagnostic).
+    pub last_pc: AtomicU64,
+    /// Blocking token of the last blocked thread of this process (K391 diagnostic).
+    pub wait_object: AtomicU64,
+    /// Number of threads of this process currently inside a syscall (K391 diagnostic).
+    pub in_syscall: AtomicU32,
+    /// Last scheme request id this process submitted as a client (K391 diagnostic).
+    pub last_submit_id: AtomicU64,
+    /// Last scheme request id this process received as a server (K391 diagnostic).
+    pub last_recv_id: AtomicU64,
+    /// Last scheme request id this process replied to as a server (K391 diagnostic).
+    pub last_send_id: AtomicU64,
+    /// Wakeups that removed a waiter without enqueueing the thread (K391 diagnostic).
+    pub wake_fail: AtomicU32,
+    /// Packed `(reason, cpu, thread_state)` of the last failed wake (K391 diagnostic).
+    pub wake_fail_detail: AtomicU64,
+    /// Wakeups that found the thread still running and set `pending_wake` (K391 diagnostic).
+    pub wake_pending: AtomicU32,
+    /// CPU that received the last successful wakeup, or `u32::MAX` once it resumed (K391).
+    pub wake_last_cpu: AtomicU32,
     /// Accumulated kernel/syscall time.
     pub system_ns: AtomicU64,
     /// Accumulated user time (not sampled yet; zero).
@@ -275,6 +781,29 @@ pub struct Process {
     pub child_system_ns: AtomicU64,
     /// Accumulated reaped-child user time.
     pub child_user_ns: AtomicU64,
+    /// Maximum resident user pages observed for this process, in bytes.
+    pub maxrss_bytes: AtomicU64,
+    /// Maximum resident user pages of any reaped child, in bytes.
+    pub child_maxrss_bytes: AtomicU64,
+}
+
+impl Process {
+    /// Resident user pages for this process, in bytes, from the page tables.
+    ///
+    /// `UserAddressSpace::mapped_pages` walks the VMA tree and counts present 4 KiB leaves; it
+    /// includes the initfs and memory-object mappings, so this is resident user memory, not
+    /// private RSS. Zero for the kernel process or after the address space is released.
+    pub fn resident_rss_bytes(&self) -> u64 {
+        let mut slot = self.address_space.lock();
+        slot.as_mut()
+            .map_or(0, |space| space.mapped_pages().saturating_mul(PAGE))
+    }
+
+    /// Fold the current resident bytes into the process's `maxrss` high-water mark.
+    pub fn update_maxrss(&self) {
+        let rss = self.resident_rss_bytes();
+        self.maxrss_bytes.fetch_max(rss, Ordering::AcqRel);
+    }
 }
 
 /// Per-process syscall personality and Linux handler handle.
@@ -342,6 +871,7 @@ pub fn current() -> Option<Arc<Process>> {
 
 /// Register a live process in the pid registry.
 pub fn register_pid(process: &Arc<Process>) {
+    note_process_weak(process);
     PID_REGISTRY
         .lock()
         .insert(process.id, Arc::downgrade(process));
@@ -374,6 +904,73 @@ pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
         .collect()
 }
 
+/// Non-blocking [`processes`] for the metrics-thread census.
+pub fn processes_try() -> Option<alloc::vec::Vec<Arc<Process>>> {
+    let registry = PID_REGISTRY.try_lock()?;
+    Some(registry.values().filter_map(Weak::upgrade).collect())
+}
+
+/// Count live processes and their live threads without allocating or taking process locks.
+pub fn live_totals() -> (usize, u32) {
+    let registry = PID_REGISTRY.lock();
+    let mut procs = 0usize;
+    let mut threads = 0u32;
+    for weak in registry.values() {
+        if let Some(process) = weak.upgrade() {
+            procs += 1;
+            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
+        }
+    }
+    (procs, threads)
+}
+
+/// Live sshd/sshd-session processes and their thread count (K449 frame-cliff diagnostic).
+pub fn sshd_totals() -> (usize, u32) {
+    let mut procs = 0usize;
+    let mut threads = 0u32;
+    for process in processes() {
+        let command = process.command.lock().clone();
+        if process.path.contains("sshd") || command.contains("sshd") {
+            procs = procs.saturating_add(1);
+            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
+        }
+    }
+    (procs, threads)
+}
+
+/// K449 diagnostic: exited processes still retained for `PROC_WAIT`.
+pub fn zombie_count() -> usize {
+    ZOMBIES.lock().len()
+}
+
+/// Live waiters on the process-owned queues (S36 timeout-retention diagnostic).
+pub fn wait_queue_len() -> usize {
+    let mut total = 0usize;
+    for process in processes() {
+        total = total.saturating_add(process.waiters.len());
+        total = total.saturating_add(process.scheme_waiters.len());
+        total = total.saturating_add(process.signal_waiters.len());
+        total = total.saturating_add(process.child_waiters.len());
+    }
+    total
+}
+
+/// Dead Threads still reachable from a process's weak live-thread list (S36 diagnostic).
+pub fn dead_live_threads() -> usize {
+    let mut total = 0usize;
+    for process in processes() {
+        let threads = process.threads_live.lock();
+        for weak in threads.iter() {
+            if let Some(thread) = weak.upgrade() {
+                if thread.state() == crate::sched::thread::ThreadState::Dead {
+                    total = total.saturating_add(1);
+                }
+            }
+        }
+    }
+    total
+}
+
 /// True when at least one live process is in `pgid` inside `sid`.
 pub fn group_in_session(pgid: u64, sid: u64) -> bool {
     let registry = PID_REGISTRY.lock();
@@ -385,6 +982,7 @@ pub fn group_in_session(pgid: u64, sid: u64) -> bool {
 
 /// Create the kernel process that owns kernel threads.
 pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
+    note_process_created();
     Ok(Arc::new(Process {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
@@ -396,6 +994,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -403,6 +1002,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(String::from("/")),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -411,7 +1011,10 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -420,28 +1023,56 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(default_limits()),
         start_ns: 0,
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     }))
 }
 
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, ids, limits) = if let Some(parent) = current() {
+    let (namespace, root, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
+        let root = parent.root.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
         let limits = *parent.limits.lock();
         (
             snapshot.child_snapshot(&ipc::registry::names()),
+            root,
             ids,
             limits,
         )
     } else {
-        (Namespace::root(), ProcessIds::kernel(), default_limits())
+        (
+            Namespace::root(),
+            String::from("/"),
+            ProcessIds::kernel(),
+            default_limits(),
+        )
     };
+    note_process_created();
+    // C19: every address space owns the kernel sigcode page from creation. A userspace spawner
+    // maps its own image and top-of-user-space stack; this page sits below the randomized kernel
+    // stack window, so the two mappings can never share a page. `build_stack` and the lazy
+    // `ensure_sigcode_page` path then find the VMA already present.
+    let mut user_address_space = UserAddressSpace::new(address_space);
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    install_sigcode(&mut user_address_space).map_err(|_| Errno::ENOMEM)?;
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -449,10 +1080,11 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
-        address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
+        address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -460,6 +1092,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(namespace),
+        root: Mutex::new(root),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -468,7 +1101,10 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -477,28 +1113,43 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(limits),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     register_pid(&process);
     Ok(process)
 }
 
-/// Create an unstarted child whose address space is a COW clone of `source`.
+/// Build the forked child's `Process` object in a callee frame.
 ///
-/// The handle table is forked with `HandleTable::fork_into`, so indices, generations, rights,
-/// retired slots and lineage nodes are preserved; the source's self-process handle is rewritten
-/// to the child. `NOFORK` mappings are absent and their verifiable object handles are closed in
-/// the child. The namespace and personality are copied. No thread is created.
-pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> {
-    let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+/// `Process` is a multi-kilobyte value and the kernel stack is small. Keeping its construction
+/// temporary in this `#[inline(never)]` callee means [`new_forked_process`] runs the address-space
+/// clone, the handle copy and the signal seed with the construction frame already popped. The
+/// aarch64 fork path overflowed its 7-page kernel stack when the temporary shared that frame.
+#[inline(never)]
+fn build_forked_process(source: &Arc<Process>, address_space: AddressSpace) -> Arc<Process> {
     let personality = *source.personality.lock();
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let limits = *source.limits.lock();
-    let child = Arc::new(Process {
+    let root = source.root.lock().clone();
+    note_process_created();
+    Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: source.path.clone(),
@@ -509,6 +1160,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -516,6 +1168,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(root),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -524,7 +1177,10 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new((*source.sigacts.lock()).clone()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -533,11 +1189,35 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         reaped: AtomicBool::new(false),
         limits: Mutex::new(limits),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
-    });
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
+    })
+}
+
+/// Create an unstarted child whose address space is a COW clone of `source`.
+///
+/// The handle table is forked with `HandleTable::fork_into`, so indices, generations, rights,
+/// retired slots and lineage nodes are preserved; the source's self-process handle is rewritten
+/// to the child. `NOFORK` mappings are absent and their verifiable object handles are closed in
+/// the child. The namespace and personality are copied. No thread is created.
+pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> {
+    let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let child = build_forked_process(source, address_space);
 
     {
         let mut source_space = source.address_space.lock();
@@ -545,6 +1225,27 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         let mut child_space = child.address_space.lock();
         let child_space = child_space.as_mut().ok_or(Errno::ESRCH)?;
         child_space.fork_clone_from(source_space)?;
+        // A fork of a userspace-spawned image may predate its first caught signal; the child
+        // still owns the C19 page from creation, exactly like `PROC_CREATE`.
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        if child_space.vmas().find(SIGCODE_BASE).is_none() {
+            install_sigcode(child_space).map_err(|_| Errno::ENOMEM)?;
+        }
+    }
+
+    // FreeBSD `fork1` gives the child its parent's `p_sigacts` (above) and copies the forking
+    // thread's `td_sigmask`/`td_sigstk`. Raven starts the child's first thread later, so the
+    // per-thread half waits here until that `THREAD_CREATE`.
+    let forking_thread = crate::sched::current_thread()
+        .filter(|thread| Arc::ptr_eq(&thread.process, source))
+        .or_else(|| source.threads_live.lock().iter().find_map(Weak::upgrade));
+    if let Some(thread) = forking_thread {
+        *child.fork_signal.lock() = Some(ForkSignalState {
+            mask: thread.sig_blocked.load(Ordering::Acquire),
+            alt_sp: thread.sig_alt_sp.load(Ordering::Acquire),
+            alt_size: thread.sig_alt_size.load(Ordering::Acquire),
+            alt_flags: thread.sig_alt_flags.load(Ordering::Acquire),
+        });
     }
 
     let (nofork, inherited) = {
@@ -589,6 +1290,21 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
 
 /// Deliver one signal with POSIX job-control semantics.
 pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<(), Errno> {
+    deliver_signal_info(target, signo, sender, SI_USER_CODE, 0, 0)
+}
+
+/// Deliver one signal with an explicit `siginfo_t` payload.
+///
+/// The stop/continue bookkeeping is identical to [`deliver_signal`]; only the queued record
+/// differs. `PROC_SIGQUEUE` uses `SI_QUEUE` plus the sender uid and the `sigval` payload.
+pub fn deliver_signal_info(
+    target: &Arc<Process>,
+    signo: u32,
+    sender: u64,
+    code: u32,
+    uid: u32,
+    value: u64,
+) -> Result<(), Errno> {
     if status::is_stop_signal(signo) {
         if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
             target.stop_reported.store(false, Ordering::Release);
@@ -601,11 +1317,11 @@ pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<
             target.continued.store(true, Ordering::Release);
             target.stop_reported.store(false, Ordering::Release);
         }
-        target.queue_signal(status::SIGCONT, sender);
+        target.queue_signal_info(status::SIGCONT, sender, code, uid, value);
         notify_parent(target, false);
         return Ok(());
     }
-    target.queue_signal(signo, sender);
+    target.queue_signal_info(signo, sender, code, uid, value);
     Ok(())
 }
 
@@ -670,12 +1386,289 @@ impl Process {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
 
-    /// Queue a signal and wake a `PROC_SIGRECV` waiter.
-    pub fn queue_signal(&self, signo: u32, sender: u64) {
-        self.pending_signals
+    /// Publish a live thread so a process-directed signal can kick it.
+    pub fn register_thread(&self, thread: &Arc<Thread>) {
+        self.threads_live.lock().push(Arc::downgrade(thread));
+    }
+
+    /// Remove an exiting thread from the live-kick list.
+    ///
+    /// The list mirrors FreeBSD `thread_unlink` in `kern_thread.c` and NetBSD `lwp_free` in
+    /// `kern_lwp.c`: the thread is removed from its process's thread list before its stack is
+    /// reclaimed. Without this, every `THREAD_CREATE`/`THREAD_EXIT` cycle leaves one `Weak`
+    /// entry behind, growing the list by 16 bytes per cycle until the churn exhausts the heap.
+    pub fn unregister_thread(&self, thread: &Arc<Thread>) {
+        let pointer = Arc::as_ptr(thread);
+        self.threads_live.lock().retain(|weak| {
+            weak.upgrade()
+                .is_some_and(|live| Arc::as_ptr(&live) != pointer)
+        });
+    }
+
+    /// True when any live thread has a registered PG-7 signal entry.
+    ///
+    /// Such a process has a libc entry that will run the disposition/default action in user
+    /// space; a process without one must have its default action applied by the kernel.
+    pub fn has_signal_entry(&self) -> bool {
+        self.threads_live
             .lock()
-            .push_back(PendingSignal { signo, sender });
+            .iter()
+            .filter_map(Weak::upgrade)
+            .any(|thread| thread.signal_entry.load(Ordering::Acquire) != 0)
+    }
+
+    /// True when at least one live thread does not mask `signo`.
+    ///
+    /// FreeBSD `sigtd` picks a thread whose `td_sigmask` does not contain the signal; when every
+    /// thread masks it, `tdsendsignal` holds the signal (`SIG_HOLD`) instead of applying the
+    /// default action. A process with no live thread is treated as accepting so a terminal
+    /// target still reaches its default action.
+    pub fn accepts_signal(&self, signo: u32) -> bool {
+        let bit = signal_bit(signo);
+        let mut any = false;
+        for thread in self.threads_live.lock().iter().filter_map(Weak::upgrade) {
+            any = true;
+            if thread.sig_blocked.load(Ordering::Acquire) & bit == 0 {
+                return true;
+            }
+        }
+        !any
+    }
+
+    /// Install the C19 sigcode trampoline page when the image has not mapped it yet.
+    ///
+    /// `build_stack` installs it for kernel-built exec images. A userspace spawner
+    /// (`raven_rt::spawn`, svcd services) maps its own image and stack, so the first caught
+    /// kernel signal installs the page before the frame's `sf_ra` can point at it. Repeated
+    /// deliveries see the existing VMA and return immediately.
+    pub fn ensure_sigcode_page(&self) -> Result<(), Errno> {
+        let mut slot = self.address_space.lock();
+        let Some(address_space) = slot.as_mut() else {
+            return Ok(());
+        };
+        if address_space.vmas().find(SIGCODE_BASE).is_some() {
+            return Ok(());
+        }
+        install_sigcode(address_space).map_err(|_| Errno::ENOMEM)
+    }
+
+    /// Queue a signal, wake a `PROC_SIGRECV` waiter and kick every live thread.
+    ///
+    /// The kick is the PG-7 bridge from the kernel's per-process queue to libc's signal entry:
+    /// `THREAD_KICK` bit 0 makes the return-to-user path resume at the registered entry, and an
+    /// interruptible wait (`ppoll`, `read`, `waitpid`) returns `EINTR` so the handler can run.
+    pub fn queue_signal(&self, signo: u32, sender: u64) {
+        self.queue_signal_info(signo, sender, SI_USER_CODE, 0, 0);
+    }
+
+    /// Queue a signal carrying the `siginfo_t` fields the kernel owns.
+    ///
+    /// The kernel stores the sender pid, `si_code`, sender uid and the queued `sigval`; it never
+    /// interprets the signal disposition. `PROC_SIGRECV` hands the fields back to libc, which
+    /// owns the user pending set and constructs the public `siginfo_t`.
+    pub fn queue_signal_info(&self, signo: u32, sender: u64, code: u32, uid: u32, value: u64) {
+        self.pending_signals.lock().push_back(PendingSignal {
+            signo,
+            sender,
+            code,
+            uid,
+            value,
+        });
         self.signal_waiters.wake_all();
+        self.kick_threads(signo);
+    }
+
+    /// Queue a signal for one thread (`THREAD_SIGQUEUE`).
+    ///
+    /// FreeBSD `tdsendsignal` with a non-NULL `td` lands in `td_sigqueue`; `issignal` merges the
+    /// thread and process queues and `postsig` consumes the thread queue first. A masked record
+    /// stays held (no `EINTR`); `sigprocmask` re-checks it when the mask opens.
+    pub fn deliver_thread_signal(
+        thread: &Arc<Thread>,
+        signo: u32,
+        sender: u64,
+        code: u32,
+        uid: u32,
+        value: u64,
+    ) {
+        if thread.process.has_signal_entry() {
+            // The libc entry only consumes the process queue (`PROC_SIGRECV_EX`); keep a
+            // thread-directed send visible to it until the legacy registration is retired.
+            thread
+                .process
+                .queue_signal_info(signo, sender, code, uid, value);
+            return;
+        }
+        thread.pending_signals.lock().push_back(PendingSignal {
+            signo,
+            sender,
+            code,
+            uid,
+            value,
+        });
+        thread.process.signal_waiters.wake_all();
+        if thread.sig_blocked.load(Ordering::Acquire) & signal_bit(signo) != 0 {
+            return;
+        }
+        thread.signal_wake.store(true, Ordering::Release);
+        thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+        if thread.interruptible.load(Ordering::Acquire) {
+            let token = thread.block_token.load(Ordering::SeqCst);
+            let token = (token != 0).then_some(token);
+            let _ = crate::sched::wake(Arc::clone(thread), token, Errno::EINTR.to_ret());
+        }
+    }
+
+    /// Kick every live thread of this process with the signal-check bit.
+    ///
+    /// A kick is meaningful when either libc registered the retired PG-7 entry or the process
+    /// has a kernel `sigaction` handler for `signo`; otherwise the record stays queued for
+    /// `PROC_SIGRECV` and no unrelated wait is disturbed.
+    fn kick_threads(&self, signo: u32) {
+        let kernel_handler = self.sigacts.lock().get(signo).is_caught();
+        let bit = signal_bit(signo);
+        let mut threads = self.threads_live.lock();
+        threads.retain(|weak| {
+            let Some(thread) = weak.upgrade() else {
+                return false;
+            };
+            let legacy = thread.signal_entry.load(Ordering::Acquire) != 0;
+            // A thread that masks this signal keeps the record pending; only a thread that can
+            // accept it is kicked (FreeBSD `sigtd`). A legacy libc entry keeps the old
+            // queue-and-kick contract until that path is retired.
+            let accepts = thread.sig_blocked.load(Ordering::Acquire) & bit == 0;
+            if !legacy && (!kernel_handler || !accepts) {
+                return true;
+            }
+            // The kernel sigaction path needs the sticky bit too: `deliver_kernel_signal` runs
+            // on every user return, but an interruptible wait must see the reason to return
+            // `EINTR` instead of a bare successful wake (FreeBSD `signotify`).
+            thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+            thread.signal_wake.store(true, Ordering::Release);
+            if thread.interruptible.load(Ordering::Acquire) {
+                let token = thread.block_token.load(Ordering::SeqCst);
+                let token = (token != 0).then_some(token);
+                let _ = crate::sched::wake(thread, token, Errno::EINTR.to_ret());
+            }
+            true
+        });
+    }
+
+    /// Pop the oldest signal that `blocked` does not mask and whose disposition is a user handler.
+    ///
+    /// FreeBSD `postsig` selects the action under `p_sigacts`; NetBSD `sigtd`/`sigismasked`
+    /// leaves a masked signal queued. A `SIG_IGN` record is dropped when `sigaction` installs the
+    /// ignore, so it is not selected here.
+    pub fn next_kernel_signal(&self, blocked: u64) -> Option<(PendingSignal, SigAction)> {
+        let thread = crate::sched::current_thread();
+        if let Some(thread) = &thread {
+            // The wait reason is consumed together with the delivery that returns to user; any
+            // signal still queued blocks again on its own pending record.
+            thread.signal_wake.store(false, Ordering::Release);
+        }
+        // A live legacy `SIG_SETUP` entry owns its own dispositions and consumes the process
+        // queue through `PROC_SIGRECV_EX`; the kernel table is not authoritative for it. Only a
+        // genuinely caught kernel record is delivered here in that mode, exactly as before the
+        // C19 migration completes.
+        if self.has_signal_entry() {
+            let sigacts = self.sigacts.lock();
+            let caught = |signal: &PendingSignal| {
+                blocked & signal_bit(signal.signo) == 0 && sigacts.get(signal.signo).is_caught()
+            };
+            let record = thread
+                .as_ref()
+                .and_then(|thread| take_queued_where(&thread.pending_signals, caught))
+                .or_else(|| take_queued_where(&self.pending_signals, caught))?;
+            let action = sigacts.get(record.signo);
+            if self.ensure_sigcode_page().is_err() {
+                exit_process(Errno::ENOMEM.to_ret() as i32);
+            }
+            return Some((record, action));
+        }
+        loop {
+            // FreeBSD `postsig` consumes the thread-directed queue (`td_sigqueue`) first, then
+            // the process queue (`p_sigqueue`).
+            let record = thread
+                .as_ref()
+                .and_then(|thread| take_queued(&thread.pending_signals, blocked))
+                .or_else(|| take_queued(&self.pending_signals, blocked))?;
+            let action = self.sigacts.lock().get(record.signo);
+            if action.handler == SIG_IGN {
+                // A record can outlive a `SIG_IGN` install only through the legacy path; drop it.
+                continue;
+            }
+            if action.is_caught() {
+                if self.ensure_sigcode_page().is_err() {
+                    exit_process(Errno::ENOMEM.to_ret() as i32);
+                }
+                return Some((record, action));
+            }
+            // SIG_DFL reached delivery only because the signal was held while masked. Apply the
+            // default action now, in `sigprocess` order, and keep looking for a handler signal.
+            match status::default_action(record.signo) {
+                None | Some(DefaultAction::Ignore) => continue,
+                Some(DefaultAction::Terminate) => {
+                    exit_process(-status::signal_status(record.signo, false))
+                }
+                Some(DefaultAction::Core) => {
+                    exit_process(-status::signal_status(record.signo, true))
+                }
+                Some(DefaultAction::Stop) => {
+                    self.apply_stop_default(record.signo);
+                    continue;
+                }
+                Some(DefaultAction::Continue) => {
+                    self.apply_continue_default();
+                    continue;
+                }
+            }
+        }
+    }
+
+    /// Apply a held `SIG_DFL` stop signal at delivery.
+    fn apply_stop_default(&self, signo: u32) {
+        if self.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
+            self.stop_reported.store(false, Ordering::Release);
+        }
+        notify_parent(self, false);
+    }
+
+    /// Apply a held `SIG_DFL` continue signal at delivery.
+    fn apply_continue_default(&self) {
+        if self.stop_signal.swap(0, Ordering::AcqRel) != 0 {
+            self.continued.store(true, Ordering::Release);
+            self.stop_reported.store(false, Ordering::Release);
+        }
+        notify_parent(self, false);
+    }
+
+    /// Apply a held default-action signal for the calling thread after it unblocks it.
+    ///
+    /// FreeBSD `issignal` applies `SIG_DFL` only after `SIGSETNAND(pending, td_sigmask)`; a
+    /// signal that stayed masked must not terminate the process at generation time. Caught and
+    /// ignored records are left to the delivery path; only held defaults are consumed here.
+    pub fn apply_deferred_defaults(&self, blocked: u64) {
+        loop {
+            let thread = crate::sched::current_thread();
+            let record = thread
+                .as_ref()
+                .and_then(|thread| take_deferred(&thread.pending_signals, self, blocked))
+                .or_else(|| take_deferred(&self.pending_signals, self, blocked));
+            let Some(record) = record else {
+                return;
+            };
+            match status::default_action(record.signo) {
+                None | Some(DefaultAction::Ignore) => {}
+                Some(DefaultAction::Terminate) => {
+                    exit_process(-status::signal_status(record.signo, false))
+                }
+                Some(DefaultAction::Core) => {
+                    exit_process(-status::signal_status(record.signo, true))
+                }
+                Some(DefaultAction::Stop) => self.apply_stop_default(record.signo),
+                Some(DefaultAction::Continue) => self.apply_continue_default(),
+            }
+        }
     }
 
     /// Pop the oldest queued signal.
@@ -683,10 +1676,124 @@ impl Process {
         self.pending_signals.lock().pop_front()
     }
 
+    /// Remove and return the oldest queued signal matching `predicate`, leaving the rest in
+    /// order.
+    ///
+    /// This is the masked-signal contract: a signal the calling thread blocks is not selected,
+    /// so it stays queued for a thread (or a later unmask) that accepts it (Illumos `fsig`,
+    /// FreeBSD `sigtd`, NetBSD `sigismasked`). No pop/requeue window exists.
+    pub fn pop_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> Option<PendingSignal> {
+        let mut pending = self.pending_signals.lock();
+        let index = pending.iter().position(|signal| predicate(signal))?;
+        pending.remove(index)
+    }
+
     /// True when at least one signal is queued.
     pub fn has_pending_signal(&self) -> bool {
         !self.pending_signals.lock().is_empty()
     }
+
+    /// Authoritative pending mask and record count for `thread`, whose own queue is included.
+    ///
+    /// The bit layout matches `sigprocmask` (signal 1 is bit 0). FreeBSD `sigpending` merges
+    /// `td_sigqueue` with `p_sigqueue`.
+    pub fn pending_snapshot(&self, thread: Option<&Thread>) -> (u64, usize) {
+        let mut mask = 0u64;
+        let mut count = 0usize;
+        for signal in self.pending_signals.lock().iter() {
+            mask |= signal_bit(signal.signo);
+            count = count.saturating_add(1);
+        }
+        if let Some(thread) = thread {
+            for signal in thread.pending_signals.lock().iter() {
+                mask |= signal_bit(signal.signo);
+                count = count.saturating_add(1);
+            }
+        }
+        (mask, count)
+    }
+
+    /// Consume the oldest pending signal whose bit is in `set`, thread queue first.
+    pub fn pop_signal_for(&self, thread: Option<&Thread>, set: u64) -> Option<PendingSignal> {
+        if let Some(thread) = thread
+            && let Some(record) = take_from_queue_set(&thread.pending_signals, set)
+        {
+            return Some(record);
+        }
+        take_from_queue_set(&self.pending_signals, set)
+    }
+
+    /// True when a signal whose bit is in `set` is queued for the process or `thread`.
+    pub fn has_signal_for(&self, thread: Option<&Thread>, set: u64) -> bool {
+        let matches = |signal: &PendingSignal| set & signal_bit(signal.signo) != 0;
+        if let Some(thread) = thread
+            && thread.pending_signals.lock().iter().any(matches)
+        {
+            return true;
+        }
+        self.pending_signals.lock().iter().any(matches)
+    }
+
+    /// True when at least one queued signal matches `predicate`.
+    pub fn has_pending_signal_where(
+        &self,
+        mut predicate: impl FnMut(&PendingSignal) -> bool,
+    ) -> bool {
+        self.pending_signals
+            .lock()
+            .iter()
+            .any(|signal| predicate(signal))
+    }
+}
+
+/// Remove the oldest queued signal the caller does not mask.
+fn take_queued(queue: &Mutex<VecDeque<PendingSignal>>, blocked: u64) -> Option<PendingSignal> {
+    let mut pending = queue.lock();
+    let index = pending
+        .iter()
+        .position(|signal| blocked & signal_bit(signal.signo) == 0)?;
+    pending.remove(index)
+}
+
+/// Remove the oldest queued signal matching `predicate`.
+fn take_queued_where(
+    queue: &Mutex<VecDeque<PendingSignal>>,
+    mut predicate: impl FnMut(&PendingSignal) -> bool,
+) -> Option<PendingSignal> {
+    let mut pending = queue.lock();
+    let index = pending.iter().position(&mut predicate)?;
+    pending.remove(index)
+}
+
+/// Remove the oldest queued signal whose bit is in `set`.
+fn take_from_queue_set(queue: &Mutex<VecDeque<PendingSignal>>, set: u64) -> Option<PendingSignal> {
+    let mut pending = queue.lock();
+    let index = pending
+        .iter()
+        .position(|signal| set & signal_bit(signal.signo) != 0)?;
+    pending.remove(index)
+}
+
+/// Remove the oldest queued `SIG_DFL` signal whose default action is not ignore.
+fn take_deferred(
+    queue: &Mutex<VecDeque<PendingSignal>>,
+    process: &Process,
+    blocked: u64,
+) -> Option<PendingSignal> {
+    let sigacts = process.sigacts.lock();
+    let mut pending = queue.lock();
+    let index = pending.iter().position(|signal| {
+        blocked & signal_bit(signal.signo) == 0
+            && sigacts.get(signal.signo).handler == SIG_DFL
+            && !matches!(
+                status::default_action(signal.signo),
+                None | Some(DefaultAction::Ignore)
+            )
+    })?;
+    pending.remove(index)
 }
 
 /// Reparent every live child of `parent` to PID 1 (init).
@@ -718,6 +1825,9 @@ pub fn reparent_children(parent: &Process) -> usize {
 /// accumulated time and the parent's signal queue.
 pub fn notify_parent(process: &Process, sigchld: bool) {
     let ppid = process.ids.lock().ppid;
+    if s194_trace() {
+        kprintln!("s194: notify-parent child={} parent={}", process.id, ppid);
+    }
     let Some(parent) = lookup_pid(ppid) else {
         return;
     };
@@ -728,7 +1838,12 @@ pub fn notify_parent(process: &Process, sigchld: bool) {
         parent
             .child_user_ns
             .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
-        parent.queue_signal(SIGCHLD, process.id);
+        parent.child_maxrss_bytes.fetch_max(
+            process.maxrss_bytes.load(Ordering::Acquire),
+            Ordering::AcqRel,
+        );
+        let uid = process.ids.lock().uid;
+        parent.queue_signal_info(SIGCHLD, process.id, CLD_EXITED_CODE, uid, 0);
     }
     parent.child_waiters.wake_all();
 }
@@ -752,8 +1867,58 @@ pub fn init_available(cmdline: &CmdLine) -> bool {
     initfs::lookup(path).is_some()
 }
 
+/// C19 sigacts selftest rows: install, read back, clear, and `execsigs`.
+///
+/// Returns the failing step name, or `None` when every row holds. Split from the
+/// exit path so the host `_ut` test can prove the same rows without QEMU.
+fn sigacts_selftest_check() -> Option<&'static str> {
+    let mut table = SigActs::new();
+    let handler = SigAction {
+        handler: 0x1234,
+        mask: 0,
+        flags: 0,
+    };
+    table.set(status::SIGUSR1, handler);
+    if table.get(status::SIGUSR1) != handler {
+        return Some("readback");
+    }
+    table.set(status::SIGUSR1, SigAction::default_action());
+    if table.get(status::SIGUSR1).handler != SIG_DFL {
+        return Some("clear readback");
+    }
+    table.set(status::SIGUSR1, handler);
+    table.set(
+        status::SIGTERM,
+        SigAction {
+            handler: SIG_IGN,
+            mask: 0,
+            flags: 0,
+        },
+    );
+    table.exec_reset();
+    if table.get(status::SIGUSR1).handler != SIG_DFL
+        || table.get(status::SIGTERM).handler != SIG_IGN
+    {
+        return Some("exec reset");
+    }
+    None
+}
+
+/// Run the sigacts selftest before PID 1 and exit QEMU through the C5 protocol.
+fn sigacts_selftest() -> ! {
+    if let Some(step) = sigacts_selftest_check() {
+        kprintln!("s44: sigacts failed {step}");
+        crate::boot::exit_qemu(0x11);
+    }
+    kprintln!("s44: sigacts table ok");
+    crate::boot::exit_qemu(0x10);
+}
+
 /// Create PID 1 from the initfs and enter ring 3. On success this never returns.
 pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
+    if cmdline.get("s44-sigactscheck").is_some() {
+        sigacts_selftest();
+    }
     let path = cmdline.get("init").unwrap_or("/init");
     let entry = initfs::lookup(path).ok_or(ProcessError::NoInit)?;
     let data = entry.data;
@@ -789,6 +1954,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     };
     let user_stack = build_stack(&mut user_address_space, path_bytes, &argv, &[], &ids, aux)?;
 
+    note_process_created();
     let process = Arc::new(Process {
         id,
         ids: Mutex::new(ids),
@@ -800,6 +1966,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        threads_live: Mutex::new(Vec::new()),
         exiting: AtomicBool::new(false),
         torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
@@ -807,6 +1974,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         namespace: Mutex::new(Namespace::root()),
+        root: Mutex::new(String::from("/")),
         schemes: Mutex::new(alloc::vec::Vec::new()),
         scheme_queue: Mutex::new(VecDeque::new()),
         scheme_waiters: WaitQueue::new(),
@@ -815,7 +1983,10 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
         pending_signals: Mutex::new(VecDeque::new()),
+        sigacts: Mutex::new(SigActs::new()),
+        fork_signal: Mutex::new(None),
         pending_exec: Mutex::new(None),
+        exec_done: AtomicBool::new(false),
         signal_waiters: WaitQueue::new(),
         child_waiters: WaitQueue::new(),
         stop_signal: AtomicU32::new(0),
@@ -824,10 +1995,23 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         reaped: AtomicBool::new(false),
         limits: Mutex::new(default_limits()),
         start_ns: crate::time::now_ns(),
+        last_syscall: AtomicU64::new(0),
+        last_pc: AtomicU64::new(0),
+        wait_object: AtomicU64::new(0),
+        in_syscall: AtomicU32::new(0),
+        last_submit_id: AtomicU64::new(0),
+        last_recv_id: AtomicU64::new(0),
+        last_send_id: AtomicU64::new(0),
+        wake_fail: AtomicU32::new(0),
+        wake_fail_detail: AtomicU64::new(0),
+        wake_pending: AtomicU32::new(0),
+        wake_last_cpu: AtomicU32::new(u32::MAX),
         system_ns: AtomicU64::new(0),
         user_ns: AtomicU64::new(0),
         child_system_ns: AtomicU64::new(0),
         child_user_ns: AtomicU64::new(0),
+        maxrss_bytes: AtomicU64::new(0),
+        child_maxrss_bytes: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -921,6 +2105,103 @@ fn map_step(
         page = page.saturating_add(1);
     }
     Ok(())
+}
+
+/// Load an exec image directly from the caller's user range.
+///
+/// The ELF header and program-header table were copied into a small kernel buffer; this path
+/// copies each `PT_LOAD` page from the still-live caller image into a fresh frame, so the 4 MiB
+/// kernel heap never holds the multi-MiB image. The ranges were validated by
+/// [`raven_elf::Elf::parse_with_len`] and are checked again here.
+pub(crate) fn load_segments_from_user(
+    address_space: &mut UserAddressSpace,
+    elf: &Elf<'_>,
+    image_base: u64,
+    image_len: u64,
+    bias: u64,
+) -> Result<(), ProcessError> {
+    let plan =
+        raven_elf::plan_load_biased(elf, PAGE, bias, LoadMode::Copy).map_err(ProcessError::Elf)?;
+    for step in plan {
+        address_space
+            .vmas_mut()
+            .insert(step.vaddr, step.len, step.prot, Backing::Anonymous)
+            .map_err(|_| ProcessError::BadAddress)?;
+        let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
+        map_step_from_user(&mut mapper, image_base, image_len, step)?;
+    }
+    // The just-written code pages must be visible to instruction fetch before EL0 runs.
+    #[cfg(target_arch = "aarch64")]
+    crate::arch::mmu::icache_invalidate_all();
+    Ok(())
+}
+
+fn map_step_from_user(
+    mapper: &mut paging::KernelMapper<'_>,
+    image_base: u64,
+    image_len: u64,
+    step: MapStep,
+) -> Result<(), ProcessError> {
+    let flags = prot_flags(step.prot)?;
+    let pages = step.len / PAGE;
+    let mut page = 0u64;
+    while page < pages {
+        let vaddr = step
+            .vaddr
+            .checked_add(page.saturating_mul(PAGE))
+            .ok_or(ProcessError::BadAddress)?;
+        let virt = VirtAddr::new(vaddr).ok_or(ProcessError::BadAddress)?;
+        let physical = frame::alloc_zeroed_frame().ok_or(ProcessError::OutOfFrames)?;
+        let destination = frame::phys_to_virt(physical);
+        if destination.is_null() {
+            return Err(ProcessError::OutOfFrames);
+        }
+        match step.kind {
+            StepKind::File { offset } => {
+                let file_offset = offset
+                    .checked_add(page.saturating_mul(PAGE))
+                    .ok_or(ProcessError::BadAddress)?;
+                copy_user_range(destination, image_base, image_len, file_offset, PAGE)?;
+            }
+            StepKind::CopyTail { offset, len } => {
+                copy_user_range(destination, image_base, image_len, offset, len)?;
+            }
+            StepKind::Zero => {}
+        }
+        // Make the bytes written through the HHDM visible to instruction fetch.
+        #[cfg(target_arch = "aarch64")]
+        // SAFETY: `destination` is a whole 4 KiB frame mapped read/write through the HHDM.
+        unsafe {
+            crate::arch::mmu::dcache_clean_range(destination as u64, PAGE);
+        }
+        mapper
+            .map(virt, PhysAddr(physical.0), flags, PageSize::Size4K)
+            .map_err(ProcessError::Map)?;
+        page = page.saturating_add(1);
+    }
+    Ok(())
+}
+
+fn copy_user_range(
+    destination: *mut u8,
+    image_base: u64,
+    image_len: u64,
+    offset: u64,
+    length: u64,
+) -> Result<(), ProcessError> {
+    let end = offset.checked_add(length).ok_or(ProcessError::BadAddress)?;
+    if end > image_len {
+        return Err(ProcessError::BadAddress);
+    }
+    let address = image_base
+        .checked_add(offset)
+        .ok_or(ProcessError::BadAddress)?;
+    let length = usize::try_from(length).map_err(|_| ProcessError::BadAddress)?;
+    // SAFETY: `destination` is a freshly zeroed frame mapped read/write through the HHDM and
+    // `length` is at most one page; the slice is live for the duration of the copy.
+    let destination = unsafe { core::slice::from_raw_parts_mut(destination, length) };
+    let source = UserSlice::new(address, length as u64).map_err(|_| ProcessError::BadAddress)?;
+    copy_from_user(destination, source).map_err(|_| ProcessError::BadAddress)
 }
 
 fn file_bytes(data: &[u8], offset: u64, page: u64, length: u64) -> Result<&[u8], ProcessError> {
@@ -1019,24 +2300,29 @@ fn build_stack(
         return Err(ProcessError::ArgTooLong);
     }
 
-    let stack_base = USER_END
-        .checked_sub(USER_STACK_SIZE + USER_GUARD)
-        .ok_or(ProcessError::BadAddress)?;
+    let stack_base = address_space.stack_base();
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let mut cursor = buffer.len();
 
-    let random = random16();
-    let random_start = cursor
-        .checked_sub(random.len())
-        .ok_or(ProcessError::ArgTooLong)?;
-    let random_slot = buffer
-        .get_mut(random_start..cursor)
-        .ok_or(ProcessError::BadAddress)?;
-    random_slot.copy_from_slice(&random);
-    cursor = random_start;
-    let random_address = stack_base
-        .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
-        .ok_or(ProcessError::BadAddress)?;
+    // AT_RANDOM comes from the same boot-seeded pool as GETRANDOM. On a platform with no
+    // hardware source the pool is unseeded and the pair is published as zero rather than a
+    // predictable fallback; GETRANDOM reports the documented EAGAIN.
+    let random_address = match random16() {
+        Some(random) => {
+            let random_start = cursor
+                .checked_sub(random.len())
+                .ok_or(ProcessError::ArgTooLong)?;
+            let random_slot = buffer
+                .get_mut(random_start..cursor)
+                .ok_or(ProcessError::BadAddress)?;
+            random_slot.copy_from_slice(&random);
+            cursor = random_start;
+            stack_base
+                .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
+                .ok_or(ProcessError::BadAddress)?
+        }
+        None => 0,
+    };
 
     let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
     let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
@@ -1173,7 +2459,48 @@ fn build_stack(
             .map_err(ProcessError::Map)?;
         page = page.saturating_add(1);
     }
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    install_sigcode(address_space)?;
     Ok(sp0)
+}
+
+/// Install the C19 sigcode page at [`SIGCODE_BASE`] in `address_space`.
+///
+/// The page is read-only+exec and anonymous, so `release`/`free_user_frames` reclaim its frame.
+/// The handler's `sf_ra` points at the first byte; returning runs `mov eax, SIGRETURN; syscall`.
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+fn install_sigcode(address_space: &mut UserAddressSpace) -> Result<(), ProcessError> {
+    address_space
+        .vmas_mut()
+        .insert(
+            SIGCODE_BASE,
+            PAGE,
+            (prot::READ | prot::EXEC) as u8,
+            Backing::Anonymous,
+        )
+        .map_err(|_| ProcessError::BadAddress)?;
+    let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
+    let virt = VirtAddr::new(SIGCODE_BASE).ok_or(ProcessError::BadAddress)?;
+    let physical = frame::alloc_zeroed_frame().ok_or(ProcessError::OutOfFrames)?;
+    let destination = frame::phys_to_virt(physical);
+    if destination.is_null() {
+        let _ = frame::free_frame(physical);
+        return Err(ProcessError::OutOfFrames);
+    }
+    // SAFETY: `destination` is a fresh zeroed frame mapped through the HHDM; `SIGCODE` is a
+    // static byte array no longer than the page.
+    unsafe {
+        core::ptr::copy_nonoverlapping(SIGCODE.as_ptr(), destination, SIGCODE.len());
+    }
+    mapper
+        .map(
+            virt,
+            PhysAddr(physical.0),
+            PageFlags::user_rx(),
+            PageSize::Size4K,
+        )
+        .map_err(ProcessError::Map)?;
+    Ok(())
 }
 
 /// Place one NUL-terminated string below `cursor` and return its user address.
@@ -1224,80 +2551,14 @@ fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), P
     Ok(())
 }
 
-fn random16() -> [u8; 16] {
+/// 16 bytes for `AT_RANDOM` from the boot-seeded ChaCha20 pool.
+///
+/// `None` means the platform has no hardware entropy source; the auxv pair is then zero and
+/// `GETRANDOM` returns the documented `EAGAIN` instead of serving a predictable fallback.
+fn random16() -> Option<[u8; 16]> {
     let mut bytes = [0u8; 16];
-    #[cfg(target_arch = "x86_64")]
-    {
-        let features = core::arch::x86_64::__cpuid(1);
-        if features.ecx & (1 << 30) != 0 {
-            let mut chunk_index = 0usize;
-            while chunk_index < 2 {
-                let mut attempt: u32 = 0;
-                let mut filled = false;
-                while attempt < 10 {
-                    let value: u64;
-                    let ok: u8;
-                    // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
-                    // effects. `setc` records the success flag.
-                    unsafe {
-                        core::arch::asm!(
-                            "rdrand {value}",
-                            "setc {ok}",
-                            value = out(reg) value,
-                            ok = out(reg_byte) ok,
-                            options(nomem, nostack),
-                        );
-                    }
-                    if ok != 0 {
-                        let start = chunk_index.saturating_mul(8);
-                        if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
-                            slot.copy_from_slice(&value.to_le_bytes());
-                        }
-                        filled = true;
-                        break;
-                    }
-                    attempt = attempt.saturating_add(1);
-                }
-                if !filled {
-                    break;
-                }
-                chunk_index = chunk_index.saturating_add(1);
-            }
-            if chunk_index == 2 {
-                return bytes;
-            }
-        }
-    }
-
-    let mut state = entropy_seed() ^ 0x9E37_79B9_7F4A_7C15;
-    let mut index = 0usize;
-    while index < bytes.len() {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        let word = state.to_le_bytes();
-        let end = index.saturating_add(8).min(bytes.len());
-        if let Some(slot) = bytes.get_mut(index..end) {
-            let copy = end.saturating_sub(index);
-            if let Some(source) = word.get(..copy) {
-                slot.copy_from_slice(source);
-            }
-        }
-        index = end;
-    }
-    bytes
-}
-
-/// Non-cryptographic fallback entropy: the architecture's free-running counter.
-#[cfg(target_arch = "x86_64")]
-fn entropy_seed() -> u64 {
-    tsc::read()
-}
-
-/// Non-cryptographic fallback entropy: the generic-timer physical counter.
-#[cfg(target_arch = "aarch64")]
-fn entropy_seed() -> u64 {
-    timer::read_counter()
+    crate::time::entropy_fill(&mut bytes).ok()?;
+    Some(bytes)
 }
 
 /// The ELF machine of the running kernel.
@@ -1328,19 +2589,49 @@ fn cleanup_evidence(process: &Process) -> bool {
 /// [`UserAddressSpace::release`], which switches CR3 to the kernel root: a foreign caller
 /// (terminating another process, reaping an unstarted child) must keep its own CR3, because it
 /// returns to user mode through `sysret`.  The cold path frees the target's frames and page
-/// tables without switching, which is safe because user threads run only on CPU 0 in a
-/// non-preemptible kernel: the caller is the only running user thread, so the target's root is
-/// not active anywhere, and none of its blocked or runnable threads can be switched to (the
-/// scheduler filter drops them).
+/// tables without switching, after [`crate::sched::quiesce_process`] has proved that no thread of
+/// the target is current on any CPU; the scheduler filter drops its runnable threads from the
+/// run queues.
 ///
 /// The per-exit evidence prints (`s24`/`s25`/`s21`/`s36` counters) belong to the dying
 /// thread's own exit path and run in that context only; a foreign caller skips them (an
 /// unstarted process has no thread to print from, and a terminated process prints on its last
 /// thread's exit).
+/// Presence check for a boot command-line gate without building the 64-token `CmdLine` table.
+///
+/// `teardown` runs on the 28 KiB kernel stack. An inlined `CmdLine::parse` copy is about 1.5 KiB,
+/// and the seven gate copies below exhausted the stack before the IPC/event close hooks ran (the
+/// K434 init-exit double fault). This is the same token walk the s17 gate already uses.
+fn cmdline_has(key: &str) -> bool {
+    paging::cmdline().split_ascii_whitespace().any(|token| {
+        token == key
+            || token
+                .strip_prefix(key)
+                .is_some_and(|rest| rest.starts_with('='))
+    })
+}
+
+/// S194 teardown-stage trace, enabled by `s194-trace` on the kernel command line.
+pub(crate) fn s194_trace() -> bool {
+    cmdline_has("s194-trace")
+}
+
 fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
+    if s194_trace() {
+        kprintln!(
+            "s194: teardown start pid={} own={}",
+            process.id,
+            own_context
+        );
+    }
+    // FreeBSD `exit1`/NetBSD `exit_lwps`: every sibling stops before the vmspace is released.
+    // `terminate_once` has already published `exiting` and asked the other CPUs to reschedule;
+    // wait until none of them is still current, so no thread can execute user code (or read a
+    // TLS block) while the address space and its frames are freed.
+
     // The pid registry keeps a weak zombie entry until `PROC_WAIT_EX` reaps the status; a weak
     // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
@@ -1351,6 +2642,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let _irq = crate::sync::critical();
         ipc::on_process_exit(process);
     }
+    // The RSS high-water mark is snapshotted in `terminate_once` before IPC teardown; do not
+    // walk the address space again after that teardown has altered the mappings.
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {
         if own_context {
@@ -1411,11 +2704,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // controller terminates the fixture server first, so its own final line is the baseline.
     // Keep this own-context only: a foreign teardown (terminate/reap) must return through the
     // caller's path, the S40 rule for every teardown evidence print.
-    if own_context
-        && CmdLine::parse(paging::cmdline())
-            .get("s16-teardowncheck")
-            .is_some()
-    {
+    if own_context && cmdline_has("s16-teardowncheck") {
         kprintln!(
             "s16: exit {} handles={} lineage={}",
             process.path,
@@ -1445,7 +2734,9 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         }
         crate::arch::halt()
     }
-    kprintln!("process: {} exited ({code})", process.path);
+    // Keep the interactive console quiet for normal child exits: `init exited` above is the
+    // stable test marker. The per-process detail remains available with `log-level=debug`.
+    crate::kdebug!("process: {} exited ({code})", process.path);
     // The per-exit evidence prints belong to the dying thread's own context; a foreign teardown
     // (reaping an unstarted process, terminating another) must return to its caller without
     // them.
@@ -1453,41 +2744,258 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         return;
     }
     // S24 leak evidence: the free-frame count after every child exit.
-    if CmdLine::parse(paging::cmdline())
-        .get("s24-framecheck")
-        .is_some()
-    {
+    if cmdline_has("s24-framecheck") {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
+        // K570: the pty-churn frame line rides the same gate. A second top-level parse/print
+        // block enlarged the teardown frame past the kernel stack (K536 rev187 double fault).
+        if cmdline_has("s24-alloccheck") {
+            kprintln!("s24: frames allocated={}", frame::stats().allocated_bytes);
+        }
     }
+
     // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
     // handle that survived process death, or a slot leaked by the transfer path, drifts this
     // number across repeated spawn/exit cycles.
-    if CmdLine::parse(paging::cmdline())
-        .get("s25-handlecheck")
-        .is_some()
-    {
+    if cmdline_has("s25-handlecheck") {
         kprintln!("s25: exit handles={}", process.handles.lock().len());
     }
     // S21b DMA leak evidence: the free-frame count after every child exit. Consecutive exits
     // print the same number when allocation and release are balanced.
-    if CmdLine::parse(paging::cmdline())
-        .get("s21-framecheck")
-        .is_some()
-    {
+    if cmdline_has("s21-framecheck") {
         kprintln!("s21: frames free={}", frame::stats().free_bytes);
     }
     // S36 stack-reuse evidence: the fresh-allocation and cached-stack counters must return to
     // baseline across repeated spawn/exit cycles.
-    if CmdLine::parse(paging::cmdline())
-        .get("s36-stackcheck")
-        .is_some()
-    {
+    if cmdline_has("s36-stackcheck") {
         let (heap_used, _) = crate::memory::heap::stats();
+        let stats = crate::memory::frame::stats();
         kprintln!(
-            "s36: stacks fresh={} cached={} heap={}",
+            "s36: stacks fresh={} cached={} heap={} frames={} allocated={}",
             crate::sched::thread::stack_fresh(),
             crate::sched::thread::stack_cached(),
-            heap_used
+            heap_used,
+            stats.free_bytes,
+            stats.allocated_bytes
+        );
+    }
+    // S36 vfsd map/unmap red row: exit 88 records the baseline, exit 89 compares the allocated
+    // frame bytes. The markers run around the fixture's vfsd pager map/unmap cycles; a leak keeps
+    // allocated_bytes above the one-chunk tolerance and prints the forbidden `leak` line.
+    if cmdline_has("s36-mapcheck") {
+        let stats = crate::memory::frame::stats();
+        if code == 88 {
+            S36_MAP_BASE.store(stats.allocated_bytes, Ordering::Release);
+            kprintln!(
+                "s36: mapcheck base allocated={} pager={}",
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
+        } else if code == 89 {
+            let base = S36_MAP_BASE.load(Ordering::Acquire);
+            let delta = stats.allocated_bytes.saturating_sub(base);
+            kprintln!(
+                "s36: mapcheck delta={} allocated={} pager={}",
+                delta,
+                stats.allocated_bytes,
+                crate::process::handle::pager_objects()
+            );
+            if delta <= 64 * 1024 {
+                kprintln!("s36: mapcheck ok");
+            } else {
+                kprintln!("s36: mapcheck leak delta={}", delta);
+            }
+        }
+    }
+    // S36 timeout-retention row: exit 90 records the live non-idle Thread count and the queued
+    // timeout sleepers; exit 91 compares them after the bounded terminate-while-waiting churn.
+    // A dead Thread retained by a timeout entry keeps both counters above the tolerance.
+    if S36_TIMEOUTCHECK.load(Ordering::Acquire) {
+        let live = crate::sched::thread::live_threads() as u64;
+        let sleepers = crate::sched::sleepers_len() as u64;
+        let reap = crate::sched::reap_len() as u64;
+        let handles = crate::process::handle::thread_handles();
+        let rq = crate::sched::runqueue_len();
+        let current = crate::sched::exiting_current();
+        let futex = crate::syscall::futex::waiters_len();
+        let procq = wait_queue_len();
+        let deadlive = dead_live_threads();
+        if code == 90 {
+            S36_TIMEOUT_LIVE.store(live, Ordering::Release);
+            S36_TIMEOUT_SLEEPERS.store(sleepers, Ordering::Release);
+            kprintln!(
+                "s36: timeoutcheck base live={} sleepers={} reap={} handles={} rq={} current={} futex={} procq={} deadlive={}",
+                live,
+                sleepers,
+                reap,
+                handles,
+                rq,
+                current,
+                futex,
+                procq,
+                deadlive
+            );
+        } else if code == 91 {
+            let live_delta = live.saturating_sub(S36_TIMEOUT_LIVE.load(Ordering::Acquire));
+            let sleepers_delta =
+                sleepers.saturating_sub(S36_TIMEOUT_SLEEPERS.load(Ordering::Acquire));
+            kprintln!(
+                "s36: timeoutcheck delta live={} sleepers={} reap={} handles={} rq={} current={} futex={} procq={} deadlive={} live_delta={} sleepers_delta={}",
+                live,
+                sleepers,
+                reap,
+                handles,
+                rq,
+                current,
+                futex,
+                procq,
+                deadlive,
+                live_delta,
+                sleepers_delta
+            );
+            if live_delta <= 8 && sleepers_delta <= 8 {
+                kprintln!("s36: timeoutcheck ok");
+            } else {
+                kprintln!(
+                    "s36: timeoutcheck leak live_delta={} sleepers_delta={}",
+                    live_delta,
+                    sleepers_delta
+                );
+            }
+        }
+    }
+    // S36 lock/time churn: exit 90 records the baseline, exit 91 compares the allocated frame
+    // bytes after the futex wake/timeout churn.
+    if cmdline_has("s36-lockcheck") {
+        let stats = crate::memory::frame::stats();
+        if code == 90 {
+            S36_LOCK_BASE.store(stats.allocated_bytes, Ordering::Release);
+            kprintln!("s36: lockcheck base allocated={}", stats.allocated_bytes);
+        } else if code == 91 {
+            let base = S36_LOCK_BASE.load(Ordering::Acquire);
+            let delta = stats.allocated_bytes.saturating_sub(base);
+            kprintln!(
+                "s36: lockcheck delta={} allocated={}",
+                delta,
+                stats.allocated_bytes
+            );
+            if delta <= 64 * 1024 {
+                kprintln!("s36: lockcheck ok");
+            } else {
+                kprintln!("s36: lockcheck leak delta={}", delta);
+            }
+        }
+    }
+    // S36b process-object diagnostic: separate line so the stable s36 regex is unchanged.
+    if paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s36-proccheck")
+    {
+        let (dead_handles, top_pid, top_count) = crate::process::handle::dead_process_handles();
+        let (notices, dead_clients, dead_servers) = crate::ipc::router::close_notice_stats();
+        let leaked = leaked_process_stats();
+        let leaked_threads = crate::sched::thread::leaked_thread_objects();
+        kprintln!(
+            "s36: procs={} threads={} zombies={} proc_size={} thread_size={} lineage={} dead_handles={} top_pid={} top_count={} notices={} dead_clients={} dead_servers={} requests={} reap={} leaked={} ext1={} ext2={} ext3={} self_handles={} all_dead_handles={} leaked_threads={} file_refs={} request_refs={} thread_handles={} all_entries={} unique={} client_refs={} ctty_refs={} zombie_refs={}",
+            live_processes(),
+            crate::sched::thread::live_threads(),
+            ZOMBIES.lock().len(),
+            core::mem::size_of::<Process>(),
+            core::mem::size_of::<crate::sched::thread::Thread>(),
+            crate::process::handle::lineage_nodes(),
+            dead_handles,
+            top_pid,
+            top_count,
+            notices,
+            dead_clients,
+            dead_servers,
+            crate::ipc::live_requests(),
+            crate::sched::reap_pending(),
+            leaked[0],
+            leaked[1],
+            leaked[2],
+            leaked[3],
+            leaked[4],
+            leaked[5],
+            leaked[6],
+            leaked[7],
+            leaked[8],
+            leaked[9],
+            leaked[10],
+            leaked[11],
+            leaked[12],
+            leaked[13],
+            leaked[14]
+        );
+        kprintln!(
+            "s36: leaked_tobj={} t_ext1={} t_ext2plus={} t_blocked={} t_ready={} t_dead={} t_token={}",
+            leaked_threads[0],
+            leaked_threads[1],
+            leaked_threads[2],
+            leaked_threads[3],
+            leaked_threads[4],
+            leaked_threads[5],
+            leaked_threads[6]
+        );
+        let thread_holders = crate::sched::thread::thread_holder_stats();
+        kprintln!(
+            "s36: hold thr={} cur={} rq={} sleep={} reap={} live={} pwait={} futex={} handle={} multi={} unexp={} reqwait={}",
+            thread_holders[0],
+            thread_holders[1],
+            thread_holders[2],
+            thread_holders[3],
+            thread_holders[4],
+            thread_holders[5],
+            thread_holders[6],
+            thread_holders[7],
+            thread_holders[8],
+            thread_holders[9],
+            thread_holders[10],
+            thread_holders[11]
+        );
+
+        let holders = request_holder_stats();
+        kprintln!(
+            "s36: ipc client={} active={} queued={} top_pid={} top_client={} top_queue_pid={} top_queue={}",
+            holders[0],
+            holders[1],
+            holders[2],
+            holders[3],
+            holders[4],
+            holders[5],
+            holders[6]
+        );
+        let (heap_used, heap_free) = crate::memory::heap::stats();
+        let class = crate::memory::heap::class_stats(16);
+        kprintln!(
+            "s36: heap used={} free={} c3072_slabs={} c3072_used={} c3072_free={} req_size={} file_size={} cap_size={} evq_size={}",
+            heap_used,
+            heap_free,
+            class.map_or(0, |stats| stats.slabs),
+            class.map_or(0, |stats| stats.in_use),
+            class.map_or(0, |stats| stats.free),
+            core::mem::size_of::<crate::ipc::PendingRequest>(),
+            core::mem::size_of::<crate::ipc::SchemeFile>(),
+            core::mem::size_of::<crate::ipc::capture::Capture>(),
+            core::mem::size_of::<crate::event::EventQueue>()
+        );
+        let opcodes = queue_opcode_stats();
+        kprintln!(
+            "s36: qop close={} dup={} open={} other={} top_queue_pid={}",
+            opcodes[0],
+            opcodes[1],
+            opcodes[2],
+            opcodes[3],
+            opcodes[4]
+        );
+        let owner = queue_owner_state();
+        kprintln!(
+            "s36: qowner pid={} state={} last_syscall={} in_syscall={} wait_object={} threads={}",
+            owner[0],
+            owner[1],
+            owner[2],
+            owner[3],
+            owner[4],
+            owner[5]
         );
     }
 }
@@ -1505,12 +3013,26 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
 /// used only by this terminal path, which no syscall can race on the boot CPU), and every wake
 /// releases the queue before taking the scheduler lock.
 fn wake_process_waiters(process: &Arc<Process>) {
+    if s194_trace() {
+        kprintln!("s194: wake-owned pid={}", process.id);
+    }
     // Process-owned queues.
     let _ = process.signal_waiters.wake_process(process.id);
     let _ = process.child_waiters.wake_process(process.id);
     let _ = process.scheme_waiters.wake_process(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-futex pid={}", process.id);
+    }
     // Futex buckets are global.
     crate::syscall::futex::remove_process(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-sleepers pid={}", process.id);
+    }
+    // Per-CPU sleep lists hold an `Arc<Thread>` until the deadline.
+    crate::sched::cancel_process_sleepers(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-handles pid={}", process.id);
+    }
 
     // Resources reachable from the dying table.  A blocked syscall keeps its object `Arc`, so
     // the object is still live even after this table is replaced.  IRQ objects are collected and
@@ -1518,6 +3040,7 @@ fn wake_process_waiters(process: &Arc<Process>) {
     // needs the pid registry and another process's handle table.
     let mut irqs: Vec<Arc<crate::driver::irq::Irq>> = Vec::new();
     let mut pipes: Vec<Arc<crate::process::pipe::PipeEnd>> = Vec::new();
+    let mut duplexes: Vec<Arc<crate::process::duplex::DuplexEnd>> = Vec::new();
     {
         let handles = process.handles.lock();
         handles.for_each_live(|_, object, _, _| match object {
@@ -1538,11 +3061,41 @@ fn wake_process_waiters(process: &Arc<Process>) {
                 end.wake_process(process.id);
                 pipes.push(Arc::clone(end));
             }
+            Object::Duplex(end) => {
+                end.wake_process(process.id);
+                duplexes.push(Arc::clone(end));
+            }
             Object::Memory(memory) => {
                 let _ = memory.page_waiters().wake_process(process.id);
             }
             _ => {}
         });
+    }
+    if s194_trace() {
+        kprintln!("s194: wake-processes pid={}", process.id);
+    }
+    // A thread of the dying process may wait on another live process's queue through a pid, not
+    // a handle: `PROC_WAIT_EX`/`waitpid` keeps only the child pid, and libc closes the fork
+    // handle. Sweep every live process's queues by waiter process id so that thread is woken and
+    // its `Waiter` entry (which holds an `Arc<Thread>`) is removed. FreeBSD `kern_wait4` and
+    // NetBSD `kern_lwp.c` abort a killed waiter's sleep queue at process exit.
+    for other in processes() {
+        if Arc::ptr_eq(&other, process) {
+            continue;
+        }
+        let _ = other.waiters.wake_process(process.id);
+        let _ = other.child_waiters.wake_process(process.id);
+        let _ = other.signal_waiters.wake_process(process.id);
+        let _ = other.scheme_waiters.wake_process(process.id);
+    }
+    if s194_trace() {
+        kprintln!("s194: wake-all-queues pid={}", process.id);
+    }
+    // Object queues (pipe, duplex, memory page waiters, console, record locks) are not reachable
+    // from the dying handle table; the global queue registry reaches every live queue.
+    let _ = crate::sched::wait::WaitQueue::wake_all_queues_for_process(process.id);
+    if s194_trace() {
+        kprintln!("s194: wake-objects pid={}", process.id);
     }
     for irq in irqs {
         if !irq_held_elsewhere(process, &irq) {
@@ -1559,6 +3112,45 @@ fn wake_process_waiters(process: &Arc<Process>) {
             retired_pipe = Some(pipe);
         }
     }
+    let mut retired_duplex: Option<Arc<crate::process::duplex::DuplexEnd>> = None;
+    for duplex in duplexes {
+        let duplicate = retired_duplex
+            .as_ref()
+            .is_some_and(|retired| retired.same_pair(&duplex));
+        if !duplicate && !duplex_held_elsewhere(process, &duplex) {
+            duplex.retire();
+            retired_duplex = Some(duplex);
+        }
+    }
+}
+
+/// True when a live process other than `owner` still has a handle to the same duplex pair.
+fn duplex_held_elsewhere(
+    owner: &Arc<Process>,
+    duplex: &Arc<crate::process::duplex::DuplexEnd>,
+) -> bool {
+    let registry = PID_REGISTRY.lock();
+    for (id, weak) in registry.iter() {
+        if *id == owner.id {
+            continue;
+        }
+        let Some(other) = weak.upgrade() else {
+            continue;
+        };
+        let table = other.handles.lock();
+        let mut found = false;
+        table.for_each_live(|_, object, _, _| {
+            if let Object::Duplex(candidate) = object
+                && candidate.same_pair(duplex)
+            {
+                found = true;
+            }
+        });
+        if found {
+            return true;
+        }
+    }
+    false
 }
 
 /// True when a live process other than `owner` still has a handle to the same pipe.
@@ -1620,10 +3212,22 @@ fn irq_held_elsewhere(owner: &Arc<Process>, irq: &Arc<crate::driver::irq::Irq>) 
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
 fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
+    // A process can die without the EXIT syscall (SIGKILL, a fault or OOM). POSIX record locks
+    // are owned by the process, so release them on the single teardown path before any waiter
+    // can observe a stale owner.
+    crate::syscall::record_lock::release_process(process.id);
+    // Snapshot the final resident footprint while the address space still exists. This runs
+    // before the critical section (the VMA walk allocates) and before `notify_parent`, so the
+    // reaped-child maxrss fold sees the completed footprint. The stack fault that forced the
+    // earlier removal was the inlined CmdLine parser in `teardown`, now gone.
+    process.update_maxrss();
     // The state/wake graph takes the per-CPU scheduler lock through `sched::wake`. The syscall
     // path now runs with IF enabled, so mask interrupts for this lock/wake section; otherwise a
     // timer tick on the same CPU can spin on the scheduler lock held here. The long address-space
     // release below stays interruptible so a target CPU can take a TLB IPI.
+    if s194_trace() {
+        kprintln!("s194: terminate pid={} own={}", process.id, own_context);
+    }
     let irq = crate::sync::critical();
     let mut state = process.state.lock();
     if *state == ProcessState::Exited {
@@ -1641,14 +3245,42 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     // reschedule so it observes `exiting` at its next scheduling point instead of returning to
     // user mode. The local CPU handles its own threads through the normal exit path.
     crate::sched::request_reschedule_all(crate::sched::smp::percpu::this_cpu());
-    reparent_children(process);
-    robust::walk_process(process);
-    wake_process_waiters(process);
-    let _ = process.waiters.wake_all();
+    // `state` is no longer needed: the process is terminal and published. Drop it before the
+    // quiesce wait so a sibling in a syscall cannot block on a lock this thread holds.
     drop(state);
+    // FreeBSD `exit1`/NetBSD `exit_lwps`: every sibling stops before the process releases its
+    // address space or signals its parent. The other CPUs have the reschedule request before this
+    // wait; the per-CPU slot lock makes the terminal check and `current` publish atomic, so no
+    // sibling can be switched in once the scan finds none.
+    crate::sched::quiesce_process(process);
+    if s194_trace() {
+        kprintln!("s194: after-quiesce pid={}", process.id);
+    }
+    reparent_children(process);
+    if s194_trace() {
+        kprintln!("s194: after-reparent pid={}", process.id);
+    }
+    robust::walk_process(process);
+    if s194_trace() {
+        kprintln!("s194: after-robust pid={}", process.id);
+    }
+    wake_process_waiters(process);
+    if s194_trace() {
+        kprintln!("s194: after-wake-waiters pid={}", process.id);
+    }
+    let _ = process.waiters.wake_all();
+    if s194_trace() {
+        kprintln!("s194: after-proc-waiters pid={}", process.id);
+    }
     crate::process::tty::hangup_session_leader(process);
+    if s194_trace() {
+        kprintln!("s194: after-tty pid={}", process.id);
+    }
     notify_parent(process, true);
-    crate::event::notify_all();
+    crate::event::notify_source(Arc::as_ptr(process) as usize as u64);
+    if s194_trace() {
+        kprintln!("s194: after-event pid={}", process.id);
+    }
     drop(irq);
     teardown(process, code, own_context);
     true
@@ -1656,10 +3288,9 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
 
 /// Process-wide `EXIT`: terminate every thread, tear down once, then exit the caller.
 ///
-/// Other threads of the process never run user code again: the scheduler drops any runnable
-/// thread of a terminal process, and a woken thread re-checks the flag before returning to user
-/// mode.  Since user threads run only on the boot CPU inside a non-preemptible kernel, no other
-/// thread is executing while this syscall runs, so the address space can be released here.
+/// Other threads of the process never run user code again: `terminate_once` waits in
+/// [`crate::sched::quiesce_process`] until every sibling is off-CPU before any release, and a
+/// woken thread re-checks `exiting` before returning to user mode.
 pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
         let _ = robust::walk_thread();
@@ -1813,9 +3444,29 @@ fn resolve_page_fault(cr2: u64, write: bool, interruptible: bool) -> bool {
 }
 
 /// Terminate the current process because of a user page fault.
-pub fn page_fault(cr2: u64) -> ! {
-    let path = current().map_or_else(String::new, |process| process.path.clone());
-    kprintln!("process: {} killed by page fault at 0x{:x}", path, cr2);
+pub fn page_fault(cr2: u64, rip: u64) -> ! {
+    let (path, pid, ppid, sig_entry) = match current() {
+        Some(process) => {
+            let ids = *process.ids.lock();
+            let sig_entry = crate::sched::current_thread()
+                .map_or(0, |thread| thread.signal_entry.load(Ordering::Acquire));
+            (process.path.clone(), process.id, ids.ppid, sig_entry)
+        }
+        None => (String::new(), 0, 0, 0),
+    };
+    // K495 rev180: the fault address alone does not identify the process or the instruction that
+    // caused it. The SIG_SETUP entry is the caller address the kernel would resume a delivered
+    // signal at; printing it with the fault RIP distinguishes a bad child exit from a bad signal
+    // resume (Ken's SIG_SETUP class).
+    kprintln!(
+        "process: {} pid={} ppid={} killed by page fault at 0x{:x} rip=0x{:x} sig_entry=0x{:x}",
+        path,
+        pid,
+        ppid,
+        cr2,
+        rip,
+        sig_entry
+    );
     exit_current(-11)
 }
 

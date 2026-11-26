@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K213: the libc setitimer/getitimer C ABI over the real ITIMER_REAL timer and SIGALRM path.
+# The fixture proves set/get, old/cancel, the shared alarm() state, a repeating interval and
+# EINVAL for unsupported selectors and out-of-range timeval fields.
+
+name = "itimer"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/itimer-fixture/build.sh"]
+initfs = "build/fixtures/itimer/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^itimer: start$'
+
+[[expect]]
+regex = '^itimer: handler-installed ok$'
+
+[[expect]]
+regex = '^itimer: handler-stored ok$'
+
+[[expect]]
+regex = '^itimer: set-first ok$'
+
+[[expect]]
+regex = '^itimer: get-armed ok$'
+
+[[expect]]
+regex = '^itimer: deliver-eintr ok$'
+
+[[expect]]
+regex = '^itimer: deliver-bounded ok$'
+
+[[expect]]
+regex = '^itimer: get-expired ok$'
+
+[[expect]]
+regex = '^itimer: set-old ok$'
+
+[[expect]]
+regex = '^itimer: cancel-old ok$'
+
+[[expect]]
+regex = '^itimer: cancel-clear ok$'
+
+[[expect]]
+regex = '^itimer: alarm-shared ok$'
+
+[[expect]]
+regex = '^itimer: alarm-cancel ok$'
+
+[[expect]]
+regex = '^itimer: interval-set ok$'
+
+[[expect]]
+regex = '^itimer: interval-hit ok$'
+
+[[expect]]
+regex = '^itimer: einval-virtual ok$'
+
+[[expect]]
+regex = '^itimer: einval-prof ok$'
+
+[[expect]]
+regex = '^itimer: einval-usec ok$'
+
+[[expect]]
+regex = '^itimer: einval-negative ok$'
+
+[[expect]]
+regex = '^itimer: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|itimer: FAIL'

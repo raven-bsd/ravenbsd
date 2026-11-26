@@ -130,7 +130,13 @@ pub fn log(args: fmt::Arguments<'_>) {
     if CONOUT.load(Ordering::Acquire)
         && let Ok(text) = core::str::from_utf8(&line.bytes[..line.len])
     {
-        uefi::print!("{text}");
+        // The UEFI ConOut copy is a mirror, not the authoritative console. A console that
+        // reports EFI_DEVICE_ERROR must not panic the loader; the bytes are already on COM1 or
+        // the PL011. `with_stdout` is only reached before `disable_conout` (and therefore before
+        // ExitBootServices), so its "boot services active" precondition holds.
+        uefi::system::with_stdout(|stdout| {
+            let _ = crate::console_mirror::write_best_effort(stdout, text);
+        });
     }
 }
 

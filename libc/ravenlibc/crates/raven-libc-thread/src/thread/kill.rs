@@ -51,14 +51,19 @@ pub fn kill<K: ThreadKernel>(kernel: &K, thread: usize, signal: i32) -> Result<(
     crate::sync::lock::lock(kernel, &pthread.killlock);
     let tid = pthread.tid.load(Ordering::Acquire);
     let result = if tid > 0 {
-        if !kernel.caps().kick {
-            Err(ENOSYS)
-        } else if !(0..NSIG).contains(&signal) {
+        if !(0..NSIG).contains(&signal) {
             Err(EINVAL)
         } else if signal == 0 {
             Ok(())
-        } else {
+        } else if kernel.caps().kick {
             kernel.kick(pthread.handle, 1u64 << (signal as u32 - 1))
+        } else if pthread.handle == 0 && thread != kernel.thread_pointer() {
+            // Only the main thread has no kernel thread handle, and `Handle::NONE` names the
+            // caller. A cross-thread send to main cannot be targeted with the accepted provider;
+            // returning success here would migrate the signal to an arbitrary thread.
+            Err(ENOSYS)
+        } else {
+            raw::thread_sigqueue(pthread.handle, signal, 0)
         }
     } else if !(0..NSIG).contains(&signal) {
         Err(EINVAL)

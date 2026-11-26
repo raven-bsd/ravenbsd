@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K495 rev167 test-only fixture: a static std program that starts, runs an external child through
+# the Raven exec path, then uses a HashMap and reads the environment. It is not a product crate.
+
+[package]
+name = "postchild-std"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "postchild-std"
+path = "src/main.rs"
+
+[workspace]

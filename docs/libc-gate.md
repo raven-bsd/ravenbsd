@@ -52,8 +52,9 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
   pass, the 10 static invariants, the P7 riscv64 server B row and two riscv64 P9 static rows
   remain; no budget raised).
 * BLOCKED: 2.1/2.2 (`results/x86_64/world.json`, H-11 tarballs and H-12 freeze absent).
-* STALE this round: 5.1, 5.2, 5.3 (no QEMU; the 24 h soak owns it). The committed
-  C74u/C74ae/C74n/C74v evidence remains green but was not re-run.
+* STALE this round: 5.1, 5.3 (no QEMU; the 24 h soak owns it). The committed C74u/C74ae
+  evidence remains green but was not re-run; 5.2 was re-run and is MET (C74n: 31.3 s
+  `core-servers`, 53.3 s `file-tools`, both exit 0).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
 `build/libc-gate/`. C74h re-ran the full gate on `beedfbbd`: the symbol audit is now MET (66/66,
@@ -63,8 +64,9 @@ exit 0); the host-test row now runs through `cargo nextest run`; `libc-dynamic`,
 per the committed evidence). C74i then added the three missing loader SAFETY
 comments: `libc-lint` now reports 26 violations, all outside the loader files (P1f/phil 14,
 P1h/otto 8, P1i/tim 3, ABI/contract 1; C74l/C74i reduced that to 15, P1f 14 and ABI 1).
-C74n closed 5.2.core-servers, C74v closed 5.2.file-tools with the real `/etc/mounts` list, and
-C74u closed 5.1 (`sscanf`, `tzname`). C74ij reconciled `strftime %s`; C74da round 3 re-ran 1.4
+C74n re-ran 5.2 on `6af246ac`: `core-servers` passes in 31.3 s and `file-tools` in 53.3 s,
+both in-tree and with `tooltest: ok`; C74v added the real `/etc/mounts` list and C74u closed
+5.1 (`sscanf`, `tzname`). C74ij reconciled `strftime %s`; C74da round 3 re-ran 1.4
 on `02152587` with `RAVENBSD_RESOURCES` (27/27 MET) and C74k recorded the one-hour
 `inet_text` soak. C74cw wired row 1.6 to the bounded Miri runner and C74fx re-ran
 `cargo run -q -p libc-gate -- eval --only 1.6 --out build/libc-gate-c74fx`: exit 0, **MET**

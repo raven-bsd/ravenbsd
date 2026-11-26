@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K285: the release command set for clean shutdown, reboot and poweroff
+# (see profiles/release.d/95-power.toml).
+
+[[initfs.programs]]
+package = "raven-shutdown"
+path = "/sbin/shutdown"
+
+[[initfs.programs]]
+package = "raven-reboot"
+path = "/sbin/reboot"
+
+[[initfs.programs]]
+package = "raven-poweroff"
+path = "/sbin/poweroff"

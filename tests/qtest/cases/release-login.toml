@@ -4,11 +4,18 @@
 # REL2b: the QEMU release gate. Boots the `release` profile, logs in as root with the
 # development password, asserts the brush root prompt, lists /bin and pings the QEMU
 # user-network gateway. The kernel/loader lines remain in the captured transcript.
+#
+# S130: the release loader contract is --image-base=0x1000. The pre-step is K131's release loader
+# check: it plants a stale loader, rebuilds the release initfs, and asserts the fresh 0x1000 base,
+# SONAME, manifest base/interpreter/hash and the loader packed in the initfs. The case still
+# exercises the dynamic getty -> PT_INTERP=/libexec/ld-elf.so.1 -> svcd spawn path through the
+# release profile; the vaddr-0 parser input remains the S129 unit/negative test.
 
 name = "release-login"
 arch = "x86_64"
 profile = "release"
 timeout_secs = 420
+pre = ["sh tests/release/check-loader.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -24,7 +31,19 @@ regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '(?i)^password: ?$'
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?'
+
+[[expect]]
+regex = '^/root$'
 
 [[expect]]
 regex = '^cat$'
@@ -34,6 +53,12 @@ regex = '^ls$'
 
 [[expect]]
 regex = '^uname$'
+
+[[expect]]
+regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+
+[[expect]]
+regex = '^PID PPID UID GID CMD$'
 
 [[expect]]
 regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
@@ -53,7 +78,7 @@ send = "root\n"
 delay_ms = 100
 
 [[step]]
-wait = '(?i)^password: ?$'
+wait = '(?i)^password: ?'
 timeout_secs = 30
 
 [[step]]
@@ -63,6 +88,30 @@ delay_ms = 100
 [[step]]
 wait = '^raven# $'
 timeout_secs = 300
+
+[[step]]
+send = "cd && pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/root$'
+timeout_secs = 30
+
+[[step]]
+send = "cd /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls -alh /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
 
 [[step]]
 send = "ls /bin\n"
@@ -78,6 +127,34 @@ timeout_secs = 30
 
 [[step]]
 wait = '^uname$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/ps -e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PID PPID UID GID CMD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^[0-9]+ [0-9]+ [0-9]+ [0-9]+ .+$'
 timeout_secs = 30
 
 [[step]]
@@ -109,4 +186,11 @@ wait = '^init exited \(0\)$'
 timeout_secs = 60
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout'
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout|command not found'
+
+[[forbid]]
+regex = '(?i)SegmentOutsideUserRange|bad ELF|getty failed'
+
+# K174: a failed root mount must not leave a dangling /root in the namespace.
+[[forbid]]
+regex = "cannot access '/root'|d\\?{9}"

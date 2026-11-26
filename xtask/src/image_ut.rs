@@ -3,9 +3,43 @@
 
 //! Host tests for image assembly helpers.
 
+use std::fs;
 use std::path::Path;
 
 use super::*;
+
+#[test]
+fn dotted_product_profile_name_loads() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let profile = Profile::load(root, "0.1.0-ufs").expect("0.1.0-ufs profile");
+    assert_eq!(profile.name, "0.1.0-ufs");
+    let boot = Profile::load(root, "0.1.0-ufs-boot").expect("0.1.0-ufs-boot profile");
+    assert_eq!(boot.name, "0.1.0-ufs-boot");
+    assert!(ufs_boot_profile(root, "0.1.0-ufs").is_some());
+}
+
+#[test]
+fn ufs_root_is_selected_by_a_spec_and_a_boot_profile() {
+    let root = std::env::temp_dir().join(format!("raven-image-ufs-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("profiles/demo")).unwrap();
+    fs::write(root.join("profiles/demo/rootfs.toml"), "size = 1048576\n").unwrap();
+    assert_eq!(ufs_boot_profile(&root, "demo"), None);
+
+    fs::write(
+        root.join("profiles/demo-boot.toml"),
+        "name = \"demo-boot\"\n[boot]\ncmdline = \"console=ttyS0\"\nlog_level = \"info\"\n",
+    )
+    .unwrap();
+    assert_eq!(
+        ufs_boot_profile(&root, "demo"),
+        Some("demo-boot".to_string())
+    );
+
+    fs::remove_file(root.join("profiles/demo/rootfs.toml")).unwrap();
+    assert_eq!(ufs_boot_profile(&root, "demo"), None);
+    let _ = fs::remove_dir_all(&root);
+}
 
 #[test]
 fn boot_toml_uses_profile_and_override() {
@@ -46,6 +80,19 @@ fn relative_overrides_are_anchored_at_the_root() {
 }
 
 #[test]
+fn replace_initfs_file_replaces_one_entry() {
+    let mut builder = raven_initfs::InitfsBuilder::new();
+    builder.add_file("/etc/keep", b"keep", 0o644).unwrap();
+    builder.add_file("/etc/replace", b"old", 0o644).unwrap();
+    let image = builder.build();
+    let replaced = replace_initfs_file(&image, "/etc/replace", b"new", 0o600, 0).expect("replace");
+    let parsed = raven_initfs::Initfs::parse(&replaced).expect("parse");
+    assert_eq!(parsed.get("/etc/keep").unwrap().data, b"keep");
+    assert_eq!(parsed.get("/etc/replace").unwrap().data, b"new");
+    assert_eq!(parsed.get("/etc/replace").unwrap().mode, 0o600);
+}
+
+#[test]
 fn platform_parses_generic_pi4_and_rejects_unknown() {
     assert!(matches!(Platform::parse("generic"), Ok(Platform::Generic)));
     assert!(matches!(Platform::parse("pi4"), Ok(Platform::Pi4)));
@@ -80,4 +127,15 @@ fn fat_with_cmdline_preserves_files_and_adds_the_cmdline() {
         .read_to_string(&mut cmdline)
         .unwrap();
     assert_eq!(cmdline, "console=ttyAMA0 loglevel=info\n");
+}
+
+#[test]
+fn release_profiles_request_release_kernel_and_loader() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let release = Profile::load(root, "release").unwrap();
+    assert!(build::image_build_release(Arch::X86_64, &release));
+    let base = Profile::load(root, "base").unwrap();
+    assert!(!build::image_build_release(Arch::X86_64, &base));
+    let pi4 = Profile::load(root, "pi4-release").unwrap();
+    assert!(build::image_build_release(Arch::Aarch64, &pi4));
 }

@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K485/K539: the stored termios bits change pty behaviour. Rows cover canonical VERASE/VKILL/VEOF/
+# VWERASE, ISIG VINTR/SIGINT and VQUIT/SIGQUIT delivery to the foreground group, none to a
+# background group, ISIG-off data, the no-group rule, OPOST/ONLCR, ICRNL/INLCR/IGNCR/ISTRIP, and
+# VMIN/VTIME with a measured range.
+
+name = "tty-discipline"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh tty-discipline"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^tty-discipline: start uid=0$'
+
+# The ptyd serial records the signal number and target group: two foreground VINTRs (the
+# foreground and background rows) send SIGINT, and the VQUIT row sends SIGQUIT. The test's
+# pause/PROC_SIGRECV rows observe the queued signal; these lines pin the number and group.
+[[expect]]
+regex = '^ptyd: signal pgrp=-[0-9]+ signo=2 ok$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: signal pgrp=-[0-9]+ signo=2 ok$'
+unordered = true
+
+[[expect]]
+regex = '^ptyd: signal pgrp=-[0-9]+ signo=3 ok$'
+unordered = true
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-erase ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-kill ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-werase ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-eof ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=canonical-eof-empty ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-intr-data ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-intr-echo ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-intr sigint=0 pgrp-unset ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-foreground sigint=1 ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-background foreground=1 background=0 ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-off data=1 sigint=0 ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=isig-quit sigquit=1 ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=opost-onlcr ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=opost-off ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=icrnl ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=inlcr ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=igncr silent ok$'
+
+[[expect]]
+regex = '^tty-discipline: row=istrip ok$'
+
+[[expect]]
+regex = '^tty-discipline: vmin1 read=1 byte=88 elapsed_ms=[0-9]+$'
+
+[[expect]]
+regex = '^tty-discipline: row=vmin1 ok$'
+
+[[expect]]
+regex = '^tty-discipline: vtime child count=0 elapsed_ms=[1-9][0-9]+$'
+
+[[expect]]
+regex = '^tty-discipline: row=vtime ok$'
+
+[[expect]]
+regex = '^tty-discipline: ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tty-discipline: .*FAIL'

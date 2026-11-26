@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 pub mod gate;
+pub mod mgmt;
 pub mod model;
 pub mod overlay;
 pub mod render;

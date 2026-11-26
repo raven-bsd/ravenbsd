@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+owner	function	rust_path	test	mutation_status	mutation_note
+K334	rack_alloc	crate::rack_misc::RackMisc::rack_alloc	rack_alloc_returns_and_reuses_a_map	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_alloc_full_limit	crate::rack_misc::RackMisc::rack_alloc_full_limit	rack_alloc_full_limit_stops_at_the_limit	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_alloc_limit	crate::rack_misc::RackMisc::rack_alloc_limit	rack_alloc_limit_marks_the_split_allocation	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_free_trim	crate::rack_misc::RackMisc::rack_free_trim	rack_free_trim_returns_to_the_hot_cache	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_free	crate::rack_misc::RackMisc::rack_free	rack_free_clears_the_map_and_keeps_the_count	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_clone_rsm	crate::rack_misc::RackMisc::rack_clone_rsm	rack_clone_rsm_copies_the_left_edge_and_flags	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_merge_rsm	crate::rack_misc::RackMisc::rack_merge_rsm	rack_merge_rsm_extends_the_left_map_and_frees_the_right	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_init_fsb_block	crate::rack_misc::RackMisc::rack_init_fsb_block	rack_init_fsb_block_sets_the_header_and_window	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_init_fsb	crate::rack_misc::RackMisc::rack_init_fsb	rack_init_fsb_allocates_and_fini_releases	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_deferred_init	crate::rack_misc::RackMisc::rack_deferred_init	rack_deferred_init_copies_the_send_state	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_init_retransmit_value	crate::rack_misc::RackMisc::rack_init_retransmit_value	rack_init_retransmit_value_selects_the_three_modes	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_init_outstanding	crate::rack_misc::RackMisc::rack_init_outstanding	rack_init_outstanding_builds_the_current_flight	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_init	crate::rack_misc::RackMisc::rack_init	rack_init_and_fini_lifecycle	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_fini	crate::rack_misc::RackMisc::rack_fini	rack_init_and_fini_lifecycle	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_mtu_change	crate::rack_misc::RackMisc::rack_mtu_change	rack_mtu_change_marks_every_sendmap	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_sndbuf_autoscale	crate::rack_misc::RackMisc::rack_sndbuf_autoscale	rack_sndbuf_autoscale_grows_the_send_buffer	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_set_profile	crate::rack_misc::RackMisc::rack_set_profile	rack_set_profile_switches_profiles	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_add_deferred_option	crate::rack_misc::RackMisc::rack_add_deferred_option	rack_add_deferred_option_is_bounded	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_stack_information	crate::rack_misc::RackMisc::rack_stack_information	rack_stack_information_reports_the_counters	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_inherit	crate::rack_misc::RackMisc::rack_inherit	rack_inherit_copies_the_option_state	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_apply_deferred_options	crate::rack_misc::RackMisc::rack_apply_deferred_options	rack_apply_deferred_options_applies_and_clears	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_set_sockopt	crate::rack_misc::RackMisc::rack_set_sockopt	rack_set_sockopt_sets_directly	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_fill_info	crate::rack_misc::RackMisc::rack_fill_info	rack_fill_info_snapshots_the_tcp_state	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_get_sockopt	crate::rack_misc::RackMisc::rack_get_sockopt	rack_get_sockopt_round_trips_set_values	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_ctor	crate::rack_misc::RackMisc::rack_ctor	rack_ctor_and_dtor_are_safe	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_dtor	crate::rack_misc::RackMisc::rack_dtor	rack_ctor_and_dtor_are_safe	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_chg_query	crate::rack_misc::RackMisc::rack_chg_query	rack_chg_query_fills_the_sendmap_and_timer_views	GAP	single constant mutation in report; no per-function mutation evidence
+K334	rack_pru_options	crate::rack_misc::RackMisc::rack_pru_options	rack_pru_options_rejects_oob	GAP	single constant mutation in report; no per-function mutation evidence
+K335	rack_start_hpts_timer	crate::rack_transport::rack_start_hpts_timer	start_timer_late_compensation_and_timer	PASS	late compensation disabled -> FAIL
+K335	rack_process_timers	crate::rack_transport::rack_process_timers	process_timers_dispatches_in_donor_order	PASS	zero-timer branch inverted -> FAIL
+K335	rack_stop_all_timers	crate::rack_transport::rack_stop_all_timers	stop_all_timers_marks_pending_persist	PASS	persist flag forced false -> FAIL
+K335	tcp_addrack	crate::rack_transport::tcp_addrack	addrack_load_and_unload_manage_context	PASS	load result forced unregistered -> FAIL
+K335	rack_ctloutput	crate::rack_transport::rack_ctloutput	ctloutput_routes_set_get_and_errors	PASS	GET path returns Ok(None) -> FAIL
+K335	rack_hw_tls_change	crate::rack_transport::rack_hw_tls_change	hwtls_change_sets_flag_and_counter	PASS	flag inverted -> FAIL
+K335	rack_pru_options	crate::rack_transport::rack_pru_options	pru_options_rejects_oob_only	PASS	OOB check disabled -> FAIL
+K335	rack_wake_check	crate::rack_transport::rack_wake_check	wake_check_uses_pacing_and_timer_deadlines	PASS	deadline comparison changed to > -> FAIL
+K335	rack_switch_failed	crate::rack_transport::rack_switch_failed	switch_failed_sets_mbufq_and_rearms	PASS	ACKCMP bit removed -> FAIL

@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K192: semantic syntax highlighting on the release console. keep_ansi preserves the
+# renderer escapes so the not-found command is asserted as bold red before Enter. A nested
+# NO_COLOR/RAVEN_PLAIN_PROMPT brush proves the same input stays plain.
+
+name = "shell-highlight"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 240
+keep_ansi = true
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '1;31mzzz-not-a-command'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '\x1b\[1;31mzzz-plain-command'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|bad ELF|getty failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 500
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+# Type a command that cannot resolve; the highlighter paints it bold red before Enter.
+[[step]]
+send = "zzz-not-a-command "
+delay_ms = 800
+
+[[step]]
+send = "\u0003"
+delay_ms = 300
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+# The plain switches must keep the next session free of the not-found style.
+[[step]]
+send = "export NO_COLOR=1 RAVEN_PLAIN_PROMPT=1\n"
+delay_ms = 100
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush -i --rcfile /etc/brush/brushrc\n"
+delay_ms = 500
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "zzz-plain-command"
+delay_ms = 800
+
+[[step]]
+send = "\u0003"
+delay_ms = 300
+
+[[step]]
+send = "exit\n"
+delay_ms = 200
+
+[[step]]
+wait = 'raven# '
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30

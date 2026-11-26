@@ -7,7 +7,7 @@
 name = "capture-lifetime"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 180
+timeout_secs = 300
 pre = ["sh tests/fixtures/s32-capture/build.sh"]
 initfs = "build/fixtures/s32-capture/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 s32-capturecheck"
@@ -18,6 +18,24 @@ regex = '^s32: canceller done$'
 
 [[expect]]
 regex = '^s32: cancel ok$'
+
+[[expect]]
+regex = '^s32: cycle ok$'
+
+[[expect]]
+regex = '^s32: bound ok success=[0-9]+ full=[0-9]+$'
+
+[[expect]]
+regex = '^s32: cancel-capture ok$'
+
+[[expect]]
+regex = '^s32: revoke ok$'
+
+[[expect]]
+regex = '^s32: close-request ok$'
+
+[[expect]]
+regex = '^s32: revoke-request ok$'
 
 [[expect]]
 regex = '^s32: roundtrip ok$'
@@ -43,8 +61,15 @@ regex = '^s32: capture frames=0 free_bytes=[0-9]+$'
 [[expect]]
 regex = '^s32: lifecycle ok$'
 
+[[expect]]
+regex = '^s32: final frames=0 free_bytes=[0-9]+$'
+
 [[forbid]]
-regex = '^s32: capture frames=[1-9][0-9]* free_bytes='
+regex = '^s32: final frames=[1-9][0-9]* free_bytes='
+
+# A cancelled capture deliberately stays mapped until the server's in-flight reply retires it;
+# the final init exit must still report frames=0 (the expectation above). The old per-exit
+# forbid is removed because K511 exercises that documented in-flight window.
 
 [[forbid]]
 regex = 's32: server saw a wrong write snapshot'

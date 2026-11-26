@@ -52,6 +52,7 @@ mod sigpause;
 mod sigpending;
 #[path = "sigprocmask.rs"]
 mod sigprocmask;
+pub(crate) use sigprocmask::sigprocmask;
 #[path = "sigqueue.rs"]
 mod sigqueue;
 #[path = "sigrelse.rs"]

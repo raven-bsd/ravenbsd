@@ -20,8 +20,11 @@ mod program {
     use alloc::string::String;
 
     use login::tty::Console;
-    use login::{Profile, parse_profile, parse_root_passwd};
-    use raven_getty::{Session, SessionError, run_session};
+    use login::{
+        Autologin, PasswdEntry, Profile, parse_autologin, parse_passwd, parse_profile,
+        parse_root_passwd,
+    };
+    use raven_getty::{Account, Session, SessionError, run_session};
     use raven_initfs::Initfs;
     use raven_rt::entry;
     use raven_rt::fs;
@@ -32,6 +35,7 @@ mod program {
     struct ConsoleSession {
         console: Console,
         initfs: Initfs<'static>,
+        accounts: alloc::vec::Vec<PasswdEntry>,
     }
 
     impl Session for ConsoleSession {
@@ -63,11 +67,29 @@ mod program {
             let options = SpawnOptions { args, env };
             spawn_wait(&self.initfs, shell, &options)
         }
+
+        fn account(&mut self, username: &str) -> Option<Account> {
+            self.accounts
+                .iter()
+                .find(|entry| entry.name == username)
+                .map(|entry| Account {
+                    home: entry.home.clone(),
+                    shell: entry.shell.clone(),
+                })
+        }
     }
 
     fn main(_args: raven_rt::Args) -> i32 {
         let profile = read_profile();
-        let shell = read_shell().unwrap_or_else(|| profile.shell.clone());
+        let passwd = read_passwd();
+        let mut accounts = parse_passwd(&passwd);
+        for entry in &mut accounts {
+            if entry.name == login::ROOT_USER {
+                entry.shell = alloc::string::String::from(login::DEFAULT_SHELL);
+            }
+        }
+        let shell = root_shell(&passwd).unwrap_or_else(|| profile.shell.clone());
+        let autologin = read_autologin();
         let Ok(console) = Console::open() else {
             return 1;
         };
@@ -77,8 +99,34 @@ mod program {
         let Ok(initfs) = Initfs::parse(image) else {
             return 1;
         };
-        let mut session = ConsoleSession { console, initfs };
-        run_session(&mut session, &profile, &shell)
+        let mut session = ConsoleSession {
+            console,
+            initfs,
+            accounts,
+        };
+        run_session(&mut session, &profile, &shell, autologin.as_deref())
+    }
+
+    fn read_passwd() -> String {
+        fs::read_to_vec("file:/etc/passwd")
+            .ok()
+            .and_then(|bytes| {
+                core::str::from_utf8(&bytes)
+                    .ok()
+                    .map(alloc::string::String::from)
+            })
+            .unwrap_or_default()
+    }
+
+    fn root_shell(passwd: &str) -> Option<alloc::string::String> {
+        parse_root_passwd(passwd).map(|entry| entry.shell)
+    }
+
+    fn read_autologin() -> Option<alloc::string::String> {
+        let bytes = fs::read_to_vec("file:/etc/raven/autologin.toml").ok()?;
+        let text = core::str::from_utf8(&bytes).ok()?;
+        let Autologin { enabled, user } = parse_autologin(text);
+        (enabled && !user.is_empty()).then_some(user)
     }
 
     fn read_profile() -> Profile {
@@ -86,12 +134,6 @@ mod program {
             .ok()
             .and_then(|bytes| core::str::from_utf8(&bytes).ok().map(parse_profile))
             .unwrap_or_default()
-    }
-
-    fn read_shell() -> Option<String> {
-        let passwd = fs::read_to_vec("file:/etc/passwd").ok()?;
-        let text = core::str::from_utf8(&passwd).ok()?;
-        parse_root_passwd(text).map(|entry| entry.shell)
     }
 
     fn spawn_wait(

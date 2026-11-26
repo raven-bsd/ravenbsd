@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K191: the shell image has HOME=/root in /etc/profile, so the initfs needs a real
+# /root directory. There is no UFS root here; this is the initfs root home.
+
+[[initfs.files]]
+src = "profiles/shell.d/root.keep"
+path = "/root/.keep"
+mode = 0o644

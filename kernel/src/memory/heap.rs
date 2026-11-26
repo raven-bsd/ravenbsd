@@ -12,8 +12,77 @@
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use spin::Mutex;
+
+/// Failed allocation size and caller addresses (K434 owner diagnostic).
+static FAIL_SIZE: AtomicUsize = AtomicUsize::new(0);
+static FAIL_ALIGN: AtomicUsize = AtomicUsize::new(0);
+static FAIL_RA0: AtomicUsize = AtomicUsize::new(0);
+static FAIL_RA1: AtomicUsize = AtomicUsize::new(0);
+/// Failed allocation caller frame chain (K434 object-site diagnostic).
+const FAIL_BT_DEPTH: usize = 6;
+static FAIL_BT: [AtomicUsize; FAIL_BT_DEPTH] = [
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+];
+
+/// Failed allocation `(size, align, caller_return_addresses)`; size 0 when none.
+pub fn fail_info() -> (usize, usize, usize, usize) {
+    (
+        FAIL_SIZE.load(Ordering::Acquire),
+        FAIL_ALIGN.load(Ordering::Acquire),
+        FAIL_RA0.load(Ordering::Acquire),
+        FAIL_RA1.load(Ordering::Acquire),
+    )
+}
+
+/// Caller return addresses captured when the last allocation failed.
+pub fn fail_backtrace() -> [usize; FAIL_BT_DEPTH] {
+    [
+        FAIL_BT[0].load(Ordering::Acquire),
+        FAIL_BT[1].load(Ordering::Acquire),
+        FAIL_BT[2].load(Ordering::Acquire),
+        FAIL_BT[3].load(Ordering::Acquire),
+        FAIL_BT[4].load(Ordering::Acquire),
+        FAIL_BT[5].load(Ordering::Acquire),
+    ]
+}
+
+fn record_fail(size: usize, align: usize, ra0: usize, ra1: usize) {
+    FAIL_SIZE.store(size, Ordering::Release);
+    FAIL_ALIGN.store(align, Ordering::Release);
+    FAIL_RA0.store(ra0, Ordering::Release);
+    FAIL_RA1.store(ra1, Ordering::Release);
+    #[cfg(target_arch = "x86_64")]
+    {
+        // `ra1` is the saved frame pointer of the allocation shim. Walk the caller chain so the
+        // panic handler can name the object site that requested the failed size. The bounds keep
+        // a corrupted frame from driving the walk into unmapped memory on the panic path.
+        let mut frame = ra1;
+        let mut depth = 0usize;
+        while depth < FAIL_BT_DEPTH && frame != 0 {
+            // SAFETY: frame is a kernel-stack frame pointer published by the compiler; the
+            // monotonic bound below rejects an invalid next frame before it is dereferenced.
+            let next = unsafe { core::ptr::read_volatile(frame as *const usize) };
+            // SAFETY: [frame + 8] is the return address slot of the frame at `frame`.
+            let ret = unsafe { core::ptr::read_volatile(frame.saturating_add(8) as *const usize) };
+            if let Some(slot) = FAIL_BT.get(depth) {
+                slot.store(ret, Ordering::Release);
+            }
+            if next <= frame || next.saturating_sub(frame) > 0x1_0000 {
+                break;
+            }
+            frame = next;
+            depth = depth.saturating_add(1);
+        }
+    }
+}
 
 #[cfg(target_arch = "aarch64")]
 use raven_abi::layout::aarch64::{KERNEL_HEAP_BASE, KERNEL_HEAP_END};
@@ -29,6 +98,13 @@ use crate::memory::paging;
 const INITIAL_HEAP_SIZE: u64 = 4 * 1024 * 1024;
 /// Growth step.
 const GROW_SIZE: u64 = 1024 * 1024;
+/// Last heap-growth failure: 0 none, 1 limit, 2 map, 3 import exhausted, 4 import no tags.
+static GROW_FAIL: AtomicUsize = AtomicUsize::new(0);
+/// Failed frees and the layout of the last rejected block (K434 diagnostic).
+static FREE_FAILS: AtomicUsize = AtomicUsize::new(0);
+static FREE_FAIL_SIZE: AtomicUsize = AtomicUsize::new(0);
+static FREE_FAIL_ALIGN: AtomicUsize = AtomicUsize::new(0);
+static FREE_FAIL_PTR: AtomicUsize = AtomicUsize::new(0);
 /// The MMIO bump window starts here inside the heap region.
 pub const MMIO_WINDOW_OFFSET: u64 = 0x1000_0000_0000;
 /// Heap growth stops before the MMIO window.
@@ -83,6 +159,86 @@ pub fn stats() -> (usize, usize) {
     }
 }
 
+/// Statistics for one general size-class slot (S36b diagnostic).
+pub fn class_stats(index: usize) -> Option<raven_kmem::CacheStats> {
+    let guard = HEAP.lock();
+    guard.as_ref()?.heap.general_stats(index)
+}
+
+/// Last heap-growth failure reason code.
+pub fn grow_fail() -> usize {
+    GROW_FAIL.load(Ordering::Acquire)
+}
+
+/// Global kmem counters `(alloc_fail, large_live, in_use_objects)`.
+pub fn kmem_counters() -> Option<(u64, u64, u64)> {
+    let guard = HEAP.lock();
+    let stats = guard.as_ref()?.heap.stats();
+    Some((
+        stats.alloc_fail,
+        stats.large_live,
+        u64::try_from(stats.in_use).unwrap_or(0),
+    ))
+}
+
+/// Failed frees `(count, last_size, last_align, last_pointer)`.
+pub fn free_fail_info() -> (usize, usize, usize, usize) {
+    (
+        FREE_FAILS.load(Ordering::Acquire),
+        FREE_FAIL_SIZE.load(Ordering::Acquire),
+        FREE_FAIL_ALIGN.load(Ordering::Acquire),
+        FREE_FAIL_PTR.load(Ordering::Acquire),
+    )
+}
+
+/// Allocated-segment histogram by size: `<=1K, <=2K, <=4K, <=8K, <=16K, <=64K, <=1M, >1M`.
+pub fn segment_histogram() -> Option<([u64; 8], [u64; 8])> {
+    let guard = HEAP.lock();
+    let arena = guard.as_ref()?.heap.arena();
+    let mut counts = [0u64; 8];
+    let mut bytes = [0u64; 8];
+    for segment in arena.segments().filter(|segment| !segment.is_free()) {
+        let size = segment.size();
+        let index = if size <= 1024 {
+            0
+        } else if size <= 2048 {
+            1
+        } else if size <= 4096 {
+            2
+        } else if size <= 8192 {
+            3
+        } else if size <= 16 * 1024 {
+            4
+        } else if size <= 64 * 1024 {
+            5
+        } else if size <= 1024 * 1024 {
+            6
+        } else {
+            7
+        };
+        if let Some(slot) = counts.get_mut(index) {
+            *slot = slot.saturating_add(1);
+        }
+        if let Some(slot) = bytes.get_mut(index) {
+            *slot = slot.saturating_add(size);
+        }
+    }
+    Some((counts, bytes))
+}
+
+/// Arena counters `(spans, free_bytes, largest_free, alloc_fail, used_bytes)`.
+pub fn arena_stats() -> Option<(usize, u64, u64, u64, u64)> {
+    let guard = HEAP.lock();
+    let stats = guard.as_ref()?.heap.arena().stats();
+    Some((
+        stats.spans,
+        stats.free_bytes,
+        stats.largest_free,
+        stats.alloc_fail,
+        stats.used_bytes,
+    ))
+}
+
 /// Run the `selftest=heap` workload.
 pub fn selftest() {
     {
@@ -107,19 +263,31 @@ pub fn selftest() {
 /// Grow the heap by [`GROW_SIZE`], importing the freshly mapped range into the arena.
 fn grow(state: &mut State) -> bool {
     let Some(next) = state.mapped.checked_add(GROW_SIZE) else {
+        GROW_FAIL.store(1, Ordering::Release);
         return false;
     };
     if KERNEL_HEAP_BASE.saturating_add(next) > HEAP_LIMIT {
+        GROW_FAIL.store(1, Ordering::Release);
         return false;
     }
     if paging::map_heap_range(state.mapped, GROW_SIZE).is_err() {
+        GROW_FAIL.store(2, Ordering::Release);
         return false;
     }
     let base = KERNEL_HEAP_BASE.saturating_add(state.mapped);
-    if state.heap.arena_mut().import(base, GROW_SIZE).is_err() {
+    if let Err(error) = state.heap.arena_mut().import(base, GROW_SIZE) {
+        GROW_FAIL.store(
+            if error == raven_vmem::VmemError::NoTags {
+                4
+            } else {
+                3
+            },
+            Ordering::Release,
+        );
         return false;
     }
     state.mapped = next;
+    GROW_FAIL.store(0, Ordering::Release);
     true
 }
 
@@ -129,12 +297,29 @@ fn grow(state: &mut State) -> bool {
 // so no allocation re-enters this lock.
 unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let (mut ra0, mut ra1) = (0usize, 0usize);
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            // The allocator is built with a frame pointer: `[rbp + 8]` is this call's return
+            // address and `[rbp]` the caller's frame pointer.
+            core::arch::asm!(
+                "mov {}, [rbp + 8]",
+                out(reg) ra0,
+                options(nomem, nostack, preserves_flags)
+            );
+            core::arch::asm!(
+                "mov {}, [rbp]",
+                out(reg) ra1,
+                options(nomem, nostack, preserves_flags)
+            );
+        }
         if layout.size() == 0 {
             // A zero-size allocation still needs a non-null, aligned address.
             return layout.align() as *mut u8;
         }
         let mut guard = HEAP.lock();
         let Some(state) = guard.as_mut() else {
+            record_fail(layout.size(), layout.align(), ra0, ra1);
             return ptr::null_mut();
         };
         loop {
@@ -142,6 +327,7 @@ unsafe impl GlobalAlloc for Allocator {
                 Ok(address) => return address as *mut u8,
                 Err(_) => {
                     if !grow(state) {
+                        record_fail(layout.size(), layout.align(), ra0, ra1);
                         return ptr::null_mut();
                     }
                 }
@@ -155,9 +341,16 @@ unsafe impl GlobalAlloc for Allocator {
         }
         let mut guard = HEAP.lock();
         if let Some(state) = guard.as_mut() {
-            let _ = state
+            if state
                 .heap
-                .free(pointer as usize as u64, layout.size(), layout.align());
+                .free(pointer as usize as u64, layout.size(), layout.align())
+                .is_err()
+            {
+                FREE_FAILS.fetch_add(1, Ordering::AcqRel);
+                FREE_FAIL_SIZE.store(layout.size(), Ordering::Release);
+                FREE_FAIL_ALIGN.store(layout.align(), Ordering::Release);
+                FREE_FAIL_PTR.store(pointer as usize, Ordering::Release);
+            }
         }
     }
 }

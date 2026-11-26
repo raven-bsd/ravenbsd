@@ -211,6 +211,15 @@ fn wait4_keeps_wno_wait() {
 }
 
 #[test]
+fn the_two_layer_continued_contract_is_pinned() {
+    assert_eq!(WCONTINUED, 8);
+    assert_eq!(WEXITED, 4);
+    assert_eq!(KERNEL_WCONTINUED, 4);
+    assert_eq!(kernel_wait_options(WCONTINUED), KERNEL_WCONTINUED);
+    assert_eq!(kernel_wait_options(WEXITED), 0);
+}
+
+#[test]
 fn the_kernel_word_maps_continued_to_the_raw_abi() {
     assert_eq!(KERNEL_WCONTINUED, 4);
     assert_eq!(kernel_wait_options(WCONTINUED), KERNEL_WCONTINUED);

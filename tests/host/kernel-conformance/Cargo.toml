@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K572 host conformance checks for C4 (entry/banner), C5 (test exit) and
+# C10 (serial). Static source assertions; the kernel is not built here.
+
+[package]
+name = "raven-kernel-conformance"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]

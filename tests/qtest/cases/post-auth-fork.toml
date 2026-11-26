@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K247: fork-only post-auth topology. A loopback listener accepts, forks, and the parent stops
+# touching the accepted socket. The child inherits the fd/event and must poll/read/write a framed
+# request. No exec, crypto or OpenSSH.
+name = "post-auth-fork"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 300
+initfs = "build/fixtures/post-auth-fork/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+pre = ["sh tests/fixtures/post-auth-fork/build.sh"]
+
+[[expect]]
+regex = '^post-auth-fork: listening$'
+
+[[expect]]
+regex = '^post-auth-fork: accepted$'
+
+[[expect]]
+regex = '^post-auth-fork: parent request sent$'
+
+[[expect]]
+regex = '^post-auth-fork: child poll ok$'
+
+[[expect]]
+regex = '^post-auth-fork: child read ok$'
+
+[[expect]]
+regex = '^post-auth-fork: child write ok$'
+
+[[expect]]
+regex = '^post-auth-fork: parent response ok$'
+
+[[expect]]
+regex = '^post-auth-fork: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)post-auth-fork: fail|panic|EXCEPTION'

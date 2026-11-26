@@ -2,11 +2,11 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # The target `raven` admin binary. `build.sh` stages it under `build/fixtures/modern-admin/`; the
-# profile installs that artifact at `/bin/raven` (the K74 host/stub binary is never installed).
+# profile installs that artifact at `/usr/sbin/raven` (the K74 host/stub binary is never installed).
 
 [[initfs.files]]
 src = "build/fixtures/modern-admin/raven"
-path = "/bin/raven"
+path = "/usr/sbin/raven"
 mode = 0o755
 generated = true
 

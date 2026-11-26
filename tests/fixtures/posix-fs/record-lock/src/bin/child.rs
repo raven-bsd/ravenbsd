@@ -19,7 +19,7 @@ use core::ffi::{c_char, c_int};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
-use raven_abi::types::fcntl::{GETLK, RecordLock, SETLK, SETLKW, WRLCK};
+use raven_abi::types::fcntl::{GETLK, RDLCK, RecordLock, SETLK, SETLKW, WRLCK};
 use raven_libc_abi::fcntl::{F_SETLK, F_WRLCK, O_RDWR};
 use raven_libc_abi::structs::Flock;
 use raven_proto_fs::{O_CREAT, O_RDWR as RAW_RDWR};
@@ -75,6 +75,22 @@ fn run(mode: &str, start: i64, len: i64) -> Result<(), String> {
                 Ok(()) => write_text(RESULT, "granted")?,
                 Err(error) => write_text(RESULT, &format!("error {}", error.0))?,
             }
+        }
+        "readpair" => {
+            // The parent holds a read lock: another read is compatible, a write is not.
+            let mut read = lock(RDLCK, start, len);
+            let read_result = match record_lock(&handle, SETLK, &mut read) {
+                Ok(()) => "granted",
+                Err(Errno::EAGAIN) => "conflict",
+                Err(error) => return Err(format!("readpair read: {}", error.0)),
+            };
+            let mut write = lock(WRLCK, start, len);
+            let write_result = match record_lock(&handle, SETLK, &mut write) {
+                Ok(()) => "granted",
+                Err(Errno::EAGAIN) => "conflict",
+                Err(error) => return Err(format!("readpair write: {}", error.0)),
+            };
+            write_text(RESULT, &format!("readpair {read_result} {write_result}"))?;
         }
         "getlk" => {
             let mut lock = lock(WRLCK, start, len);

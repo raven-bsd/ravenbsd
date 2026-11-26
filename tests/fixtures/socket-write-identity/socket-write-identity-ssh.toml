@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K431 S5 identity service: run after netd publishes the net scheme, accept one host connection on
+# the tap, and prove fd 7/1/2 route to the same socket across fork+exec.
+
+name = "socket-write-identity"
+exec = "/bin/socket-write-identity"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

@@ -4,7 +4,7 @@
 //! Integration tests over the B17 fixture rulesets and packets.
 
 use raven_pf::{
-    Action, AddrSpec, Direction, Engine, IfaceSpec, Ipv4Addr, Packet, PortSpec, Protocol,
+    Action, AddrSpec, Direction, Engine, IfaceSpec, IpAddr, Ipv4Addr, Packet, PortSpec, Protocol,
     StatePolicy, Verdict, parse,
 };
 
@@ -75,9 +75,9 @@ fn the_stateful_packet_fixture_matches() {
             "icmp" => Protocol::Icmp,
             other => panic!("protocol {other}"),
         };
-        let source = Ipv4Addr::parse(fields[3]).unwrap();
+        let source = IpAddr::V4(Ipv4Addr::parse(fields[3]).unwrap());
         let source_port = fields[4].parse().unwrap();
-        let destination = Ipv4Addr::parse(fields[5]).unwrap();
+        let destination = IpAddr::V4(Ipv4Addr::parse(fields[5]).unwrap());
         let destination_port = fields[6].parse().unwrap();
         let length = fields[7].parse().unwrap();
         let flags = parse_flags(fields[8]);
@@ -96,6 +96,7 @@ fn the_stateful_packet_fixture_matches() {
             destination_port,
             length,
             tcp_flags: flags,
+            fragment: false,
         };
         let decision = engine.evaluate(&packet, now);
         assert_eq!(decision.verdict, expected, "line {}: {line}", index + 1);

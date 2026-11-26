@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Deterministic `docs/posix/GAPS.md` rendering and the stale-file check.
+//! Deterministic management `posix/GAPS.md` rendering and the stale-file check.
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -370,7 +370,7 @@ fn count_files(root: &Path) -> usize {
 
 /// Write the generated GAPS.md.
 pub fn generate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()> {
-    let dir = root.join("docs/posix");
+    let dir = crate::mgmt::posix_dir(root)?;
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
     let text = render_gaps(root, profile, trace)?;
     std::fs::write(dir.join("GAPS.md"), text).context("cannot write GAPS.md")
@@ -378,7 +378,7 @@ pub fn generate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
 
 /// Fail when GAPS.md is not exactly the generated text.
 pub fn check_current(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()> {
-    let path = root.join("docs/posix/GAPS.md");
+    let path = crate::mgmt::posix_dir(root)?.join("GAPS.md");
     let current = std::fs::read_to_string(&path)
         .with_context(|| format!("cannot read {}", path.display()))?;
     let expected = render_gaps(root, profile, trace)?;

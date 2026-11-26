@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "ecn"
+port = 24007
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario ecn"
+donor = [
+  "NetBSD sys/netinet/tcp_input.c:tcp_input (ECN negotiation)",
+  "NetBSD sys/netinet/tcp_output.c:tcp_output (ECE/CWR flags)",
+]
+rfcs = ["RFC 3168 section 6.1.1 (ECN setup SYN/SYN-ACK)"]
+
+[[expect]]
+step = "host tcp_ecn=1; peer SYN sets ECE and CWR"
+packet = "SYN"
+assert = "SYN-ACK sets ECE"
+
+[[expect]]
+step = "peer ACKs the SYN-ACK"
+packet = "ACK"
+assert = "connection established with ECN negotiated"

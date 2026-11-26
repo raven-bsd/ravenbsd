@@ -546,3 +546,48 @@ fn invalid_short_id_is_rejected() {
     assert!(verify_release_build_id(b"abc1234", "", false).is_err());
     assert!(verify_release_build_id(b"abc1234", "not-hex!", false).is_err());
 }
+
+#[test]
+fn profile_artifact_names_keep_release_and_debug_apart() {
+    assert_eq!(
+        artifact_filename(Component::Kernel, true),
+        Some("kernel.elf")
+    );
+    assert_eq!(
+        artifact_filename(Component::Kernel, false),
+        Some("kernel-debug.elf")
+    );
+    assert_eq!(
+        artifact_filename(Component::Loader, true),
+        Some("loader.efi")
+    );
+    assert_eq!(
+        artifact_filename(Component::Loader, false),
+        Some("loader-debug.efi")
+    );
+    assert_eq!(artifact_filename(Component::User, true), None);
+    assert_eq!(
+        profile_artifact_path(Path::new("/r"), Arch::X86_64, Component::Kernel, false),
+        Path::new("/r/build/x86_64/kernel-debug.elf")
+    );
+}
+
+#[test]
+fn artifact_profile_stamp_round_trips_and_rejects_mismatch() {
+    let root = std::env::temp_dir().join(format!("raven-artifact-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let kernel = root.join("kernel.elf");
+    fs::write(&kernel, b"kernel").unwrap();
+    write_artifact_profile(&kernel, true).unwrap();
+    assert_eq!(read_artifact_profile(&kernel), Some(true));
+    assert!(verify_artifact_profile(&kernel, true).is_ok());
+    assert!(verify_artifact_profile(&kernel, false).is_err());
+    assert_eq!(parse_artifact_profile(b"release\n"), Some(true));
+    assert_eq!(parse_artifact_profile(b"debug\n"), Some(false));
+    assert_eq!(parse_artifact_profile(b"other\n"), None);
+    let unstamped = root.join("loader.efi");
+    fs::write(&unstamped, b"loader").unwrap();
+    assert!(verify_artifact_profile(&unstamped, true).is_err());
+    let _ = fs::remove_dir_all(&root);
+}

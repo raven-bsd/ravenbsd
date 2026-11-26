@@ -3,7 +3,7 @@
 
 //! Host tests for the personality-created descriptor modes.
 
-use super::{install_status, is_eventfd_kind};
+use super::{bounded_hi, install_status, is_eventfd_kind};
 use raven_libc_personality_linux::seams::FdKind;
 use raven_libc_platform::fd::ofd::OfdKind;
 
@@ -43,4 +43,22 @@ fn only_eventfds_route_read_write_through_the_counter_engine() {
     ] {
         assert!(!is_eventfd_kind(kind));
     }
+}
+
+#[test]
+fn close_range_hi_is_clamped_to_the_hard_descriptor_limit() {
+    // No descriptor at or above the hard RLIMIT exists: INT_MAX must not be iterated.
+    assert_eq!(bounded_hi(i32::MAX, 32768), 32767);
+    assert_eq!(bounded_hi(i32::MAX, 1024), 1023);
+}
+
+#[test]
+fn close_range_hi_keeps_a_smaller_request() {
+    assert_eq!(bounded_hi(10, 32768), 10);
+    assert_eq!(bounded_hi(0, 32768), 0);
+}
+
+#[test]
+fn close_range_hi_handles_a_zero_hard_limit() {
+    assert_eq!(bounded_hi(5, 0), 0);
 }

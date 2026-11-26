@@ -45,6 +45,8 @@ pub mod consts;
 pub mod daemon;
 pub mod errors;
 pub mod exec_path;
+#[cfg(target_os = "none")]
+pub mod exec_raw;
 pub mod getauxval;
 pub mod getprogname;
 pub mod ids;

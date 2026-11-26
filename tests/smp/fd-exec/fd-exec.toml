@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K486: descriptors across exec. The controller opens a known fd set, marks CLOEXEC on some,
+# execs /bin/libc-test again and the child proves the exact surviving set with fcntl(F_GETFD).
+# The same case covers fcntl after open/dup, 10 rounds of 64 descriptors, closefrom and a
+# socketpair fd.
+
+name = "fd-exec"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/smp/fd-exec/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^fd-exec: start$'
+
+[[expect]]
+regex = '^fd-exec: baseline=[0-9]+$'
+
+[[expect]]
+regex = '^fd-exec: round=1 keep=[0-9]+ close=[0-9]+ after=[0-9]+ baseline=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^fd-exec: round=10 keep=[0-9]+ close=[0-9]+ after=[0-9]+ baseline=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^fd-exec: closefrom ok$'
+
+[[expect]]
+regex = '^fd-exec: socketpair ok=[01]$'
+
+[[expect]]
+regex = '^fd-exec: done ok=1 socket=[01]$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fd-exec: FAIL|child exec failed|socket child exec failed'

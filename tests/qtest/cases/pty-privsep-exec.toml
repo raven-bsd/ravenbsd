@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K476: the sshd privsep pty shape. The monitor owns the pty; the session child is fork+exec'd and
+# only then asks for a pty over an inherited socketpair. The monitor passes the master with
+# SCM_RIGHTS. The child round-trips a byte, closes, asks for a second allocation, and a negative
+# child closes the channel first and must see EPIPE/EBADF while ptyd stays healthy.
+
+name = "pty-privsep-exec"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh pty-privsep-exec"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: start uid=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child start fd=[0-9]+ negative=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child reexec fd=[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child state tag=exec2 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=0 request=ok$'
+
+[[expect]]
+regex = '^pty-privsep-exec: monitor round=0 master=[0-9]+ name=/dev/pts/[0-9]+$'
+# The monitor and the child print to the same serial line discipline; the monitor can print its
+# round line before the child prints its request line. The line is required exactly once, but its
+# position relative to the child's line is not deterministic.
+unordered = true
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=0 name=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=0 master=[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=0 roundtrip=MS$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=1 request=ok$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=1 name=/dev/pts/[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=1 master=[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child round=1 roundtrip=MS$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child allocations=2 ok$'
+
+[[expect]]
+regex = '^pty-privsep-exec: positive child status=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: positive monitor status=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: positive ok$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child start fd=[0-9]+ negative=1$'
+
+[[expect]]
+regex = '^pty-privsep-exec: child state tag=exec1 fstat=-?[0-9]+/[0-9]+ dup=-?[0-9]+/[0-9]+ getsockopt=-?[0-9]+/[0-9]+ type=[0-9]+ fcntl=-?[0-9]+$'
+
+[[expect]]
+regex = '^pty-privsep-exec: negative send errno=(9|32)$'
+
+[[expect]]
+regex = '^pty-privsep-exec: negative channel-closed ok$'
+
+[[expect]]
+regex = '^pty-privsep-exec: negative child status=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: negative monitor status=0$'
+
+[[expect]]
+regex = '^pty-privsep-exec: negative ok$'
+
+[[expect]]
+regex = '^pty-privsep-exec: ok$'
+
+[[expect]]
+regex = '^ptyd: files=0 pairs=0$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pty-privsep-exec: FAIL'

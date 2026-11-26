@@ -3,10 +3,30 @@
 # case<TAB>hard PGs<TAB>soft PGs<TAB>binaries<TAB>link
 case	hard	soft	binaries	link
 hello	1 13 22 23 24 29 50 53	52	libc-test	static
+exec-timing	1 13 22 23 24 29 50 53		libc-test	static
 stdio	1 13 22 23 24 29 50 53	12	libc-test	static
 time	1 13 22 23 24 29 50 53	17 18 20	libc-test	static
 threads	1 2 13 22 23 24 29 50 53	3 5 8 9 11	libc-test	static
 signals	1 2 13 22 23 24 29 50 53	7 8 12 19	libc-test	static
+signal-chld	1 2 13 22 23 24 29 50 53	7 8	libc-test	static
 dynamic	1 2 13 22 23 24 29 49 50 53	36 51 52	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
 spawn	1 13 22 23 24 29 50 53	35 44 45 46 47 49	libc-test libc-child	static
 spawn-std	1 13 22 23 24 29 50 53	35 44 45 46 47 49	libc-test libc-child	static
+fork	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test	static
+forkpty	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test	static
+pty-alloc	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+openpty-null	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-calls	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+termios	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-winsize	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-churn	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-concurrent	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-ssh-shape	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-exec	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-privsep-exec	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+tty-discipline	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-concurrent	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+pty-monitor	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+fdpass	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test libplug.so libc.so.1 ld-elf.so.1	dynamic
+closefrom	1 13 22 23 24 29 50 53	35 44 45 46 47 49	libc-test	static
+tty-pgrp	1 13 22 23 24 29 45 50 53	35 44 46 47 49	libc-test	static

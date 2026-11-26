@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K182: the Pi 4 host-backed UFS-root payload. It uses the release shell userland
+# (brush, uutils, file tools, mount/ps/uname) plus the release login/session
+# entries; the Pi 4-specific storage stack lives in the real pi4-rootfs SD profile
+# and in the fake-card bootstrap. The rootfs spec adds the post-pivot markers.
+
+name = "pi4-root-pivot"
+extends = "shell"
+
+[initfs]
+release = true
+
+[image]
+release = true
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K495 rev168: TCG4 twin of pty-wake-kvm4.toml. Same fixture, initfs and rows; QEMU runs with
+# `-accel tcg` at `-smp 4` so the pty-wake row has independent KVM4/TCG4 evidence.
+
+name = "smp-readiness-pty-wake-tcg4"
+arch = "x86_64"
+profile = "network-config-test"
+# The fixture runs R1-R6. R6 sets the pty slave as the child's controlling terminal (setsid +
+# TIOCSCTTY), opens /dev/tty and fstats the same slave inode. The measured summary is `PASS 6/6`;
+# the pre-R6 5/5 summary is not expected (mutation with 5/5 fails).
+# The KVM measured row budget is 120 s (60 s did not reach the fixture); 180 s is the slower TCG
+# boot + R1-R6 + margin. The guest currently stays up because `exit_when_exits = readiness-pty` does
+# not produce `init exited (0)` (measured >480 s); that is an init/svcd exit issue, not a budget one.
+timeout_secs = 180
+pre = ["sh tests/smp/readiness/build-pty-wake.sh"]
+initfs = "build/smp/readiness/pty-wake/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = ["-accel", "tcg", "-smp", "4", "-nic", "user,model=virtio-net-pci"]
+expect_exit = "success"
+
+[[expect]]
+regex = 'PTY-WAKE start$'
+
+[[expect]]
+regex = 'PTY-WAKE R1 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R2 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R3 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R4 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R5 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE R6 .* ok$'
+
+[[expect]]
+regex = 'PTY-WAKE SUMMARY PASS 6/6$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|PTY-WAKE .* FAIL'

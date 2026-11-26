@@ -13,6 +13,7 @@
 
 extern crate alloc;
 
+pub mod bootscreen;
 pub mod config;
 pub mod grants;
 pub mod health;
@@ -26,6 +27,13 @@ mod legacy;
 mod svc;
 #[cfg(target_os = "none")]
 mod worker;
+#[cfg(target_os = "none")]
+pub use worker::{WAIT_ERROR_CODE, wait_child_status};
+
+/// Select the plain boot transcript when the caller has `NO_COLOR` or `TERM=dumb`.
+pub fn configure_boot_plain(no_color: bool, term_dumb: bool) {
+    bootscreen::set_plain(no_color || term_dumb);
+}
 
 /// Boot the service manager on a real target and return the process exit code.
 #[cfg(target_os = "none")]

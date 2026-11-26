@@ -3,34 +3,21 @@
 
 //! Integration tests for `verify` (L2, H1-H3, the musl measurement, identity, headers).
 
-use std::path::{Path, PathBuf};
+mod support;
+
+use std::path::Path;
 use std::process::{Command, Output};
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..")
-}
+use support::{repo_root, require_resources};
 
-fn resources() -> PathBuf {
-    let mut directory = Some(repo_root());
-    while let Some(current) = directory {
-        let candidate = current.join("ravenbsd-resources");
-        if candidate.join("donors.lock").is_file() {
-            return candidate;
-        }
-        directory = current.parent().map(Path::to_path_buf);
-    }
-    panic!("cannot find ravenbsd-resources");
-}
-
-fn verify(extra: &[&str]) -> Output {
+fn verify(extra: &[&str], resources: &Path) -> Output {
     let root = repo_root();
-    let res = resources();
     let mut args = vec![
         "verify",
         "--root",
         root.to_str().unwrap(),
         "--resources",
-        res.to_str().unwrap(),
+        resources.to_str().unwrap(),
     ];
     args.extend(extra.iter().copied());
     Command::new(env!("CARGO_BIN_EXE_raven-libc-hdrgen"))
@@ -58,13 +45,19 @@ fn assert_ok_or_skip(output: &Output) {
 
 #[test]
 fn verify_all_succeeds() {
-    let output = verify(&["--target", "all"]);
+    let Some(resources) = require_resources("verify_all_succeeds") else {
+        return;
+    };
+    let output = verify(&["--target", "all"], &resources);
     assert_ok_or_skip(&output);
 }
 
 #[test]
 fn verify_prints_the_musl_probe_table() {
-    let output = verify(&["--target", "all"]);
+    let Some(resources) = require_resources("verify_prints_the_musl_probe_table") else {
+        return;
+    };
+    let output = verify(&["--target", "all"], &resources);
     if output.status.code() == Some(77) {
         return;
     }
@@ -79,7 +72,10 @@ fn verify_prints_the_musl_probe_table() {
 
 #[test]
 fn verify_reports_the_h3_difference_set() {
-    let output = verify(&["--target", "all"]);
+    let Some(resources) = require_resources("verify_reports_the_h3_difference_set") else {
+        return;
+    };
+    let output = verify(&["--target", "all"], &resources);
     if output.status.code() == Some(77) {
         return;
     }
@@ -92,7 +88,11 @@ fn verify_reports_the_h3_difference_set() {
 
 #[test]
 fn verify_reports_the_compiler_identity_and_headers() {
-    let output = verify(&["--target", "all"]);
+    let Some(resources) = require_resources("verify_reports_the_compiler_identity_and_headers")
+    else {
+        return;
+    };
+    let output = verify(&["--target", "all"], &resources);
     if output.status.code() == Some(77) {
         return;
     }
@@ -106,28 +106,37 @@ fn verify_reports_the_compiler_identity_and_headers() {
 
 #[test]
 fn verify_single_target_succeeds() {
+    let Some(resources) = require_resources("verify_single_target_succeeds") else {
+        return;
+    };
     for target in ["x86_64", "aarch64", "riscv64"] {
-        let output = verify(&["--target", target]);
+        let output = verify(&["--target", target], &resources);
         assert_ok_or_skip(&output);
     }
 }
 
 #[test]
 fn verify_rejects_an_unknown_target() {
-    let output = verify(&["--target", "mips"]);
+    let Some(resources) = require_resources("verify_rejects_an_unknown_target") else {
+        return;
+    };
+    let output = verify(&["--target", "mips"], &resources);
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown --target"));
 }
 
 #[test]
 fn a_missing_tool_is_a_skip_unless_required() {
+    let Some(resources) = require_resources("a_missing_tool_is_a_skip_unless_required") else {
+        return;
+    };
     let output = Command::new(env!("CARGO_BIN_EXE_raven-libc-hdrgen"))
         .args([
             "verify",
             "--root",
             repo_root().to_str().unwrap(),
             "--resources",
-            resources().to_str().unwrap(),
+            resources.to_str().unwrap(),
             "--clang",
             "definitely-not-a-clang",
         ])

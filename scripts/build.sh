@@ -21,6 +21,16 @@ have cargo || die "cargo not found: run 'make setup' first"
 cd "$ROOT"
 repro_env
 out="$ROOT/build/$arch"
+# K441: never consume an artifact older than its sources. A clean clone has no stamp and skips;
+# an existing stamp must verify or the build stops with the documented rebuild command.
+if [ -f "$out/libc.stamp" ]; then
+	cargo xtask libc-pack --arch "$arch" --verify ||
+		die "artifact stale: run cargo xtask libc-pack"
+fi
+if [ -f "$out/libc-dso.stamp" ]; then
+	cargo xtask libc-link --arch "$arch" --verify ||
+		die "artifact stale: run cargo xtask libc-link"
+fi
 mkdir -p "$out/user"
 pdir=$([ "$profile" = release ] && echo release || echo debug)
 

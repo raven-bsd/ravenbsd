@@ -52,10 +52,53 @@ fn valid_timeout(timeout: &Timespec) -> bool {
     timeout.tv_sec >= 0 && (0..1_000_000_000).contains(&timeout.tv_nsec)
 }
 
-/// `sigsuspend`: swap the mask, wait for a kick, run the entry logic once, return `EINTR`.
+/// `sigsuspend`: install the temporary mask and wait atomically, then run the handler.
 pub fn sigsuspend<K: SigKernel>(kernel: &K, table: &DispTable, set: &SigSet) -> Errno {
     raw::call_testcancel_hook();
     let tp = kernel.thread_pointer();
+    if kernel.caps().authoritative {
+        // The kernel `SIGWAIT` operation installs its temporary mask and checks the queue under
+        // one lock, so a signal arriving at the mask change cannot be lost. Block everything
+        // first, then wait for the complement of the requested mask; the signal SIGWAIT returns
+        // is re-queued thread-directed while still blocked and re-exposed under the temporary
+        // mask, so its handler runs before this call returns (FreeBSD `kern_sigsuspend`).
+        let temporary = set.app_word() & APP_MASK;
+        let old = match kernel.sigprocmask(
+            raven_libc_abi::generated::signal::SIG_SETMASK,
+            Some(APP_MASK),
+        ) {
+            Ok(old) => old,
+            Err(error) => return error,
+        };
+        raw::mask_store(tp, APP_MASK);
+        let unblockable = crate::critical::signal_bit(raven_libc_abi::generated::signal::SIGKILL)
+            | crate::critical::signal_bit(raven_libc_abi::generated::signal::SIGSTOP);
+        let wait_set = APP_MASK & !temporary & !unblockable;
+        let result = match kernel.wait_signal(wait_set, 0, false) {
+            Ok((sig, record)) => {
+                let queued = kernel.thread_sigqueue(crate::kernel::HANDLE_NONE, sig, record[4]);
+                let exposed = queued.and_then(|()| {
+                    kernel.sigprocmask(
+                        raven_libc_abi::generated::signal::SIG_SETMASK,
+                        Some(temporary),
+                    )
+                });
+                let restored =
+                    kernel.sigprocmask(raven_libc_abi::generated::signal::SIG_SETMASK, Some(old));
+                exposed.and(restored).map(|_| ())
+            }
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result {
+            kernel
+                .sigprocmask(raven_libc_abi::generated::signal::SIG_SETMASK, Some(old))
+                .ok();
+            raw::mask_store(tp, old);
+            return error;
+        }
+        raw::mask_store(tp, old);
+        return EINTR_ERR;
+    }
     crate::critical::critical_enter(kernel);
     let old = raw::mask_swap(tp, set.app_word() & APP_MASK);
     let pending = raw::pending_load(tp);
@@ -100,6 +143,20 @@ pub fn sigtimedwait<K: SigKernel>(
     let poll_only = timeout
         .as_ref()
         .is_some_and(|value| value.tv_sec == 0 && value.tv_nsec == 0);
+    if kernel.caps().authoritative {
+        // The kernel consumes the record under its temporary mask, so the pending bit and the
+        // mask move together and libc's mirror is not consulted.
+        let timeout_ns = timeout.as_ref().map_or(0, |value| {
+            (value.tv_sec.max(0) as u64)
+                .saturating_mul(1_000_000_000)
+                .saturating_add(value.tv_nsec.max(0) as u64)
+        });
+        let (sig, record) = kernel.wait_signal(wanted, timeout_ns, poll_only)?;
+        if let Some(out) = info {
+            *out = crate::kernel::process_siginfo(&record).1;
+        }
+        return Ok(sig);
+    }
     let deadline = timeout.as_ref().and_then(|value| {
         if poll_only {
             None

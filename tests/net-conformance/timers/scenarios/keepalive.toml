@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "timer-keepalive"
+port = 24101
+baseline = "host-side: timeout 120 cargo nextest run -p tcp-timer-conformance keepalive_probes_at_keepidle_and_keepintvl_then_drops_after_maxidle"
+donor = [
+  "FreeBSD sys/netinet/tcp_timer.c:tcp_timer_keep (TP_KEEPIDLE/TP_KEEPINTVL/TP_KEEPCNT)",
+]
+rfcs = ["RFC 1122 section 4.2.3.6 (TCP keep-alives)"]
+
+[[expect]]
+step = "connection established and idle for TP_KEEPIDLE (1000 ms in the host scenario)"
+packet = "ACK"
+assert = "a zero-length probe with seq = snd_una-1 and ack = rcv_nxt"
+
+[[expect]]
+step = "peer ACKs each probe; the connection stays idle"
+packet = "ACK"
+assert = "probes repeat every TP_KEEPINTVL (500 ms) for TP_KEEPCNT (3) probes"
+
+[[expect]]
+step = "peer never answers; idle reaches TP_KEEPIDLE + TP_KEEPCNT*TP_KEEPINTVL"
+packet = "none"
+assert = "the connection is dropped with ETIMEDOUT"
+
+# The K253 guest fixture holds a connection for only 12 s and the stack's default keepidle is
+# 7200 s, so the wire variant is narrowed; the host timer state machine above sets the short
+# interval explicitly and asserts the exact virtual timing.
+narrowed = "wire keepalive needs a fixture that sets TCP_KEEPIDLE/TCP_KEEPINTVL; the host timer scenario is deterministic"

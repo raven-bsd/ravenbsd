@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K198 DHCP mode: the drop-in selects mode=dhcp, netd keeps the existing DHCP-first/QEMU
+# behaviour, resolvd receives the lease DNS, and the sentinel static address 10.0.9.9 never
+# reaches eth0. Hostname raven-dhcp is applied through sysd.
+
+name = "network-config-dhcp"
+arch = "x86_64"
+profile = "network-config-test-dhcp"
+timeout_secs = 300
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^netd: network config mode=dhcp hostname=raven-dhcp$'
+unordered = true
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+unordered = true
+
+[[expect]]
+regex = '^netd: hostname raven-dhcp$'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: lease eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3'
+unordered = true
+
+[[expect]]
+regex = '(?i)^.*login: ?root'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^raven-dhcp$'
+
+[[expect]]
+regex = '^ifconfig: eth0 .*inet 10\.0\.2\.15 netmask 255\.255\.255\.0$'
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "hostname\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven-dhcp$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/sbin/ifconfig\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ifconfig: eth0 .*inet 10\.0\.2\.15 netmask 255\.255\.255\.0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '10\.0\.9\.9'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|No child process|i/o error|ECHILD|out of memory|oom-kill|command not found|devd failed'

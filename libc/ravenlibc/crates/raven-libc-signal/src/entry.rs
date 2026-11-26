@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The twelve-step entry path (ticket 4.5, CLEANROOM from `09` 4.1 and `06` A-sol-19/22).
+//! The direct delivery body used by the libc wait paths that cannot return to the kernel entry.
 //!
-//! Step 1 is the per-architecture asm stub (`raw/entry_*`), step 12 is `SIGRETURN`. The body here
-//! saves `errno`, COPY-INs the kernel area into a stack `ucontext_t` (freeing the area for a
-//! nested kick), handles the `CANCEL`/`SYNCCALL` bits, computes the deliverable set, honours the
-//! critical-section deferral, applies the default action or calls the handler on the selected
-//! stack, restores the mask and COPY-OUTs the possibly modified machine context.
+//! The kernel owns the caught-signal frame and trampoline (C19); there is no user-registered
+//! entry. `run_direct` is the narrowly scoped synchronous path (`ppoll` with a temporary mask)
+//! that invokes a pending handler in the caller's context. It saves `errno`, computes the
+//! deliverable set, honours the critical-section deferral, applies the default action or calls
+//! the handler on the selected stack, and restores the mask.
 
 use raven_libc_abi::generated::signal;
 use raven_libc_abi::structs::{SiginfoT, StackT, UcontextT};
@@ -31,23 +31,7 @@ pub struct EntryOutcome {
     pub spurious: bool,
 }
 
-/// The production body invoked from the asm stub: process, then `SIGRETURN` (never returns).
-pub fn signal_entry<K: SigKernel>(
-    kernel: &K,
-    table: &DispTable,
-    bits: u32,
-    fault: Option<FaultRecord>,
-) -> ! {
-    process(kernel, table, bits, fault, true, true);
-    if !kernel.caps().sigreturn && !kernel.caps().entry {
-        // No PG-7: this body is not reachable from a kernel entry in production. Terminating is
-        // the only honest action; the host fake implements `sigreturn` by unwinding.
-        kernel.terminate(signal::SIGSEGV, true);
-    }
-    kernel.sigreturn()
-}
-
-/// The libc-only direct entry used by `raise` and self `pthread_kill` (PG-7 absent fallback).
+/// The libc-only direct entry used by the synchronous wait paths.
 pub fn run_direct<K: SigKernel>(
     kernel: &K,
     table: &DispTable,
@@ -57,7 +41,8 @@ pub fn run_direct<K: SigKernel>(
     process(kernel, table, bits, fault, false, false)
 }
 
-fn process<K: SigKernel>(
+/// One direct delivery pass; the test kernel uses `from_kernel` to feed a saved frame.
+pub(crate) fn process<K: SigKernel>(
     kernel: &K,
     table: &DispTable,
     bits: u32,
@@ -192,6 +177,7 @@ fn process<K: SigKernel>(
                     alt_flags,
                     disposition.flags,
                     interrupted_sp,
+                    raw::current_stack_pointer(),
                 );
                 // Step 10: call through the asm helper (16-byte aligned at the call).
                 let arg1 = sig as usize;
@@ -233,6 +219,7 @@ fn handler_stack(
     alt_flags: i32,
     flags: u32,
     interrupted_sp: usize,
+    entry_sp: usize,
 ) -> usize {
     let enabled = alt_flags & crate::altstack::SS_DISABLE == 0 && alt_size != 0;
     let inside =
@@ -240,13 +227,16 @@ fn handler_stack(
     if flags & SA_ONSTACK != 0 && enabled && !inside {
         return alt_base.wrapping_add(alt_size) & !15usize;
     }
+    // The handler must run below the live call frame, not at the interrupted stack pointer:
+    // the kernel frame starts at `interrupted_sp - 128`, and reusing that address for the
+    // handler overwrites the caller's own return frame.
     #[cfg(target_arch = "x86_64")]
     {
-        interrupted_sp.saturating_sub(128)
+        entry_sp.saturating_sub(128)
     }
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
     {
-        interrupted_sp.saturating_sub(16)
+        entry_sp.saturating_sub(16)
     }
 }
 

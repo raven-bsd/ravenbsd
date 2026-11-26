@@ -31,10 +31,25 @@ regex = '^record-lock: getlk-conflict ok$'
 regex = '^record-lock: block ok$'
 
 [[expect]]
+regex = '^record-lock: close-any ok$'
+
+[[expect]]
 regex = '^record-lock: close ok$'
 
 [[expect]]
 regex = '^record-lock: exit ok$'
+
+[[expect]]
+regex = '^record-lock: read-read ok$'
+
+[[expect]]
+regex = '^record-lock: disjoint ok$'
+
+[[expect]]
+regex = '^record-lock: getlk-pid ok$'
+
+[[expect]]
+regex = '^record-lock: kill ok$'
 
 [[expect]]
 regex = '^record-lock: libc-getlk-free ok$'

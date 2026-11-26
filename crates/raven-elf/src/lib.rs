@@ -227,6 +227,27 @@ impl<'a> Elf<'a> {
         machine: Machine,
         user_range: Range<u64>,
     ) -> Result<Elf<'a>, ElfError> {
+        let file_len = u64::try_from(data.len()).map_err(|_| ElfError::BadPhdr)?;
+        Self::parse_with_len(data, file_len, machine, user_range)
+    }
+
+    /// Parse and validate an ELF64 file whose bytes are not all in `data`.
+    ///
+    /// `data` must contain the ELF header, the complete program-header table and the
+    /// `PT_INTERP` string, but it may omit the `PT_LOAD` file bytes. `file_len` is the real
+    /// image length used to validate every segment's `p_offset + p_filesz` range. This is the
+    /// kernel `PROC_EXEC` path: it copies only the headers into kernel memory and streams each
+    /// segment from the caller's image.
+    ///
+    /// [`segment_data`](Self::segment_data) on such an `Elf` returns an empty slice for a segment
+    /// whose file range is outside `data`; callers that need the bytes use the original image
+    /// range and the validated offsets. [`parse`](Self::parse) keeps the full-image behavior.
+    pub fn parse_with_len(
+        data: &'a [u8],
+        file_len: u64,
+        machine: Machine,
+        user_range: Range<u64>,
+    ) -> Result<Elf<'a>, ElfError> {
         if data.len() < EHDR_SIZE {
             return Err(ElfError::TooShort);
         }
@@ -274,12 +295,12 @@ impl<'a> Elf<'a> {
         if e_phnum > MAX_PHNUM {
             return Err(ElfError::TooManySegments);
         }
-        let data_len = u64::try_from(data.len()).map_err(|_| ElfError::BadPhdr)?;
         let table_len = u64::from(e_phentsize)
             .checked_mul(u64::from(e_phnum))
             .ok_or(ElfError::BadPhdr)?;
         let table_end = e_phoff.checked_add(table_len).ok_or(ElfError::BadPhdr)?;
-        if table_end > data_len {
+        let buffer_len = u64::try_from(data.len()).map_err(|_| ElfError::BadPhdr)?;
+        if table_end > file_len || table_end > buffer_len {
             return Err(ElfError::BadPhdr);
         }
 
@@ -325,7 +346,7 @@ impl<'a> Elf<'a> {
                 let file_end = p_offset
                     .checked_add(p_filesz)
                     .ok_or(ElfError::SegmentOutOfBounds)?;
-                if file_end > data_len {
+                if file_end > file_len {
                     return Err(ElfError::SegmentOutOfBounds);
                 }
                 let mem_end = p_vaddr
@@ -371,7 +392,7 @@ impl<'a> Elf<'a> {
                 let p_filesz = read_u64(data, base.checked_add(32).ok_or(ElfError::BadPhdr)?)
                     .ok_or(ElfError::BadPhdr)?;
                 let file_end = p_offset.checked_add(p_filesz).ok_or(ElfError::BadPhdr)?;
-                if file_end > data_len {
+                if file_end > file_len {
                     return Err(ElfError::BadPhdr);
                 }
                 let start = usize::try_from(p_offset).map_err(|_| ElfError::BadPhdr)?;
@@ -551,3 +572,7 @@ fn page_ceil(value: u64) -> Option<u64> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "parse_len_ut.rs"]
+mod parse_len_tests;

@@ -5,10 +5,11 @@
 
 use std::fmt::Write as _;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
+use crate::attribution::Attributions;
 use crate::model::ConstDef;
-use crate::provenance::{CommentStyle, musl_notice};
+use crate::provenance::CommentStyle;
 use crate::validate::{Tables, expected_header};
 use crate::values;
 
@@ -16,12 +17,14 @@ use crate::values;
 pub fn render_all(
     tables: &Tables,
     values: &crate::validate::Values,
-    musl_rev: &str,
+    attributions: &Attributions,
 ) -> Result<std::collections::BTreeMap<String, String>> {
     let mut files = std::collections::BTreeMap::new();
     for group in &tables.groups {
-        let upstream = group.def.source.join(", ");
-        let mut out = musl_notice(CommentStyle::BlockC, &upstream, musl_rev);
+        let attribution = attributions
+            .get(&group.stem)
+            .with_context(|| format!("group {} has no attribution", group.stem))?;
+        let mut out = attribution.notice(CommentStyle::BlockC);
         out.push('\n');
         let _ = writeln!(
             out,

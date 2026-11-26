@@ -4,7 +4,7 @@
 //! Initfs packing and uutils staging-detection tests.
 
 use super::*;
-use crate::profiles::{Boot, File, Initfs as InitfsSpec, Profile};
+use crate::profiles::{Boot, File, Image, Initfs as InitfsSpec, Profile, Program};
 use raven_initfs::Initfs;
 
 fn profile(files: &[(&str, &str)]) -> Profile {
@@ -24,11 +24,45 @@ fn profile(files: &[(&str, &str)]) -> Profile {
             release: false,
             dynamic: false,
         },
+        image: Image::default(),
         boot: Boot {
             cmdline: "console=ttyS0".to_string(),
             log_level: "info".to_string(),
         },
     }
+}
+
+fn program(package: &str, path: &str) -> Program {
+    Program {
+        package: package.to_string(),
+        path: path.to_string(),
+    }
+}
+
+#[test]
+fn shell_bin_tools_link_statically_but_getty_and_login_stay_dynamic() {
+    for package in [
+        "curl",
+        "man",
+        "raven-date",
+        "raven-hostname",
+        "raven-ps",
+        "raven-rsh",
+        "raven-sleep",
+        "raven-svcctl",
+        "raven-uname",
+        "wget",
+    ] {
+        assert!(
+            program_is_static(&program(package, "/bin/tool")),
+            "{package} must be static"
+        );
+    }
+    assert!(!program_is_static(&program("raven-getty", "/bin/getty")));
+    assert!(!program_is_static(&program("login", "/bin/login")));
+    assert!(!program_is_static(&program("raven-other", "/bin/other")));
+    assert!(program_is_static(&program("raven-vfsd", "/sbin/vfsd")));
+    assert!(program_is_static(&program("raven-init", "/init")));
 }
 
 #[test]
@@ -95,6 +129,10 @@ fn only_the_matching_arch_uutils_tree_is_detected() {
     assert_eq!(
         uutils_source_name(Arch::X86_64, "build/x86_64/uutils/sub/ls"),
         None
+    );
+    assert_eq!(
+        uutils_source_name(Arch::Aarch64, "build/{arch}/uutils/ls"),
+        Some("ls")
     );
     assert_eq!(uutils_source_name(Arch::X86_64, "services/ls.toml"), None);
 }
@@ -257,7 +295,7 @@ fn brush_missing_checks_the_arch_path_not_the_legacy_source() {
 }
 
 #[test]
-fn source_path_maps_only_the_legacy_brush_source() {
+fn source_path_maps_the_arch_placeholder_and_legacy_brush() {
     let root = std::path::Path::new("/repo");
     assert_eq!(
         source_path(root, Arch::X86_64, "build/brush"),
@@ -270,6 +308,14 @@ fn source_path_maps_only_the_legacy_brush_source() {
     assert_eq!(
         source_path(root, Arch::X86_64, "build/x86_64/brush"),
         std::path::PathBuf::from("/repo/build/x86_64/brush")
+    );
+    assert_eq!(
+        source_path(root, Arch::Aarch64, "build/{arch}/uutils/ls"),
+        std::path::PathBuf::from("/repo/build/aarch64/uutils/ls")
+    );
+    assert_eq!(
+        source_path(root, Arch::X86_64, "build/{arch}/uutils/ls"),
+        std::path::PathBuf::from("/repo/build/x86_64/uutils/ls")
     );
     assert_eq!(
         source_path(root, Arch::X86_64, "tests/brush/bash-compat.sh"),
@@ -337,43 +383,132 @@ fn missing_fixtures_skips_existing_sources() {
 }
 
 #[test]
-fn release_userspace_paths_cover_staged_and_target_caches() {
+fn release_userspace_paths_keep_the_cargo_target_caches() {
     let root = Path::new("/repo");
+    let x86 = release_userspace_paths(root, Arch::X86_64);
     assert_eq!(
-        release_userspace_paths(root, Arch::X86_64),
+        x86,
         [
             PathBuf::from("/repo/build/x86_64/brush"),
             PathBuf::from("/repo/build/x86_64/uutils"),
-            PathBuf::from("/repo/build/cargo/brush-x86_64"),
-            PathBuf::from("/repo/build/cargo/uutils-x86_64"),
+            PathBuf::from("/repo/build/x86_64/libc.so.1"),
+            PathBuf::from("/repo/build/x86_64/ld-elf.so.1"),
+            PathBuf::from("/repo/build/x86_64/loader-manifest.toml"),
         ]
     );
+    assert!(!x86.iter().any(|path| path.starts_with("/repo/build/cargo")));
+    let arm = release_userspace_paths(root, Arch::Aarch64);
     assert_eq!(
-        release_userspace_paths(root, Arch::Aarch64),
+        arm,
         [
             PathBuf::from("/repo/build/aarch64/brush"),
             PathBuf::from("/repo/build/aarch64/uutils"),
-            PathBuf::from("/repo/build/cargo/brush-aarch64"),
-            PathBuf::from("/repo/build/cargo/uutils-aarch64"),
+            PathBuf::from("/repo/build/aarch64/libc.so.1"),
+            PathBuf::from("/repo/build/aarch64/ld-elf.so.1"),
+            PathBuf::from("/repo/build/aarch64/loader-manifest.toml"),
         ]
     );
+    assert!(!arm.iter().any(|path| path.starts_with("/repo/build/cargo")));
 }
 
 #[test]
-fn release_purge_removes_staged_and_target_caches() {
-    let root = std::env::temp_dir().join(format!("raven-s122-purge-{}", std::process::id()));
+fn release_purge_removes_staged_outputs_and_keeps_target_caches() {
+    let root = std::env::temp_dir().join(format!("raven-k131-purge-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("build/x86_64/uutils")).unwrap();
     std::fs::create_dir_all(root.join("build/cargo/brush-x86_64")).unwrap();
     std::fs::create_dir_all(root.join("build/cargo/uutils-x86_64")).unwrap();
     std::fs::write(root.join("build/x86_64/brush"), b"stale").unwrap();
     std::fs::write(root.join("build/x86_64/uutils/ls"), b"stale").unwrap();
-    std::fs::write(root.join("build/cargo/brush-x86_64/artifact"), b"stale").unwrap();
-    std::fs::write(root.join("build/cargo/uutils-x86_64/artifact"), b"stale").unwrap();
+    std::fs::write(root.join("build/cargo/brush-x86_64/artifact"), b"warm").unwrap();
+    std::fs::write(root.join("build/cargo/uutils-x86_64/artifact"), b"warm").unwrap();
+    // The K131 stale shape: a non-ELF loader plus a manifest from another build.
+    std::fs::write(root.join("build/x86_64/ld-elf.so.1"), b"STALE-NOT-ELF").unwrap();
+    std::fs::write(root.join("build/x86_64/libc.so.1"), b"stale libc").unwrap();
+    std::fs::write(root.join("build/x86_64/loader-manifest.toml"), b"stale").unwrap();
 
     purge_release_userspace(&root, Arch::X86_64).unwrap();
     for path in release_userspace_paths(&root, Arch::X86_64) {
         assert!(!path.exists(), "{} still exists", path.display());
     }
+    // The cargo target caches are reused: cargo fingerprints features and RUSTFLAGS, and the
+    // staged outputs are rebuilt from them, so a stale image binary still cannot be packed.
+    assert!(root.join("build/cargo/brush-x86_64/artifact").exists());
+    assert!(root.join("build/cargo/uutils-x86_64/artifact").exists());
     std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn libc_stamp_tracks_the_source_hash() {
+    let root = std::env::temp_dir().join(format!("raven-k548-libc-stamp-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let source = root.join("libc/ravenlibc/crates/raven-libc/src.rs");
+    std::fs::create_dir_all(source.parent().expect("parent")).expect("mkdir");
+    std::fs::write(&source, b"one").expect("write");
+    let stamp = root.join("build/x86_64/libc.stamp");
+    std::fs::create_dir_all(stamp.parent().expect("parent")).expect("mkdir");
+    let hash = crate::libc_pack::source_hash(&root).expect("hash");
+    std::fs::write(
+        &stamp,
+        format!("format=k441.1\narch=x86_64\nset=server\nsources={hash:016x}\n"),
+    )
+    .expect("stamp");
+    assert!(libc_stamp_current(&root, Arch::X86_64));
+    std::fs::write(&source, b"two").expect("rewrite");
+    assert!(!libc_stamp_current(&root, Arch::X86_64));
+    std::fs::remove_file(&stamp).expect("remove stamp");
+    assert!(!libc_stamp_current(&root, Arch::X86_64));
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn source_path_resolves_arch_in_any_position() {
+    let root = Path::new("/repo");
+    assert_eq!(
+        source_path(root, Arch::Aarch64, "build/ssh/{arch}/bin/sshd"),
+        root.join("build/ssh/aarch64/bin/sshd")
+    );
+    assert_eq!(
+        source_path(root, Arch::X86_64, "build/{arch}/uutils/ls"),
+        root.join("build/x86_64/uutils/ls")
+    );
+}
+
+fn elf_header(machine: u16) -> Vec<u8> {
+    let mut data = vec![0u8; 64];
+    data[..4].copy_from_slice(b"\x7fELF");
+    data[4] = 2;
+    data[5] = 1;
+    data[6] = 1;
+    data[16..18].copy_from_slice(&2u16.to_le_bytes());
+    data[18..20].copy_from_slice(&machine.to_le_bytes());
+    data
+}
+
+#[test]
+fn foreign_arch_elf_is_rejected_for_aarch64() {
+    let data = elf_header(62);
+    let error = verify_staged_elf(Arch::Aarch64, Path::new("build/ssh/x86_64/bin/sshd"), &data)
+        .expect_err("a foreign-arch ELF must not be staged");
+    let text = format!("{error:#}");
+    assert!(text.contains("BadMachine"), "{text}");
+    assert!(text.contains("aarch64"), "{text}");
+}
+
+#[test]
+fn matching_arch_elf_is_accepted() {
+    let data = elf_header(183);
+    assert!(
+        verify_staged_elf(
+            Arch::Aarch64,
+            Path::new("build/ssh/aarch64/bin/sshd"),
+            &data
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn non_elf_staged_file_is_ignored() {
+    assert!(verify_staged_elf(Arch::Aarch64, Path::new("etc/rc.conf"), b"sshd=YES\n").is_ok());
 }

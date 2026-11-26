@@ -21,8 +21,8 @@ use raven_proto_fs::{Call, CallRequest, CallResponse, SetTime, Stat as WireStat}
 
 use crate::backend::SysBackend;
 use crate::fd::fdsan::{Action, FdsanState, Mismatch};
-use crate::fd::inherit::{FdMap, FdMapEntry, transferable};
-use crate::fd::ofd::{OfdArena, OfdKind, OfdRef};
+use crate::fd::inherit::{ENV_NAME, FdMap, FdMapEntry, InheritedSocket, transferable};
+use crate::fd::ofd::{OfdArena, OfdKind, OfdRef, SocketMeta};
 use crate::fd::table::{FD_CLOEXEC, FdTable};
 use crate::fd::{DEFAULT_HARD_NOFILE, DEFAULT_SOFT_NOFILE};
 use crate::lock::{Lock, NoLock, guard};
@@ -219,30 +219,49 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     pub(crate) fn release_ofd_ref(&self, index: u32) {
         let close = {
             let _guard = guard(&self.lock);
-            self.take_close_handle(index)
+            self.take_close_handles(index)
         };
-        let _ = self.close_handle(close);
+        let _ = self.close_handles(close);
     }
 
-    /// Drop one reference and, at zero, take the handle out of the arena. The caller must close
-    /// the returned handle **after** releasing the lock.
-    fn take_close_handle(&self, index: u32) -> Option<Handle> {
+    /// Drop one reference and, at zero, take the data and event handles out of the arena. The
+    /// caller must close the returned handles **after** releasing the lock.
+    fn take_close_handles(&self, index: u32) -> [Handle; 2] {
         let mut arena = self.ofd.borrow_mut();
         if arena.drop_ref(index) {
-            arena.release(index).map(|ofd| ofd.handle)
+            arena
+                .release(index)
+                .map_or([Handle::NONE; 2], |ofd| [ofd.handle.get(), ofd.event.get()])
         } else {
-            None
+            [Handle::NONE; 2]
         }
     }
 
-    fn close_handle(&self, handle: Option<Handle>) -> Result<(), Errno> {
-        match handle {
-            Some(handle) => match self.backend.close(handle) {
+    fn close_handle(&self, handle: Handle) -> Result<(), Errno> {
+        if handle == Handle::NONE {
+            return Ok(());
+        }
+        match self.backend.close(handle) {
+            Err(Errno::EINTR) => Ok(()),
+            other => other,
+        }
+    }
+
+    fn close_handles(&self, handles: [Handle; 2]) -> Result<(), Errno> {
+        let [data, event] = handles;
+        let mut first = self.close_handle(data);
+        // The second handle is a socket's readiness doorbell (a `UserEvent`). `CLOSE` answers
+        // `EBADF` for it and leaves it open; only `HANDLE_CLOSE` releases it.
+        if event != Handle::NONE {
+            let result = match self.backend.handle_close(event) {
                 Err(Errno::EINTR) => Ok(()),
                 other => other,
-            },
-            None => Ok(()),
+            };
+            if first.is_ok() && result.is_err() {
+                first = result;
+            }
         }
+        first
     }
 
     pub(crate) fn set_ofd_status(&self, index: u32, status: u32) -> u32 {
@@ -253,6 +272,43 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 .swap(status, core::sync::atomic::Ordering::Relaxed),
             None => 0,
         }
+    }
+
+    /// Record the socket identity that an inherited OFD must restore after `execve`.
+    pub fn set_ofd_socket_meta(&self, index: u32, meta: SocketMeta) {
+        if let Some(ofd) = self.ofd.borrow().get(index) {
+            ofd.set_socket_meta(meta);
+        }
+    }
+
+    /// Every live socket OFD with the identity needed to rebuild the libc socket table.
+    ///
+    /// Called by the socket layer after startup restored the inheritance block. Descriptors
+    /// closed by `close_cloexec_fds` are already absent from the fd table.
+    #[must_use]
+    pub fn inherited_sockets(&self) -> Vec<InheritedSocket> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut out = Vec::new();
+        for (fd, entry) in entries {
+            let Some(ofd) = arena.get(entry.ofd) else {
+                continue;
+            };
+            if ofd.kind != OfdKind::Socket {
+                continue;
+            }
+            let Some(socket) = ofd.socket_meta() else {
+                continue;
+            };
+            out.push(InheritedSocket {
+                fd,
+                ofd: entry.ofd,
+                handle: ofd.handle.get(),
+                status: ofd.status.load(core::sync::atomic::Ordering::Relaxed),
+                socket,
+            });
+        }
+        out
     }
 
     pub(crate) fn set_ofd_kind(&self, index: u32, kind: OfdKind) {
@@ -267,6 +323,19 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
     }
 
+    pub(crate) fn set_ofd_pty_master(&self, index: u32) {
+        if let Some(ofd) = self.ofd.borrow_mut().get_mut(index) {
+            ofd.set_pty_master();
+        }
+    }
+
+    /// Attach the notification event a scheme-backed socket uses for `poll` readiness.
+    pub fn set_ofd_event(&self, index: u32, event: Handle) -> Result<(), Errno> {
+        let mut arena = self.ofd.borrow_mut();
+        let slot = arena.get_mut(index).ok_or(Errno::EBADF)?;
+        slot.set_event(event)
+    }
+
     /// Install a handle and return the new lowest-free fd.
     pub fn install(
         &self,
@@ -277,6 +346,48 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         cloexec: bool,
     ) -> Result<i32, Errno> {
         self.install_impl(None, handle, kind, status, path, cloexec, 0)
+    }
+
+    /// Install an OFD that has no kernel handle yet and return the new lowest-free fd.
+    ///
+    /// `socket(2)` must return a descriptor before `bind`/`connect`/`listen` decides the scheme
+    /// endpoint. The lazy-socket seam installs this pending socket OFD and supplies the handle
+    /// later with [`Platform::attach_handle`].
+    pub fn install_pending(
+        &self,
+        kind: OfdKind,
+        status: u32,
+        path: Option<Box<[u8]>>,
+        cloexec: bool,
+    ) -> Result<i32, Errno> {
+        self.install_impl(None, Handle::NONE, kind, status, path, cloexec, 0)
+    }
+
+    /// The kernel handle currently cached by an OFD.
+    ///
+    /// `fork_child_inherit` replaces a socket's parent handle with the child's fresh handle; a
+    /// caller holding the old `Sock` value must query the OFD instead of using the stale copy.
+    #[must_use]
+    pub fn ofd_handle(&self, index: u32) -> Option<Handle> {
+        let arena = self.ofd.borrow();
+        arena
+            .get(index)
+            .map(|ofd| ofd.handle.get())
+            .filter(|handle| *handle != Handle::NONE)
+    }
+
+    /// Attach the kernel handle to an OFD installed with [`Platform::install_pending`].
+    ///
+    /// The handle is owned by the fd table from this point on. A second attach is `EEXIST`, and
+    /// an OFD that already owns a handle is never replaced.
+    pub fn attach_handle(&self, ofd: u32, handle: Handle) -> Result<(), Errno> {
+        if handle == Handle::NONE {
+            return Err(Errno::EINVAL);
+        }
+        let _guard = guard(&self.lock);
+        let mut arena = self.ofd.borrow_mut();
+        let slot = arena.get_mut(ofd).ok_or(Errno::EBADF)?;
+        slot.set_handle(handle)
     }
 
     /// Install a handle at exactly `fd`, closing any displaced OFD.
@@ -327,14 +438,16 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             let close = displaced.and_then(|entry| {
                 if arena.drop_ref(entry.ofd) {
-                    arena.release(entry.ofd).map(|ofd| ofd.handle)
+                    arena
+                        .release(entry.ofd)
+                        .map(|ofd| [ofd.handle.get(), ofd.event.get()])
                 } else {
                     None
                 }
             });
             (installed, close)
         };
-        self.close_handle(close)?;
+        self.close_handles(close.unwrap_or([Handle::NONE; 2]))?;
         Ok(installed as i32)
     }
 
@@ -389,11 +502,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 displaced = table.remove(new);
             }
             table.install_at(new as u32, index, cloexec, tag)?;
-            let close = displaced.and_then(|entry| self.take_close_handle(entry.ofd));
+            let close = displaced.map(|entry| self.take_close_handles(entry.ofd));
             (displaced, close)
         };
         let _ = displaced;
-        self.close_handle(close)?;
+        self.close_handles(close.unwrap_or([Handle::NONE; 2]))?;
         Ok(new)
     }
 
@@ -405,9 +518,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 let mut table = self.fd.borrow_mut();
                 table.remove(fd).ok_or(Errno::EBADF)?
             };
-            self.take_close_handle(entry.ofd)
+            self.take_close_handles(entry.ofd)
         };
-        self.close_handle(close)
+        self.close_handles(close)
     }
 
     /// `close` with an expected fdsan tag.
@@ -471,11 +584,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             let removed = self.fd.borrow_mut().close_from(first);
             removed
                 .iter()
-                .filter_map(|(_, entry)| self.take_close_handle(entry.ofd))
+                .flat_map(|(_, entry)| self.take_close_handles(entry.ofd))
                 .collect::<Vec<_>>()
         };
         for handle in handles {
-            self.close_handle(Some(handle))?;
+            self.close_handle(handle)?;
         }
         Ok(())
     }
@@ -487,11 +600,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             let removed = self.fd.borrow_mut().close_range(first, last);
             removed
                 .iter()
-                .filter_map(|(_, entry)| self.take_close_handle(entry.ofd))
+                .flat_map(|(_, entry)| self.take_close_handles(entry.ofd))
                 .collect::<Vec<_>>()
         };
         for handle in handles {
-            self.close_handle(Some(handle))?;
+            self.close_handle(handle)?;
         }
         Ok(())
     }
@@ -624,6 +737,31 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let resolved =
             resolve(&base, path, false, &self.limits).map_err(crate::path::path_errno)?;
         let spec = xlat::open_flags(flags)?;
+        // `/dev/tty` names the process's controlling terminal, not a VFS node. FreeBSD `cttyopen`
+        // resolves it from the session's controlling vnode; Raven asks the kernel for the live
+        // terminal handle. With no controlling terminal the kernel answers `ENXIO` (POSIX).
+        if resolved.abs == b"/dev/tty" {
+            match self.backend.ctty_handle() {
+                Ok(handle) => {
+                    let path_box: Box<[u8]> = resolved.abs.clone().into_boxed_slice();
+                    return match self.install(
+                        handle,
+                        OfdKind::Tty,
+                        spec.status,
+                        Some(path_box),
+                        spec.cloexec,
+                    ) {
+                        Ok(fd) => Ok(fd),
+                        Err(error) => {
+                            let _ = self.backend.close(handle);
+                            Err(error)
+                        }
+                    };
+                }
+                Err(Errno::ENOSYS) => {}
+                Err(error) => return Err(error),
+            }
+        }
         let mut wire = spec.wire;
         if resolved.must_be_dir {
             if flags & fcntl::O_CREAT as u32 != 0 {
@@ -631,7 +769,14 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             wire |= raven_proto_fs::WIRE_OPEN_DIRECTORY;
         }
-        let wire_path = file_path(&resolved.abs);
+        // `/dev/pts/<N>` is the public pty slave name and `/dev/ptmx` the clone device; the pty
+        // server is the `pty:` scheme. Keep the public path on the OFD (ttyname) and send the
+        // scheme path to the backend.
+        let pty_wire = pty_wire(&resolved.abs);
+        let wire_path = match &pty_wire {
+            Some(wire) => wire.clone(),
+            None => file_path(&resolved.abs),
+        };
         let handle = crate::intr::cancellable(|| {
             crate::intr::run(
                 crate::intr::CallClass::Restartable,
@@ -639,7 +784,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 || self.backend.open(&wire_path, u32::from(wire)),
             )
         })?;
-        let kind = if is_tty_path(&resolved.abs) {
+        let kind = if pty_wire.is_some() || is_tty_path(&resolved.abs) {
             OfdKind::Tty
         } else if wire & raven_proto_fs::WIRE_OPEN_DIRECTORY != 0 {
             OfdKind::Dir
@@ -654,6 +799,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 return Err(error);
             }
         };
+        // The public clone/master path carries the `pty:ptmx` wire name, so the OFD records the
+        // terminal role even though it remembers the public path for `ttyname`.
+        if pty_wire.as_deref().is_some_and(is_pty_master_wire)
+            && let Ok(reference) = self.get(fd)
+        {
+            reference.set_pty_master();
+        }
         if flags & fcntl::O_CREAT as u32 != 0 {
             // PG-24: protocol v1 has no mode on the wire; apply `mode & ~umask` after the create.
             let wanted = (mode & 0o777) & !self.umask.get();
@@ -703,12 +855,58 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             return Err(Errno::EBADF);
         }
         let handle = reference.handle();
-        crate::intr::cancellable(|| {
-            crate::intr::run(
-                crate::intr::CallClass::Restartable,
-                crate::intr::restart_wanted(),
-                || self.backend.read(handle, buf),
-            )
+        let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
+        // Any OFD with an attached scheme event is a waitable scheme socket. The kind is not a
+        // sufficient test: `scheme::probe_kind` reports `Unknown` for a net socket adopted from
+        // `SCM_RIGHTS`, even after its readiness event is attached (K438).
+        let doorbell = reference.poll_signaled();
+        let pipe = reference.kind() == OfdKind::Pipe;
+        loop {
+            let result = crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.read(handle, buf),
+                )
+            });
+            // A terminal master read of zero past a real buffer is the pty hangup (EOF). Keep it
+            // sticky so the next `poll` reports `POLLHUP` even though the scheme-file readiness
+            // fallback still reports the master as readable (PG-25 is the server-side fix). The
+            // OFD role is recorded at open time, so both `posix_openpt` and the `/dev/ptmx`
+            // SchemeFile master qualify; the slave and the console must not inherit a master
+            // hangup from a slave-side VEOF/^D read.
+            if matches!(&result, Ok(0))
+                && reference.kind() == OfdKind::Tty
+                && reference.is_pty_master()
+                && !buf.is_empty()
+            {
+                reference.set_eof();
+            }
+            match result {
+                Err(Errno::EAGAIN) if blocking && (doorbell || pipe) => {
+                    // The kernel pipe end is created non-blocking (there is no runtime setter);
+                    // POSIX blocking is emulated from the OFD status here. The socket doorbell is
+                    // also a hint: netd may have drained the queue before this read.
+                    let ready = crate::poll::wait_readable(self, fd, -1)?;
+                    if ready == 0 {
+                        continue;
+                    }
+                }
+                other => return other,
+            }
+        }
+    }
+
+    /// The fd currently attached to a socket handle, if any.
+    ///
+    /// The net adapter receives a kernel `Sock` (handle), while `poll` is fd-based. This lookup
+    /// closes that gap for `accept`/`recv` waits without exposing the whole table.
+    pub fn fd_for_socket_handle(&self, handle: Handle) -> Option<i32> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        entries.into_iter().find_map(|(fd, entry)| {
+            let ofd = arena.get(entry.ofd)?;
+            (ofd.kind == OfdKind::Socket && ofd.handle.get() == handle).then_some(fd)
         })
     }
 
@@ -719,13 +917,54 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             return Err(Errno::EBADF);
         }
         let handle = reference.handle();
-        crate::intr::cancellable(|| {
-            crate::intr::run(
-                crate::intr::CallClass::Restartable,
-                crate::intr::restart_wanted(),
-                || self.backend.write(handle, buf),
-            )
-        })
+        let pipe = reference.kind() == OfdKind::Pipe;
+        let blocking = reference.status() & fcntl::O_NONBLOCK as u32 == 0;
+        if pipe && blocking && !buf.is_empty() {
+            // The kernel pipe end is always non-blocking (see `pipe2`); a blocking descriptor
+            // waits here for ring space and loops until every byte is accepted.
+            self.write_pipe_blocking(fd, handle, buf)
+        } else {
+            crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.write(handle, buf),
+                )
+            })
+        }
+    }
+
+    /// Emulate a blocking pipe write over the non-blocking kernel endpoint.
+    fn write_pipe_blocking(&self, fd: i32, handle: Handle, buf: &[u8]) -> Result<usize, Errno> {
+        let mut done = 0usize;
+        while done < buf.len() {
+            let remaining = &buf[done..];
+            let result = crate::intr::cancellable(|| {
+                crate::intr::run(
+                    crate::intr::CallClass::Restartable,
+                    crate::intr::restart_wanted(),
+                    || self.backend.write(handle, remaining),
+                )
+            });
+            match result {
+                Ok(0) => break,
+                Ok(count) => done = done.saturating_add(count.min(remaining.len())),
+                Err(Errno::EAGAIN) => {
+                    let ready = crate::poll::wait_writable(self, fd, -1)?;
+                    if ready == 0 {
+                        continue;
+                    }
+                }
+                Err(Errno::EINTR) if done == 0 && crate::intr::restart_wanted() => continue,
+                Err(error) => {
+                    if done == 0 {
+                        return Err(error);
+                    }
+                    break;
+                }
+            }
+        }
+        Ok(done)
     }
 
     /// `readv`: one request up to 64 KiB, then a loop for the rest.
@@ -880,10 +1119,51 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         self.stat_at(fcntl::AT_FDCWD, path, fcntl::AT_SYMLINK_NOFOLLOW)
     }
 
+    /// One-call `Lstat` on the cached `file:/` root. The server returns the fixed `Stat`
+    /// record; `ENOSYS`/`EPROTO` keeps the old open+FSTAT+close fallback below.
+    fn root_stat(&self, path: &[u8]) -> Result<Stat, Errno> {
+        let mut request = [0u8; raven_proto_fs::CALL_HEADER_LEN + 2 + raven_proto_fs::MAX_PATH];
+        let encoded = CallRequest::new(Call::Lstat { path })
+            .encode(&mut request)
+            .map_err(|error| error.errno())?;
+        let (handle, reopened) = self.root_handle()?;
+        let mut response = [0u8; 128];
+        let count = match self
+            .backend
+            .call(handle, &request[..encoded], &mut response)
+        {
+            Err(Errno::EIO) if !reopened => {
+                self.invalidate_root();
+                let (handle, _) = self.root_handle()?;
+                self.backend
+                    .call(handle, &request[..encoded], &mut response)?
+            }
+            other => other?,
+        };
+        match CallResponse::decode(raven_proto_fs::OP_LSTAT, &response[..count])
+            .map_err(|error| error.errno())?
+        {
+            CallResponse::Stat { status: 0, stat } => {
+                Ok(crate::stat::from_wire(&stat, StatSource::Unknown))
+            }
+            CallResponse::Stat { status, .. } => match xlat::call_status(status) {
+                Err(error) => Err(error),
+                Ok(()) => Err(Errno::EPROTO),
+            },
+            _ => Err(Errno::EPROTO),
+        }
+    }
+
     /// `fstatat`.
     pub fn stat_at(&self, dirfd: i32, path: &[u8], flags: i32) -> Result<Stat, Errno> {
         if path.is_empty() && flags & fcntl::AT_EMPTY_PATH != 0 {
             return self.fstat(dirfd);
+        }
+        if flags & fcntl::AT_SYMLINK_NOFOLLOW != 0 {
+            let absolute = self.absolute_at(dirfd, path)?;
+            if let Ok(stat) = self.root_stat(&absolute) {
+                return Ok(stat);
+            }
         }
         let mut open_flags = fcntl::O_RDONLY as u32;
         if flags & fcntl::AT_SYMLINK_NOFOLLOW != 0 {
@@ -918,6 +1198,14 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
+        // The public pty slave name is a scheme endpoint, not a VFS node: the pty server owns
+        // the node metadata (`fstat` reports a root-owned 0600 chr device). FreeBSD devfs allows
+        // `chmod` on the pts node; Raven models that node as read-only, and OpenSSH
+        // `sshpty.c` `pty_setowner` explicitly tolerates `EROFS` for a root-owned tty whose mode
+        // has no group/other bits.
+        if pty_slave_wire(&resolved.abs).is_some() {
+            return Err(Errno::EROFS);
+        }
         self.root_call(Call::Chmod {
             mode: mode & 0o7777,
             path: &resolved.abs,
@@ -947,6 +1235,11 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
+        // See `chmod`: the pty slave node metadata is server-owned and read-only. OpenSSH's
+        // `pty_setowner` treats `EROFS` on a root-owned tty as "warn and continue".
+        if pty_slave_wire(&resolved.abs).is_some() {
+            return Err(Errno::EROFS);
+        }
         self.root_call(Call::Chown {
             uid,
             gid,
@@ -1446,7 +1739,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok((handle, true))
     }
 
-    fn invalidate_root(&self) {
+    /// Drop the cached `file:/` root; a `chroot` must never reuse the old root.
+    pub fn invalidate_root(&self) {
         if let Some(handle) = self.root.borrow_mut().take() {
             let _ = self.backend.close(handle);
         }
@@ -1520,7 +1814,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             }
             let child = mapping
                 .iter()
-                .find(|(parent, _)| *parent == ofd.handle)
+                .find(|(parent, _)| *parent == ofd.handle.get())
                 .map(|(_, child)| *child)
                 .ok_or(Errno::EBADF)?;
             let mut inherited = FdMapEntry::new(
@@ -1531,42 +1825,214 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 ofd.status.load(core::sync::atomic::Ordering::Relaxed),
             );
             inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
+            inherited.event = event_number(ofd.event.get());
+            inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
+            inherited.socket = ofd.socket_meta();
+            inherited.pty_master = ofd.is_pty_master();
             out.push(inherited);
         }
         Ok(FdMap { entries: out })
     }
 
-    /// Rebuild the table from an inheritance block whose handles are already valid in this
-    /// process. The block is installed before `main`; the table starts empty (O-5).
-    pub fn restore_fdmap(&self, block: &FdMap) -> Result<(), Errno> {
-        for entry in &block.entries {
-            if !transferable(entry.kind) {
-                return Err(Errno::EINVAL);
+    /// Build the `NAME=hex` environment entry that carries the fd table across `execve`.
+    ///
+    /// `PROC_EXEC` keeps the kernel handles in the same process but replaces the image, so the
+    /// new libc starts with an empty table. The environment entry carries the identity mapping
+    /// (`fd -> handle`) that the new image restores before its first fd use. Non-transferable
+    /// kinds and pending socket OFDs without a handle are skipped.
+    pub fn exec_fdmap_env(&self) -> Result<Option<Vec<u8>>, Errno> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut block = FdMap::empty();
+        for (fd, entry) in entries {
+            let ofd = arena.get(entry.ofd).ok_or(Errno::EBADF)?;
+            if !transferable(ofd.kind) || ofd.handle.get() == Handle::NONE {
+                continue;
             }
-            let ofd = self.ofd.borrow_mut().insert(
-                Handle(entry.handle),
-                entry.kind,
-                entry.status,
-                entry.path.clone().map(Vec::into_boxed_slice),
+            let mut inherited = FdMapEntry::new(
+                fd,
+                ofd.handle.get().0,
+                ofd.kind,
+                entry.fd_flags,
+                ofd.status.load(core::sync::atomic::Ordering::Relaxed),
             );
-            self.fd.borrow_mut().install_at(
-                entry.fd as u32,
-                ofd,
-                entry.fd_flags & FD_CLOEXEC != 0,
-                0,
-            )?;
+            inherited.path = ofd.path.as_ref().map(|path| path.to_vec());
+            // The parent may close its accepted fd and event immediately after fork, before the
+            // child restores the FdMap. Give the child its own handle to the same UserEvent so
+            // the parent's final close cannot invalidate it.
+            let event = ofd.event.get();
+            inherited.event = if event == Handle::NONE {
+                0
+            } else {
+                self.backend
+                    .dup(event, raven_abi::types::Rights::ALL.bits())
+                    .map_or(event.0, |duplicate| duplicate.0)
+            };
+            inherited.readiness = ofd.rearm.load(core::sync::atomic::Ordering::Relaxed);
+            inherited.socket = ofd.socket_meta();
+            inherited.pty_master = ofd.is_pty_master();
+            block.entries.push(inherited);
+        }
+        if block.entries.is_empty() {
+            return Ok(None);
+        }
+        let value = block.encode_env()?;
+        let mut out =
+            Vec::with_capacity(ENV_NAME.len().saturating_add(1).saturating_add(value.len()));
+        out.extend_from_slice(ENV_NAME);
+        out.push(b'=');
+        out.extend_from_slice(&value);
+        Ok(Some(out))
+    }
+
+    /// `RSH_FD0/1/2` environment entries for the shell's standard descriptors.
+    ///
+    /// The first-party `rsh` takes its standard streams as scheme handles in these variables. A
+    /// host that execs it directly (OpenSSH's command child) has only fd numbers, so publish the
+    /// current fd 0/1/2 handles. The caller's existing `RSH_FD*` values win.
+    pub fn stdio_env(&self) -> Vec<Vec<u8>> {
+        let entries = self.fd.borrow().open_entries();
+        let arena = self.ofd.borrow();
+        let mut out = Vec::new();
+        for (fd, entry) in entries {
+            let name = match fd {
+                0 => b"RSH_FD0".as_slice(),
+                1 => b"RSH_FD1".as_slice(),
+                2 => b"RSH_FD2".as_slice(),
+                _ => continue,
+            };
+            let Some(ofd) = arena.get(entry.ofd) else {
+                continue;
+            };
+            if !transferable(ofd.kind) {
+                continue;
+            }
+            let handle = ofd.handle.get();
+            if handle == Handle::NONE {
+                continue;
+            }
+            let mut row = Vec::new();
+            row.extend_from_slice(name);
+            row.push(b'=');
+            row.extend_from_slice(alloc::format!("{}", handle.0).as_bytes());
+            out.push(row);
+        }
+        out
+    }
+
+    /// Close every descriptor marked `FD_CLOEXEC` after `execve` restored the table.
+    ///
+    /// The kernel keeps handles across exec; only the new libc knows which descriptors carried
+    /// the flag. This runs once during startup, after [`Self::restore_fdmap`].
+    pub fn close_cloexec_fds(&self) -> Result<(), Errno> {
+        let open = self.fd.borrow().open_entries();
+        for (fd, entry) in open {
+            if entry.cloexec() {
+                let _ = self.close(fd);
+            }
         }
         Ok(())
     }
 
-    /// `pipe`: `ENOSYS` until PG-35 (`pipe:` server).
-    pub fn pipe(&self) -> Result<(i32, i32), Errno> {
-        Err(Errno::ENOSYS)
+    /// Rebuild the table from an inheritance block whose handles are already valid in this
+    /// process. The block is installed before `main`; the table starts empty (O-5).
+    pub fn restore_fdmap(&self, block: &FdMap) -> Result<(), Errno> {
+        let mut by_handle: alloc::collections::BTreeMap<u32, u32> =
+            alloc::collections::BTreeMap::new();
+        for entry in &block.entries {
+            if !transferable(entry.kind) {
+                return Err(Errno::EINVAL);
+            }
+            // A handle has exactly one OFD: fds that were dup'd from each other must share the
+            // status flags and the close-at-last-reference lifetime.
+            let ofd = if let Some(index) = by_handle.get(&entry.handle).copied() {
+                self.ofd.borrow_mut().add_ref(index)?;
+                index
+            } else {
+                let index = self.ofd.borrow_mut().insert(
+                    Handle(entry.handle),
+                    entry.kind,
+                    entry.status,
+                    entry.path.clone().map(Vec::into_boxed_slice),
+                );
+                if let Some(inherited) = self.ofd.borrow_mut().get_mut(index) {
+                    if entry.event != 0 {
+                        let _ = inherited.set_event(Handle(entry.event));
+                    }
+                    inherited.set_poll_rearm(entry.readiness);
+                    if let Some(socket) = entry.socket {
+                        inherited.set_socket_meta(socket);
+                    }
+                    if entry.pty_master {
+                        inherited.set_pty_master();
+                    }
+                }
+                by_handle.insert(entry.handle, index);
+                index
+            };
+            if let Err(error) = self.fd.borrow_mut().install_at(
+                entry.fd as u32,
+                ofd,
+                entry.fd_flags & FD_CLOEXEC != 0,
+                0,
+            ) {
+                self.release_ofd_ref(ofd);
+                return Err(error);
+            }
+        }
+        Ok(())
     }
 
-    /// `pipe2`: `ENOSYS` until PG-35.
-    pub fn pipe2(&self, _flags: i32) -> Result<(i32, i32), Errno> {
-        Err(Errno::ENOSYS)
+    /// `pipe`: create an in-kernel pipe with no flags.
+    pub fn pipe(&self) -> Result<(i32, i32), Errno> {
+        self.pipe2(0)
+    }
+
+    /// `pipe2`: create an in-kernel pipe and install its two handles in the fd table.
+    ///
+    /// The kernel accepts only `O_CLOEXEC` and `O_NONBLOCK`; every other bit is `EINVAL`, not a
+    /// silent ignore. `O_NONBLOCK` is recorded in both OFD status words and `O_CLOEXEC` in both
+    /// fd-table entries.
+    ///
+    /// The kernel pipe end captures its blocking flag at creation and has no runtime setter, while
+    /// POSIX `fcntl(F_SETFL)` must change the open-file description. Create every kernel end
+    /// non-blocking and emulate blocking in `read`/`write` from the OFD status; a later
+    /// `F_SETFL(O_NONBLOCK)` then takes effect without a second kernel object.
+    pub fn pipe2(&self, flags: i32) -> Result<(i32, i32), Errno> {
+        let flags = u32::try_from(flags).map_err(|_| Errno::EINVAL)?;
+        let known = (fcntl::O_CLOEXEC | fcntl::O_NONBLOCK) as u32;
+        if flags & !known != 0 {
+            return Err(Errno::EINVAL);
+        }
+        let kernel_flags = flags | fcntl::O_NONBLOCK as u32;
+        let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(kernel_flags)?;
+        let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
+        let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
+            fcntl::O_NONBLOCK as u32
+        } else {
+            0
+        };
+        let read = self.install(
+            read_handle,
+            OfdKind::Pipe,
+            fcntl::O_RDONLY as u32 | status,
+            None,
+            cloexec,
+        )?;
+        let write = match self.install(
+            write_handle,
+            OfdKind::Pipe,
+            fcntl::O_WRONLY as u32 | status,
+            None,
+            cloexec,
+        ) {
+            Ok(fd) => fd,
+            Err(error) => {
+                let _ = self.close(read);
+                return Err(error);
+            }
+        };
+        Ok((read, write))
     }
 
     /// `tcgetattr`.
@@ -1760,6 +2226,61 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         Ok(queue)
     }
 
+    /// Drop a cached event queue and create a fresh one on the next wait.
+    ///
+    /// A forked child inherits the parent's queue handle. The kernel allows one waiter per queue,
+    /// so the child must not keep using it; a lazy reset on `EBUSY` covers every fork/exec path
+    /// without a fork hook in the shell.
+    pub fn reset_event_queue(&self) {
+        if let Some(queue) = self.event_queue.borrow_mut().take() {
+            let _ = self.backend.handle_close(queue);
+        }
+    }
+
+    /// Take a fresh scheme reference for every inherited scheme descriptor in the fork child.
+    ///
+    /// The kernel copies the handle table on fork, but the scheme server counts references per
+    /// open file. A parent `close` must therefore not be the last reference while the child still
+    /// holds the descriptor. `DUP` both gives the child its own handle and sends the server the
+    /// duplicate notification; `closef`-style last-reference release then works on both sides.
+    /// Sockets, tty/pty masters and pipes are scheme-backed: an sshd session forks after opening
+    /// the accepted socket, the pty master and the privsep/channel pipes, and the parent's close
+    /// must not release the server-side object while the session child still owns it.
+    pub fn fork_child_inherit(&self) {
+        let mut seen = alloc::collections::BTreeSet::new();
+        let indices: Vec<u32> = self
+            .fd
+            .borrow()
+            .open_entries()
+            .into_iter()
+            .map(|(_, entry)| entry.ofd)
+            .collect();
+        for index in indices {
+            if !seen.insert(index) {
+                continue;
+            }
+            let (kind, handle) = {
+                let arena = self.ofd.borrow();
+                let Some(ofd) = arena.get(index) else {
+                    continue;
+                };
+                (ofd.kind, ofd.handle.get())
+            };
+            if !matches!(kind, OfdKind::Socket | OfdKind::Tty | OfdKind::Pipe)
+                || handle == Handle::NONE
+            {
+                continue;
+            }
+            if let Ok(duplicate) = self
+                .backend
+                .dup(handle, raven_abi::types::Rights::ALL.bits())
+                && let Some(ofd) = self.ofd.borrow_mut().get_mut(index)
+            {
+                ofd.handle.set(duplicate);
+            }
+        }
+    }
+
     /// The OFD table epoch for `fd`, used in epoll cookies.
     pub(crate) fn ofd_epoch(&self, fd: i32) -> Option<u32> {
         let index = {
@@ -1779,8 +2300,39 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
     }
 }
 
+fn event_number(event: Handle) -> u32 {
+    if event == Handle::NONE { 0 } else { event.0 }
+}
+
 fn is_tty_path(path: &[u8]) -> bool {
     matches!(path, b"/dev/tty" | b"/dev/console" | b"/dev/ptmx")
+}
+
+/// Map a public pty path to the pty server's scheme path.
+///
+/// `/dev/ptmx` is the clone device (FreeBSD `sys/kern/tty_pty.c` `ptmxopen`, NetBSD `ptyattach`)
+/// and `/dev/pts/<N>` is the slave, exactly as the NetBSD/FreeBSD `pty:` node names.
+fn pty_wire(path: &[u8]) -> Option<Vec<u8>> {
+    if path == b"/dev/ptmx" {
+        return Some(Vec::from(b"pty:ptmx" as &[u8]));
+    }
+    pty_slave_wire(path)
+}
+
+/// The `pty:` wire paths that name the master endpoint.
+fn is_pty_master_wire(wire: &[u8]) -> bool {
+    wire == b"pty:ptmx" || wire.starts_with(b"pty:master")
+}
+
+/// Map the public `/dev/pts/<N>` slave path to the pty server's `pty:slave/<N>` scheme path.
+fn pty_slave_wire(path: &[u8]) -> Option<Vec<u8>> {
+    let id = path.strip_prefix(b"/dev/pts/")?;
+    if id.is_empty() {
+        return None;
+    }
+    let mut wire = Vec::from(b"pty:slave/" as &[u8]);
+    wire.extend_from_slice(id);
+    Some(wire)
 }
 
 impl<B: SysBackend, L: Lock> OfdRef<'_, B, L> {

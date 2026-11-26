@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S195: the TLB shootdown must survive a lost NMI and a target that acknowledges after the
+# 100 ms diagnostic deadline. Both rows run in the SMP selftest against CPU 1.
+name = "smp-lock-time-tlb-ack"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=smp"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^selftest: smp tlb lost-nmi ok elapsed_ms=\d+$'
+
+[[expect]]
+regex = '^selftest: smp tlb delayed-ack ok elapsed_ms=\d+$'
+
+[[expect]]
+regex = '^selftest: smp ok cpus=4 switches=\d+$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tlb shootdown timeout|selftest: smp tlb .*failed'

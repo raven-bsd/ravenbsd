@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Post-pivot mount table for the QEMU UFS root: `/` is the mounted UFS2 disk.
+# The bootstrap initfs table still starts with initfs: before the pivot; the UFS
+# payload ships this file so `mount` and `df` report UFS on `/`.
+
+/ ufs:
+/tmp ramfs:
+/dev/null null:
+/dev/zero zero:
+/dev/random rand:
+/dev/urandom rand:

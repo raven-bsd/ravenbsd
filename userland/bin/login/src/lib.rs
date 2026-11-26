@@ -30,6 +30,7 @@
 extern crate alloc;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 
 /// Default search path when `/etc/profile` has no `PATH`.
 pub const DEFAULT_PATH: &str = "/bin:/sbin";
@@ -102,6 +103,67 @@ pub fn parse_root_passwd(text: &str) -> Option<PasswdEntry> {
         entry.shell = String::from(DEFAULT_SHELL);
         Some(entry)
     })
+}
+
+/// Parse every valid `/etc/passwd` entry. Malformed lines are ignored, as they are for
+/// [`parse_root_passwd`]; the account database publisher owns the strict validation.
+#[must_use]
+pub fn parse_passwd(text: &str) -> Vec<PasswdEntry> {
+    text.lines().filter_map(parse_passwd_line).collect()
+}
+
+/// Find one account in `/etc/passwd`.
+#[must_use]
+pub fn find_passwd(text: &str, name: &str) -> Option<PasswdEntry> {
+    parse_passwd(text)
+        .into_iter()
+        .find(|entry| entry.name == name)
+}
+
+/// Persisted console autologin.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Autologin {
+    /// Whether the console starts a session without a password.
+    pub enabled: bool,
+    /// Account to start.
+    pub user: String,
+}
+
+/// Parse `/etc/raven/autologin.toml`.
+///
+/// The reader accepts the small `[console] user/enabled` shape written by `raven config`; it
+/// ignores comments, sections and unknown keys. A malformed or invalid account disables the
+/// feature rather than blocking the console.
+#[must_use]
+pub fn parse_autologin(text: &str) -> Autologin {
+    let mut autologin = Autologin::default();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with('[') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        match key.trim() {
+            "user" => {
+                autologin.user = String::from(
+                    value
+                        .strip_prefix('"')
+                        .and_then(|value| value.strip_suffix('"'))
+                        .unwrap_or(value),
+                );
+            }
+            "enabled" => autologin.enabled = value == "true",
+            _ => {}
+        }
+    }
+    if normalize_username(&autologin.user).is_none() {
+        autologin.user.clear();
+        autologin.enabled = false;
+    }
+    autologin
 }
 
 fn parse_passwd_line(line: &str) -> Option<PasswdEntry> {
@@ -180,14 +242,21 @@ pub fn verify_root_password(shadow_text: &str, password: &str) -> bool {
 
 /// The exit status for one login attempt.
 ///
-/// Only the root account can authenticate; an unknown account, a locked record or a wrong
-/// password all return [`LOGIN_RETRY`] so getty prints `Login incorrect` and prompts again.
+/// Any account with a verifiable `$6$` shadow record can authenticate. An unknown account, a
+/// locked record or a wrong password all return [`LOGIN_RETRY`] so getty prints
+/// `Login incorrect` and prompts again.
 #[must_use]
 pub fn login_status(shadow_text: &str, username: &str, password: &str) -> i32 {
-    if is_root_user(username) && verify_root_password(shadow_text, password) {
-        LOGIN_OK
-    } else {
-        LOGIN_RETRY
+    let line = shadow_text.lines().find(|line| {
+        let mut fields = line.split(':');
+        fields.next() == Some(username) && fields.count() == 8
+    });
+    let Some(line) = line else {
+        return LOGIN_RETRY;
+    };
+    match raven_auth::ShadowEntry::parse(line) {
+        Ok(entry) if entry.verify(username, password) => LOGIN_OK,
+        _ => LOGIN_RETRY,
     }
 }
 
@@ -263,7 +332,16 @@ pub mod tty {
             let mut line: Vec<u8> = Vec::new();
             let mut buffer = [0u8; 64];
             loop {
-                let count = client.read(self.handle, 0, &mut buffer)?;
+                let count = match client.read(self.handle, 0, &mut buffer) {
+                    Ok(count) => count,
+                    // The console server must not block its dispatch loop on an idle read
+                    // (that starves the console output path and queues tty requests); poll.
+                    Err(Errno::EAGAIN) => {
+                        let _ = raven_rt::nanosleep(10_000_000);
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                };
                 if count == 0 {
                     return Err(Errno::EIO);
                 }

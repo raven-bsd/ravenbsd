@@ -30,6 +30,34 @@ wait = '^raven# $'
 timeout_secs = 120
 
 [[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "ps -e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PID PPID UID GID CMD$'
+timeout_secs = 15
+
+[[step]]
+wait = '^[0-9]+ [0-9]+ [0-9]+ [0-9]+ .+$'
+timeout_secs = 15
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
 send = "mkdir /tmp/bt\n"
 delay_ms = 100
 

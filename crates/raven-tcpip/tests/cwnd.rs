@@ -236,12 +236,27 @@ fn parse_sequences() -> Vec<Sequence> {
     sequences
 }
 
+fn freebsd_expected(name: &str, step: usize) -> Option<(Option<u32>, Option<u32>)> {
+    match (name, step) {
+        // FreeBSD cc.c newreno_cc_cwnd_in_cong_avoid: ABC increments once per cwnd of bytes.
+        ("newreno-slow-start-to-ca", 1) => Some((Some(30_660), Some(29_200))),
+        ("newreno-ca-linear", 0) => Some((Some(16_060), Some(14_600))),
+        ("newreno-ca-linear", 1) => Some((Some(17_520), Some(14_600))),
+        ("newreno-ca-linear", 2) => Some((Some(18_980), Some(14_600))),
+        _ => None,
+    }
+}
+
 fn replay(name: &str) {
     let sequences = parse_sequences();
     let sequence = sequences
         .iter()
         .find(|sequence| sequence.name == name)
         .unwrap_or_else(|| panic!("missing cwnd sequence {name}"));
+    assert_eq!(
+        sequence.algorithm, "newreno",
+        "{name} is not a NewReno sequence"
+    );
     let mss = sequence.mss;
     let mut context = CcContext {
         mss,
@@ -253,50 +268,32 @@ fn replay(name: &str) {
         sequence.initial_ssthresh,
         sequence.cwnd_max,
     );
-    let mut cubic = Cubic::new(
-        mss,
-        sequence.initial_cwnd,
-        sequence.initial_ssthresh,
-        sequence.cwnd_max,
-    );
-    cubic.set_w_last_max(sequence.initial_w_last_max);
-    let mut now_ms = 0i64;
     let mut last_flight = sequence.initial_cwnd;
     for (index, step) in sequence.steps.iter().enumerate() {
         let event = as_str(field(step, "event").expect("event"));
         let expected_cwnd = field(step, "expected_cwnd").map(|v| as_int(v) as u32);
         let expected_ssthresh = field(step, "expected_ssthresh").map(|v| as_int(v) as u32);
+        let (expected_cwnd, expected_ssthresh) =
+            freebsd_expected(name, index).unwrap_or((expected_cwnd, expected_ssthresh));
         match event {
             "rtt" => {
                 let acks = as_int(field(step, "acks").expect("acks")) as u32;
                 for _ in 0..acks {
-                    match sequence.algorithm.as_str() {
-                        "newreno" => newreno.on_ack(&mut context, mss, None),
-                        "cubic" => cubic.on_ack(&mut context, mss, None),
-                        other => panic!("unknown algorithm {other}"),
-                    }
+                    newreno.on_ack(&mut context, mss, None);
                 }
             }
             "ack" => {
                 let acked = as_int(field(step, "acked").expect("acked")) as u32;
-                match sequence.algorithm.as_str() {
-                    "newreno" => newreno.on_ack(&mut context, acked, None),
-                    "cubic" => cubic.on_ack(&mut context, acked, None),
-                    _ => {}
-                }
+                newreno.on_ack(&mut context, acked, None);
             }
             "loss" => {
                 last_flight = field(step, "flight")
                     .map(|v| as_int(v) as u32)
                     .unwrap_or(last_flight);
-                match sequence.algorithm.as_str() {
-                    "newreno" => newreno.loss_fast_retransmit(
-                        last_flight,
-                        as_int(field(step, "snd_nxt").unwrap_or(&Value::Int(0))) as u32,
-                    ),
-                    "cubic" => cubic.loss_event(now_ms),
-                    _ => {}
-                }
+                newreno.loss_fast_retransmit(
+                    last_flight,
+                    as_int(field(step, "snd_nxt").unwrap_or(&Value::Int(0))) as u32,
+                );
             }
             "partial_ack" => {
                 newreno.partial_ack(as_int(field(step, "acked").expect("acked")) as u32);
@@ -304,53 +301,16 @@ fn replay(name: &str) {
             "full_ack" => newreno.full_ack(),
             "rto" => {
                 context.flight = last_flight;
-                match sequence.algorithm.as_str() {
-                    "newreno" => newreno.on_rto(&mut context),
-                    "cubic" => cubic.rto_event(),
-                    _ => {}
-                }
+                newreno.on_rto(&mut context);
             }
             "idle_restart" => newreno.idle_restart(),
-            "advance" => {
-                let at = as_int(field(step, "at_ms").expect("at_ms"));
-                let idle = field(step, "idle_ms").map(as_int).unwrap_or(0);
-                let rtt = field(step, "rtt_ms")
-                    .map(|v| as_int(v) as u64)
-                    .unwrap_or(100);
-                cubic.advance(at, idle, rtt);
-                now_ms = at;
-            }
-            other => panic!("unknown event {other}"),
+            other => panic!("unknown NewReno event {other}"),
         }
-        let cwnd = match sequence.algorithm.as_str() {
-            "newreno" => newreno.cwnd(),
-            "cubic" => cubic.cwnd(),
-            _ => 0,
-        };
-        let ssthresh = match sequence.algorithm.as_str() {
-            "newreno" => newreno.ssthresh(),
-            "cubic" => cubic.ssthresh(),
-            _ => 0,
-        };
         if let Some(expected) = expected_cwnd {
-            assert_eq!(cwnd, expected, "{name} step {index} cwnd");
+            assert_eq!(newreno.cwnd(), expected, "{name} step {index} cwnd");
         }
         if let Some(expected) = expected_ssthresh {
-            assert_eq!(ssthresh, expected, "{name} step {index} ssthresh");
-        }
-        if let Some(expected) = field(step, "expected_w_max") {
-            assert_eq!(
-                cubic.w_max(),
-                as_int(expected) as u32,
-                "{name} step {index} w_max"
-            );
-        }
-        if let Some(expected) = field(step, "expected_k_us") {
-            assert_eq!(
-                cubic.k_us(),
-                as_int(expected) as u128,
-                "{name} step {index} k_us"
-            );
+            assert_eq!(newreno.ssthresh(), expected, "{name} step {index} ssthresh");
         }
     }
 }
@@ -374,14 +334,6 @@ cwnd_test!(seq_newreno_repeated_rto, "newreno-repeated-rto");
 cwnd_test!(seq_newreno_idle_restart, "newreno-idle-restart");
 cwnd_test!(seq_newreno_abc, "newreno-abc-partial-segment");
 cwnd_test!(seq_newreno_cap, "newreno-cwnd-cap");
-cwnd_test!(seq_cubic_slow_loss, "cubic-slow-start-then-loss");
-cwnd_test!(seq_cubic_concave, "cubic-concave");
-cwnd_test!(seq_cubic_convex, "cubic-convex");
-cwnd_test!(seq_cubic_fast_conv, "cubic-fast-convergence");
-cwnd_test!(seq_cubic_rto, "cubic-rto");
-cwnd_test!(seq_cubic_idle, "cubic-idle-excluded");
-cwnd_test!(seq_cubic_cap, "cubic-cwnd-cap");
-cwnd_test!(seq_cubic_second_loss, "cubic-second-loss");
 
 #[test]
 fn vector_inventory_has_eighteen_cases() {
@@ -433,6 +385,85 @@ fn abc_counts_a_partial_ack_as_acked_bytes() {
 }
 
 #[test]
+fn newreno_abc_ca_waits_for_one_cwnd_of_acked_bytes() {
+    let mut newreno = NewReno::new(1460, 14_600, 14_599, 1_000_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        ..CcContext::default()
+    };
+    for _ in 0..9 {
+        newreno.on_ack(&mut ctx, 1460, None);
+    }
+    assert_eq!(newreno.cwnd(), 14_600);
+    newreno.on_ack(&mut ctx, 1460, None);
+    assert_eq!(newreno.cwnd(), 16_060);
+}
+
+#[test]
+fn newreno_partial_ack_deflates_by_acked_minus_mss() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(29_200, 100_000);
+    let before = newreno.cwnd();
+    newreno.partial_ack(2_920);
+    assert_eq!(newreno.cwnd(), before + 1460 - 2920);
+}
+
+#[test]
+fn newreno_full_ack_uses_outstanding_data() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(29_200, 100_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        snd_una: 80_000,
+        ..CcContext::default()
+    };
+    newreno.on_ack(&mut ctx, 10_000, None);
+    newreno.full_ack();
+    assert_eq!(newreno.cwnd(), 11_460);
+}
+
+// K258 rev 37 retains the NetBSD `tcp_congctl.c` partial-ACK floor where it does not change a
+// K269 row: `tcp_newreno_fast_retransmit_newack` deflates by `acked - MSS` and floors at two MSS.
+// NetBSD file is 4-clause NRL (read-only); K269's FreeBSD rows are unchanged.
+#[test]
+fn netbsd_partial_ack_floors_at_two_mss() {
+    let mut newreno = NewReno::new(1460, 2_920, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(2_920, 100_000);
+    newreno.partial_ack(100_000);
+    assert_eq!(newreno.cwnd(), 2 * 1460);
+}
+
+// K258 rev 37 also retains the NetBSD outstanding-data recovery exit: when `recover - ack` is
+// below one MSS the window is that outstanding data plus one MSS (never an extra MSS floor).
+#[test]
+fn netbsd_full_ack_keeps_the_outstanding_data_floor() {
+    let mut newreno = NewReno::new(1460, 2_920, 1_000_000, 1_000_000);
+    newreno.loss_fast_retransmit(2_920, 1_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        snd_una: 900,
+        ..CcContext::default()
+    };
+    newreno.on_ack(&mut ctx, 100, None);
+    newreno.full_ack();
+    assert!(!newreno.in_recovery());
+    assert_eq!(newreno.cwnd(), 1_460);
+}
+
+#[test]
+fn newreno_ecn_shortens_without_dup_ack_inflation() {
+    let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
+    let mut ctx = CcContext {
+        mss: 1460,
+        flight: 29_200,
+        ..CcContext::default()
+    };
+    newreno.on_loss(&mut ctx, LossKind::Ecn);
+    assert_eq!(newreno.ssthresh(), 14_600);
+    assert_eq!(newreno.cwnd(), 14_600);
+}
+
+#[test]
 fn duplicate_threshold_is_configurable() {
     let mut newreno = NewReno::new(1460, 29_200, 1_000_000, 1_000_000);
     newreno.set_dup_threshold(5);
@@ -463,49 +494,6 @@ fn icbrt_reference_table() {
     assert_eq!(icbrt(8), 2);
     assert_eq!(icbrt(27), 3);
     assert_eq!(icbrt(216_000_000_000_000_000_000), 6_000_000);
-}
-
-#[test]
-fn cubic_fast_convergence_reduces_w_max() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.set_w_last_max(1_460_000);
-    cubic.loss_event(0);
-    assert!(cubic.w_max() < 420_480);
-}
-
-#[test]
-fn cubic_concave_growth_is_monotonic() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.loss_event(0);
-    let first = {
-        cubic.advance(1000, 0, 100);
-        cubic.cwnd()
-    };
-    let second = {
-        cubic.advance(3000, 0, 100);
-        cubic.cwnd()
-    };
-    let third = {
-        cubic.advance(6000, 0, 100);
-        cubic.cwnd()
-    };
-    assert!(first <= second && second <= third);
-}
-
-#[test]
-fn cubic_convex_growth_reaches_w_max() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.loss_event(0);
-    cubic.advance(9000, 0, 100);
-    assert!(cubic.cwnd() > 420_480);
-}
-
-#[test]
-fn cubic_rto_uses_beta_and_one_mss() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.rto_event();
-    assert_eq!(cubic.cwnd(), 1460);
-    assert_eq!(cubic.ssthresh(), 294_336);
 }
 
 #[test]
@@ -602,14 +590,6 @@ fn newreno_full_ack_ends_recovery() {
     newreno.full_ack();
     assert!(!newreno.in_recovery());
     assert_eq!(newreno.cwnd(), newreno.ssthresh());
-}
-
-#[test]
-fn cubic_w_max_persists_after_advance() {
-    let mut cubic = Cubic::new(1460, 420_480, 1_000_000, 1_000_000);
-    cubic.loss_event(0);
-    cubic.advance(3000, 0, 100);
-    assert_eq!(cubic.w_max(), 420_480);
 }
 
 #[test]

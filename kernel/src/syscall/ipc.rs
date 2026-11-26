@@ -3,6 +3,7 @@
 
 //! Scheme IPC syscalls (`0x60..0x69`).
 
+use alloc::string::String;
 use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
@@ -57,6 +58,7 @@ fn register(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno>
             _ => return Err(Errno::EACCES),
         }
     }
+    registry::authorize(caller, &name)?;
     let server = registry::register(caller, &name)?;
     let rights = Rights::READ
         .union(Rights::WRITE)
@@ -73,9 +75,45 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
     let (scheme, suffix) = model::split_path(&path).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    // A per-process root only affects the file namespace. Lexical `.`/`..` resolution clamps at
+    // the root before the request leaves the process boundary; symlink resolution remains a
+    // vfsd responsibility (K224).
+    let mut root = None;
+    let effective = if matches!(scheme, "file" | "vfs") {
+        let caller_root = caller.root.lock().clone();
+        if caller_root == "/" {
+            String::from(suffix)
+        } else {
+            root = Some(caller_root.clone());
+            process::resolve_root_path(&caller_root, suffix)
+        }
+    } else {
+        String::from(suffix)
+    };
     let server = registry::lookup(caller, scheme)?;
-    let handle = router::open(caller, server, suffix, flags)?;
+    let handle = router::open(caller, server, &effective, root.as_deref(), flags)?;
     Ok(handle.0 as usize)
+}
+
+/// Break copy-on-write for a scheme read response buffer before the capture copies it.
+///
+/// A buffer written before `fork` is a private COW page whose PTE is read-only until a write.
+/// `capture::create` rejects that PTE with `EFAULT` even though the VMA is writable; a plain
+/// `copy_to_user` would take the COW fault and retry. Resolve the same write fault here, once
+/// per page, so the capture sees a writable private page. Bounded: the transfer limit rejects
+/// oversized reads before this point.
+fn fault_in_read_buffer(address: u64, len: u64) {
+    const PAGE: u64 = 4096;
+    const MAX_FAULT_IN: u64 = 1 << 20;
+    if len == 0 || len > MAX_FAULT_IN {
+        return;
+    }
+    let end = address.saturating_add(len);
+    let mut page = address & !(PAGE - 1);
+    while page < end {
+        let _ = crate::process::handle_page_fault(page);
+        page = page.saturating_add(PAGE);
+    }
 }
 
 fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
@@ -92,8 +130,16 @@ fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
             raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
         );
     }
+    if let Object::Duplex(end) = object {
+        caller.handles.lock().get(handle, Rights::READ)?;
+        return crate::process::duplex::read(
+            &end,
+            raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
+        );
+    }
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
     crate::process::tty::check_access(caller, &file, false)?;
+    fault_in_read_buffer(frame.rsi, frame.rdx);
     router::read(caller, &file, frame.rsi, frame.rdx)
 }
 
@@ -110,6 +156,13 @@ fn write(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
             raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
         );
     }
+    if let Object::Duplex(end) = object {
+        caller.handles.lock().get(handle, Rights::WRITE)?;
+        return crate::process::duplex::write(
+            &end,
+            raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
+        );
+    }
     let file = ipc::file_from_handle(caller, handle, Rights::WRITE)?;
     crate::process::tty::check_access(caller, &file, true)?;
     router::write(caller, &file, frame.rsi, frame.rdx)
@@ -121,6 +174,7 @@ pub fn pread(frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(&caller, handle, Rights::READ)?;
     crate::process::tty::check_access(&caller, &file, false)?;
+    fault_in_read_buffer(frame.rsi, frame.rdx);
     router::pread(&caller, &file, frame.rsi, frame.rdx, frame.r10)
 }
 

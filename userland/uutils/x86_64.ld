@@ -11,7 +11,8 @@
 ENTRY(_start)
 
 PHDRS {
-    text PT_LOAD FLAGS(5);
+    phdr PT_PHDR PHDRS;
+    text PT_LOAD FILEHDR PHDRS FLAGS(5);
     rodata PT_LOAD FLAGS(4);
     data PT_LOAD FLAGS(6);
     bss PT_LOAD FLAGS(6);
@@ -19,7 +20,10 @@ PHDRS {
 }
 
 SECTIONS {
-    . = 0x00400000;
+    /* The first LOAD maps the ELF and program headers, so AT_PHDR names a mapped table and
+       libc can find PT_TLS. Keep the image base at 0x00400000; .text starts after the headers
+       and is page-aligned, so the file part still ends on a page boundary. */
+    . = 0x00400000 + SIZEOF_HEADERS;
 
     /* The R E LOAD file part must be a page multiple: spawn(Strict) rejects a partial tail. */
     .text ALIGN(4096) : {

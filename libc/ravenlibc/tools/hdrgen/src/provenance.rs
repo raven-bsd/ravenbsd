@@ -123,6 +123,21 @@ pub struct Lock {
     pub musl: String,
     /// The pinned `linux-raw-sys` commit.
     pub linux_raw_sys: String,
+    /// The pinned FreeBSD commit (DR-69 native application ABI).
+    pub freebsd: String,
+}
+
+impl Lock {
+    /// The pinned revision of one donor, when `donors.lock` records it.
+    #[must_use]
+    pub fn revision_of(&self, donor: &str) -> Option<&str> {
+        match donor {
+            "musl" => Some(&self.musl),
+            "freebsd" => Some(&self.freebsd),
+            "linux-raw-sys" => Some(&self.linux_raw_sys),
+            _ => None,
+        }
+    }
 }
 
 /// Find `ravenbsd-resources/donors.lock` at or above `start`.
@@ -146,6 +161,7 @@ pub fn read_lock(resources: &Path) -> Result<Lock> {
         .with_context(|| format!("cannot read {}", path.display()))?;
     let mut musl = None;
     let mut linux_raw_sys = None;
+    let mut freebsd = None;
     for line in text.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -158,12 +174,14 @@ pub fn read_lock(resources: &Path) -> Result<Lock> {
         match name {
             "musl" => musl = Some(sha.to_string()),
             "linux-raw-sys" => linux_raw_sys = Some(sha.to_string()),
+            "freebsd" => freebsd = Some(sha.to_string()),
             _ => {}
         }
     }
     Ok(Lock {
         musl: musl.context("donors.lock has no musl entry")?,
         linux_raw_sys: linux_raw_sys.context("donors.lock has no linux-raw-sys entry")?,
+        freebsd: freebsd.context("donors.lock has no freebsd entry")?,
     })
 }
 
@@ -212,17 +230,27 @@ impl ImportEntry {
 }
 
 /// Build every `[[import]]` entry from the loaded tables.
-#[must_use]
-pub fn import_entries(tables: &Tables, date: &str, lock: &Lock) -> Vec<ImportEntry> {
+pub fn import_entries(tables: &Tables, date: &str, lock: &Lock) -> Result<Vec<ImportEntry>> {
+    let attributions = crate::attribution::Attributions::resolve(tables, lock)?;
     let mut entries = Vec::new();
     for group in &tables.groups {
         let stem = &group.stem;
-        let upstream = group.def.source.join(", ");
-        let notes = format!(
-            "no per-file header; covered by musl/COPYRIGHT; checkout {}; constants transcribed \
-             into abi/{stem}.toml; deviations in abi/deviations.toml",
-            lock.musl
-        );
+        let attribution = attributions
+            .get(stem)
+            .with_context(|| format!("group {stem} has no attribution"))?;
+        let upstream = attribution.paths.join(", ");
+        let notes = if attribution.donor == "musl" {
+            format!(
+                "no per-file header; covered by musl/COPYRIGHT; checkout {}; constants transcribed \
+                 into abi/{stem}.toml; deviations in abi/deviations.toml",
+                attribution.revision
+            )
+        } else {
+            format!(
+                "reviewed {} source; constants transcribed into abi/{stem}.toml",
+                attribution.donor
+            )
+        };
         let header = expected_header(stem);
         let paths = [
             format!("libc/ravenlibc/abi/{stem}.toml"),
@@ -232,10 +260,10 @@ pub fn import_entries(tables: &Tables, date: &str, lock: &Lock) -> Vec<ImportEnt
         for path in paths {
             entries.push(ImportEntry {
                 path,
-                upstream: "musl".to_string(),
+                upstream: attribution.donor.clone(),
                 upstream_path: upstream.clone(),
-                upstream_rev: lock.musl.clone(),
-                license: "MIT".to_string(),
+                upstream_rev: attribution.revision.clone(),
+                license: attribution.license.clone(),
                 tier: "A".to_string(),
                 copied: date.to_string(),
                 modified: true,
@@ -257,7 +285,7 @@ pub fn import_entries(tables: &Tables, date: &str, lock: &Lock) -> Vec<ImportEnt
         });
     }
     entries.sort_by(|left, right| left.path.cmp(&right.path));
-    entries
+    Ok(entries)
 }
 
 /// Validate a `--date` argument.

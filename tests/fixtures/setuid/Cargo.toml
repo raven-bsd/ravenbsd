@@ -25,6 +25,10 @@ path = "src/init.rs"
 name = "raven-setuid-child"
 path = "src/child.rs"
 
+[[bin]]
+name = "raven-setuid-auxv"
+path = "src/auxv.rs"
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-initfs = { path = "../../../crates/raven-initfs" }

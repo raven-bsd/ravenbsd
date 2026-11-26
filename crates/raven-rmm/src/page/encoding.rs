@@ -46,6 +46,12 @@ pub trait Encoding {
 
     /// The canonical-address predicate for this architecture.
     fn is_canonical(address: u64) -> bool;
+
+    /// True when `address` is in this architecture's user (lower) virtual half.
+    ///
+    /// The mapper refuses a user-accessible mapping outside this half: the kernel root and the
+    /// per-address-space upper half are shared, so a user bit there would expose kernel tables.
+    fn is_user_half(address: u64) -> bool;
 }
 
 /// The x86-64 PTE encoding: the historical S06 behaviour, bit for bit.
@@ -97,6 +103,10 @@ impl Encoding for X86_64Encoding {
 
     fn is_canonical(address: u64) -> bool {
         crate::arch::x86_64::is_canonical(address)
+    }
+
+    fn is_user_half(address: u64) -> bool {
+        address < 0x0000_8000_0000_0000
     }
 }
 
@@ -182,6 +192,9 @@ impl Encoding for Aarch64Encoding {
     fn decode(entry: u64, level: u8) -> (PhysAddr, PageFlags, PageSize) {
         let address = crate::arch::aarch64::entry_address(entry);
         let mut flags = PageFlags::empty();
+        if entry & crate::arch::aarch64::ENTRY_VALID != 0 {
+            flags.insert(PageFlags::from_bits(crate::page::PRESENT));
+        }
 
         // Attribute index back to logical flags.
         let attribute = entry & (0b111 << 2);
@@ -233,6 +246,10 @@ impl Encoding for Aarch64Encoding {
 
     fn is_canonical(address: u64) -> bool {
         crate::arch::aarch64::is_canonical(address)
+    }
+
+    fn is_user_half(address: u64) -> bool {
+        crate::arch::aarch64::is_user_half(address)
     }
 }
 

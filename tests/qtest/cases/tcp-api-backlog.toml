@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K294 listener backlog on TCG: the host peer opens four connections before the
+# guest accepts any, then sends one byte on each. The guest must accept and close
+# all four, so the listen backlog has to hold the queued connections.
+
+name = "tcp-api-backlog"
+arch = "x86_64"
+profile = "network-config-test"
+timeout_secs = 60
+initfs = "build/fixtures/net-conformance/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-accel", "tcg",
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23090-:23090",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "timeout"
+pre = [
+    "test -f build/fixtures/net-conformance/initfs.img || sh tests/fixtures/net-conformance/build.sh",
+    "sh tests/qtest/cases/tcp-api-backlog-peer.sh > /tmp/opencode/tcp-api-backlog-peer.log 2>&1 &",
+]
+
+[[expect]]
+regex = '^netconf: listening port=23090$'
+
+[[expect]]
+regex = '^.*netconf: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^netconf: write=44 errno=0$'
+
+[[expect]]
+regex = '^netconf: peer-event=[0-9]+ read=1$'
+
+[[expect]]
+regex = '^netconf: closed$'
+
+[[expect]]
+regex = '^.*netconf: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^netconf: write=44 errno=0$'
+
+[[expect]]
+regex = '^netconf: peer-event=[0-9]+ read=1$'
+
+[[expect]]
+regex = '^netconf: closed$'
+
+[[expect]]
+regex = '^.*netconf: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^netconf: write=44 errno=0$'
+
+[[expect]]
+regex = '^netconf: peer-event=[0-9]+ read=1$'
+
+[[expect]]
+regex = '^netconf: closed$'
+
+[[expect]]
+regex = '^.*netconf: accepted fd=[0-9]+$'
+
+[[expect]]
+regex = '^netconf: write=44 errno=0$'
+
+[[expect]]
+regex = '^netconf: peer-event=[0-9]+ read=1$'
+
+[[expect]]
+regex = '^netconf: closed$'
+
+[[forbid]]
+regex = '(?i)netconf: socket errno|netconf: accept errno|netconf: fail|panic|EXCEPTION'

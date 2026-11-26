@@ -11,6 +11,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use raven_elf::{Elf, LoadMode, Machine, plan_load};
 
 use crate::build::Arch;
 use crate::process::{CommandSpec, run as run_command};
@@ -32,6 +33,7 @@ pub(crate) fn build_for_arch(root: &Path, arch: Arch) -> Result<u8> {
         BuildOptions {
             arch,
             release: true,
+            check: false,
         },
     )
 }
@@ -50,6 +52,7 @@ pub(crate) fn target_for(arch: Arch) -> &'static str {
 struct BuildOptions {
     arch: Arch,
     release: bool,
+    check: bool,
 }
 
 fn parse_build(args: &[String]) -> Result<BuildOptions> {
@@ -57,6 +60,7 @@ fn parse_build(args: &[String]) -> Result<BuildOptions> {
     // The target shell is installed in the boot image; a debug brush carries megabytes of DWARF
     // and no longer fits the ESP. Release is the default, as for the uutils target build.
     let mut release = true;
+    let mut check = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -72,6 +76,7 @@ fn parse_build(args: &[String]) -> Result<BuildOptions> {
             }
             "--release" => release = true,
             "--debug" => release = false,
+            "--check" => check = true,
             other => bail!("build brush: unknown argument `{other}`"),
         }
         index += 1;
@@ -79,7 +84,55 @@ fn parse_build(args: &[String]) -> Result<BuildOptions> {
     Ok(BuildOptions {
         arch: arch.ok_or_else(|| anyhow::anyhow!("build brush: --arch is required"))?,
         release,
+        check,
     })
+}
+
+/// The link script selected for one architecture.
+///
+/// RISC-V has no brush build today; it keeps the old lld-default behavior.
+fn linker_for(arch: Arch) -> Option<PathBuf> {
+    match arch {
+        Arch::X86_64 | Arch::Aarch64 => {
+            Some(PathBuf::from(format!("xtask/brush-{}.ld", arch.as_str())))
+        }
+        Arch::Riscv64 => None,
+    }
+}
+
+/// Resolve the selected script and require it before cargo runs.
+fn selected_linker(root: &Path, arch: Arch) -> Result<Option<PathBuf>> {
+    let Some(relative) = linker_for(arch) else {
+        return Ok(None);
+    };
+    let path = root.join(relative);
+    if !path.is_file() {
+        bail!("missing brush linker script: {}", path.display());
+    }
+    Ok(Some(path))
+}
+
+fn machine_for(arch: Arch) -> Machine {
+    match arch {
+        Arch::X86_64 => Machine::X86_64,
+        Arch::Aarch64 => Machine::Aarch64,
+        Arch::Riscv64 => Machine::Riscv64,
+    }
+}
+
+/// Run the real `raven-elf` Strict planner on a staged artifact.
+fn verify_strict(path: &Path, arch: Arch) -> Result<()> {
+    // Mirrors raven-abi's user end; spawn parses at `0..USER_END`.
+    const USER_END: u64 = 0x0000_7FFF_FFFF_F000;
+    const PAGE: u64 = 4096;
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("cannot read brush artifact {}", path.display()))?;
+    let elf = Elf::parse(&bytes, machine_for(arch), 0..USER_END)
+        .map_err(|error| anyhow::anyhow!("{}: ELF parse failed: {error:?}", path.display()))?;
+    let plan = plan_load(&elf, PAGE, LoadMode::Strict)
+        .map_err(|error| anyhow::anyhow!("{}: Strict plan = Err({error:?})", path.display()))?;
+    println!("{}: Strict plan = Ok({})", path.display(), plan.count());
+    Ok(())
 }
 
 /// Intercept `build brush` before the generic component parser sees it.
@@ -100,6 +153,15 @@ fn run_build(args: &[String]) -> Result<u8> {
 }
 
 fn build(root: &Path, options: BuildOptions) -> Result<u8> {
+    if options.check {
+        let staged = root.join(staged_for(options.arch));
+        if !staged.is_file() {
+            bail!("brush artifact is missing: {}", staged.display());
+        }
+        verify_strict(&staged, options.arch)?;
+        return Ok(0);
+    }
+
     let manifest = root.join("userland/brush/Cargo.toml");
     if !manifest.is_file() {
         bail!(
@@ -128,22 +190,16 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
         .join(format!("brush-{}", options.arch.as_str()));
     // A std binary is PIE by default. The Raven spawn loader wants a fixed-address ET_EXEC with
     // page-aligned segments, so use the same static link script and code model as uutils.
-    let linker = root
-        .join("xtask")
-        .join(format!("brush-{}.ld", options.arch.as_str()));
-    if options.arch == Arch::X86_64 && !linker.is_file() {
-        bail!("missing brush linker script: {}", linker.display());
-    }
+    let linker = selected_linker(root, options.arch)?;
     let code_model = if options.arch == Arch::X86_64 {
         " -C code-model=small"
     } else {
         ""
     };
-    let linker_arg = if options.arch == Arch::X86_64 {
-        format!(" -C link-arg=-T{}", linker.display())
-    } else {
-        String::new()
-    };
+    let linker_arg = linker
+        .as_ref()
+        .map(|path| format!(" -C link-arg=-T{}", path.display()))
+        .unwrap_or_default();
     let flags = format!(
         "--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static{}{} \
          -C link-arg={} -C link-arg={} -C link-arg=-L{} -C link-arg=-lc -C link-arg={}",
@@ -193,6 +249,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
     }
     let staged = root.join(staged_for(options.arch));
     copy(&artifact, &staged)?;
+    verify_strict(&staged, options.arch)?;
     println!("{}", staged.display());
     Ok(0)
 }

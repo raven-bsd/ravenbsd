@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "out-of-order-sack"
+port = 24004
+baseline = "timeout 180 sudo -n python3 tests/net-conformance/baselines/linux/run.py --scenario out-of-order-sack"
+donor = [
+  "NetBSD sys/netinet/tcp_input.c:tcp_input (SACK block processing and scoreboard)",
+  "NetBSD sys/netinet/tcp_output.c:tcp_output (SACK option and hole retransmit)",
+]
+rfcs = ["RFC 2018 (TCP SACK)", "RFC 6675 section 4 (SACK loss recovery)"]
+
+[[expect]]
+step = "peer SYN offers SACK permitted and WS"
+packet = "SYN"
+assert = "SYN-ACK echoes sack=True"
+
+[[expect]]
+step = "server sends at least three 1 KiB data segments"
+packet = "data"
+assert = "segments carry monotonically increasing sequence numbers"
+
+[[expect]]
+step = "peer ACKs only the first segment and adds a SACK block for the third"
+packet = "ACK"
+assert = "SACK option covers the third segment range"
+
+[[expect]]
+step = "server fills the hole"
+packet = "data"
+assert = "retransmitted segment has seq == first_end and length 1024"

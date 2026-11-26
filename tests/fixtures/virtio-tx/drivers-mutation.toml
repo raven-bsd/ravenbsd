@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K382 mutation-only driver config: the same server virtio-net driver with the test-only
+# `tx-stall` argument, which drops TX used-ring completions so the qtest must fail. Never staged
+# in a product profile.
+
+[[driver]]
+name = "virtio-net"
+vendor = 0x1af4
+device = 0x1041
+exec = "/sbin/virtio-net"
+args = ["bar=4", "resources=dma+irq", "serve", "tx-stall"]
+cycles = 1
