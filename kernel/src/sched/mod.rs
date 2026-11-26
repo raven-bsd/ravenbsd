@@ -87,6 +87,10 @@ pub struct CpuSched {
     need_resched: bool,
     switches: u64,
     next_token: u64,
+    /// Raw `Arc<Thread>` of a dying thread whose stack is still in use until this CPU switches
+    /// to the incoming thread. The incoming context publishes it to `REAP`; freeing it here
+    /// would release the stack the dying thread is still executing on.
+    reap_handoff: Option<usize>,
 }
 
 impl CpuSched {
@@ -99,6 +103,7 @@ impl CpuSched {
             need_resched: false,
             switches: 0,
             next_token: 1,
+            reap_handoff: None,
         }
     }
 }
@@ -647,8 +652,9 @@ fn schedule_locked() {
     debug_assert_eq!(parked, from_raw as usize);
     // SAFETY: `parked` is the owning reference stored by this frame before the switch.
     drop(unsafe { Arc::from_raw(parked as *const Thread) });
-    // Resumed on the incoming thread's stack: the outgoing stack is not this one, so deferred
-    // dead stacks can be freed here.
+    // Resumed on the incoming thread's stack: the outgoing stack is not this one, so the handoff
+    // and any deferred dead stacks can be published and freed here.
+    publish_reap_handoff();
     reap_dead();
 }
 
@@ -1404,14 +1410,13 @@ pub fn exit_thread(code: i32) -> ! {
         crate::process::notify_exit(code);
     }
     // The frame that switches away is abandoned on the dead stack, so its `Arc` local can never
-    // be dropped.  Move the owning reference into the deferred-reap queue; the reference is
-    // turned back into an `Arc` and dropped by the next schedule on another thread.
+    // be dropped. Hand the owning reference to the incoming context; publishing it to `REAP`
+    // before the switch would let another CPU free this stack while it is still executing.
     let raw = Arc::into_raw(thread);
-    push_reap(raw as usize);
     let _guard = sync::critical();
     let cpu = this_cpu();
-    // SAFETY: the raw reference is owned by the reap queue until a later scheduling point; this
-    // switch is the only reader and happens before the queue is drained.
+    // SAFETY: the raw reference is owned by the handoff until the incoming context publishes it;
+    // this thread keeps its own stack alive until the switch below.
     let dead = unsafe { &*raw };
     let to = {
         let mut slot = lock_cpu(cpu);
@@ -1433,6 +1438,13 @@ pub fn exit_thread(code: i32) -> ! {
         state.switches = state.switches.saturating_add(1);
         let to = Arc::as_ptr(&next);
         state.current = Some(next);
+        // A thread that ran on this CPU after the previous handoff has already switched away,
+        // so a still-pending handoff is safe to publish. Then park this dying thread's reference
+        // for the incoming context.
+        if let Some(previous) = state.reap_handoff.take() {
+            push_reap(previous);
+        }
+        state.reap_handoff = Some(raw as usize);
         to
     };
     if crate::process::s194_trace() && dead.process.threads.load(Ordering::Acquire) == 0 {
@@ -1490,6 +1502,20 @@ static REAP: SpinMutex<Vec<usize>> = SpinMutex::new(Vec::new());
 
 fn push_reap(raw: usize) {
     REAP.lock().push(raw);
+}
+
+/// Publish the dying thread's stack handoff after this CPU has switched onto the incoming thread.
+///
+/// The outgoing thread may still be executing on its own stack until `context::switch` completes;
+/// only the resumed thread may queue that stack for the reaper.
+fn publish_reap_handoff() {
+    let handoff = {
+        let mut slot = lock_cpu(this_cpu());
+        slot.as_mut().and_then(|state| state.reap_handoff.take())
+    };
+    if let Some(raw) = handoff {
+        push_reap(raw);
+    }
 }
 
 /// Number of dead threads waiting for the next scheduling point (S36b diagnostic).
