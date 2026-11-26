@@ -19,8 +19,8 @@ use crate::prelude::*;
 
 use super::{
     pthread_key_t, pthread_spinlock_t, utsname, PTHREAD_MUTEX_DEFAULT, PTHREAD_MUTEX_ERRORCHECK,
-    PTHREAD_MUTEX_NORMAL, PTHREAD_MUTEX_RECURSIVE, UTSLENGTH, _SC_SEM_NSEMS_MAX,
-    _SC_SEM_VALUE_MAX,
+    PTHREAD_MUTEX_NORMAL, PTHREAD_MUTEX_RECURSIVE, UTSLENGTH, _SC_2_FORT_DEV, _SC_2_FORT_RUN,
+    _SC_SEM_NSEMS_MAX, _SC_SEM_VALUE_MAX,
 };
 
 // `SYS_NMLN` is 256: five fields of 256 bytes, 1280 bytes, no `domainname`.
@@ -57,6 +57,10 @@ const _: [(); 2] = [(); PTHREAD_MUTEX_RECURSIVE as usize];
 const _: [(); 3] = [(); PTHREAD_MUTEX_NORMAL as usize];
 const _: [(); 1] = [(); PTHREAD_MUTEX_DEFAULT as usize];
 
-// The FreeBSD `include/unistd.h` 133344405 `_SC_SEM_*` rows.
+// The FreeBSD `include/unistd.h` 133344405 `_SC_SEM_*` rows. `_SC_2_FORT_*`
+// keep their distinct FreeBSD values so the SEM rows can occupy 49/50 in the
+// single `SysconfVar` discriminant space.
 const _: [(); 49] = [(); _SC_SEM_NSEMS_MAX as usize];
 const _: [(); 50] = [(); _SC_SEM_VALUE_MAX as usize];
+const _: [(); 21] = [(); _SC_2_FORT_DEV as usize];
+const _: [(); 22] = [(); _SC_2_FORT_RUN as usize];
