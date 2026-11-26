@@ -61,9 +61,9 @@ pub fn encode_dirents(raw: &[u8], out: &mut [u8]) -> Result<usize, Errno> {
         let record = out.get_mut(written..end).ok_or(Errno::EIO)?;
         record.fill(0);
         record
-            .get_mut(0..8)
+            .get_mut(0..4)
             .ok_or(Errno::EIO)?
-            .copy_from_slice(&entry.header.ino.to_le_bytes());
+            .copy_from_slice(&(entry.header.ino as u32).to_le_bytes());
         record
             .get_mut(16..18)
             .ok_or(Errno::EIO)?
