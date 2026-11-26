@@ -1058,8 +1058,8 @@ mod program {
             return Ok(target);
         }
         let request = CallRequest::new(Call::Fchown {
-            uid: creds.euid,
-            gid: creds.egid,
+            uid: u32::MAX,
+            gid: u32::MAX,
         });
         let mut response = [0u8; 64];
         let result = client
