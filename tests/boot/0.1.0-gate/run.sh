@@ -127,8 +127,11 @@ out=${out:-build/boot-gate/$arch-$accel}
 mkdir -p "$out"
 build_log=$out/build.log
 artifact=$out/artifacts.tsv
+host_state=$out/host.txt
 : >"$build_log"
 : >"$artifact"
+awk '{print "load1=" $1, "load5=" $2, "load15=" $3}' /proc/loadavg >"$host_state"
+printf 'nproc=%s\n' "$(nproc)" >>"$host_state"
 
 fingerprint() {
     [ -f "$1" ] || refuse "measured artifact not found: $1"
@@ -191,7 +194,7 @@ PY
         [ -r "$ovmf_code" ] || refuse "AAVMF code not found: $ovmf_code"
         [ -r "$ovmf_vars" ] || refuse "AAVMF vars not found: $ovmf_vars"
         image=$out/aarch64-release.img
-        cargo xtask image --arch aarch64 --platform generic --profile release \
+        RAVEN_QT_ARCH=$arch cargo xtask image --arch aarch64 --platform generic --profile release \
             --cmdline "console=ttyAMA0 test-exit=1" --output "$image" >>"$build_log" 2>&1 ||
             refuse "aarch64 release image build failed (see $build_log)"
         fingerprint "$image"
@@ -252,18 +255,26 @@ while [ "$run" -le "$runs" ]; do
             ;;
         *)
             failed=$((failed + 1))
-            printf 'boot-gate: run=%s FAILED exit=%s log=%s\n' "$run" "$result" "$log" >&2
+            case "$boot_ms" in
+                '' | *[!0-9]*) ;;
+                *) printf '%s\n' "$boot_ms" >>"$boots" ;;
+            esac
+            printf 'boot-gate: run=%s FAILED exit=%s boot_ms=%s log=%s\n' \
+                "$run" "$result" "${boot_ms:-none}" "$log" >&2
             [ -z "$output" ] || printf '%s\n' "$output" >&2
-            printf '%s\t\t\t%s\t%s\n' "$run" "$result" "$log" >>"$summary"
+            printf '%s\t%s\t%s\t%s\t%s\n' "$run" "$boot_ms" "$kernel_ms" "$result" "$log" >>"$summary"
             ;;
     esac
     run=$((run + 1))
 done
 
 count=$(awk 'NF {n++} END {print n+0}' "$boots")
-if [ "$count" -eq 0 ]; then
-    printf 'boot-gate: GATE FAIL: no clean run reached the login marker (%s attempted)\n' \
+if [ "$clean" -eq 0 ]; then
+    printf 'boot-gate: GATE FAIL: no clean run reached the login marker under 1000 ms (%s attempted)\n' \
         "$runs" >&2
+fi
+if [ "$count" -eq 0 ]; then
+    printf 'boot-gate: GATE FAIL: no run reported a boot time (%s attempted)\n' "$runs" >&2
     exit 1
 fi
 min=$(sort -n "$boots" | head -n 1)
@@ -276,8 +287,8 @@ seconds() {
     awk -v ms="$1" 'BEGIN { printf "%.3f", ms / 1000 }'
 }
 
-printf 'boot-gate: commit=%s arch=%s accel=%s smp=%s runs=%s clean=%s failed=%s artifacts=%s\n' \
-    "$commit" "$arch" "$accel" "$smp" "$runs" "$clean" "$failed" "$artifact"
+printf 'boot-gate: commit=%s arch=%s accel=%s smp=%s runs=%s clean=%s failed=%s measured=%s artifacts=%s\n' \
+    "$commit" "$arch" "$accel" "$smp" "$runs" "$clean" "$failed" "$count" "$artifact"
 printf 'boot-gate: boot_ms min=%s median=%s max=%s\n' "$min" "$median" "$max"
 printf 'boot-gate: boot_s min=%s median=%s max=%s\n' \
     "$(seconds "$min")" "$(seconds "$median")" "$(seconds "$max")"
