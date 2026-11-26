@@ -133,6 +133,19 @@ impl UnixBackend for ShellUnix {
         Ok(())
     }
 
+    fn unix_write(
+        &self,
+        backend: &dyn raven_libc_net::NetBackend,
+        sock: Sock,
+        data: &[u8],
+    ) -> Result<usize, Errno> {
+        // `Net::sendmsg` raises `SIGPIPE` from `SendErr`, so the kernel must never queue its own
+        // copy for a libc send: with no control record the flag word otherwise never reaches the
+        // kernel and `MSG_NOSIGNAL` is lost. Route the plain write through the control send with
+        // the suppress bit set and keep the one signal decision in libc.
+        self.unix_sendmsg(backend, sock, data, &[], MSG_NOSIGNAL)
+    }
+
     fn unix_sendmsg<B: raven_libc_net::NetBackend + ?Sized>(
         &self,
         _backend: &B,
@@ -202,17 +215,30 @@ impl UnixBackend for ShellUnix {
                 control: Vec::new(),
             });
         }
-        let raw = parse_raw_control(&control, used, count)?;
-        let cspace = cmsg::space(count.saturating_mul(4));
+        let records = parse_raw_controls(&control, used, count)?;
+        // A C `cmsghdr` carries eight-byte alignment after every payload while the raw kernel
+        // record packs the handles tightly, so a raw prefix that fits can still need more
+        // `CMSG_SPACE` than the caller offered. Reject that message before adopting a single
+        // descriptor: the handles are still raw kernel references and can be closed without
+        // leaving a partially installed set behind.
+        let cspace = records.iter().fold(0usize, |total, record| {
+            total.saturating_add(cmsg::space(record.len().saturating_mul(4)))
+        });
         if cspace > control_capacity {
-            for handle in &raw {
-                close_raw(*handle);
+            for record in &records {
+                for handle in record {
+                    close_raw(*handle);
+                }
             }
             return Err(Errno::EMSGSIZE);
         }
         let platform = crate::ffi::platform::global();
-        let mut fds = Vec::with_capacity(count);
-        for (index, handle) in raw.iter().enumerate() {
+        let mut flat: Vec<u32> = Vec::with_capacity(count);
+        for record in &records {
+            flat.extend_from_slice(record);
+        }
+        let mut adopted: Vec<i32> = Vec::with_capacity(count);
+        for (index, handle) in flat.iter().enumerate() {
             match platform.adopt(
                 Handle(*handle),
                 ADOPT_STATUS,
@@ -253,30 +279,46 @@ impl UnixBackend for ShellUnix {
                             let _ = platform.set_ofd_event(index, event);
                         }
                     }
-                    fds.push(fd);
+                    adopted.push(fd);
                 }
                 Err(error) => {
                     close_raw(*handle);
-                    for rest in raw.get(index.saturating_add(1)..).unwrap_or(&[]) {
+                    for rest in flat.get(index.saturating_add(1)..).unwrap_or(&[]) {
                         close_raw(*rest);
                     }
-                    for fd in &fds {
+                    for fd in &adopted {
                         let _ = platform.close(*fd);
                     }
                     return Err(Errno(error.0));
                 }
             }
         }
-        let mut payload = Vec::with_capacity(count.saturating_mul(4));
-        for fd in &fds {
-            payload.extend_from_slice(&fd.to_ne_bytes());
-        }
         let mut ccontrol = vec![0u8; cspace];
-        let used_control = cmsg::encode_cmsg(SOL_SOCKET, SCM_RIGHTS, &payload, &mut ccontrol)
-            .ok_or(Errno::EMSGSIZE)?;
+        let mut start = 0usize;
+        let mut base = 0usize;
+        for record in &records {
+            let end = start.saturating_add(record.len());
+            let space = cmsg::space(record.len().saturating_mul(4));
+            let mut payload = Vec::with_capacity(record.len().saturating_mul(4));
+            for fd in adopted.get(start..end).unwrap_or(&[]) {
+                payload.extend_from_slice(&fd.to_ne_bytes());
+            }
+            let encoded = match ccontrol.get_mut(base..base.saturating_add(space)) {
+                Some(slot) => cmsg::encode_cmsg(SOL_SOCKET, SCM_RIGHTS, &payload, slot),
+                None => None,
+            };
+            if encoded.is_none() {
+                for fd in &adopted {
+                    let _ = platform.close(*fd);
+                }
+                return Err(Errno::EMSGSIZE);
+            }
+            start = end;
+            base = base.saturating_add(space);
+        }
         Ok(UnixRecv {
             len,
-            control: ccontrol.get(..used_control).unwrap_or(&[]).to_vec(),
+            control: ccontrol,
         })
     }
 
@@ -344,32 +386,51 @@ fn encode_control(control: &[u8]) -> Result<Vec<u8>, Errno> {
     Ok(out)
 }
 
-/// Validate one raw control record and return its handle ids.
-fn parse_raw_control(control: &[u8], used: usize, count: usize) -> Result<Vec<u32>, Errno> {
+/// Validate every raw control record and return its handle ids, keeping the sender's boundaries.
+///
+/// The kernel packs the records tightly (`len, level, type, count`, then `count` handles) and
+/// reports the bytes it installed in `used`; the handle count is the sum across every record.
+fn parse_raw_controls(control: &[u8], used: usize, count: usize) -> Result<Vec<Vec<u32>>, Errno> {
     if used < CONTROL_HEADER || used > control.len() {
         return Err(Errno::EPROTO);
     }
-    let record = usize::try_from(u32_at(control, 0)?).unwrap_or(usize::MAX);
-    let level = u32_at(control, 4)?;
-    let kind = u32_at(control, 8)?;
-    let stated = usize::try_from(u32_at(control, 12)?).unwrap_or(usize::MAX);
-    if record < CONTROL_HEADER
-        || record > used
-        || record != CONTROL_HEADER.saturating_add(stated.saturating_mul(4))
-        || stated != count
-        || level != SOL_SOCKET as u32
-        || kind != SCM_RIGHTS as u32
-    {
+    let mut records = Vec::new();
+    let mut total = 0usize;
+    let mut offset = 0usize;
+    while offset < used {
+        let record = usize::try_from(u32_at(control, offset)?).unwrap_or(usize::MAX);
+        let level = u32_at(control, offset.saturating_add(4))?;
+        let kind = u32_at(control, offset.saturating_add(8))?;
+        let stated =
+            usize::try_from(u32_at(control, offset.saturating_add(12))?).unwrap_or(usize::MAX);
+        if record < CONTROL_HEADER
+            || !record.is_multiple_of(4)
+            || offset.saturating_add(record) > used
+            || record != CONTROL_HEADER.saturating_add(stated.saturating_mul(4))
+            || level != SOL_SOCKET as u32
+            || kind != SCM_RIGHTS as u32
+        {
+            return Err(Errno::EPROTO);
+        }
+        let mut handles = Vec::with_capacity(stated);
+        for index in 0..stated {
+            handles.push(u32_at(
+                control,
+                offset
+                    .saturating_add(CONTROL_HEADER)
+                    .saturating_add(index.saturating_mul(4)),
+            )?);
+        }
+        total = total.saturating_add(stated);
+        offset = offset.saturating_add(record);
+        if !handles.is_empty() {
+            records.push(handles);
+        }
+    }
+    if offset != used || total != count {
         return Err(Errno::EPROTO);
     }
-    let mut handles = Vec::with_capacity(count);
-    for index in 0..count {
-        handles.push(u32_at(
-            control,
-            CONTROL_HEADER.saturating_add(index.saturating_mul(4)),
-        )?);
-    }
-    Ok(handles)
+    Ok(records)
 }
 
 /// Close a raw kernel handle that was not installed as an fd.

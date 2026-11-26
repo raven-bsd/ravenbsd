@@ -6,6 +6,7 @@
 // console, so the qtest can match it without a tty.
 
 #include <errno.h>
+#include <poll.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -106,6 +107,60 @@ static int recv_fd(int sock, void *data, size_t capacity, size_t *used) {
     }
     memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
     return fd;
+}
+
+static int send_two_fds(int sock, int first, int second, const void *data, size_t len) {
+    struct msghdr message;
+    struct iovec iov;
+    union {
+        struct cmsghdr header;
+        char buffer[CMSG_SPACE(sizeof(int)) * 2];
+    } control;
+    struct cmsghdr *cmsg;
+
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = (void *)data;
+    iov.iov_len = len;
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = sizeof(control.buffer);
+    cmsg = CMSG_FIRSTHDR(&message);
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    memcpy(CMSG_DATA(cmsg), &first, sizeof(first));
+    cmsg = CMSG_NXTHDR(&message, cmsg);
+    if (cmsg == NULL) {
+        errno = EMSGSIZE;
+        return -1;
+    }
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    memcpy(CMSG_DATA(cmsg), &second, sizeof(second));
+    return (int)sendmsg(sock, &message, 0);
+}
+
+// A closed peer must become readable with EOF; a receiver that kept an undelivered handle open
+// keeps the peer writable and the poll times out.
+static int peer_eof(int fd) {
+    struct pollfd pfd;
+    char buffer[4];
+
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    if (poll(&pfd, 1, 1000) <= 0) {
+        errno = ETIMEDOUT;
+        return -1;
+    }
+    if (read(fd, buffer, sizeof(buffer)) != 0) {
+        errno = EPROTO;
+        return -1;
+    }
+    return 0;
 }
 
 static int dup_pair(void) {
@@ -333,9 +388,45 @@ static int control_negative(void) {
         (void)close(dups[index]);
     }
 
-    if (send_fd(sv[0], passed[0], &byte, 1) != 1) {
-        return fail("control retry send");
+    (void)close(passed[0]);
+    (void)close(passed[1]);
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    say("socketpair-control: negative ok\n");
+    return 0;
+}
+
+// FreeBSD `kern_recvit` (sys/kern/uipc_syscalls.c:1007-1021): a control buffer too small for a
+// record still returns the data, sets MSG_CTRUNC, consumes the message exactly once and closes
+// the descriptors that were not copied out. A control buffer too small for the whole C
+// `CMSG_SPACE` of a record takes the same path, because the donor copies mbufs sized by
+// `CMSG_SPACE`, not by the packed handle count.
+static int control_truncation(void) {
+    int sv[2];
+    int passed[2];
+    int fresh[2];
+    int received;
+    size_t used = 0;
+    char byte = 'T';
+    char buffer[8];
+    struct msghdr message;
+    struct iovec iov;
+    union {
+        struct cmsghdr header;
+        char buffer[CMSG_SPACE(sizeof(int))];
+    } control;
+    static const char text[] = "trunc";
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, passed) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, fresh) != 0) {
+        return fail("truncation socketpair");
     }
+    if (send_fd(sv[0], passed[0], &byte, 1) != 1) {
+        return fail("truncation send");
+    }
+
+    // One descriptor offered, eight control bytes: no cmsg header fits at all.
     memset(&message, 0, sizeof(message));
     memset(&control, 0, sizeof(control));
     iov.iov_base = buffer;
@@ -344,21 +435,160 @@ static int control_negative(void) {
     message.msg_iovlen = 1;
     message.msg_control = control.buffer;
     message.msg_controllen = 8;
-    if (recvmsg(sv[1], &message, 0) != -1 || errno != EMSGSIZE) {
-        return fail("control small buffer");
+    if (recvmsg(sv[1], &message, 0) != 1 || buffer[0] != byte) {
+        return fail("truncation data");
+    }
+    if ((message.msg_flags & MSG_CTRUNC) == 0) {
+        return fail("truncation ctrunc");
+    }
+    if (message.msg_controllen != 0 || CMSG_FIRSTHDR(&message) != NULL) {
+        return fail("truncation controllen");
+    }
+
+    // Every undelivered handle must be closed: the peer sees EOF after the sender closes.
+    if (close(passed[0]) != 0) {
+        return fail("truncation close sender");
+    }
+    if (peer_eof(passed[1]) != 0) {
+        return fail("truncation leaked handle");
+    }
+    (void)close(passed[1]);
+
+    // A raw record that fits the packed kernel layout but not its eight-byte-aligned C
+    // `CMSG_SPACE` must follow the same truncation rule, not EMSGSIZE.
+    if (send_fd(sv[0], fresh[0], &byte, 1) != 1) {
+        return fail("truncation aligned send");
+    }
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = buffer;
+    iov.iov_len = sizeof(buffer);
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = CMSG_LEN(sizeof(int));
+    if (recvmsg(sv[1], &message, 0) != 1 || buffer[0] != byte) {
+        return fail("truncation aligned data");
+    }
+    if ((message.msg_flags & MSG_CTRUNC) == 0 || message.msg_controllen != 0) {
+        return fail("truncation aligned ctrunc");
+    }
+    if (close(fresh[0]) != 0) {
+        return fail("truncation aligned close sender");
+    }
+    if (peer_eof(fresh[1]) != 0) {
+        return fail("truncation aligned leaked handle");
+    }
+    (void)close(fresh[1]);
+
+    // The next message is a fresh one and is delivered normally.
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fresh) != 0) {
+        return fail("truncation retry socketpair");
+    }
+    if (send_fd(sv[0], fresh[0], text, sizeof(text) - 1) != (int)(sizeof(text) - 1)) {
+        return fail("truncation retry send");
+    }
+    received = recv_fd(sv[1], buffer, sizeof(buffer), &used);
+    if (received < 0) {
+        return fail("truncation retry recv");
+    }
+    // The truncated message was consumed, so this is the fresh payload, not the old one.
+    if (used != sizeof(text) - 1 || memcmp(buffer, text, sizeof(text) - 1) != 0) {
+        return fail("truncation retry consumed");
+    }
+    if (write(received, "tr", 2) != 2) {
+        return fail("truncation retry write");
+    }
+    if (read(fresh[1], buffer, 2) != 2 || memcmp(buffer, "tr", 2) != 0) {
+        return fail("truncation retry peer");
+    }
+    (void)close(received);
+    (void)close(fresh[0]);
+    if (peer_eof(fresh[1]) != 0) {
+        return fail("truncation retry eof");
+    }
+    (void)close(fresh[1]);
+    (void)close(sv[0]);
+    (void)close(sv[1]);
+    say("socketpair-control: truncation ok\n");
+    return 0;
+}
+
+// Two SCM_RIGHTS records in one datagram keep their own headers through the libc marshal.
+static int control_records(void) {
+    int sv[2];
+    int first[2];
+    int second[2];
+    char byte = 'R';
+    char buffer[8];
+    size_t used = 0;
+    struct msghdr message;
+    struct iovec iov;
+    union {
+        struct cmsghdr header;
+        char buffer[CMSG_SPACE(sizeof(int)) * 2];
+    } control;
+    struct cmsghdr *cmsg;
+
+    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, first) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, second) != 0) {
+        return fail("records socketpair");
+    }
+    if (send_two_fds(sv[0], first[0], second[0], &byte, 1) != 1) {
+        return fail("records send");
+    }
+    memset(&message, 0, sizeof(message));
+    memset(&control, 0, sizeof(control));
+    iov.iov_base = buffer;
+    iov.iov_len = sizeof(buffer);
+    message.msg_iov = &iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.buffer;
+    message.msg_controllen = sizeof(control.buffer);
+    if (recvmsg(sv[1], &message, 0) != 1 || buffer[0] != byte) {
+        return fail("records data");
+    }
+    if (message.msg_flags != 0) {
+        return fail("records flags");
+    }
+    used = message.msg_controllen;
+    if (used != sizeof(control.buffer)) {
+        return fail("records controllen");
+    }
+    cmsg = CMSG_FIRSTHDR(&message);
+    if (cmsg == NULL || cmsg->cmsg_len != CMSG_LEN(sizeof(int)) ||
+        cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
+        return fail("records first header");
     }
     {
-        int received = recv_fd(sv[1], buffer, sizeof(buffer), &used);
-        if (received < 0) {
-            return fail("control retry recv");
+        int received = -1;
+        memcpy(&received, CMSG_DATA(cmsg), sizeof(received));
+        (void)close(first[0]);
+        if (write(received, "a", 1) != 1 || read(first[1], buffer, 1) != 1) {
+            return fail("records first fd");
         }
         (void)close(received);
     }
-    (void)close(passed[0]);
-    (void)close(passed[1]);
+    cmsg = CMSG_NXTHDR(&message, cmsg);
+    if (cmsg == NULL || cmsg->cmsg_len != CMSG_LEN(sizeof(int)) ||
+        cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
+        return fail("records second header");
+    }
+    {
+        int received = -1;
+        memcpy(&received, CMSG_DATA(cmsg), sizeof(received));
+        (void)close(second[0]);
+        if (write(received, "b", 1) != 1 || read(second[1], buffer, 1) != 1) {
+            return fail("records second fd");
+        }
+        (void)close(received);
+    }
+    (void)close(first[1]);
+    (void)close(second[1]);
     (void)close(sv[0]);
     (void)close(sv[1]);
-    say("socketpair-control: negative ok\n");
+    say("socketpair-control: records ok\n");
     return 0;
 }
 
@@ -581,10 +811,16 @@ int main(void) {
     if (control_datagram() != 0) {
         return 1;
     }
+    if (control_records() != 0) {
+        return 1;
+    }
     if (control_negative() != 0) {
         return 1;
     }
     if (peercred_pair() != 0) {
+        return 1;
+    }
+    if (control_truncation() != 0) {
         return 1;
     }
     say("socketpair-control: ok\n");
