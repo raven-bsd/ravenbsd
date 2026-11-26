@@ -470,14 +470,7 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mknod(
-                parent,
-                &name,
-                0o010000 | (mode & 0o7777),
-                0,
-                uid,
-                gid,
-            )
+            .mknod(parent, &name, 0o010000 | (mode & 0o7777), 0, uid, gid)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
