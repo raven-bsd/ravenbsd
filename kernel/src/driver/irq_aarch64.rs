@@ -5,20 +5,23 @@
 //!
 //! An `Irq` owns one shared peripheral interrupt (SPI). The object keeps the line masked until
 //! the first `IRQ_WAIT` (or `IRQ_ACK`), masks a level line again after every delivery, and
-//! releases the SPI claim when the last handle closes. GICv2 has no MSI/MSI-X routing on these
-//! boards, so `IRQ_CREATE(MSI|MSIX)` reports `EOPNOTSUPP` instead of inventing a vector ABI.
+//! releases the SPI claim when the last handle closes. A GICv2m MSI frame, when the firmware
+//! ACPI MADT advertises one, provides the MSI-X doorbell and SPI pool; without that frame
+//! `IRQ_CREATE(MSIX)` reports `EOPNOTSUPP` instead of inventing a vector ABI.
 
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
+use raven_usercopy::UserSlice;
 
 use crate::arch::aarch64::gic;
 use crate::event;
 use crate::process::{self, handle::Object};
 use crate::syscall::SyscallFrame;
 use crate::time;
+use crate::usercopy::copy_to_user;
 
 /// `IRQ_CREATE` kinds.
 pub const IRQ_LEGACY: u32 = 1;
@@ -43,6 +46,58 @@ const SLOTS: usize = MAX_SPI as usize;
 const CLAIMED: u64 = 1;
 /// Priority used for every driver line.
 const PRIORITY: u8 = 0xa0;
+
+/// GICv2m MSI frame size; the Typer and Set SPI registers live in the first page.
+const V2M_FRAME_SIZE: usize = 0x1000;
+/// GICv2m `MSI_TYPER`: SPI base in bits 25:16, SPI count in bits 9:0.
+const GIC_MSI_TYPER: usize = 0x0008;
+/// GICv2m `MSI_SETSPI`: writing an SPI number raises that interrupt.
+const GIC_MSI_SETSPI: u64 = 0x0040;
+/// MADT Generic MSI Frame flags: `SpiCount`/`SpiBase` override the Typer register.
+const MADT_OVERRIDE_SPI_VALUES: u32 = 1;
+/// MADT table type of a Generic MSI Frame (ACPI 5.1, "GICv2m").
+const MADT_GENERIC_MSI_FRAME: u8 = 0x0d;
+/// MADT offset of the first interrupt-controller entry: the 36-byte SDT header plus the
+/// Local Interrupt Controller Address and Flags fields.
+const MADT_ENTRIES_OFFSET: usize = 44;
+
+/// One GICv2m MSI frame found in the firmware MADT.
+#[derive(Clone, Copy)]
+struct V2mFrame {
+    /// Physical base of the MSI frame (the Set SPI doorbell is at `base + 0x40`).
+    base: u64,
+    /// First SPI the frame can raise.
+    spi_base: u16,
+    /// Number of contiguous SPIs the frame owns.
+    spi_count: u16,
+}
+
+/// The discovered frame, cached after the first `IRQ_CREATE(MSIX)`.
+static V2M: spin::Mutex<Option<V2mFrame>> = spin::Mutex::new(None);
+
+/// The user-visible `IrqInfo` record, fixed by the ABI syscall documentation.
+#[repr(C)]
+struct IrqInfo {
+    vector: u32,
+    address_lo: u32,
+    address_hi: u32,
+    data: u32,
+}
+
+impl IrqInfo {
+    fn as_bytes(&self) -> [u8; 16] {
+        let mut bytes = [0u8; 16];
+        let mut at = 0usize;
+        for value in [self.vector, self.address_lo, self.address_hi, self.data] {
+            let end = at.saturating_add(4);
+            if let Some(slot) = bytes.get_mut(at..end) {
+                slot.copy_from_slice(&value.to_le_bytes());
+            }
+            at = end;
+        }
+        bytes
+    }
+}
 
 /// One claimed SPI's shared state.
 ///
@@ -134,6 +189,137 @@ fn slot(spi: u32) -> Option<&'static AtomicU64> {
     OWNERS.get(usize::try_from(spi).ok()?)
 }
 
+/// The GICv2m frame discovered from the firmware MADT, if the platform has one.
+fn v2m_frame() -> Option<V2mFrame> {
+    let mut cached = V2M.lock();
+    if let Some(frame) = *cached {
+        return Some(frame);
+    }
+    let discovered = discover_v2m()?;
+    *cached = Some(discovered);
+    Some(discovered)
+}
+
+/// Read the GICv2m base and SPI pool from the captured ACPI MADT.
+///
+/// The MADT names the frame's physical base. Firmware may also override the SPI base/count in
+/// the entry flags; otherwise the frame's `MSI_TYPER` register is authoritative, as the NetBSD
+/// `gic_v2m_acpi_find_msi_frame` donor does.
+fn discover_v2m() -> Option<V2mFrame> {
+    let Some(madt) = crate::arch::pcie::acpi_table(b"APIC") else {
+        crate::kprintln!("irq: GICv2m unavailable: no MADT in the ACPI blob");
+        return None;
+    };
+    let Some((frame_base, override_values)) = msi_frame_entry(madt) else {
+        crate::kprintln!("irq: GICv2m unavailable: MADT has no generic MSI frame");
+        return None;
+    };
+    let (spi_base, spi_count) = match override_values {
+        Some(values) => values,
+        None => {
+            let Some(pointer) = crate::memory::mmio::map_mmio(frame_base, V2M_FRAME_SIZE).ok()
+            else {
+                crate::kprintln!("irq: GICv2m frame map failed at {frame_base:#x}");
+                return None;
+            };
+            // SAFETY: `map_mmio` mapped the frame's first page as device memory and the mapping
+            // is never unmapped; the Typer register is a 4-byte aligned read-only register.
+            let typer =
+                unsafe { core::ptr::read_volatile(pointer.add(GIC_MSI_TYPER).cast::<u32>()) };
+            let base = u16::try_from((typer >> 16) & 0x3ff).ok()?;
+            let count = u16::try_from(typer & 0x3ff).ok()?;
+            (base, count)
+        }
+    };
+    if spi_count == 0 {
+        crate::kprintln!("irq: GICv2m frame at {frame_base:#x} owns no SPI");
+        return None;
+    }
+    crate::kprintln!(
+        "irq: GICv2m frame {frame_base:#x} SPIs {spi_base}..{}",
+        u32::from(spi_base).saturating_add(u32::from(spi_count))
+    );
+    Some(V2mFrame {
+        base: frame_base,
+        spi_base,
+        spi_count,
+    })
+}
+
+/// Find the first Generic MSI Frame entry in a MADT and return its base and optional override.
+fn msi_frame_entry(madt: &[u8]) -> Option<(u64, Option<(u16, u16)>)> {
+    if madt.get(..4)? != b"APIC" {
+        return None;
+    }
+    let length = usize::try_from(read_u32(madt, 4)?).ok()?;
+    let end = length.min(madt.len());
+    let mut at = MADT_ENTRIES_OFFSET;
+    while at.checked_add(2)? <= end {
+        let kind = *madt.get(at)?;
+        let size = usize::from(*madt.get(at.checked_add(1)?)?);
+        if size < 2 {
+            return None;
+        }
+        let next = at.checked_add(size)?;
+        if next > end {
+            return None;
+        }
+        if kind == MADT_GENERIC_MSI_FRAME {
+            let entry = madt.get(at..next)?;
+            if entry.len() < 24 {
+                return None;
+            }
+            let base = read_u64(entry, 8)?;
+            let flags = read_u32(entry, 16)?;
+            let override_values = if flags & MADT_OVERRIDE_SPI_VALUES != 0 {
+                Some((read_u16(entry, 22)?, read_u16(entry, 20)?))
+            } else {
+                None
+            };
+            return Some((base, override_values));
+        }
+        at = next;
+    }
+    None
+}
+
+/// Claim the first free SPI in the frame's pool.
+fn claim_v2m_spi(frame: V2mFrame) -> Result<u32, Errno> {
+    let first = u32::from(frame.spi_base);
+    let end = first
+        .saturating_add(u32::from(frame.spi_count))
+        .min(MAX_SPI);
+    let mut spi = first;
+    while spi < end {
+        let Some(slot) = slot(spi) else {
+            return Err(Errno::EINVAL);
+        };
+        if slot
+            .compare_exchange(0, CLAIMED, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            return Ok(spi);
+        }
+        spi = spi.saturating_add(1);
+    }
+    Err(Errno::ENOSPC)
+}
+
+fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    let end = offset.checked_add(2)?;
+    Some(u16::from_le_bytes(bytes.get(offset..end)?.try_into().ok()?))
+}
+
+fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let end = offset.checked_add(4)?;
+    Some(u32::from_le_bytes(bytes.get(offset..end)?.try_into().ok()?))
+}
+
+fn read_u64(bytes: &[u8], offset: usize) -> Option<u64> {
+    let end = offset.checked_add(8)?;
+    Some(u64::from_le_bytes(bytes.get(offset..end)?.try_into().ok()?))
+}
+
 /// Handle a claimed SPI from the interrupt vector.
 ///
 /// Returns false when the line is unclaimed; the vector then masks it and counts the event.
@@ -218,7 +404,59 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
             let rights = Rights::READ.union(Rights::DUP).union(Rights::TRANSFER);
             Ok(caller.handles.lock().insert(Object::Irq(irq), rights)?.0 as usize)
         }
-        IRQ_MSI | IRQ_MSIX => Err(Errno::EOPNOTSUPP),
+        IRQ_MSIX => {
+            let v2m = v2m_frame().ok_or(Errno::EOPNOTSUPP)?;
+            // The fourth argument is the writable `IrqInfo` the driver reads the message from.
+            let destination = UserSlice::new(frame.r10, 16)?;
+            let spi = claim_v2m_spi(v2m)?;
+            // MSI is edge-triggered; the frame's SPI behaves like any other peripheral SPI.
+            let configured = gic::set_priority(spi, PRIORITY).is_ok()
+                && gic::set_target(spi, 0).is_ok()
+                && gic::configure_spi(spi, false).is_ok()
+                && gic::disable(spi).is_ok()
+                && gic::clear_pending(spi).is_ok();
+            if !configured {
+                if let Some(slot) = slot(spi) {
+                    slot.store(0, Ordering::Release);
+                }
+                return Err(Errno::EINVAL);
+            }
+            let doorbell = v2m.base.saturating_add(GIC_MSI_SETSPI);
+            let fill = IrqInfo {
+                vector: spi,
+                address_lo: doorbell as u32,
+                address_hi: (doorbell >> 32) as u32,
+                data: spi,
+            };
+            if let Err(error) = copy_to_user(destination, &fill.as_bytes()) {
+                if let Some(slot) = slot(spi) {
+                    slot.store(0, Ordering::Release);
+                }
+                let _ = gic::disable(spi);
+                let _ = gic::clear_pending(spi);
+                return Err(error);
+            }
+            let state = Arc::new(SpiState {
+                spi,
+                level: false,
+                armed: AtomicBool::new(false),
+                pending: AtomicU64::new(0),
+                closed: AtomicBool::new(false),
+            });
+            if let Some(slot) = slot(spi) {
+                slot.store(Arc::as_ptr(&state) as u64, Ordering::Release);
+            }
+            let irq = Arc::new(Irq {
+                state,
+                retired: AtomicBool::new(false),
+            });
+            LIVE_IRQS.fetch_add(1, Ordering::AcqRel);
+            let rights = Rights::READ.union(Rights::DUP).union(Rights::TRANSFER);
+            Ok(caller.handles.lock().insert(Object::Irq(irq), rights)?.0 as usize)
+        }
+        // GICv2m also carries plain MSI, but no Raven driver requests it and the s21d aarch64
+        // fixture pins the existing `IRQ_MSI` negative contract; MSI-X is the device path.
+        IRQ_MSI => Err(Errno::EOPNOTSUPP),
         _ => Err(Errno::EINVAL),
     }
 }

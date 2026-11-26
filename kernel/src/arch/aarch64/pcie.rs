@@ -262,6 +262,36 @@ pub fn acpi_blob() -> Option<&'static [u8]> {
     }
 }
 
+/// Find one table in the captured ACPI bundle by its four-character signature.
+///
+/// The returned slice covers the whole table, header included. Bundle signatures pad short ACPI
+/// signatures with spaces, so a caller passes the four significant bytes.
+#[must_use]
+pub fn acpi_table(signature: &[u8; 4]) -> Option<&'static [u8]> {
+    let blob = acpi_blob()?;
+    if read_u32(blob, 0)? != ACPI_BLOB_MAGIC {
+        return None;
+    }
+    let count = read_u32(blob, 16)?;
+    let directory = usize::try_from(read_u32(blob, 20)?).ok()?;
+    let mut index = 0u32;
+    while index < count {
+        let at = directory.checked_add(
+            usize::try_from(index)
+                .ok()?
+                .checked_mul(ACPI_BLOB_ENTRY_SIZE)?,
+        )?;
+        let entry = blob.get(at..at.checked_add(ACPI_BLOB_ENTRY_SIZE)?)?;
+        if entry.get(..4)? == signature {
+            let offset = usize::try_from(read_u32(entry, 8)?).ok()?;
+            let length = usize::try_from(read_u32(entry, 12)?).ok()?;
+            return blob.get(offset..offset.checked_add(length)?);
+        }
+        index = index.saturating_add(1);
+    }
+    None
+}
+
 fn build_acpi_blob(rsdp_phys: u64, blob: &mut AcpiBlob) -> Result<(), &'static str> {
     if rsdp_phys == 0 {
         return Err("no RSDP");

@@ -102,12 +102,15 @@ init=$root/build/$arch/user/raven-init
 cargo xtask initfs --arch "$arch" --profile network-config-test > /dev/null
 cp build/"$arch"/initfs.img "$out/base.img"
 
+# The network-config-test profile still stages `profiles/server.d/devd.manifest`, which predates
+# the S199 `platform-root` grant that devd needs for MSI-X; stage the product entry instead.
 cargo build -q -p raven-b70-overlay
 overlay=$root/target/debug/raven-b70-overlay
 "$overlay" "$out/base.img" "$out/initfs.img" \
     "/init=$init" \
     "/bin/socket-conformance=$out/socket-conformance:0755" \
     "/etc/services.d/socket-conformance.toml=$root/tests/conformance/sockets/socket-conformance.service.toml" \
+    "/etc/services.d/devd.toml=$root/etc/services.d/devd.toml" \
     "/etc/svcd.conf=$root/tests/conformance/sockets/socket-conformance.svcd.conf"
 
 echo "socket-conformance fixture: $out/initfs.img"
