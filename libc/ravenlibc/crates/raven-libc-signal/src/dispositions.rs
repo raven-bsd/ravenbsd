@@ -45,22 +45,20 @@ pub const ENTRY_COUNT: usize = 65;
 /// Bits the entry path may spin before yielding the CPU.
 pub const READ_SPINS: u32 = 1000;
 
-/// `SA_NOCLDSTOP`.
-pub const SA_NOCLDSTOP: u32 = 1;
-/// `SA_NOCLDWAIT`.
-pub const SA_NOCLDWAIT: u32 = 2;
-/// `SA_SIGINFO`.
-pub const SA_SIGINFO: u32 = 4;
-/// `SA_RESTORER`: accepted but never stored (no restorer in Raven).
-pub const SA_RESTORER: u32 = 0x0400_0000;
-/// `SA_ONSTACK`.
-pub const SA_ONSTACK: u32 = 0x0800_0000;
-/// `SA_RESTART`.
-pub const SA_RESTART: u32 = 0x1000_0000;
-/// `SA_NODEFER`.
-pub const SA_NODEFER: u32 = 0x4000_0000;
-/// `SA_RESETHAND`.
-pub const SA_RESETHAND: u32 = 0x8000_0000;
+/// `SA_NOCLDSTOP` (FreeBSD profile).
+pub const SA_NOCLDSTOP: u32 = raven_libc_abi::generated::signal::SA_NOCLDSTOP as u32;
+/// `SA_NOCLDWAIT` (FreeBSD profile).
+pub const SA_NOCLDWAIT: u32 = raven_libc_abi::generated::signal::SA_NOCLDWAIT as u32;
+/// `SA_SIGINFO` (FreeBSD profile).
+pub const SA_SIGINFO: u32 = raven_libc_abi::generated::signal::SA_SIGINFO as u32;
+/// `SA_ONSTACK` (FreeBSD profile).
+pub const SA_ONSTACK: u32 = raven_libc_abi::generated::signal::SA_ONSTACK as u32;
+/// `SA_RESTART` (FreeBSD profile).
+pub const SA_RESTART: u32 = raven_libc_abi::generated::signal::SA_RESTART as u32;
+/// `SA_NODEFER` (FreeBSD profile).
+pub const SA_NODEFER: u32 = raven_libc_abi::generated::signal::SA_NODEFER as u32;
+/// `SA_RESETHAND` (FreeBSD profile).
+pub const SA_RESETHAND: u32 = raven_libc_abi::generated::signal::SA_RESETHAND as u32;
 
 /// One stored disposition (handler 0 = `SIG_DFL`, 1 = `SIG_IGN`, else a function address).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

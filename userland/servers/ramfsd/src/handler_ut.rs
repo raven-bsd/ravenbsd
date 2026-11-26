@@ -118,6 +118,55 @@ fn create_write_read_round_trip() {
 }
 
 #[test]
+fn create_applies_the_requested_mode() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler.expect_open(10, "m");
+    let opened = handler
+        .open_with("m", flags(O_RDWR | O_CREAT), 0o600, &ctx())
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    assert_eq!(handler.fstat(file).expect("stat").mode & 0o7777, 0o600);
+}
+
+#[test]
+fn create_applies_the_caller_umask() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler.expect_open(10, "umasked");
+    let mut ctx = ctx();
+    ctx.credentials.umask = 0o027;
+    let opened = handler
+        .open_with("umasked", flags(O_RDWR | O_CREAT), 0o666, &ctx)
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    assert_eq!(handler.fstat(file).expect("stat").mode & 0o7777, 0o640);
+}
+
+#[test]
+fn create_uses_the_authenticated_owner() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler
+        .fs
+        .mkdir_at_owned(ROOT_INO, "home", 0o755, 1000, 1000, 0)
+        .expect("home");
+    handler.expect_open(10, "home/owned");
+    let mut ctx = ctx();
+    ctx.credentials.euid = 1000;
+    ctx.credentials.egid = 1000;
+    let opened = handler
+        .open_with("home/owned", flags(O_RDWR | O_CREAT), 0o644, &ctx)
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    let stat = handler.fstat(file).expect("stat");
+    assert_eq!((stat.uid, stat.gid), (1000, 1000));
+}
+
+#[test]
 fn exclusive_create_fails_the_second_time() {
     let mut handler = RamfsHandler::new(|| 1000);
     let flags = flags(O_RDWR | O_CREAT | O_EXCL);
@@ -753,6 +802,58 @@ fn utimens_sets_and_omits_times() {
     .expect("utimens now");
     let stat = handler.fs.stat(ino).expect("stat");
     assert_eq!((stat.atime, stat.mtime), (1000, 222));
+}
+
+#[test]
+fn a_multi_component_path_longer_than_the_old_field_is_carried() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let root = root(&mut handler);
+    let a = [b'a'; 100];
+    let b = [b'b'; 100];
+    let c = [b'c'; 100];
+    let mut path = Vec::new();
+    path.extend_from_slice(&a);
+    path.push(b'/');
+    path.extend_from_slice(&b);
+    path.push(b'/');
+    path.extend_from_slice(&c);
+    assert!(path.len() > 255);
+    let mut parent = Vec::new();
+    parent.extend_from_slice(&a);
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkdir {
+            mode: 0o755,
+            path: &parent,
+        },
+    )
+    .expect("mkdir a");
+    parent.push(b'/');
+    parent.extend_from_slice(&b);
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkdir {
+            mode: 0o755,
+            path: &parent,
+        },
+    )
+    .expect("mkdir a/b");
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkdir {
+            mode: 0o755,
+            path: &path,
+        },
+    )
+    .expect("mkdir");
+    let (op, response) = call(&mut handler, root, Call::Lstat { path: &path }).expect("lstat");
+    match CallResponse::decode(op, &response).expect("decode") {
+        CallResponse::Stat { status: 0, stat } => assert_eq!(stat.mode & S_IFMT, S_IFDIR),
+        other => panic!("unexpected response: {other:?}"),
+    }
 }
 
 #[test]

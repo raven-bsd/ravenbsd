@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! `raven-proto-fs` packed directory entry tests.
+//! Host tests for the packed directory-entry records.
 
 use super::*;
 
@@ -120,7 +120,7 @@ fn nonzero_header_padding_is_rejected() {
 }
 
 #[test]
-fn bad_names_are_rejected() {
+fn bad_names_are_rejected_but_bytes_are_preserved() {
     let mut bytes = [0u8; 32];
     assert_eq!(
         entry(b"a/b").encode(&mut bytes),
@@ -130,11 +130,6 @@ fn bad_names_are_rejected() {
         entry(b"a\0b").encode(&mut bytes),
         Err(ProtoError::InvalidName)
     );
-}
-
-#[test]
-fn non_utf8_names_are_byte_strings_and_round_trip() {
-    let mut bytes = [0u8; 32];
     let written = entry(&[0xff, 0xfe]).encode(&mut bytes).unwrap();
     let (decoded, consumed) = DirEntry::decode(&bytes[..written]).unwrap();
     assert_eq!(decoded.name, &[0xff, 0xfe]);

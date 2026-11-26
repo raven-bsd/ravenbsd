@@ -35,7 +35,10 @@
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use crate::dispositions::{DispTable, Disposition, SA_RESTART, SA_RESTORER};
+use crate::dispositions::{
+    DispTable, Disposition, SA_NOCLDSTOP, SA_NOCLDWAIT, SA_NODEFER, SA_ONSTACK, SA_RESETHAND,
+    SA_RESTART, SA_SIGINFO,
+};
 use crate::errors::EINVAL_ERR;
 use crate::sigset::APP_MASK;
 use raven_libc_abi::errno::Errno;
@@ -61,7 +64,7 @@ pub fn sigaction(
     new: Option<&Disposition>,
     old: Option<&mut Disposition>,
 ) -> Result<(), Errno> {
-    if !(1..=64).contains(&sig) || (32..=34).contains(&sig) {
+    if !(1..=64).contains(&sig) {
         return Err(EINVAL_ERR);
     }
     if new.is_some()
@@ -71,7 +74,19 @@ pub fn sigaction(
         return Err(EINVAL_ERR);
     }
     if let Some(requested) = new {
-        let flags = requested.flags & !SA_RESTORER;
+        let flags = requested.flags;
+        // FreeBSD `kern_sigaction` rejects an unknown flag only when the disposition names a
+        // handler; SIG_DFL/SIG_IGN keep the flags they were given.
+        const SUPPORTED: u32 = SA_ONSTACK
+            | SA_RESTART
+            | SA_RESETHAND
+            | SA_NOCLDSTOP
+            | SA_NODEFER
+            | SA_NOCLDWAIT
+            | SA_SIGINFO;
+        if requested.handler > 1 && flags & !SUPPORTED != 0 {
+            return Err(EINVAL_ERR);
+        }
         let disposition = Disposition {
             handler: requested.handler,
             mask: requested.mask & APP_MASK,

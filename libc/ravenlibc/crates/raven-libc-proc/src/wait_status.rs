@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The Linux wait-status codec and the `wait4` -> `wait6` mapping.
+//! The FreeBSD wait-status codec and the `wait4` -> `wait6` mapping.
 //!
-//! Raven uses the Linux numeric values (DR-13), so the C header macros and this codec agree:
-//! exits are `code << 8`, signals are `sig | 0x80` with the core bit, stops are
-//! `(sig << 8) | 0x7f`, and a continued child is `0xffff`.
+//! The native profile is FreeBSD (`sys/sys/wait.h` at the S700 pin): exits are `code << 8`,
+//! signals are `sig | 0x80` with the core bit, stops are `(sig << 8) | 0x7f`, and a continued
+//! child is `W_CONTINUED` (`0x13`, the `SIGCONT` number).
 
 use crate::consts::{
     __WALL, KERNEL_WCONTINUED, P_ALL, P_PGID, P_PID, WAIT_OPTION_MASK, WCONTINUED, WEXITED,
 };
 use crate::errors::{EINVAL, Errno};
+
+/// The FreeBSD `W_CONTINUED` status (`0x13`, the `SIGCONT` number).
+pub const CONTINUED_STATUS: i32 = 0x13;
 
 /// One decoded wait status.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,14 +40,14 @@ pub fn encode(status: WaitStatus) -> i32 {
         WaitStatus::Exited(code) => i32::from(code) << 8,
         WaitStatus::Signaled { sig, core } => i32::from(sig) | if core { 0x80 } else { 0 },
         WaitStatus::Stopped(sig) => (i32::from(sig) << 8) | 0x7f,
-        WaitStatus::Continued => 0xffff,
+        WaitStatus::Continued => CONTINUED_STATUS,
     }
 }
 
 /// Decode one raw status. Values that do not name a real class return `None`.
 #[must_use]
 pub fn decode(raw: i32) -> Option<WaitStatus> {
-    if raw == 0xffff {
+    if raw == CONTINUED_STATUS {
         return Some(WaitStatus::Continued);
     }
     if raw & 0x7f == 0 {
@@ -70,7 +73,7 @@ pub fn decode(raw: i32) -> Option<WaitStatus> {
 
 /// Translate the public `sys/wait.h` option word to the raw `PROC_WAIT_EX` option word.
 ///
-/// The C header keeps the musl/Linux values (`WCONTINUED = 8`, `WEXITED = 4`). The kernel's
+/// The C header keeps the FreeBSD values (`WCONTINUED = 4`, `WEXITED = 16`). The kernel's
 /// `PROC_WAIT_EX` ABI has no `WEXITED` bit (it always reports exits) and uses
 /// [`KERNEL_WCONTINUED`] for continued children, so the two public bits are replaced by the
 /// kernel bit. Unsupported bits stay in the word and are rejected by the kernel with `EINVAL`,
@@ -94,8 +97,6 @@ pub enum IdType {
     Pid = P_PID,
     /// One process group.
     Pgid = P_PGID,
-    /// One pidfd.
-    PidFd = 3,
 }
 
 /// Map the BSD/Linux `wait4` arguments to `wait6` arguments.

@@ -94,7 +94,5 @@ pub use safe_list::is_async_signal_safe;
 pub use send::{kill, killpg, raise, sigqueue};
 pub use sig2str::{SIG2STR_MAX, sig2str, str2sig};
 pub use sigjmp::{LONGJMP, SETJMP, longjmp, setjmp, siglongjmp, sigsetjmp};
-pub use sigset::{
-    ALL_MASK, APP_MASK, NSIG, SIGCANCEL, SIGRTMAX, SIGRTMIN, SIGSYNCCALL, SIGTIMER, SigSet,
-};
+pub use sigset::{ALL_MASK, APP_MASK, NSIG, SIG_MAXSIG, SIGRTMAX, SIGRTMIN, SigSet};
 pub use wait::{sigsuspend, sigtimedwait, sigwait, sigwaitinfo};

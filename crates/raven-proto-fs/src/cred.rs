@@ -32,6 +32,8 @@ pub struct Credentials {
     pub group_count: u32,
     /// Supplementary groups.
     pub groups: [u32; MAX_GROUPS],
+    /// File-creation mask recorded by the kernel when the request was submitted.
+    pub umask: u32,
 }
 
 impl Credentials {
@@ -43,6 +45,7 @@ impl Credentials {
         egid: 0,
         group_count: 0,
         groups: [0; MAX_GROUPS],
+        umask: 0,
     };
 
     /// Build a snapshot, clamping the group count to the array bound.
@@ -54,6 +57,7 @@ impl Credentials {
         egid: u32,
         groups: [u32; MAX_GROUPS],
         group_count: u32,
+        umask: u32,
     ) -> Self {
         Self {
             uid,
@@ -66,6 +70,7 @@ impl Credentials {
                 group_count
             },
             groups,
+            umask,
         }
     }
 

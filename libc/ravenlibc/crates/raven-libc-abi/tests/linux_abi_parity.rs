@@ -127,10 +127,13 @@ fn flag_parity_with_raven_linux_abi() {
     let deviations = linux_abi_deviations();
     let mut compared = 0usize;
     let mut mismatches = Vec::new();
+    // The native signal domain is FreeBSD (S713); `raven-linux-abi` keeps the Linux values and
+    // is checked by `native_signal_domain_and_linux_keep_their_values` below. The wait selectors
+    // are likewise native-domain values.
+    const NATIVE_WAIT: &[&str] = &["WEXITED", "WCONTINUED", "WNOWAIT"];
     for group in [
         &raven_libc_abi::fcntl::ALL,
         &raven_libc_abi::mman::ALL,
-        &raven_libc_abi::signal::ALL,
         &raven_libc_abi::socket::ALL,
         &raven_libc_abi::netinet::ALL,
         &raven_libc_abi::poll::ALL,
@@ -142,7 +145,7 @@ fn flag_parity_with_raven_linux_abi() {
             let Some(their) = linux.get(*name) else {
                 continue;
             };
-            if deviations.contains_key(*name) {
+            if deviations.contains_key(*name) || NATIVE_WAIT.contains(name) {
                 continue;
             }
             compared += 1;
@@ -154,6 +157,51 @@ fn flag_parity_with_raven_linux_abi() {
     assert!(mismatches.is_empty(), "{mismatches:#?}");
     assert!(compared > 300, "only {compared} names compared");
     println!("linux-abi flag parity: compared {compared} constants");
+}
+
+#[test]
+fn native_signal_domain_and_linux_keep_their_values() {
+    // FreeBSD sys/sys/signal.h at the S700 pin owns the native numbers; raven-linux-abi keeps
+    // the Linux personality numbers and must not be renumbered with the native table.
+    let linux = parse_flags();
+    for (name, native, linux_value) in [
+        ("SIGUSR1", raven_libc_abi::signal::SIGUSR1, 10),
+        ("SIGUSR2", raven_libc_abi::signal::SIGUSR2, 12),
+        ("SIGCHLD", raven_libc_abi::signal::SIGCHLD, 17),
+        ("SIGCONT", raven_libc_abi::signal::SIGCONT, 18),
+        ("SIGSTOP", raven_libc_abi::signal::SIGSTOP, 19),
+        ("SIGTSTP", raven_libc_abi::signal::SIGTSTP, 20),
+        ("SIGURG", raven_libc_abi::signal::SIGURG, 23),
+        ("SIGSYS", raven_libc_abi::signal::SIGSYS, 31),
+    ] {
+        assert_ne!(
+            i128::from(native),
+            i128::from(linux_value),
+            "{name} must not use Linux"
+        );
+        assert_eq!(
+            linux.get(name),
+            Some(&linux_value),
+            "{name} linux-abi value"
+        );
+    }
+    assert_eq!(raven_libc_abi::signal::SIGUSR1, 30);
+    assert_eq!(raven_libc_abi::signal::SIGEMT, 7);
+    assert_eq!(raven_libc_abi::signal::SIGBUS, 10);
+    assert_eq!(raven_libc_abi::signal::SIGSYS, 12);
+    assert_eq!(raven_libc_abi::signal::SIGURG, 16);
+    assert_eq!(raven_libc_abi::signal::SIGCHLD, 20);
+    assert_eq!(raven_libc_abi::signal::SIGCONT, 19);
+    assert_eq!(raven_libc_abi::signal::SIGUSR2, 31);
+}
+
+#[test]
+fn native_wait_selectors_are_freebsd() {
+    // FreeBSD sys/sys/wait.h: WCONTINUED 4, WEXITED 16, WNOWAIT 8. The Linux personality keeps
+    // its own values in raven-linux-abi and is not asserted from this native ABI table.
+    assert_eq!(raven_libc_abi::misc::WCONTINUED, 4);
+    assert_eq!(raven_libc_abi::misc::WEXITED, 16);
+    assert_eq!(raven_libc_abi::misc::WNOWAIT, 8);
 }
 
 #[test]
@@ -291,9 +339,20 @@ fn flag_values_are_the_frozen_table() {
     assert_eq!(raven_libc_abi::socket::AF_LINK, 129);
     assert_eq!(raven_libc_abi::signal::SIGRTMIN, 35);
     assert_eq!(raven_libc_abi::signal::SIGRTMAX, 64);
-    assert_eq!(raven_libc_abi::signal::NSIG, 65);
-    assert_eq!(raven_libc_abi::signal::MINSIGSTKSZ, 6144);
-    assert_eq!(raven_libc_abi::signal::SIGSTKSZ, 16384);
+    assert_eq!(raven_libc_abi::signal::NSIG, 32);
+    // FreeBSD sys/sys/_sigaltstack.h with sys/{x86,arm64}/include/_limits.h. The generator
+    // currently collapses the two per-arch rows to the last value, so x86 is still red here;
+    // the hdrgen per-arch fix is the recorded S713 blocker.
+    #[cfg(target_arch = "x86_64")]
+    {
+        assert_eq!(raven_libc_abi::signal::MINSIGSTKSZ, 2048);
+        assert_eq!(raven_libc_abi::signal::SIGSTKSZ, 34816);
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        assert_eq!(raven_libc_abi::signal::MINSIGSTKSZ, 4096);
+        assert_eq!(raven_libc_abi::signal::SIGSTKSZ, 36864);
+    }
 }
 
 #[test]
