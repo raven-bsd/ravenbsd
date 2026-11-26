@@ -165,6 +165,18 @@ fn component_256_is_enametoolong() {
 }
 
 #[test]
+fn multi_component_path_over_255_is_accepted() {
+    let mut path = vec![b'a'; 100];
+    path.push(b'/');
+    path.extend_from_slice(&[b'b'; 100]);
+    path.push(b'/');
+    path.extend_from_slice(&[b'c'; 100]);
+    assert_eq!(path.len(), 302);
+    let resolved = resolve(b"/", &path, false, &DEFAULT_LIMITS).expect("302-byte path");
+    assert_eq!(resolved.abs.len(), 303);
+}
+
+#[test]
 fn total_4095_is_rejected_by_the_transport_limit() {
     let mut path = Vec::new();
     for index in 0..16 {

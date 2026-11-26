@@ -12,15 +12,18 @@ pub struct Limits {
     pub path_max: usize,
     /// `NAME_MAX`: one component.
     pub component_max: usize,
-    /// The effective transport limit of the scheme path (255 today, PG-40 widens it).
+    /// The largest absolute path the filesystem control wire can carry, excluding the NUL.
     pub transport_max: usize,
 }
 
-/// Defaults fixed by doc 11 section 3.2: 4096 / 255 / 255.
+/// Defaults: public `PATH_MAX` 4096 (including the NUL), `NAME_MAX` 255, and the filesystem
+/// wire transport of 4095 path bytes. `open(2)` is still bounded by the smaller S11 `Open`
+/// packet; a longer path returns `ENAMETOOLONG` from the kernel. Control calls (`mkdir`,
+/// `rename`, `stat`, ...) carry the path in the request buffer and use the full 4095.
 pub const DEFAULT_LIMITS: Limits = Limits {
     path_max: 4096,
     component_max: 255,
-    transport_max: 255,
+    transport_max: 4095,
 };
 
 /// Why the lexical resolver rejected a path.
