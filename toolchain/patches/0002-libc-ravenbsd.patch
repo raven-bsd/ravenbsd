@@ -120397,9 +120397,9 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
+index 0000000..26b78565201ef6ed7942cec138483b660db2b0bd
 --- /dev/null
-@@ -0,0 +1,2445 @@
+@@ -0,0 +1,2444 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -120419,7 +120419,9 @@ index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
 +pub type pthread_t = *mut c_void;
 +// Must be usize due to library/std/sys_common/thread_local.rs,
 +// should technically be *mut c_void
-+pub type pthread_key_t = usize;
++pub type pthread_key_t = c_int;
++#[doc = "FreeBSD pthread_spinlock_t is a pointer to the opaque struct"]
++pub type pthread_spinlock_t = *mut c_void;
 +pub type rlim_t = c_ulonglong;
 +pub type sa_family_t = u16;
 +pub type sem_t = *mut c_void;
@@ -120447,7 +120449,6 @@ index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
 +        pub release: [c_char; UTSLENGTH],
 +        pub version: [c_char; UTSLENGTH],
 +        pub machine: [c_char; UTSLENGTH],
-+        pub domainname: [c_char; UTSLENGTH],
 +    }
 +
 +    pub struct dirent {
@@ -120551,9 +120552,13 @@ index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
 +        pub pw_passwd: *mut c_char,
 +        pub pw_uid: crate::uid_t,
 +        pub pw_gid: crate::gid_t,
++        pub pw_change: crate::time_t,
++        pub pw_class: *mut c_char,
 +        pub pw_gecos: *mut c_char,
 +        pub pw_dir: *mut c_char,
 +        pub pw_shell: *mut c_char,
++        pub pw_expire: crate::time_t,
++        pub pw_fields: c_int,
 +    }
 +
 +    // FIXME(1.0): This should not implement `PartialEq`
@@ -120718,11 +120723,6 @@ index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
 +    pub struct pthread_once_t {
 +        bytes: [u8; _PTHREAD_ONCE_SIZE],
 +    }
-+    #[repr(C)]
-+    #[repr(align(4))]
-+    pub struct pthread_spinlock_t {
-+        bytes: [u8; _PTHREAD_SPINLOCK_SIZE],
-+    }
 +
 +    #[allow(dead_code)] // std does not construct rlimit through this crate yet.
 +    pub struct rlimit {
@@ -120793,7 +120793,6 @@ index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
 +const _PTHREAD_MUTEX_SIZE: usize = 40;
 +const _PTHREAD_MUTEXATTR_SIZE: usize = 4;
 +const _PTHREAD_ONCE_SIZE: usize = 4;
-+const _PTHREAD_SPINLOCK_SIZE: usize = 4;
 +
 +#[repr(C)]
 +#[derive(Copy, Clone)]
@@ -120843,7 +120842,7 @@ index 0000000..4bf8bb7668bdb259c4587aabefcf8e5b23256166
 +    }
 +}
 +
-+pub const UTSLENGTH: usize = 65;
++pub const UTSLENGTH: usize = 256;
 +
 +// intentionally not public, only used for fd_set
 +cfg_if! {

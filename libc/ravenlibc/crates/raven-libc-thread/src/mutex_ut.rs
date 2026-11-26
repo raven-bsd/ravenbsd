@@ -30,6 +30,12 @@ fn robust_attr() -> MutexAttr {
     attr
 }
 
+fn normal_attr() -> MutexAttr {
+    let mut attr = attr_init();
+    attr_settype(&mut attr, PTHREAD_MUTEX_NORMAL).unwrap();
+    attr
+}
+
 #[test]
 fn size_and_alignment_are_the_c_object() {
     assert_eq!(core::mem::size_of::<Mutex>(), 40);
@@ -58,15 +64,15 @@ fn init_clears_and_applies_the_type() {
     mutex.words[1].store(7, Ordering::Release);
     let attr = recursive_attr();
     init(&mut mutex, Some(&attr));
-    assert_eq!(mutex.type_word(), PTHREAD_MUTEX_RECURSIVE);
+    assert_eq!(mutex.type_word(), MUTEX_KIND_RECURSIVE);
     assert_eq!(mutex.lock_value(), 0);
 }
 
 #[test]
-fn init_without_attr_is_normal() {
+fn init_without_attr_is_the_default_errorchecking_type() {
     let mut mutex = Mutex::new();
     init(&mut mutex, None);
-    assert_eq!(mutex.kind(), PTHREAD_MUTEX_NORMAL);
+    assert_eq!(mutex.kind(), MUTEX_KIND_DEFAULT);
 }
 
 #[test]
@@ -83,7 +89,7 @@ fn attr_type_round_trip() {
 #[test]
 fn attr_rejects_a_bad_type() {
     let mut attr = attr_init();
-    for kind in [-1, 3, 4, 100] {
+    for kind in [-1, 0, 4, 100] {
         assert_eq!(attr_settype(&mut attr, kind), Err(EINVAL));
     }
 }
@@ -183,7 +189,8 @@ fn attr_robust_round_trip() {
 #[test]
 fn normal_lock_free_is_one_cas() {
     let kernel = kernel();
-    let mutex = Mutex::new();
+    let mut mutex = Mutex::new();
+    init(&mut mutex, Some(&normal_attr()));
     assert_eq!(lock(&kernel, &mutex), Ok(()));
     assert_eq!(mutex.lock_value(), EBUSY.0 as u32);
     assert_eq!(unlock(&kernel, &mutex), Ok(()));
@@ -193,7 +200,8 @@ fn normal_lock_free_is_one_cas() {
 #[test]
 fn normal_trylock_success_and_busy() {
     let kernel = kernel();
-    let mutex = Mutex::new();
+    let mut mutex = Mutex::new();
+    init(&mut mutex, Some(&normal_attr()));
     assert_eq!(trylock(&kernel, &mutex), Ok(()));
     assert_eq!(trylock(&kernel, &mutex), Err(EBUSY));
     assert_eq!(unlock(&kernel, &mutex), Ok(()));
@@ -279,7 +287,8 @@ fn errorcheck_unlock_by_another_tid_is_eperm() {
 #[test]
 fn normal_unlock_does_not_check_the_owner() {
     let kernel = kernel();
-    let mutex = Mutex::new();
+    let mut mutex = Mutex::new();
+    init(&mut mutex, Some(&normal_attr()));
     assert_eq!(lock(&kernel, &mutex), Ok(()));
     crate::thread::current_pthread(&kernel)
         .tid
@@ -463,7 +472,8 @@ fn the_type_word_carries_robust_and_shared_bits() {
 #[test]
 fn a_held_normal_mutex_has_ebusy_as_the_owner_word() {
     let kernel = kernel();
-    let mutex = Mutex::new();
+    let mut mutex = Mutex::new();
+    init(&mut mutex, Some(&normal_attr()));
     assert_eq!(lock(&kernel, &mutex), Ok(()));
     assert_eq!(mutex.lock_value(), 16);
     assert_eq!(mutex.lock_value() & crate::limits::OWNER_MASK, 16);

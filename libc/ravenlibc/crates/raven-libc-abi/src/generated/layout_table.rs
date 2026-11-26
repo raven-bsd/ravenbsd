@@ -696,32 +696,27 @@ pub const STRUCTS: &[StructLayout] = &[
             FieldLayout {
                 name: "sysname",
                 offset: core::mem::offset_of!(Utsname, sysname),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "nodename",
                 offset: core::mem::offset_of!(Utsname, nodename),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "release",
                 offset: core::mem::offset_of!(Utsname, release),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "version",
                 offset: core::mem::offset_of!(Utsname, version),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "machine",
                 offset: core::mem::offset_of!(Utsname, machine),
-                size: 65,
-            },
-            FieldLayout {
-                name: "domainname",
-                offset: core::mem::offset_of!(Utsname, domainname),
-                size: 65,
+                size: 256,
             },
         ],
     },
@@ -947,6 +942,16 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 4,
             },
             FieldLayout {
+                name: "pw_change",
+                offset: core::mem::offset_of!(Passwd, pw_change),
+                size: 8,
+            },
+            FieldLayout {
+                name: "pw_class",
+                offset: core::mem::offset_of!(Passwd, pw_class),
+                size: 8,
+            },
+            FieldLayout {
                 name: "pw_gecos",
                 offset: core::mem::offset_of!(Passwd, pw_gecos),
                 size: 8,
@@ -960,6 +965,16 @@ pub const STRUCTS: &[StructLayout] = &[
                 name: "pw_shell",
                 offset: core::mem::offset_of!(Passwd, pw_shell),
                 size: 8,
+            },
+            FieldLayout {
+                name: "pw_expire",
+                offset: core::mem::offset_of!(Passwd, pw_expire),
+                size: 8,
+            },
+            FieldLayout {
+                name: "pw_fields",
+                offset: core::mem::offset_of!(Passwd, pw_fields),
+                size: 4,
             },
         ],
     },

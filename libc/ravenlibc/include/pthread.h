@@ -43,12 +43,11 @@ __BEGIN_DECLS
 #define __NEED_pthread_cond_t
 #define __NEED_pthread_rwlock_t
 #define __NEED_pthread_barrier_t
-#define __NEED_pthread_spinlock_t
-#define __NEED_pthread_key_t
 #define __NEED_pthread_once_t
 #define __NEED_size_t
 
 #include <bits/alltypes.h>
+#include <bits/pthread_types.h>
 
 #include <sched.h>
 #include <time.h>
@@ -56,10 +55,10 @@ __BEGIN_DECLS
 #define PTHREAD_CREATE_JOINABLE 0
 #define PTHREAD_CREATE_DETACHED 1
 
-#define PTHREAD_MUTEX_NORMAL 0
-#define PTHREAD_MUTEX_DEFAULT 0
-#define PTHREAD_MUTEX_RECURSIVE 1
-#define PTHREAD_MUTEX_ERRORCHECK 2
+#define PTHREAD_MUTEX_NORMAL 3
+#define PTHREAD_MUTEX_DEFAULT 1
+#define PTHREAD_MUTEX_RECURSIVE 2
+#define PTHREAD_MUTEX_ERRORCHECK 1
 
 #define PTHREAD_MUTEX_STALLED 0
 #define PTHREAD_MUTEX_ROBUST 1
@@ -68,11 +67,11 @@ __BEGIN_DECLS
 #define PTHREAD_PRIO_INHERIT 1
 #define PTHREAD_PRIO_PROTECT 2
 
-#define PTHREAD_INHERIT_SCHED 0
-#define PTHREAD_EXPLICIT_SCHED 1
+#define PTHREAD_INHERIT_SCHED 4
+#define PTHREAD_EXPLICIT_SCHED 0
 
-#define PTHREAD_SCOPE_SYSTEM 0
-#define PTHREAD_SCOPE_PROCESS 1
+#define PTHREAD_SCOPE_SYSTEM 2
+#define PTHREAD_SCOPE_PROCESS 0
 
 #define PTHREAD_PROCESS_PRIVATE 0
 #define PTHREAD_PROCESS_SHARED 1
@@ -87,7 +86,7 @@ __BEGIN_DECLS
 #define PTHREAD_CANCEL_MASKED 2
 
 #define PTHREAD_CANCEL_DEFERRED 0
-#define PTHREAD_CANCEL_ASYNCHRONOUS 1
+#define PTHREAD_CANCEL_ASYNCHRONOUS 2
 
 #define PTHREAD_CANCELED ((void *)-1)
 

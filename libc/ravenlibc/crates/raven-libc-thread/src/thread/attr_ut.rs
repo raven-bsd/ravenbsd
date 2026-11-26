@@ -103,6 +103,7 @@ fn setstack_below_the_minimum_is_einval() {
 #[test]
 fn inheritsched_round_trip() {
     let mut attr = init();
+    assert_eq!(getinheritsched(&attr), PTHREAD_INHERIT_SCHED);
     assert_eq!(setinheritsched(&mut attr, PTHREAD_EXPLICIT_SCHED), Ok(()));
     assert_eq!(getinheritsched(&attr), PTHREAD_EXPLICIT_SCHED);
     assert_eq!(setinheritsched(&mut attr, PTHREAD_INHERIT_SCHED), Ok(()));

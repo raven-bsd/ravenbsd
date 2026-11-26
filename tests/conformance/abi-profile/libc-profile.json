@@ -1823,22 +1823,22 @@
     "PTHREAD_MUTEX_DEFAULT": {
       "group": "pthread",
       "ty": "c_int",
-      "value": 0
+      "value": 1
     },
     "PTHREAD_MUTEX_ERRORCHECK": {
       "group": "pthread",
       "ty": "c_int",
-      "value": 2
+      "value": 1
     },
     "PTHREAD_MUTEX_NORMAL": {
       "group": "pthread",
       "ty": "c_int",
-      "value": 0
+      "value": 3
     },
     "PTHREAD_MUTEX_RECURSIVE": {
       "group": "pthread",
       "ty": "c_int",
-      "value": 1
+      "value": 2
     },
     "PTHREAD_MUTEX_ROBUST": {
       "group": "pthread",
@@ -4237,22 +4237,42 @@
           "ty": "u32"
         },
         {
-          "name": "pw_gecos",
+          "name": "pw_change",
           "off": 24,
-          "ty": "ptr"
+          "ty": "i64"
         },
         {
-          "name": "pw_dir",
+          "name": "pw_class",
           "off": 32,
           "ty": "ptr"
         },
         {
-          "name": "pw_shell",
+          "name": "pw_gecos",
           "off": 40,
           "ty": "ptr"
+        },
+        {
+          "name": "pw_dir",
+          "off": 48,
+          "ty": "ptr"
+        },
+        {
+          "name": "pw_shell",
+          "off": 56,
+          "ty": "ptr"
+        },
+        {
+          "name": "pw_expire",
+          "off": 64,
+          "ty": "i64"
+        },
+        {
+          "name": "pw_fields",
+          "off": 72,
+          "ty": "i32"
         }
       ],
-      "size": 48
+      "size": 80
     },
     "pollfd": {
       "align": 4,
@@ -4861,35 +4881,30 @@
         {
           "name": "sysname",
           "off": 0,
-          "ty": "[c_char; 65]"
+          "ty": "[c_char; 256]"
         },
         {
           "name": "nodename",
-          "off": 65,
-          "ty": "[c_char; 65]"
+          "off": 256,
+          "ty": "[c_char; 256]"
         },
         {
           "name": "release",
-          "off": 130,
-          "ty": "[c_char; 65]"
+          "off": 512,
+          "ty": "[c_char; 256]"
         },
         {
           "name": "version",
-          "off": 195,
-          "ty": "[c_char; 65]"
+          "off": 768,
+          "ty": "[c_char; 256]"
         },
         {
           "name": "machine",
-          "off": 260,
-          "ty": "[c_char; 65]"
-        },
-        {
-          "name": "domainname",
-          "off": 325,
-          "ty": "[c_char; 65]"
+          "off": 1024,
+          "ty": "[c_char; 256]"
         }
       ],
-      "size": 390
+      "size": 1280
     }
   },
   "schema": 1,
@@ -4897,7 +4912,7 @@
     "model": {
       "bsd-extras.toml": "3d5e4560e190e6ca402d94029162cea74b98dafdeb925d60654e322c69368bbb",
       "data-symbols.toml": "686ec89334a97fd69c19c41e156fef8fc47aa08265e77d816c451eebda09d2e4",
-      "deviations.toml": "ca0bf993c83ebbfa76c29266cd60315f7e002e1479231ae13c94f1575ebdfde2",
+      "deviations.toml": "2186aa89d353b497b44e26e42952960a2de12cbfa9abd13084796fd551096507",
       "errno.toml": "7e0983f00564995e07f8ce8d8ea65dbf21b0951e0dbd31badeab2c8cabadc95e",
       "fcntl.toml": "69b8c18997984a92eb75a45ae55253490a8b036e5503d5248d9e018c09d0a543",
       "limits.toml": "2cfab601137e494f5dffb6a47c9947371b4d2f259ec7226b61e6fd09821ae892",
@@ -4905,16 +4920,16 @@
       "mman.toml": "dfbe024514c4cea9a2b8aa019b57c87ca23bb06b3099b0b57e03f3f2ffecd2f7",
       "netinet.toml": "36c4a3fce94ee2416377337e4c717d026de672b82d7f4582d7095a48e89bc6f6",
       "poll.toml": "3b50971f9de820b486720b5aa33234da05c7513c8eea8a5e55a9e57dc3c8d986",
-      "pthread.toml": "2846eba947d322fd812ea2d2ea4610c0c97b81eaf0cdc4e2bdae640de83bf2a2",
+      "pthread.toml": "1690fbb58e3515728cfaa589a376f201bcdfc1b98e504ea4628b67b3099ca5f7",
       "resource.toml": "df6450635162a3aa68351945e4677b5505e02225c7935aa2571f18542247c52a",
       "ring-changes.toml": "f9064f0f90715001526c3b62cb267e1e3ed3cb40fa225517a7b28a155ba1ac33",
       "signal.toml": "742c90697206935938c5947f850a7dd46c3c75b989afefcca5bed142605166db",
       "socket.toml": "4ba387dc14b36d76572a7ce55f68c2a69203a803718fcbdd166e6ecc3e98e68f",
       "stat.toml": "449a8b182cbd02a4dd179936f6a3f13b1181f065a28ab564071dcf78c2144cc4",
-      "structs.toml": "c561d3ce956dd534422824b3e3366af96bff0754a45d25b89f4697e541603cad",
+      "structs.toml": "095b62ca2274ba1af88768c92ffae6b9b8dcff5e8c93062b44c4015b5e7f4d49",
       "sysconf.toml": "667fbeff301776a6e3b24f47f62817d6ee72bf4f7cbf1a851aec210378d0f501",
       "time.toml": "441208c2f196d783842f2c773d2e03f2e18b3f92be6060deface346f80c5b191",
-      "types.toml": "d980c831877790acd11d99d4df25e4f4831266809ed32f3c5cc977e0c82305c5"
+      "types.toml": "712884f26821fe6c12233e0f96429121207d1acdd27fe470e022bf8df2bce29e"
     },
     "target": "toolchain/vendor/libc/src/unix/ravenbsd/mod.rs"
   },
@@ -4986,7 +5001,12 @@
     },
     "pthread_key_t": {
       "bits": 32,
-      "rust": "u32",
+      "rust": "i32",
+      "signed": true
+    },
+    "pthread_spinlock_t": {
+      "bits": 64,
+      "rust": "*mut core::ffi::c_void",
       "signed": false
     },
     "pthread_t": {
