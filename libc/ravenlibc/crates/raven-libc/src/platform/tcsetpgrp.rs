@@ -22,7 +22,12 @@ pub(crate) fn set_pgrp(fd: c_int, pgrp: c_int) -> Result<(), Errno> {
     let raw = unsafe {
         raven_libc_sys::arch::syscall2(PROC_CTTY_SET_FG, handle.0 as usize, pgrp as isize as usize)
     };
-    raven_libc_sys::errno::ret(raw).map(|_| ())
+    raven_libc_sys::errno::ret(raw)?;
+    // The kernel owns the session and permission decision; a tty server that generates
+    // terminal signals (ptyd) needs the accepted group to address them. Propagation only:
+    // a console without the server-local op returns ENOTTY and keeps the kernel value.
+    let _ = raven_libc_platform::ioctl::tcsetpgrp(crate::ffi::platform::global(), fd, pgrp);
+    Ok(())
 }
 
 /// Set the foreground process group of `fd`, or `-1` with the POSIX errno.

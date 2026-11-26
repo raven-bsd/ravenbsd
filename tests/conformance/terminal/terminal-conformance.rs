@@ -701,6 +701,13 @@ fn run_signal_child(pair: &Pair, setup: fn(c_int) -> c_int, signal: c_int) -> Op
             if ioctl(fd, TIOCSCTTY) != 0 {
                 _exit(22);
             }
+            // A session leader that acquires the controlling terminal also makes its group
+            // the foreground group (POSIX); the shell does this with tcsetpgrp after
+            // TIOCSCTTY, and the pty server needs the accepted group to address signals.
+            let pgrp = getpgrp();
+            if pgrp <= 0 || tcsetpgrp(fd, pgrp) != 0 {
+                _exit(26);
+            }
             if setup(fd) != 0 {
                 _exit(23);
             }
