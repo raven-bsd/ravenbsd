@@ -17,6 +17,9 @@ use raven_rt::println;
 
 entry!(main);
 
+static TARGET: u32 = 7;
+static POINTER: &u32 = &TARGET;
+
 unsafe extern "C" {
     /// A libc-only symbol; the linker must add `DT_NEEDED libc.so.1`.
     fn getpid() -> i32;
@@ -25,6 +28,7 @@ unsafe extern "C" {
 fn main(_args: raven_rt::Args) -> i32 {
     // SAFETY: `getpid` is the C ABI entry with no arguments.
     let pid = unsafe { getpid() };
-    println!("rtld-relative-rust: main pid={}", black_box(pid));
-    0
+    let target = black_box(*POINTER);
+    println!("rtld-relative-rust: main pid={} relative={}", black_box(pid), target);
+    if target == 7 { 0 } else { 1 }
 }

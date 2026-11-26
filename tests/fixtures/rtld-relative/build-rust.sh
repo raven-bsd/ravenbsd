@@ -63,6 +63,11 @@ if "$readelf" --dyn-syms "$pie" | grep -qw main; then
     printf 'rtld-relative-rust: target unexpectedly exports main\n' >&2
     exit 1
 fi
+relative=$("$readelf" -r "$pie" | grep -c 'R_X86_64_RELATIVE' || true)
+if [ "$relative" -lt 1 ]; then
+    printf 'rtld-relative-rust: target has no R_X86_64_RELATIVE relocation\n' >&2
+    exit 1
+fi
 
 # Populate the profile's loader/libc/libplug and the C dynamic fixture set.
 sh tests/libc/target/build.sh dynamic x86_64

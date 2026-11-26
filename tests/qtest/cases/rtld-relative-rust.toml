@@ -19,7 +19,7 @@ expect_exit = "success"
 regex = '^dynamic-exec: launching$'
 
 [[expect]]
-regex = '^rtld-relative-rust: main pid=\d+$'
+regex = '^rtld-relative-rust: main pid=\d+ relative=7$'
 
 [[expect]]
 regex = '^svcd: settled$'
