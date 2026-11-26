@@ -147,10 +147,17 @@ impl<B: Backend> Cyclics<B> {
         self.heap.swap_remove(index);
         if index < last {
             let parent = index.saturating_sub(1) / 2;
-            if index > 0 && self.heap[index].less(&self.heap[parent]) {
-                self.sift_up(index);
-            } else {
-                self.sift_down(index);
+            let entries = self
+                .heap
+                .get(index)
+                .copied()
+                .zip(self.heap.get(parent).copied());
+            if let Some((entry, parent_entry)) = entries {
+                if entry.less(&parent_entry) {
+                    self.sift_up(index);
+                } else {
+                    self.sift_down(index);
+                }
             }
         }
         self.reprogram();
