@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S178: one one-shot thread/futex conformance probe.  It runs the normal rows and both controlled
+# mutations in one boot; the host runner parses the row contract and owns the final exit mapping.
+
+name = "threads-conformance"
+exec = "/bin/conformance-probe"
+args = ["threads-conformance", "--all", "--cpus", "4"]
+needs = ["scheme:file", "ramfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S178 thread/futex table: name <TAB> requirement <TAB> gate.
+futex-wait-wake	S178-R01	1
+futex-eagain	S178-R01	1
+futex-wake-limit	S178-R01	1
+futex-requeue	S178-R01	1
+robust-owner-died	S178-R01	1
+tls-per-thread	S178-R01	1
+thread-exit-tid	S178-R01	1
+sched-getaffinity	S178-R01	1
