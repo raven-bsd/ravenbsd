@@ -7,6 +7,8 @@
 Run: python3 tests/boot/0.1.0-usb-keyboard/gate_ut.py
 """
 
+import os
+import tempfile
 import unittest
 
 import gate
@@ -140,6 +142,31 @@ class MutationTests(unittest.TestCase):
         self.assertIn("usb-kbd,display=video0", argv)
         self.assertIn("VGA,id=video0", argv)
         self.assertIn("qemu-xhci", argv)
+
+
+class SerialTests(unittest.TestCase):
+    def test_login_rejection_is_reported_at_the_login_stage(self):
+        handle, path = tempfile.mkstemp(prefix="s85p-serial-")
+        os.close(handle)
+        try:
+            with open(path, "wb") as stream:
+                stream.write(b"login: \nPassword: \n")
+            serial = gate.Serial(gate.Path(path), 5)
+            serial._drain()
+            since = serial.mark()
+            with open(path, "ab") as stream:
+                stream.write(b"Login incorrect\n")
+            with self.assertRaises(gate.GateFailure) as caught:
+                serial.expect(
+                    gate.SHELL_PROMPT,
+                    1,
+                    gate.LOGIN,
+                    since=since,
+                    reject=gate.REJECTED,
+                )
+            self.assertEqual(caught.exception.stage, gate.LOGIN)
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__":
