@@ -32,26 +32,26 @@ const SIGQUIT: c_int = 3;
 /// `SIGTERM`.
 const SIGTERM: c_int = 15;
 
-const IGNBRK: u32 = 0o000001;
-const BRKINT: u32 = 0o000002;
-const PARMRK: u32 = 0o000010;
-const ISTRIP: u32 = 0o000040;
-const INLCR: u32 = 0o000100;
-const IGNCR: u32 = 0o000200;
-const ICRNL: u32 = 0o000400;
-const IXON: u32 = 0o002000;
-const IMAXBEL: u32 = 0o020000;
-const OPOST: u32 = 0o000001;
-const ISIG: u32 = 0o000001;
-const ICANON: u32 = 0o000002;
-const ECHO: u32 = 0o000010;
-const ECHONL: u32 = 0o000100;
-const IEXTEN: u32 = 0o100000;
-const CSIZE: u32 = 0o000060;
-const CS8: u32 = 0o000060;
-const PARENB: u32 = 0o000400;
+const IGNBRK: u32 = 0x0000_0001;
+const BRKINT: u32 = 0x0000_0002;
+const PARMRK: u32 = 0x0000_0008;
+const ISTRIP: u32 = 0x0000_0020;
+const INLCR: u32 = 0x0000_0040;
+const IGNCR: u32 = 0x0000_0080;
+const ICRNL: u32 = 0x0000_0100;
+const IXON: u32 = 0x0000_0200;
+const IMAXBEL: u32 = 0x0000_2000;
+const OPOST: u32 = 0x0000_0001;
+const ISIG: u32 = 0x0000_0080;
+const ICANON: u32 = 0x0000_0100;
+const ECHO: u32 = 0x0000_0008;
+const ECHONL: u32 = 0x0000_0010;
+const IEXTEN: u32 = 0x0000_0400;
+const CSIZE: u32 = 0x0000_0300;
+const CS8: u32 = 0x0000_0300;
+const PARENB: u32 = 0x0000_1000;
 
-/// The C `struct termios` shape shared by the host libc and ravenlibc.
+/// The pinned FreeBSD public `struct termios` (DR-71/C20).
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Termios {
@@ -59,22 +59,20 @@ pub(crate) struct Termios {
     pub(crate) c_oflag: u32,
     pub(crate) c_cflag: u32,
     pub(crate) c_lflag: u32,
-    pub(crate) c_line: u8,
-    pub(crate) c_cc: [u8; 32],
-    pub(crate) __c_ispeed: u32,
-    pub(crate) __c_ospeed: u32,
+    pub(crate) c_cc: [u8; 20],
+    pub(crate) c_ispeed: u32,
+    pub(crate) c_ospeed: u32,
 }
 
-const _: () = assert!(core::mem::size_of::<Termios>() == 60);
+const _: () = assert!(core::mem::size_of::<Termios>() == 44);
 const _: () = assert!(core::mem::align_of::<Termios>() == 4);
 const _: () = assert!(core::mem::offset_of!(Termios, c_iflag) == 0);
 const _: () = assert!(core::mem::offset_of!(Termios, c_oflag) == 4);
 const _: () = assert!(core::mem::offset_of!(Termios, c_cflag) == 8);
 const _: () = assert!(core::mem::offset_of!(Termios, c_lflag) == 12);
-const _: () = assert!(core::mem::offset_of!(Termios, c_line) == 16);
-const _: () = assert!(core::mem::offset_of!(Termios, c_cc) == 17);
-const _: () = assert!(core::mem::offset_of!(Termios, __c_ispeed) == 52);
-const _: () = assert!(core::mem::offset_of!(Termios, __c_ospeed) == 56);
+const _: () = assert!(core::mem::offset_of!(Termios, c_cc) == 16);
+const _: () = assert!(core::mem::offset_of!(Termios, c_ispeed) == 36);
+const _: () = assert!(core::mem::offset_of!(Termios, c_ospeed) == 40);
 
 impl Termios {
     pub(crate) const ZERO: Self = Self {
@@ -82,10 +80,9 @@ impl Termios {
         c_oflag: 0,
         c_cflag: 0,
         c_lflag: 0,
-        c_line: 0,
-        c_cc: [0; 32],
-        __c_ispeed: 0,
-        __c_ospeed: 0,
+        c_cc: [0; 20],
+        c_ispeed: 0,
+        c_ospeed: 0,
     };
 
     /// Clear the canonical, echo and signal flags and select the 8-bit data path.

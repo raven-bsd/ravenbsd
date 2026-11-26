@@ -6,7 +6,7 @@
 use raven_abi::errno::Errno;
 use raven_libc_abi::fcntl;
 
-use super::{CC_MAP, cc_from_wire, cc_to_wire};
+use super::{CC_MAP, SPEED_MAP, cc_from_wire, cc_to_wire, termios_from_wire, wire_from_termios};
 use crate::backend::FakeSys;
 use crate::ioctl::tty::{
     B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VEOF, VINTR, VMIN, VTIME, Winsize, cfgetispeed,
@@ -228,14 +228,39 @@ fn every_control_character_round_trips_in_both_directions() {
     assert_eq!(got.c_cc, want.c_cc);
 }
 
+/// The expected mapping, written independently of the production table.
+const EXPECTED_CC_MAP: [(usize, usize); 20] = [
+    (0, 4),   // VEOF
+    (1, 11),  // VEOL
+    (2, 16),  // VEOL2
+    (3, 2),   // VERASE
+    (4, 14),  // VWERASE
+    (5, 3),   // VKILL
+    (6, 12),  // VREPRINT
+    (7, 7),   // VERASE2
+    (8, 0),   // VINTR
+    (9, 1),   // VQUIT
+    (10, 10), // VSUSP
+    (11, 17), // VDSUSP
+    (12, 8),  // VSTART
+    (13, 9),  // VSTOP
+    (14, 15), // VLNEXT
+    (15, 13), // VDISCARD
+    (16, 6),  // VMIN
+    (17, 5),  // VTIME
+    (18, 18), // VSTATUS
+    (19, 19), // spare 19
+];
+
 #[test]
 fn every_public_slot_maps_to_its_exact_wire_slot() {
+    assert_eq!(CC_MAP, EXPECTED_CC_MAP, "production table drifted");
     let mut public = [0u8; 20];
     for (index, byte) in public.iter_mut().enumerate() {
         *byte = 0x10 + index as u8;
     }
     let wire = cc_to_wire(&public);
-    for &(public_index, wire_index) in CC_MAP {
+    for &(public_index, wire_index) in &EXPECTED_CC_MAP {
         assert_eq!(
             wire[wire_index], public[public_index],
             "public slot {public_index} must land in wire slot {wire_index}"
@@ -247,6 +272,48 @@ fn every_public_slot_maps_to_its_exact_wire_slot() {
     assert_eq!(wire[5], public[17], "VTIME");
     assert_eq!(wire[19], public[19], "spare 19");
     assert_eq!(cc_from_wire(&wire), public);
+}
+
+#[test]
+fn every_donor_speed_round_trips_through_both_seams() {
+    let (platform, fd) = tty_platform();
+    for &(public, wire_value) in SPEED_MAP {
+        let mut termios = default_termios();
+        assert_eq!(cfsetispeed(&mut termios, public), 0, "ispeed {public}");
+        assert_eq!(cfsetospeed(&mut termios, public), 0, "ospeed {public}");
+        assert_eq!(cfgetispeed(&termios), public);
+        assert_eq!(cfgetospeed(&termios), public);
+        let wire = wire_from_termios(&termios);
+        assert_eq!(wire.ispeed, wire_value);
+        assert_eq!(wire.ospeed, wire_value);
+        let back = termios_from_wire(wire);
+        assert_eq!(back.c_ispeed, public);
+        assert_eq!(back.c_ospeed, public);
+        tcsetattr(&platform, fd, &termios).expect("tcsetattr");
+        let got = tcgetattr(&platform, fd).expect("tcgetattr");
+        assert_eq!(got.c_ispeed, public);
+        assert_eq!(got.c_ospeed, public);
+    }
+}
+
+#[test]
+fn every_donor_flag_bit_round_trips_through_tcsetattr() {
+    const IFLAGS: u32 = 0x0000_6fff;
+    const OFLAGS: u32 = 0x0000_007f;
+    const CFLAGS: u32 = 0x003f_ff01;
+    const LFLAGS: u32 = 0xa2c0_0fff;
+    let (platform, fd) = tty_platform();
+    let mut termios = default_termios();
+    termios.c_iflag = IFLAGS;
+    termios.c_oflag = OFLAGS;
+    termios.c_cflag = CFLAGS;
+    termios.c_lflag = LFLAGS;
+    tcsetattr(&platform, fd, &termios).expect("tcsetattr");
+    let got = tcgetattr(&platform, fd).expect("tcgetattr");
+    assert_eq!(got.c_iflag, IFLAGS, "input flags");
+    assert_eq!(got.c_oflag, OFLAGS, "output flags");
+    assert_eq!(got.c_cflag, CFLAGS, "control flags");
+    assert_eq!(got.c_lflag, LFLAGS, "local flags");
 }
 
 #[test]

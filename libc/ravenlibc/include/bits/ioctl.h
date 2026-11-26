@@ -100,12 +100,6 @@
 #define TIOCCBRK        _IO('t', 122)
 #define TIOCSBRK        _IO('t', 123)
 
-/* Compatibility aliases for the Linux-shaped names used by older clients. */
-#define TCGETS   TIOCGETA
-#define TCSETS   TIOCSETA
-#define TCSETSW  TIOCSETAW
-#define TCSETSF  TIOCSETAF
-
 #define TIOCM_LE   0001
 #define TIOCM_DTR  0002
 #define TIOCM_RTS  0004
