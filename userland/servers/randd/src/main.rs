@@ -15,7 +15,6 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use raven_abi::errno::Errno;
     use raven_abi::types::clock;
     use raven_proto_fs::{S_IFCHR, Stat};
     use raven_randd::Source;
@@ -36,9 +35,9 @@ mod program {
             _mode: u32,
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
-            if flags & 4 != 0 {
-                return Err(Errno::EINVAL.into());
-            }
+            // `/dev/urandom` is a character device: the create/close-on-exec bits are not a
+            // reason to refuse the open. Rust std opens it O_RDONLY and expects the stream.
+            let _ = flags;
             Ok(Opened::File(0))
         }
 
