@@ -7,7 +7,9 @@
 name = "ufs-statfs"
 arch = "x86_64"
 profile = "qemu-ufs"
-timeout_secs = 420
+# K413: the demo getty restarts by design (K234); the case ends at the bounded
+# timeout after proving the restart, not at an `init exited` line.
+timeout_secs = 180
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -16,10 +18,20 @@ qemu_extra = [
     "-drive", "if=none,id=ufs,format=raw,file=build/x86_64/qemu-ufs-root.img",
     "-device", "virtio-blk-pci,drive=ufs,disable-legacy=on",
 ]
-expect_exit = "success"
+expect_exit = "timeout"
 
 [[expect]]
 regex = '^svcd: root pivoted to UFS at /$'
+
+# K374: the styled boot screen is printed before the login prompt.
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '^-{80}$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD 0\.1 x86_64$'
 
 [[expect]]
 regex = '^ufs: +2[0-4][0-9]M +[0-9.]+[KMG]? +[0-9.]+[KMG]? +[0-9]+% /$'
@@ -34,8 +46,8 @@ regex = '^fill=[0-9]+$'
 [[expect]]
 regex = '^ufs: on /$'
 
-[[expect]]
-regex = '^init exited \(0\)$'
+[[forbid]]
+regex = '^init exited'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|SegmentOutsideUserRange|cannot access'
@@ -58,7 +70,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 120
 
 [[step]]
 send = "/bin/df -h /\n"
@@ -116,6 +128,36 @@ timeout_secs = 30
 send = "exit 0\n"
 delay_ms = 100
 
+# K234: the getty restarts; `login:` returning is the real marker. The second
+# session re-reads the statfs fill file to prove the rw root survived.
 [[step]]
-wait = '^init exited \(0\)$'
+wait = '(?i)^login: ?$'
+timeout_secs = 60
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/stat -c 'fill=%s' /statfs-fill\n"
+delay_ms = 100
+
+[[step]]
+wait = '^fill=[0-9]+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
 timeout_secs = 30
