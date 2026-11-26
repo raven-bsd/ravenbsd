@@ -569,7 +569,6 @@ pub fn create(
     len: u64,
     writable: bool,
 ) -> Result<Capture, Errno> {
-    crate::kprintln!("capture: create addr={:#x} len={} writable={}", client_addr, len, writable);
     if len == 0 {
         return Err(Errno::EINVAL);
     }

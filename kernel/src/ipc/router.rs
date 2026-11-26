@@ -234,7 +234,6 @@ fn read_at(
     }
     let trace = super::trace_k147() && K147_RT.fetch_add(1, Ordering::Relaxed) < 64;
     let trace_start = if trace { crate::time::now_ns() } else { 0 };
-    crate::kprintln!("ipc-read: router len={} addr={:#x} pos={:?}", len, address, positional);
     if let Err(error) = ensure_server(&file.server) {
         crate::kprintln!("ipc-read: ensure_server failed {:?}", error);
         return Err(error);
