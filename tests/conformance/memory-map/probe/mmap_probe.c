@@ -29,24 +29,39 @@ static int mutation_private_shared = 0;
 // quiesce the worker before it releases the address space; the serial trace names the probe pid.
 static char *sibling_page;
 static int sibling_pipe[2];
-static volatile sig_atomic_t sibling_ready;
-static volatile unsigned long sibling_ticks;
+static volatile sig_atomic_t user_ready;
+static volatile sig_atomic_t kernel_ready;
+static volatile unsigned long user_ticks;
+static volatile unsigned long kernel_ticks;
 
-static void *sibling_worker(void *argument) {
+static void *sibling_user_worker(void *argument) {
     (void)argument;
     unsigned long ticks = 0;
     sibling_page[0] = (char)0xa5;
     for (;;) {
         sibling_page[1] = (char)(ticks & 0xff);
-        if ((ticks & 63) == 0) {
-            struct pollfd ready = {.fd = sibling_pipe[0], .events = POLLIN, .revents = 0};
-            (void)poll(&ready, 1, 1);
-        }
         ticks++;
-        sibling_ticks = ticks;
-        if (!sibling_ready) {
-            sibling_ready = 1;
-            printf("S715-SIBLING ready pid=%d ticks=%lu\n", (int)getpid(), ticks);
+        user_ticks = ticks;
+        if (!user_ready) {
+            user_ready = 1;
+            printf("S715-SIBLING user ready pid=%d ticks=%lu\n", (int)getpid(), ticks);
+            fflush(stdout);
+        }
+    }
+    return NULL;
+}
+
+static void *sibling_kernel_worker(void *argument) {
+    (void)argument;
+    unsigned long ticks = 0;
+    for (;;) {
+        struct pollfd ready = {.fd = sibling_pipe[0], .events = POLLIN, .revents = 0};
+        (void)poll(&ready, 1, 1);
+        ticks++;
+        kernel_ticks = ticks;
+        if (!kernel_ready) {
+            kernel_ready = 1;
+            printf("S715-SIBLING kernel ready pid=%d ticks=%lu\n", (int)getpid(), ticks);
             fflush(stdout);
         }
     }
@@ -67,21 +82,31 @@ static int sibling_exit(void) {
         printf("S715-MAIN fail=pipe errno=%d\n", errno);
         return 1;
     }
-    pthread_t worker;
-    int created = pthread_create(&worker, NULL, sibling_worker, NULL);
+    pthread_t user_worker;
+    pthread_t kernel_worker;
+    int created = pthread_create(&user_worker, NULL, sibling_user_worker, NULL);
     if (created != 0) {
-        printf("S715-MAIN fail=create rc=%d\n", created);
+        printf("S715-MAIN fail=user-create rc=%d\n", created);
         return 1;
     }
-    while (!sibling_ready) {
+    created = pthread_create(&kernel_worker, NULL, sibling_kernel_worker, NULL);
+    if (created != 0) {
+        printf("S715-MAIN fail=kernel-create rc=%d\n", created);
+        return 1;
+    }
+    while (!user_ready || !kernel_ready) {
         sched_yield();
     }
     struct timespec delay = {.tv_sec = 0, .tv_nsec = 200 * 1000 * 1000};
     (void)nanosleep(&delay, NULL);
-    unsigned long ticks = sibling_ticks;
+    unsigned long user = user_ticks;
+    unsigned long kernel = kernel_ticks;
     int pid = (int)getpid();
-    printf("S715-MAIN exit pid=%d ticks=%lu\n", pid, ticks);
-    printf("mmap: sibling-exit pid=%d ticks=%lu ok=%d\n", pid, ticks, ticks > 0);
+    printf("S715-MAIN exit pid=%d user=%lu kernel=%lu\n", pid, user, kernel);
+    printf(
+        "mmap: sibling-exit pid=%d user=%lu kernel=%lu ok=%d\n",
+        pid, user, kernel, user > 0 && kernel > 0
+    );
     fflush(stdout);
     _exit(0);
 }

@@ -37,9 +37,9 @@ python3 tests/conformance/memory-map/run.py --image ... --sibling-exit
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --mutation
 ```
 
-`--sibling-exit` (S715) runs `/bin/mmap-probe --sibling-exit`: one thread keeps writing a shared
-user page and periodically enters an interruptible one-millisecond `poll` while the main thread
-calls `_exit(0)`. The runner requires the probe exit status 0 and correlates the printed pid with
+`--sibling-exit` (S715) runs `/bin/mmap-probe --sibling-exit`: one sibling keeps writing a shared
+user page while a second sibling blocks in an interruptible one-millisecond `poll`; the main
+thread calls `_exit(0)`. The runner requires the probe exit status 0 and correlates the pid with
 the kernel's `s194: quiesce waited pid=<pid>` and `s194: last-exit pid=<pid> code=0` lines. A
 missing quiesce wait, a page fault/panic, or a command that does not return inside the bounded
 window fails the row. The image command line enables `s194-trace=1` for that correlation.

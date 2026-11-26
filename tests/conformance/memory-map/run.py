@@ -79,7 +79,9 @@ GATE_ROWS = [
 ]
 
 KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
-SIBLING_ROW_RE = re.compile(r"^mmap: sibling-exit pid=(\d+) ticks=(\d+) ok=([01])$", re.MULTILINE)
+SIBLING_ROW_RE = re.compile(
+    r"^mmap: sibling-exit pid=(\d+) user=(\d+) kernel=(\d+) ok=([01])$", re.MULTILINE
+)
 SIBLING_SSH_TIMEOUT = 20
 
 # S198 churn tolerances. A 1440-byte allocation is served from the 1536-byte class (the K434
@@ -389,11 +391,15 @@ def run_sibling(image: Path, accel: str, smp: int) -> int:
         if match is None:
             failures.append("sibling-exit: row missing")
         else:
-            pid, ticks, ok = match.group(1), int(match.group(2)), match.group(3)
+            pid, user, kernel, ok = (
+                match.group(1), int(match.group(2)), int(match.group(3)), match.group(4)
+            )
             if ok != "1":
                 failures.append(f"sibling-exit: ok={ok} expected 1")
-            if ticks == 0:
-                failures.append("sibling-exit: sibling never ran")
+            if user == 0:
+                failures.append("sibling-exit: user worker never ran")
+            if kernel == 0:
+                failures.append("sibling-exit: kernel worker never ran")
             if f"s194: quiesce waited pid={pid}" not in serial_text:
                 failures.append(f"sibling-exit: no quiesce wait for pid={pid}")
             if f"s194: last-exit pid={pid} code=0" not in serial_text:
@@ -410,7 +416,10 @@ def run_sibling(image: Path, accel: str, smp: int) -> int:
                 print(f"memory-map: FAIL: {failure}")
             print(f"memory-map: run={run_dir}")
             return 1
-        print(f"memory-map: PASS sibling-exit pid={match.group(1)} ticks={match.group(2)}")
+        print(
+            f"memory-map: PASS sibling-exit pid={match.group(1)} "
+            f"user={match.group(2)} kernel={match.group(3)}"
+        )
         print(f"memory-map: run={run_dir}")
         return 0
     finally:
