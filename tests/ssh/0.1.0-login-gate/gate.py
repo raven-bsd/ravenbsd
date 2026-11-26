@@ -338,6 +338,11 @@ def banner(port: int, deadline: float) -> str | None:
     return None
 
 
+def sshd_ready(text: str) -> bool:
+    """svcd may print `svcd: sshd up` right after the getty login prompt on the same line."""
+    return re.search(r"svcd: sshd up\s*$", text, re.MULTILINE) is not None
+
+
 def wait_sshd(child: pexpect.spawn, initial: str) -> tuple[str, str]:
     """Drain the serial until svcd reports `sshd up`, then return the state and text."""
     text = initial
@@ -346,7 +351,7 @@ def wait_sshd(child: pexpect.spawn, initial: str) -> tuple[str, str]:
         return state, text
     deadline = time.monotonic() + LISTEN_TIMEOUT
     while True:
-        if re.search(r"(?m)^svcd: sshd up\s*$", text):
+        if sshd_ready(text):
             return PROBE_PRESENT, text
         if time.monotonic() >= deadline:
             return PROBE_NOT_LISTENING, text

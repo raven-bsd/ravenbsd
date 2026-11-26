@@ -177,6 +177,11 @@ class SshdStateTest(unittest.TestCase):
         serial = "000.00  sshd   \x1b[32mok\x1b[0m\n"
         self.assertEqual(gate.sshd_state_from_serial(serial), gate.PROBE_PRESENT)
 
+    def test_readiness_after_the_login_prompt_counts(self) -> None:
+        self.assertTrue(gate.sshd_ready("login: svcd: sshd up\r\n"))
+        self.assertTrue(gate.sshd_ready("svcd: sshd up\n"))
+        self.assertFalse(gate.sshd_ready("svcd: sshd down\n"))
+
 
 if __name__ == "__main__":
     unittest.main()
