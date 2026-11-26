@@ -12,13 +12,45 @@ export LC_ALL
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$ROOT" || exit 1
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp/opencode}/k376-selftest.XXXXXX") || exit 1
-trap 'sh tests/smp/tlb/load-generator.sh stop "$tmp/load.pids" >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT INT TERM
-
 fail() {
     echo "selftest: FAIL: $*" >&2
     exit 1
 }
+
+# The frozen product docs/ cannot carry the K376 runbook; its required material
+# lives in tests/smp/tlb/README.md. This check keeps the documented invocation,
+# measured runtime, load control, PASS/FAIL reading and donor note from drifting.
+check_docs() {
+    readme=tests/smp/tlb/README.md
+    [ -f "$readme" ] || fail "missing $readme"
+    for needle in \
+        'sh scripts/tlb-stress.sh --load 100 --iterations 20' \
+        'sh scripts/tlb-stress.sh --load 0 --iterations 3' \
+        'one load-matched row is 295-311 s' \
+        'No cap is raised to hide a timeout' \
+        'A nonzero qtest exit is FAIL for that iteration and is never retried' \
+        'no kernel or network behaviour is taken from a donor'
+    do
+        grep -Fq -- "$needle" "$readme" || fail "README is missing: $needle"
+    done
+}
+
+case "${1:-}" in
+    "")
+        ;;
+    --docs)
+        [ "$#" -eq 1 ] || fail "unknown argument: $2"
+        check_docs
+        echo "selftest: docs PASS"
+        exit 0
+        ;;
+    *)
+        fail "unknown argument: $1"
+        ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp/opencode}/k376-selftest.XXXXXX") || exit 1
+trap 'sh tests/smp/tlb/load-generator.sh stop "$tmp/load.pids" >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT INT TERM
 
 # The load generator must start exactly N workers and stop exactly those workers.
 sh tests/smp/tlb/load-generator.sh start 3 "$tmp/load.pids" > "$tmp/start.out"
@@ -63,5 +95,7 @@ grep -q 'must not be a list' "$tmp/case.out" || fail "missing case-list message"
 sh scripts/tlb-stress.sh --help > "$tmp/help.out"
 grep -q -- '--runs N' "$tmp/help.out" || fail "S120 --runs is missing from help"
 grep -q -- '--load N' "$tmp/help.out" || fail "K376 --load is missing from help"
+
+check_docs
 
 echo "selftest: PASS"
