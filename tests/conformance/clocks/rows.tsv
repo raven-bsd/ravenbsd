@@ -3,10 +3,10 @@
 #
 # S176 clock and sleep table: name <TAB> requirement <TAB> gate.
 ids	S176-R01	1
-getres	S176-R05	1
-monotonic	S176-R02	1
-monotonic-smp	S176-R07	1
-sleep	S176-R03	1
-eintr	S176-R04	1
-gettimeofday	S176-R06	1
+getres	S176-R01	1
+monotonic	S176-R01	1
+monotonic-smp	S176-R01	1
+sleep	S176-R01	1
+eintr	S176-R01	1
+gettimeofday	S176-R01	1
 rates	S176-R01	1
