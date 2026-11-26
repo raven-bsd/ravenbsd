@@ -390,6 +390,14 @@ fn other_process_holds(caller: &Arc<Process>, file: &Arc<SchemeFile>) -> bool {
         if Arc::ptr_eq(&process, caller) {
             continue;
         }
+        if process.id == caller.id {
+            crate::kprintln!(
+                "close-debug same-pid caller={:p} registry={:p} pid={}",
+                Arc::as_ptr(caller),
+                Arc::as_ptr(&process),
+                process.id
+            );
+        }
         let mut holds = false;
         {
             let handles = process.handles.lock();
