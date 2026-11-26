@@ -34,7 +34,7 @@ regex = '(?i)^.*login: ?root'
 regex = '(?i)^password: ?'
 
 [[expect]]
-regex = '^raven# $'
+regex = '^raven# '
 
 [[expect]]
 regex = '^/root$'
