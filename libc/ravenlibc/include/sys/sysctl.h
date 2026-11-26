@@ -61,6 +61,8 @@
 #define KERN_VERSION 4
 #define KERN_ARGMAX 8
 #define KERN_HOSTNAME 10
+#define KERN_HOSTID 11
+#define KERN_NISDOMAINNAME 22
 
 #define HW_MACHINE 1
 #define HW_MODEL 2

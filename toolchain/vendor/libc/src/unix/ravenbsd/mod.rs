@@ -36,6 +36,23 @@ pub type timer_t = *mut c_void;
 pub type uid_t = u32;
 pub type gid_t = u32;
 
+// sys/sysctl.h (S744): the declared FreeBSD numeric MIB subset.
+pub const CTL_MAXNAME: c_int = 24;
+pub const CTL_KERN: c_int = 1;
+pub const CTL_HW: c_int = 6;
+pub const KERN_OSTYPE: c_int = 1;
+pub const KERN_OSRELEASE: c_int = 2;
+pub const KERN_VERSION: c_int = 4;
+pub const KERN_ARGMAX: c_int = 8;
+pub const KERN_HOSTNAME: c_int = 10;
+pub const KERN_HOSTID: c_int = 11;
+pub const KERN_NISDOMAINNAME: c_int = 22;
+pub const HW_MACHINE: c_int = 1;
+pub const HW_MODEL: c_int = 2;
+pub const HW_NCPU: c_int = 3;
+pub const HW_PHYSMEM: c_int = 5;
+pub const HW_PAGESIZE: c_int = 7;
+
 extern_ty! {
     pub enum timezone {}
 }

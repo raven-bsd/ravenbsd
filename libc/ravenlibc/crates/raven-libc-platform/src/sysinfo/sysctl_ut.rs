@@ -8,8 +8,8 @@ use raven_abi::errno::Errno;
 use crate::backend::FakeSys;
 use crate::platform::Platform;
 use crate::sysinfo::sysctl::{
-    CTL_HW, CTL_KERN, HW_NCPU, KERN_HOSTNAME, sysctl, sysctl_mib_to_name, sysctl_name_to_mib,
-    sysctlbyname, sysctlnametomib,
+    CTL_HW, CTL_KERN, HW_MODEL, HW_NCPU, KERN_ARGMAX, KERN_HOSTNAME, sysctl, sysctl_mib_to_name,
+    sysctl_name_to_mib, sysctlbyname, sysctlnametomib,
 };
 
 fn platform() -> Platform<FakeSys> {
@@ -32,6 +32,14 @@ fn name_to_mib() {
 fn mib_to_name() {
     let entry = sysctl_mib_to_name(&[CTL_HW, HW_NCPU]).expect("known");
     assert_eq!(entry.name, "hw.ncpu");
+}
+
+#[test]
+fn argmax_and_model_use_the_freebsd_numbers() {
+    let argmax = sysctl_name_to_mib(b"kern.argmax").expect("kern.argmax");
+    assert_eq!(argmax.mib, &[CTL_KERN, KERN_ARGMAX]);
+    let model = sysctl_name_to_mib(b"hw.model").expect("hw.model");
+    assert_eq!(model.mib, &[CTL_HW, HW_MODEL]);
 }
 
 #[test]

@@ -24,13 +24,12 @@ pub unsafe extern "C" fn sysctlnametomib(
     let name = unsafe { crate::ffi::cstr::slice(name) };
     // SAFETY: the caller granted one readable size_t.
     let mut length = unsafe { core::ptr::read_unaligned(miblenp) };
-    if length == 0 {
-        return ret_unit(Err(Errno::ENOMEM));
-    }
     // SAFETY: the caller granted `length` writable int entries.
     let out = unsafe { core::slice::from_raw_parts_mut(mib, length) };
     let result = raven_libc_personality_bsd::sysctl::sysctlnametomib(name, out, &mut length);
-    // SAFETY: the caller granted one writable size_t.
-    unsafe { core::ptr::write_unaligned(miblenp, length) };
+    if result.is_ok() {
+        // SAFETY: the caller granted one writable size_t.
+        unsafe { core::ptr::write_unaligned(miblenp, length) };
+    }
     ret_unit(result)
 }

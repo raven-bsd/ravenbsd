@@ -26,14 +26,18 @@ pub const KERN_OSTYPE: i32 = 1;
 pub const KERN_OSRELEASE: i32 = 2;
 /// `KERN_VERSION`.
 pub const KERN_VERSION: i32 = 4;
+/// `KERN_ARGMAX`.
+pub const KERN_ARGMAX: i32 = 8;
 /// `KERN_HOSTNAME`.
 pub const KERN_HOSTNAME: i32 = 10;
 /// `KERN_HOSTID`.
 pub const KERN_HOSTID: i32 = 11;
-/// `KERN_DOMAINNAME` (NetBSD and OpenBSD).
-pub const KERN_DOMAINNAME: i32 = 22;
+/// `KERN_NISDOMAINNAME` (FreeBSD `sys/sys/sysctl.h`).
+pub const KERN_NISDOMAINNAME: i32 = 22;
 /// `HW_MACHINE`.
 pub const HW_MACHINE: i32 = 1;
+/// `HW_MODEL`.
+pub const HW_MODEL: i32 = 2;
 /// `HW_NCPU`.
 pub const HW_NCPU: i32 = 3;
 /// `HW_PHYSMEM`.
@@ -96,15 +100,27 @@ pub const MIB_TABLE: &[MibEntry] = &[
         kind: ValueKind::Integer,
     },
     MibEntry {
-        mib: &[CTL_KERN, KERN_DOMAINNAME],
+        mib: &[CTL_KERN, KERN_NISDOMAINNAME],
         name: "kern.domainname",
         path: b"kern/domainname",
         kind: ValueKind::Text,
     },
     MibEntry {
+        mib: &[CTL_KERN, KERN_ARGMAX],
+        name: "kern.argmax",
+        path: b"kern/argmax",
+        kind: ValueKind::Integer,
+    },
+    MibEntry {
         mib: &[CTL_HW, HW_MACHINE],
         name: "hw.machine",
         path: b"hw/machine",
+        kind: ValueKind::Text,
+    },
+    MibEntry {
+        mib: &[CTL_HW, HW_MODEL],
+        name: "hw.model",
+        path: b"hw/model",
         kind: ValueKind::Text,
     },
     MibEntry {

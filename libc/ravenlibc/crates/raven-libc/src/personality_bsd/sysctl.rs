@@ -7,6 +7,14 @@ use raven_libc_personality_bsd::seams::Errno;
 
 use crate::personality_common::{RealSysInfoBsd, ret_unit};
 
+/// Write `*oldlenp` only for the results where FreeBSD copies it out.
+fn copy_out(oldlenp: *mut usize, length: usize, result: Result<(), Errno>) {
+    if !oldlenp.is_null() && (result.is_ok() || matches!(result, Err(Errno::ENOMEM))) {
+        // SAFETY: the caller granted one writable size_t.
+        unsafe { core::ptr::write_unaligned(oldlenp, length) };
+    }
+}
+
 /// `sysctl(mib, namelen, old, oldlenp, new, newlen)`.
 ///
 /// # Safety
@@ -20,46 +28,52 @@ pub unsafe extern "C" fn sysctl(
     new: *const c_void,
     newlen: usize,
 ) -> c_int {
-    let count = usize::try_from(namelen).unwrap_or(0);
-    if (mib.is_null() && count > 0) || (new.is_null() && newlen > 0) {
+    let count = usize::try_from(namelen).unwrap_or(usize::MAX);
+    if count < 2 || count > raven_libc_personality_bsd::sysctl::CTL_MAXNAME {
+        return ret_unit(Err(Errno::EINVAL));
+    }
+    if mib.is_null() {
         return ret_unit(Err(Errno::EFAULT));
     }
     // SAFETY: the caller granted `count` readable mib entries.
     let mib = unsafe { core::slice::from_raw_parts(mib, count) };
-    // SAFETY: the caller granted `newlen` readable bytes when non-NULL.
-    let new = if newlen == 0 {
+    // SAFETY: a non-NULL `new` grants `newlen` readable bytes; a NULL `new` means no write,
+    // whatever `newlen` says (FreeBSD `userland_sysctl` ignores `newlen` when `new` is NULL).
+    let new = if new.is_null() {
         None
     } else {
         Some(unsafe { core::slice::from_raw_parts(new.cast::<u8>(), newlen) })
     };
     if old.is_null() {
-        if !oldlenp.is_null() {
-            // A query for the needed length; the model writes it through `oldlen`.
-            let mut length = 0usize;
-            let result = raven_libc_personality_bsd::sysctl::sysctl(
-                &mut RealSysInfoBsd,
-                mib,
-                None,
-                &mut length,
-                new,
-            );
-            if result.is_ok() {
-                // SAFETY: the caller granted one writable size_t.
-                unsafe { core::ptr::write_unaligned(oldlenp, length) };
-            }
-            return ret_unit(result);
-        }
-        let mut length = 0usize;
-        return ret_unit(raven_libc_personality_bsd::sysctl::sysctl(
+        let mut length = if oldlenp.is_null() {
+            0
+        } else {
+            // SAFETY: the caller granted one readable size_t.
+            unsafe { core::ptr::read_unaligned(oldlenp) }
+        };
+        let result = raven_libc_personality_bsd::sysctl::sysctl(
             &mut RealSysInfoBsd,
             mib,
             None,
             &mut length,
             new,
-        ));
+        );
+        copy_out(oldlenp, length, result);
+        return ret_unit(result);
     }
     if oldlenp.is_null() {
-        return ret_unit(Err(Errno::EFAULT));
+        // FreeBSD treats a missing length as zero: the output is ENOMEM and `oldlenp` is not
+        // written (it is NULL), not EFAULT.
+        let mut empty: [u8; 0] = [];
+        let mut length = 0usize;
+        let result = raven_libc_personality_bsd::sysctl::sysctl(
+            &mut RealSysInfoBsd,
+            mib,
+            Some(&mut empty[..]),
+            &mut length,
+            new,
+        );
+        return ret_unit(result);
     }
     // SAFETY: the caller granted one readable/writable size_t.
     let mut length = unsafe { core::ptr::read_unaligned(oldlenp) };
@@ -72,8 +86,6 @@ pub unsafe extern "C" fn sysctl(
         &mut length,
         new,
     );
-    // SAFETY: the caller granted one writable size_t; the model stores the needed length even
-    // on `ENOMEM`.
-    unsafe { core::ptr::write_unaligned(oldlenp, length) };
+    copy_out(oldlenp, length, result);
     ret_unit(result)
 }
