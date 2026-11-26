@@ -5,7 +5,9 @@
 
 Application-level POSIX memory-mapping contract rows on the release image. The probe runs as the
 unprivileged `raven` account over SSH and prints `mmap: <row> key=value ... ok=<0|1>` lines; the
-runner asserts them.
+runner asserts them. The probe and the test-only login shell are generated into the build tree at
+build time (`build/conformance/memory-map/*.c`), following the S710b layout-probe pattern; no C
+source is committed to the scaffold.
 
 | Row | Contract | Expected |
 |---|---|---|
@@ -99,4 +101,4 @@ large bound, and `pt_frames` counts page-table (PTE) metadata with a small measu
 | MAP_FIXED occupied errno | Raven `docs/mm-contract.md` K4 (EEXIST), NetBSD `uvm_mmap.c` |
 | mremap (Partial, PG-13) | musl `src/mman/mremap.c` via the libc registry; private anonymous growth only |
 
-The test is original C; no donor code is copied.
+The test is original C generated into the build tree at build time; no donor code is copied.
