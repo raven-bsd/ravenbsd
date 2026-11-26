@@ -99,6 +99,7 @@ if [ -z "$out_root" ]; then
     out_root=$prjmgmt/tickets/evidence/artifacts/S85l/runs
 fi
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
+started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 label=$(printf '%s-%s-%s-smp%s' "$stamp" "$arch" "$accel" "$smp" | tr -c 'A-Za-z0-9._-' '_')
 out=$out_root/$label
 mkdir -p "$out/serials"
@@ -122,7 +123,7 @@ write_meta() {
         printf 'timeout_s=%s\n' "$timeout_secs"
         printf 'load1=%s\n' "$load1"
         printf 'nproc=%s\n' "$nproc"
-        printf 'started_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'started_utc=%s\n' "$started_utc"
         printf 'finished_utc=%s\n' "${finished:-}"
         printf 'failed=%s\n' "${failed:-false}"
     } > "$out/run.txt"
