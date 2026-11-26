@@ -387,10 +387,20 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
             _ => return Err(Errno::EBADF),
         }
     };
+    let before = file
+        .as_ref()
+        .map(|file| (file.server_id(), Arc::strong_count(file)));
     crate::event::close_handle(caller, handle)?;
     if let Some(file) = file
         && Arc::strong_count(&file) == 1
     {
+        crate::kprintln!(
+            "close-debug: pid={} last id={:?} before={:?} refs={}",
+            caller.id,
+            before,
+            file.server_id(),
+            file.server_refs.load(Ordering::Acquire)
+        );
         // No other handle, transfer or in-flight request references this open-file description.
         // Build the CLOSE requests here, in the shallow close-syscall context, so they are
         // queued before the caller's next request.
@@ -403,6 +413,13 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
                 references,
             );
         }
+    } else if let Some((id, count)) = before {
+        crate::kprintln!(
+            "close-debug: pid={} not-last id={} count={}",
+            caller.id,
+            id,
+            count
+        );
     }
     Ok(())
 }
