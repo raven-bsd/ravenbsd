@@ -2133,6 +2133,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-klog-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-kmem"
 version = "0.1.0"
 dependencies = [
