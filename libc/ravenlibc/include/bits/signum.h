@@ -36,11 +36,11 @@
 #define ILL_ILLTRP 4
 #define ILL_PRVOPC 5
 #define ILL_PRVREG 6
-#if defined(__x86_64__)
-#define MINSIGSTKSZ 4096
-#endif
 #if defined(__aarch64__) || defined(__riscv)
-#define MINSIGSTKSZ 4096
+#define MINSIGSTKSZ 2048
+#endif
+#if defined(__x86_64__)
+#define MINSIGSTKSZ 2048
 #endif
 #define NSIG 32
 #define POLL_ERR 4
@@ -92,11 +92,11 @@
 /* public minimum of the supported realtime range; the FreeBSD 65..126 widening is the remaining S713 signal-set-width unit */
 #define SIGRTMIN 35
 #define SIGSEGV 11
-#if defined(__x86_64__)
-#define SIGSTKSZ 36864
-#endif
 #if defined(__aarch64__) || defined(__riscv)
-#define SIGSTKSZ 36864
+#define SIGSTKSZ 34816
+#endif
+#if defined(__x86_64__)
+#define SIGSTKSZ 34816
 #endif
 #define SIGSTOP 17
 #define SIGSYS 12

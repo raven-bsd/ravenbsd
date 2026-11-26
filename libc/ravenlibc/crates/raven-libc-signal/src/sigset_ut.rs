@@ -8,7 +8,7 @@ fn empty_has_no_bits() {
     let set = SigSet::empty();
     assert!(set.is_empty());
     assert_eq!(set.app_word(), 0);
-    for sig in 1..=64 {
+    for sig in 1..=SIG_MAXSIG as i32 {
         assert!(!set.is_member(sig).unwrap());
     }
 }
@@ -19,7 +19,7 @@ fn fill_sets_every_supported_bit() {
     set.fill();
     assert_eq!(set.app_word(), APP_MASK);
     assert_eq!(set.app_word(), !0);
-    for sig in 1..=64 {
+    for sig in 1..=SIG_MAXSIG as i32 {
         assert!(set.is_member(sig).unwrap(), "sig {sig}");
     }
 }
@@ -33,7 +33,7 @@ fn words_one_to_fifteen_stay_zero() {
     set.del(1).unwrap();
     let _ = set.and(&SigSet::singleton(9));
     let union = set.or(&SigSet::singleton(10));
-    for word in union.0.iter().skip(1) {
+    for word in union.0.iter().skip(SIG_MAXSIG / 64) {
         assert_eq!(*word, 0);
     }
 }
@@ -41,11 +41,11 @@ fn words_one_to_fifteen_stay_zero() {
 #[test]
 fn add_and_del_reject_out_of_range() {
     let mut set = SigSet::empty();
-    for sig in [0, -1, 65, 100, i32::MIN, i32::MAX] {
+    for sig in [0, -1, 129, 1000, i32::MIN, i32::MAX] {
         assert_eq!(set.add(sig), Err(EINVAL_ERR));
         assert_eq!(set.del(sig), Err(EINVAL_ERR));
     }
-    for sig in 1..=64 {
+    for sig in 1..=SIG_MAXSIG as i32 {
         set.add(sig).unwrap();
         assert!(set.is_member(sig).unwrap());
         set.del(sig).unwrap();
@@ -54,12 +54,12 @@ fn add_and_del_reject_out_of_range() {
 }
 
 #[test]
-fn is_member_range_is_one_to_sixty_four() {
+fn is_member_range_is_one_to_maxsig() {
     let set = SigSet::empty();
     assert_eq!(set.is_member(0), Ok(false));
-    assert_eq!(set.is_member(65), Ok(false));
+    assert_eq!(set.is_member(129), Ok(false));
     assert_eq!(set.is_member(-1), Ok(false));
-    for sig in 1..=64 {
+    for sig in 1..=SIG_MAXSIG as i32 {
         set.is_member(sig).unwrap();
     }
 }

@@ -31,10 +31,10 @@ pub const ILL_ILLOPN: i32 = 2;
 pub const ILL_ILLTRP: i32 = 4;
 pub const ILL_PRVOPC: i32 = 5;
 pub const ILL_PRVREG: i32 = 6;
-#[cfg(target_arch = "x86_64")]
-pub const MINSIGSTKSZ: i32 = 4096;
 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-pub const MINSIGSTKSZ: i32 = 4096;
+pub const MINSIGSTKSZ: i32 = 2048;
+#[cfg(target_arch = "x86_64")]
+pub const MINSIGSTKSZ: i32 = 2048;
 pub const NSIG: i32 = 32;
 pub const POLL_ERR: i32 = 4;
 pub const POLL_HUP: i32 = 6;
@@ -85,10 +85,10 @@ pub const SIGRTMAX: i32 = 64;
 /// public minimum of the supported realtime range; the FreeBSD 65..126 widening is the remaining S713 signal-set-width unit
 pub const SIGRTMIN: i32 = 35;
 pub const SIGSEGV: i32 = 11;
-#[cfg(target_arch = "x86_64")]
-pub const SIGSTKSZ: i32 = 36864;
 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-pub const SIGSTKSZ: i32 = 36864;
+pub const SIGSTKSZ: i32 = 34816;
+#[cfg(target_arch = "x86_64")]
+pub const SIGSTKSZ: i32 = 34816;
 pub const SIGSTOP: i32 = 17;
 pub const SIGSYS: i32 = 12;
 pub const SIGTERM: i32 = 15;
@@ -149,10 +149,10 @@ pub const ALL: &[(&str, i128)] = &[
     ("ILL_ILLTRP", 4i128),
     ("ILL_PRVOPC", 5i128),
     ("ILL_PRVREG", 6i128),
-    #[cfg(target_arch = "x86_64")]
-    ("MINSIGSTKSZ", 4096i128),
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-    ("MINSIGSTKSZ", 4096i128),
+    ("MINSIGSTKSZ", 2048i128),
+    #[cfg(target_arch = "x86_64")]
+    ("MINSIGSTKSZ", 2048i128),
     ("NSIG", 32i128),
     ("POLL_ERR", 4i128),
     ("POLL_HUP", 6i128),
@@ -199,10 +199,10 @@ pub const ALL: &[(&str, i128)] = &[
     ("SIGRTMAX", 64i128),
     ("SIGRTMIN", 35i128),
     ("SIGSEGV", 11i128),
-    #[cfg(target_arch = "x86_64")]
-    ("SIGSTKSZ", 36864i128),
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-    ("SIGSTKSZ", 36864i128),
+    ("SIGSTKSZ", 34816i128),
+    #[cfg(target_arch = "x86_64")]
+    ("SIGSTKSZ", 34816i128),
     ("SIGSTOP", 17i128),
     ("SIGSYS", 12i128),
     ("SIGTERM", 15i128),
