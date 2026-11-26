@@ -564,16 +564,26 @@ fn serialize() {
     }
 }
 
-/// Send INIT, wait, then one SIPI to `apic_id`; the caller retries the sequence on timeout.
+mod sequence;
+
+pub(crate) use sequence::AP_START_WAIT_NS;
+use sequence::{reset_sequence, start_sequence};
+
+/// Run one per-AP start sequence.
 pub fn start_ap(apic_id: u32) {
-    const INIT_ASSERT: u32 = (0b101 << 8) | (1 << 14) | (1 << 15);
-    const INIT_DEASSERT: u32 = (0b101 << 8) | (1 << 15);
-    const SIPI: u32 = (0b110 << 8) | (TRAMPOLINE_VECTOR as u32) | (1 << 14) | (1 << 15);
-    send_icr(apic_id, INIT_ASSERT);
-    time::delay_ns(10_000_000);
-    send_icr(apic_id, INIT_DEASSERT);
-    time::delay_ns(200_000);
-    send_icr(apic_id, SIPI);
+    run_sequence(apic_id, &start_sequence(TRAMPOLINE_VECTOR));
+}
+
+/// Park an AP that did not come online, before its trampoline mapping is dropped.
+pub fn reset_ap(apic_id: u32) {
+    run_sequence(apic_id, &reset_sequence());
+}
+
+fn run_sequence(apic_id: u32, steps: &[sequence::StartStep]) {
+    for step in steps {
+        send_icr(apic_id, step.icr);
+        time::delay_ns(step.delay_ns);
+    }
 }
 
 fn send_icr(destination: u32, value: u32) {
