@@ -1100,6 +1100,11 @@
       "ty": "i32",
       "value": 3
     },
+    "IOV_MAX": {
+      "group": "limits",
+      "ty": "c_int",
+      "value": 1024
+    },
     "IPPROTO_DCCP": {
       "group": "netinet",
       "ty": "c_int",

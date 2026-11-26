@@ -120397,10 +120397,10 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
+index 0000000..eda6d18dc67ed988a4c9ff5a819463c73d912182
 --- /dev/null
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
-@@ -0,0 +1,2497 @@
+@@ -0,0 +1,2498 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -120857,6 +120857,7 @@ index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
 +
 +// limits.h
 +pub const PATH_MAX: c_int = 4096;
++pub const IOV_MAX: c_int = 1024;
 +
 +// fcntl.h
 +
