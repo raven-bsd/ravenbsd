@@ -137,5 +137,5 @@ fn thrd_detach_reports_esrch_for_a_null_thread() {
 #[test]
 fn the_joinable_constant_is_the_pthread_one() {
     assert_eq!(THRD_JOINABLE, 0);
-    assert_eq!(ETIMEDOUT.0, 110);
+    assert_eq!(i32::from(ETIMEDOUT.0), raven_libc_abi::errno::ETIMEDOUT);
 }

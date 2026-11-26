@@ -67,7 +67,7 @@ fn setcanceltype_round_trip() {
         setcanceltype(&kernel, PTHREAD_CANCEL_DEFERRED),
         Ok(PTHREAD_CANCEL_ASYNCHRONOUS)
     );
-    assert_eq!(setcanceltype(&kernel, 2), Err(EINVAL));
+    assert_eq!(setcanceltype(&kernel, 1), Err(EINVAL));
 }
 
 #[test]

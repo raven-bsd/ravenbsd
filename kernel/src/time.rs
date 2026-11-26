@@ -951,7 +951,10 @@ fn software_seed() -> Option<([u8; raven_entropy::SEED_SIZE], JitterStats)> {
         let current = timer_counter();
         let delta = current.wrapping_sub(previous);
         previous = current;
-        deltas[index] = delta;
+        // `index < SAMPLES` is the loop bound; the checked access keeps the invariant explicit.
+        if let Some(sample) = deltas.get_mut(index) {
+            *sample = delta;
+        }
         min_delta = min_delta.min(delta);
         max_delta = max_delta.max(delta);
         if delta != 0 {
@@ -962,14 +965,19 @@ fn software_seed() -> Option<([u8; raven_entropy::SEED_SIZE], JitterStats)> {
         let word = state ^ delta.rotate_left(23) ^ (current >> 17);
         let offset = (index % 5).saturating_mul(8);
         for (byte_index, byte) in word.to_le_bytes().iter().enumerate() {
-            seed[(offset + byte_index) % raven_entropy::SEED_SIZE] ^= byte;
+            let slot = offset.wrapping_add(byte_index) % raven_entropy::SEED_SIZE;
+            if let Some(entry) = seed.get_mut(slot) {
+                *entry ^= byte;
+            }
         }
         index = index.saturating_add(1);
     }
 
     let mut distinct = 0u32;
     for current in 0..SAMPLES {
-        if !deltas[..current].contains(&deltas[current]) {
+        if let (Some(prefix), Some(value)) = (deltas.get(..current), deltas.get(current))
+            && !prefix.contains(value)
+        {
             distinct = distinct.saturating_add(1);
         }
     }
@@ -978,11 +986,17 @@ fn software_seed() -> Option<([u8; raven_entropy::SEED_SIZE], JitterStats)> {
     if let Some(ns) = rtc {
         let bytes = ns.to_le_bytes();
         for (index, byte) in bytes.iter().enumerate() {
-            seed[index % raven_entropy::SEED_SIZE] ^= byte;
+            let slot = index % raven_entropy::SEED_SIZE;
+            if let Some(entry) = seed.get_mut(slot) {
+                *entry ^= byte;
+            }
         }
         let word = state.rotate_left(29) ^ ns.rotate_left(11);
         for (index, byte) in word.to_le_bytes().iter().enumerate() {
-            seed[(32 + index) % raven_entropy::SEED_SIZE] ^= byte;
+            let slot = index.wrapping_add(32) % raven_entropy::SEED_SIZE;
+            if let Some(entry) = seed.get_mut(slot) {
+                *entry ^= byte;
+            }
         }
     }
 

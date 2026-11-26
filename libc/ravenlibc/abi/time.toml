@@ -1,28 +1,10 @@
-# SPDX-License-Identifier: MIT
-# Copyright © 2005-2020 Rich Felker, et al.
+# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# RavenBSD: transpiled from musl:include/time.h, include/sys/time.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
-# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# RavenBSD: native clock IDs and timer selectors transcribed from
+# freebsd:sys/sys/_clock_id.h, freebsd:include/time.h and freebsd:sys/sys/time.h @
+# 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-3-Clause, tier A, DR-69). Linux-only clock
+# IDs stay as explicit extensions above CLOCK_TAI.
 
 schema = 1
 group = "time"
@@ -30,31 +12,37 @@ c_header = "bits/abi_time.h"
 guard = "_RAVEN_BITS_ABI_TIME_H"
 rust_type = "i32"
 base = "dec"
-source = ["include/time.h", "include/sys/time.h"]
+source = ["freebsd:sys/sys/_clock_id.h", "freebsd:include/time.h", "freebsd:sys/sys/time.h"]
+donor = { name = "freebsd", revision = "133344405f532bd54ff3629a77d4c4e062f01fdb", license = "BSD-3-Clause" }
+donor_absent = "Linux-only clock IDs stay as explicit Raven extensions above CLOCK_TAI"
 prefixes = ["CLOCK_", "TIMER_", "TIME_", "ITIMER_", "CLOCKS_PER_SEC"]
 
 consts = [
-  { name = "CLOCKS_PER_SEC", value = 1000000, suffix = "L" },
+  { name = "CLOCKS_PER_SEC", value = 128, suffix = "L" },
   { name = "TIME_UTC", value = 1 },
   { name = "CLOCK_REALTIME", value = 0 },
-  { name = "CLOCK_MONOTONIC", value = 1 },
-  { name = "CLOCK_PROCESS_CPUTIME_ID", value = 2 },
-  { name = "CLOCK_THREAD_CPUTIME_ID", value = 3 },
-  { name = "CLOCK_MONOTONIC_RAW", value = 4 },
-  { name = "CLOCK_REALTIME_COARSE", value = 5 },
-  { name = "CLOCK_MONOTONIC_COARSE", value = 6 },
-  { name = "CLOCK_BOOTTIME", value = 7 },
-  { name = "CLOCK_REALTIME_ALARM", value = 8 },
-  { name = "CLOCK_BOOTTIME_ALARM", value = 9 },
-  { name = "CLOCK_SGI_CYCLE", value = 10 },
-  { name = "CLOCK_TAI", value = 11 },
-  { name = "CLOCK_UPTIME", alias = "CLOCK_BOOTTIME", visible = "bsd" },
-  { name = "CLOCK_UPTIME_FAST", alias = "CLOCK_BOOTTIME", visible = "bsd" },
-  { name = "CLOCK_UPTIME_PRECISE", alias = "CLOCK_BOOTTIME", visible = "bsd" },
-  { name = "CLOCK_MONOTONIC_FAST", alias = "CLOCK_MONOTONIC", visible = "bsd" },
-  { name = "CLOCK_MONOTONIC_PRECISE", alias = "CLOCK_MONOTONIC", visible = "bsd" },
-  { name = "CLOCK_REALTIME_FAST", alias = "CLOCK_REALTIME", visible = "bsd" },
-  { name = "CLOCK_REALTIME_PRECISE", alias = "CLOCK_REALTIME", visible = "bsd" },
+  { name = "CLOCK_VIRTUAL", value = 1, visible = "bsd" },
+  { name = "CLOCK_PROF", value = 2, visible = "bsd" },
+  { name = "CLOCK_MONOTONIC", value = 4 },
+  { name = "CLOCK_UPTIME", value = 5, visible = "bsd" },
+  { name = "CLOCK_UPTIME_PRECISE", value = 7, visible = "bsd" },
+  { name = "CLOCK_UPTIME_FAST", value = 8, visible = "bsd" },
+  { name = "CLOCK_REALTIME_PRECISE", value = 9, visible = "bsd" },
+  { name = "CLOCK_REALTIME_FAST", value = 10, visible = "bsd" },
+  { name = "CLOCK_MONOTONIC_PRECISE", value = 11, visible = "bsd" },
+  { name = "CLOCK_MONOTONIC_FAST", value = 12, visible = "bsd" },
+  { name = "CLOCK_SECOND", value = 13, visible = "bsd" },
+  { name = "CLOCK_THREAD_CPUTIME_ID", value = 14 },
+  { name = "CLOCK_PROCESS_CPUTIME_ID", value = 15 },
+  { name = "CLOCK_TAI", value = 16 },
+  { name = "CLOCK_BOOTTIME", alias = "CLOCK_MONOTONIC" },
+  { name = "CLOCK_REALTIME_COARSE", alias = "CLOCK_REALTIME_FAST" },
+  { name = "CLOCK_MONOTONIC_COARSE", alias = "CLOCK_MONOTONIC_FAST" },
+  { name = "CLOCK_MONOTONIC_RAW", value = 17, doc = "Raven extension: no FreeBSD equivalent" },
+  { name = "CLOCK_REALTIME_ALARM", value = 18, doc = "Raven extension: no FreeBSD equivalent" },
+  { name = "CLOCK_BOOTTIME_ALARM", value = 19, doc = "Raven extension: no FreeBSD equivalent" },
+  { name = "CLOCK_SGI_CYCLE", value = 20, doc = "Raven extension: no FreeBSD equivalent" },
+  { name = "TIMER_RELTIME", value = 0 },
   { name = "TIMER_ABSTIME", value = 1 },
   { name = "ITIMER_REAL", value = 0 },
   { name = "ITIMER_VIRTUAL", value = 1 },

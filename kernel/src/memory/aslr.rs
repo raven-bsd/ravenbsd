@@ -63,9 +63,10 @@ fn page_slide(window: u64) -> u64 {
     }
     let mut bytes = [0u8; 8];
     match crate::time::entropy_fill(&mut bytes) {
-        Ok(8) => {
-            (u64::from_le_bytes(bytes) % pages).saturating_mul(crate::memory::frame::PAGE_SIZE)
-        }
+        Ok(8) => u64::from_le_bytes(bytes)
+            .checked_rem(pages)
+            .unwrap_or(0)
+            .saturating_mul(crate::memory::frame::PAGE_SIZE),
         _ => {
             if !LOGGED_FALLBACK.swap(true, Ordering::AcqRel) {
                 crate::kprintln!("aslr: entropy unavailable; fixed layout");

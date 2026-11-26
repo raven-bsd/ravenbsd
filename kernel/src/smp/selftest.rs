@@ -271,9 +271,10 @@ fn ipiq_test() -> Result<u32, &'static str> {
     let mut ordered = true;
     for round in 0..4u32 {
         for value in 0..100u32 {
+            let tagged = round.saturating_mul(100).saturating_add(value);
             let message = Message {
-                func: round * 100 + value,
-                arg1: (round * 100 + value) as usize,
+                func: tagged,
+                arg1: tagged as usize,
                 arg2: 0,
             };
             queue.push(message).map_err(|_| "ipiq full")?;

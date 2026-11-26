@@ -208,6 +208,7 @@ fn test_tables() -> Tables {
             base: "dec".to_string(),
             source: vec!["include/errno.h".to_string()],
             donor: None,
+            donor_absent: None,
             prefixes: Vec::new(),
             omit: Vec::new(),
             consts,
@@ -443,4 +444,59 @@ fn comparison_has_no_difference_when_every_measurement_matches() {
         &mut inventory,
     );
     assert!(inventory.diffs.is_empty(), "{:?}", inventory.diffs);
+}
+
+#[test]
+fn the_rust_oracle_reads_the_evaluated_all_table() {
+    let text = "\
+pub const POLLWRNORM: i32 = POLLOUT;
+pub const ALL: &[(&str, i128)] = &[
+    (\"POLLOUT\", 4i128),
+    (\"POLLWRNORM\", 4i128),
+    (\"POLLSTANDARD\", 511i128),
+];
+";
+    let values = parse_rust_constants(text);
+    assert_eq!(values["POLLOUT"]["x86_64"], 4);
+    assert_eq!(values["POLLWRNORM"]["aarch64"], 4);
+    assert_eq!(values["POLLSTANDARD"]["riscv64"], 511);
+}
+
+#[test]
+fn the_rust_oracle_keeps_the_arch_cfg_of_an_all_row() {
+    let text = "\
+pub const ALL: &[(&str, i128)] = &[
+    #[cfg(any(target_arch = \"aarch64\", target_arch = \"riscv64\"))]
+    (\"MINSIGSTKSZ\", 4096i128),
+    #[cfg(target_arch = \"x86_64\")]
+    (\"MINSIGSTKSZ\", 2048i128),
+];
+";
+    let values = parse_rust_constants(text);
+    assert_eq!(values["MINSIGSTKSZ"]["x86_64"], 2048);
+    assert_eq!(values["MINSIGSTKSZ"]["aarch64"], 4096);
+    assert_eq!(values["MINSIGSTKSZ"]["riscv64"], 4096);
+}
+
+#[test]
+fn a_declared_donor_absent_policy_approves_an_extension() {
+    let mut tables = test_tables();
+    let diff = Diff {
+        family: "fcntl".to_string(),
+        kind: "donor-absent",
+        name: "O_TMPFILE".to_string(),
+        arch: "x86_64".to_string(),
+        expected: Value::Text("absent".to_string()),
+        actual: Value::Int(0x410000),
+        detail: String::new(),
+        approved: false,
+    };
+    assert!(!approved(&tables, &diff));
+    tables.groups[1].def.donor_absent = Some("Raven extension".to_string());
+    assert!(approved(&tables, &diff));
+    let wrong = Diff {
+        expected: Value::Text("something else".to_string()),
+        ..diff
+    };
+    assert!(!approved(&tables, &wrong));
 }

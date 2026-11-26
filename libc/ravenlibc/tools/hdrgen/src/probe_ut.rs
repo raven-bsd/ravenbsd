@@ -18,8 +18,8 @@ fn tables() -> (Tables, Values, std::path::PathBuf) {
 fn layout_probe_has_assertions_for_every_record() {
     let (tables, _, _) = tables();
     let probe = layout_probe(&tables, "x86_64").expect("probe");
-    assert!(probe.contains("_Static_assert(sizeof(struct __ab_stat) == 128"));
-    assert!(probe.contains("_Static_assert(offsetof(struct __ab_stat, st_size) == 48"));
+    assert!(probe.contains("_Static_assert(sizeof(struct __ab_stat) == 224"));
+    assert!(probe.contains("_Static_assert(offsetof(struct __ab_stat, st_size) == 112"));
     assert!(probe.contains("_Static_assert(_Alignof(struct __ab_sigaction) == 8"));
     assert!(
         probe.contains(
@@ -67,9 +67,9 @@ fn musl_probe_includes_every_public_header() {
         assert!(probe.contains(&format!("#include <{header}>")), "{header}");
     }
     assert!(probe.contains("#define _GNU_SOURCE"));
-    assert!(probe.contains("const int sz_stat = sizeof(struct stat);"));
-    assert!(probe.contains("const int sz_stat = sizeof(struct stat);"));
-    assert!(probe.contains("const int off_dirent_d_name = offsetof(struct dirent, d_name);"));
+    // stat and dirent are FreeBSD-only records; the musl probe no longer carries their fields.
+    assert!(!probe.contains("sz_stat = sizeof(struct stat)"));
+    assert!(!probe.contains("off_dirent_d_name"));
     assert!(probe.contains("const int off_tm_tm_gmtoff = offsetof(struct tm, __tm_gmtoff);"));
     assert!(probe.contains("const int sz_nlink_t = sizeof(nlink_t);"));
 }
@@ -146,4 +146,32 @@ fn tools_probe_finds_clang_and_sed_when_installed() {
         assert_eq!(clang, "clang");
         assert_eq!(sed, "sed");
     }
+}
+
+#[test]
+fn a_missing_only_copy_keeps_the_public_header() {
+    let base = std::env::temp_dir().join(format!(
+        "raven-libc-hdrgen-copy-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_nanos())
+    ));
+    let from = base.join("sys/sys");
+    let to = base.join("include");
+    std::fs::create_dir_all(&from).expect("source tree");
+    std::fs::create_dir_all(&to).expect("destination tree");
+    std::fs::write(to.join("time.h"), "public").expect("public header");
+    std::fs::write(from.join("time.h"), "kernel").expect("kernel header");
+    std::fs::write(from.join("param.h"), "kernel-only").expect("kernel-only header");
+    copy_tree_missing(&from, &to).expect("copy");
+    assert_eq!(
+        std::fs::read_to_string(to.join("time.h")).expect("public"),
+        "public"
+    );
+    assert_eq!(
+        std::fs::read_to_string(to.join("param.h")).expect("kernel-only"),
+        "kernel-only"
+    );
+    let _ = std::fs::remove_dir_all(&base);
 }

@@ -35,6 +35,18 @@ pub fn proc_chroot(path: &[u8]) -> Result<(), Errno> {
     crate::errno::ret(raw).map(|_| ())
 }
 
+/// Raw `GETRANDOM` (`0x08`): fill `buf` from the boot-seeded kernel CSPRNG.
+///
+/// The number is reviewer-assigned in `kernel/src/syscall/basic.rs` (S72) and is not a
+/// `raven_abi::syscall::Syscall` variant yet. The kernel accepts `GRND_NONBLOCK`/`GRND_RANDOM`,
+/// rejects unknown flags with `EINVAL`, and returns `EAGAIN` while the pool is unseeded.
+pub fn getrandom(buf: &mut [u8], flags: u32) -> Result<usize, Errno> {
+    // SAFETY: `buf` is a live writable slice; the kernel copies at most `buf.len()` bytes into
+    // it through the fault-safe user layer.
+    let raw = unsafe { arch::syscall3(0x08, buf.as_mut_ptr() as usize, buf.len(), flags as usize) };
+    crate::errno::ret(raw)
+}
+
 /// Raw `PROC_EXEC` (`0x6a`): replace the caller's image from an 88-byte flat request.
 ///
 /// The request layout is owned by the kernel/`raven-libc-proc`; this wrapper only checks the

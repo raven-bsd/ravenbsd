@@ -548,37 +548,35 @@ const _: () = assert!(core::mem::offset_of!(Rusage, ru_nvcsw) == 128);
 const _: () = assert!(core::mem::offset_of!(Rusage, ru_nivcsw) == 136);
 const _: () = assert!(core::mem::offset_of!(Rusage, __reserved) == 144);
 
+/// S746: FreeBSD 133344405 struct utsname, SYS_NMLN 256, five fields; musl's domainname field is not part of the FreeBSD record
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Utsname {
-    pub sysname: [core::ffi::c_char; 65],
-    pub nodename: [core::ffi::c_char; 65],
-    pub release: [core::ffi::c_char; 65],
-    pub version: [core::ffi::c_char; 65],
-    pub machine: [core::ffi::c_char; 65],
-    pub domainname: [core::ffi::c_char; 65],
+    pub sysname: [core::ffi::c_char; 256],
+    pub nodename: [core::ffi::c_char; 256],
+    pub release: [core::ffi::c_char; 256],
+    pub version: [core::ffi::c_char; 256],
+    pub machine: [core::ffi::c_char; 256],
 }
 
 impl Utsname {
     /// All-zero value.
     pub const ZERO: Self = Self {
-        sysname: [0; 65],
-        nodename: [0; 65],
-        release: [0; 65],
-        version: [0; 65],
-        machine: [0; 65],
-        domainname: [0; 65],
+        sysname: [0; 256],
+        nodename: [0; 256],
+        release: [0; 256],
+        version: [0; 256],
+        machine: [0; 256],
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Utsname>() == 390 && core::mem::align_of::<Utsname>() == 1);
+    assert!(core::mem::size_of::<Utsname>() == 1280 && core::mem::align_of::<Utsname>() == 1);
 const _: () = assert!(core::mem::offset_of!(Utsname, sysname) == 0);
-const _: () = assert!(core::mem::offset_of!(Utsname, nodename) == 65);
-const _: () = assert!(core::mem::offset_of!(Utsname, release) == 130);
-const _: () = assert!(core::mem::offset_of!(Utsname, version) == 195);
-const _: () = assert!(core::mem::offset_of!(Utsname, machine) == 260);
-const _: () = assert!(core::mem::offset_of!(Utsname, domainname) == 325);
+const _: () = assert!(core::mem::offset_of!(Utsname, nodename) == 256);
+const _: () = assert!(core::mem::offset_of!(Utsname, release) == 512);
+const _: () = assert!(core::mem::offset_of!(Utsname, version) == 768);
+const _: () = assert!(core::mem::offset_of!(Utsname, machine) == 1024);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -741,6 +739,7 @@ const _: () = assert!(core::mem::offset_of!(Statvfs, f_frsize) == 64);
 const _: () = assert!(core::mem::offset_of!(Statvfs, f_fsid) == 72);
 const _: () = assert!(core::mem::offset_of!(Statvfs, f_namemax) == 80);
 
+/// S746: FreeBSD 133344405 struct passwd, eleven fields; musl has only the seven 7-field /etc/passwd members
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Passwd {
@@ -748,9 +747,13 @@ pub struct Passwd {
     pub pw_passwd: *mut core::ffi::c_void,
     pub pw_uid: u32,
     pub pw_gid: u32,
+    pub pw_change: i64,
+    pub pw_class: *mut core::ffi::c_void,
     pub pw_gecos: *mut core::ffi::c_void,
     pub pw_dir: *mut core::ffi::c_void,
     pub pw_shell: *mut core::ffi::c_void,
+    pub pw_expire: i64,
+    pub pw_fields: i32,
 }
 
 impl Passwd {
@@ -760,20 +763,28 @@ impl Passwd {
         pw_passwd: core::ptr::null_mut(),
         pw_uid: 0,
         pw_gid: 0,
+        pw_change: 0,
+        pw_class: core::ptr::null_mut(),
         pw_gecos: core::ptr::null_mut(),
         pw_dir: core::ptr::null_mut(),
         pw_shell: core::ptr::null_mut(),
+        pw_expire: 0,
+        pw_fields: 0,
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Passwd>() == 48 && core::mem::align_of::<Passwd>() == 8);
+const _: () = assert!(core::mem::size_of::<Passwd>() == 80 && core::mem::align_of::<Passwd>() == 8);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_name) == 0);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_passwd) == 8);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_uid) == 16);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_gid) == 20);
-const _: () = assert!(core::mem::offset_of!(Passwd, pw_gecos) == 24);
-const _: () = assert!(core::mem::offset_of!(Passwd, pw_dir) == 32);
-const _: () = assert!(core::mem::offset_of!(Passwd, pw_shell) == 40);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_change) == 24);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_class) == 32);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_gecos) == 40);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_dir) == 48);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_shell) == 56);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_expire) == 64);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_fields) == 72);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

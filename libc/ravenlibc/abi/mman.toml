@@ -1,28 +1,10 @@
-# SPDX-License-Identifier: MIT
-# Copyright © 2005-2020 Rich Felker, et al.
+# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# RavenBSD: transpiled from musl:include/sys/mman.h, arch/x86_64/bits/mman.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
-# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# RavenBSD: native VM flags and protections transcribed from freebsd:sys/sys/mman.h @
+# 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-3-Clause, tier A, DR-69). Constants are
+# transcribed to TOML and generated, not copied. Linux-only flags stay as explicit Raven
+# extensions in the high bits, distinct from every FreeBSD-named flag.
 
 schema = 1
 group = "mman"
@@ -30,14 +12,14 @@ c_header = "bits/abi_mman.h"
 guard = "_RAVEN_BITS_ABI_MMAN_H"
 rust_type = "i32"
 base = "hex"
-source = ["include/sys/mman.h", "arch/x86_64/bits/mman.h"]
+source = ["freebsd:sys/sys/mman.h"]
+donor = { name = "freebsd", revision = "133344405f532bd54ff3629a77d4c4e062f01fdb", license = "BSD-3-Clause" }
+donor_absent = "Linux-only VM flags and madvise commands stay as explicit Raven extensions in high bits"
 prefixes = ["MAP_", "PROT_", "MS_", "MCL_", "MADV_", "MREMAP_", "POSIX_MADV_", "MFD_"]
 
 omit = [
   { name = "MAP_FAILED", reason = "pointer expression ((void *)-1); C37's sys/mman.h text" },
   { name = "MAP_ALIGNED", reason = "FreeBSD function-like macro, not an object-like constant; C37 policy" },
-  { name = "MAP_GUARD", reason = "FreeBSD-only flag with no Linux value; ring 3, not defined" },
-  { name = "MAP_EXCL", reason = "FreeBSD-only flag with no Linux value; ring 3, not defined" },
 ]
 
 consts = [
@@ -45,52 +27,54 @@ consts = [
   { name = "PROT_READ", value = 1 },
   { name = "PROT_WRITE", value = 2 },
   { name = "PROT_EXEC", value = 4 },
-  { name = "PROT_GROWSDOWN", value = 0x01000000 },
-  { name = "PROT_GROWSUP", value = 0x02000000 },
+  { name = "PROT_GROWSDOWN", value = 0x01000000, doc = "Raven extension: Linux-only protection flag" },
+  { name = "PROT_GROWSUP", value = 0x02000000, doc = "Raven extension: Linux-only protection flag" },
   { name = "MAP_SHARED", value = 0x01 },
   { name = "MAP_PRIVATE", value = 0x02 },
-  { name = "MAP_SHARED_VALIDATE", value = 0x03 },
-  { name = "MAP_TYPE", value = 0x0f },
+  { name = "MAP_SHARED_VALIDATE", value = 0x03, doc = "Raven extension: Linux-only map type" },
+  { name = "MAP_TYPE", value = 0x0f, doc = "Raven extension: Linux-only type mask" },
   { name = "MAP_FIXED", value = 0x10 },
-  { name = "MAP_ANON", value = 0x20 },
-  { name = "MAP_ANONYMOUS", alias = "MAP_ANON" },
-  { name = "MAP_GROWSDOWN", value = 0x0100 },
-  { name = "MAP_DENYWRITE", value = 0x0800 },
-  { name = "MAP_EXECUTABLE", value = 0x1000 },
-  { name = "MAP_LOCKED", value = 0x2000 },
-  { name = "MAP_NORESERVE", value = 0x4000 },
-  { name = "MAP_POPULATE", value = 0x8000 },
-  { name = "MAP_NONBLOCK", value = 0x10000 },
-  { name = "MAP_STACK", value = 0x20000 },
-  { name = "MAP_HUGETLB", value = 0x40000 },
-  { name = "MAP_SYNC", value = 0x80000 },
-  { name = "MAP_FIXED_NOREPLACE", value = 0x100000 },
   { name = "MAP_FILE", value = 0 },
-  { name = "MAP_HUGE_SHIFT", value = 26 },
-  { name = "MAP_HUGE_MASK", value = 0x3f },
-  { name = "MAP_HUGE_16KB", shl = [14, 26] },
-  { name = "MAP_HUGE_64KB", shl = [16, 26] },
-  { name = "MAP_HUGE_512KB", shl = [19, 26] },
-  { name = "MAP_HUGE_1MB", shl = [20, 26] },
-  { name = "MAP_HUGE_2MB", shl = [21, 26] },
-  { name = "MAP_HUGE_8MB", shl = [23, 26] },
-  { name = "MAP_HUGE_16MB", shl = [24, 26] },
-  { name = "MAP_HUGE_32MB", shl = [25, 26] },
-  { name = "MAP_HUGE_256MB", shl = [28, 26] },
-  { name = "MAP_HUGE_512MB", shl = [29, 26] },
-  { name = "MAP_HUGE_1GB", shl = [30, 26] },
-  { name = "MAP_HUGE_2GB", shl = [31, 26] },
-  { name = "MAP_HUGE_16GB", shl = [34, 26], ty = "u32", suffix = "U" },
-  { name = "MAP_32BIT", value = 0x40, arch = ["x86_64"], doc = "x86_64 only (O-abi-5); other arches use sysconf" },
-  { name = "MAP_NOCORE", value = 0x10000000, visible = "bsd" },
-  { name = "MAP_NOSYNC", value = 0x20000000, visible = "bsd" },
-  { name = "MAP_PREFAULT_READ", value = 0x40000000, visible = "bsd" },
+  { name = "MAP_ANON", value = 0x1000 },
+  { name = "MAP_ANONYMOUS", alias = "MAP_ANON" },
+  { name = "MAP_GUARD", value = 0x2000, visible = "bsd" },
+  { name = "MAP_EXCL", value = 0x4000, visible = "bsd" },
+  { name = "MAP_STACK", value = 0x0400, visible = "bsd" },
+  { name = "MAP_NOSYNC", value = 0x0800, visible = "bsd" },
+  { name = "MAP_NOCORE", value = 0x00020000, visible = "bsd" },
+  { name = "MAP_PREFAULT_READ", value = 0x00040000, visible = "bsd" },
+  { name = "MAP_32BIT", value = 0x00080000, visible = "bsd" },
+  { name = "MAP_GROWSDOWN", value = 0x10000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_DENYWRITE", value = 0x20000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_EXECUTABLE", value = 0x40000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_LOCKED", value = 0x08000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_NORESERVE", value = 0x04000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_POPULATE", value = 0x02000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_NONBLOCK", value = 0x01000000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_HUGETLB", value = 0x00800000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_SYNC", value = 0x00100000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_FIXED_NOREPLACE", value = 0x00200000, doc = "Raven extension: Linux-only VM flag" },
+  { name = "MAP_HUGE_SHIFT", value = 26, doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_MASK", value = 0x3f, doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_16KB", shl = [14, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_64KB", shl = [16, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_512KB", shl = [19, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_1MB", shl = [20, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_2MB", shl = [21, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_8MB", shl = [23, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_16MB", shl = [24, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_32MB", shl = [25, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_256MB", shl = [28, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_512MB", shl = [29, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_1GB", shl = [30, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_2GB", shl = [31, 26], doc = "Raven extension: Linux-only huge-page encoding" },
+  { name = "MAP_HUGE_16GB", shl = [34, 26], ty = "u32", suffix = "U", doc = "Raven extension: Linux-only huge-page encoding" },
   { name = "MS_ASYNC", value = 1 },
   { name = "MS_INVALIDATE", value = 2 },
-  { name = "MS_SYNC", value = 4 },
+  { name = "MS_SYNC", value = 0 },
   { name = "MCL_CURRENT", value = 1 },
   { name = "MCL_FUTURE", value = 2 },
-  { name = "MCL_ONFAULT", value = 4 },
+  { name = "MCL_ONFAULT", value = 4, doc = "Raven extension: Linux-only lock flag" },
   { name = "POSIX_MADV_NORMAL", value = 0 },
   { name = "POSIX_MADV_RANDOM", value = 1 },
   { name = "POSIX_MADV_SEQUENTIAL", value = 2 },
@@ -101,29 +85,34 @@ consts = [
   { name = "MADV_SEQUENTIAL", value = 2 },
   { name = "MADV_WILLNEED", value = 3 },
   { name = "MADV_DONTNEED", value = 4 },
-  { name = "MADV_FREE", value = 8 },
-  { name = "MADV_REMOVE", value = 9 },
-  { name = "MADV_DONTFORK", value = 10 },
-  { name = "MADV_DOFORK", value = 11 },
-  { name = "MADV_MERGEABLE", value = 12 },
-  { name = "MADV_UNMERGEABLE", value = 13 },
-  { name = "MADV_HUGEPAGE", value = 14 },
-  { name = "MADV_NOHUGEPAGE", value = 15 },
-  { name = "MADV_DONTDUMP", value = 16 },
-  { name = "MADV_DODUMP", value = 17 },
-  { name = "MADV_WIPEONFORK", value = 18 },
-  { name = "MADV_KEEPONFORK", value = 19 },
-  { name = "MADV_COLD", value = 20 },
-  { name = "MADV_PAGEOUT", value = 21 },
-  { name = "MADV_POPULATE_READ", value = 22 },
-  { name = "MADV_POPULATE_WRITE", value = 23 },
-  { name = "MADV_DONTNEED_LOCKED", value = 24 },
-  { name = "MADV_COLLAPSE", value = 25 },
-  { name = "MADV_HWPOISON", value = 100 },
-  { name = "MADV_SOFT_OFFLINE", value = 101 },
-  { name = "MREMAP_MAYMOVE", value = 1 },
-  { name = "MREMAP_FIXED", value = 2 },
-  { name = "MREMAP_DONTUNMAP", value = 4 },
+  { name = "MADV_FREE", value = 5, visible = "bsd" },
+  { name = "MADV_NOSYNC", value = 6, visible = "bsd" },
+  { name = "MADV_AUTOSYNC", value = 7, visible = "bsd" },
+  { name = "MADV_NOCORE", value = 8, visible = "bsd" },
+  { name = "MADV_CORE", value = 9, visible = "bsd" },
+  { name = "MADV_PROTECT", value = 10, visible = "bsd" },
+  { name = "MADV_REMOVE", value = 26, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_DONTFORK", value = 27, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_DOFORK", value = 11, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_MERGEABLE", value = 12, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_UNMERGEABLE", value = 13, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_HUGEPAGE", value = 14, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_NOHUGEPAGE", value = 15, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_DONTDUMP", value = 16, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_DODUMP", value = 17, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_WIPEONFORK", value = 18, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_KEEPONFORK", value = 19, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_COLD", value = 20, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_PAGEOUT", value = 21, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_POPULATE_READ", value = 22, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_POPULATE_WRITE", value = 23, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_DONTNEED_LOCKED", value = 24, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_COLLAPSE", value = 25, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_HWPOISON", value = 100, doc = "Raven extension: Linux-only advice" },
+  { name = "MADV_SOFT_OFFLINE", value = 101, doc = "Raven extension: Linux-only advice" },
+  { name = "MREMAP_MAYMOVE", value = 1, doc = "Raven extension: FreeBSD has no mremap" },
+  { name = "MREMAP_FIXED", value = 2, doc = "Raven extension: FreeBSD has no mremap" },
+  { name = "MREMAP_DONTUNMAP", value = 4, doc = "Raven extension: FreeBSD has no mremap" },
   { name = "MFD_CLOEXEC", value = 0x0001, ty = "u32", suffix = "U" },
   { name = "MFD_ALLOW_SEALING", value = 0x0002, ty = "u32", suffix = "U" },
   { name = "MFD_HUGETLB", value = 0x0004, ty = "u32", suffix = "U" },
