@@ -58,7 +58,7 @@ consts = [
   { name = "AF_BRIDGE", value = 7 },
   { name = "AF_ATMPVC", value = 8 },
   { name = "AF_X25", value = 9 },
-  { name = "AF_INET6", value = 10 },
+  { name = "AF_INET6", value = 28, doc = "DR-69/FreeBSD sys/sys/socket.h:256" },
   { name = "AF_ROSE", value = 11 },
   { name = "AF_DECnet", value = 12 },
   { name = "AF_NETBEUI", value = 13 },

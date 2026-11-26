@@ -10,6 +10,7 @@ use core::cell::UnsafeCell;
 use core::ffi::{c_char, c_int};
 
 use raven_libc_abi::errno::{ERANGE, Errno};
+use raven_libc_abi::socket::{AF_INET, AF_INET6};
 use raven_libc_nss::FileSource;
 use raven_libc_resolv::dbfiles::{NetFile, ProtoFile, ServFile};
 use raven_libc_resolv::hosts::{HostLine, parse_hosts};
@@ -347,7 +348,7 @@ pub(crate) fn pack_net(
     let base = buf.as_mut_ptr() as usize;
     record.n_name = base.wrapping_add(name) as *mut c_char;
     record.n_aliases = base.wrapping_add(table) as *mut *mut c_char;
-    record.n_addrtype = 2; // AF_INET
+    record.n_addrtype = AF_INET;
     record.n_net = entry.addr;
     Ok(())
 }
@@ -427,12 +428,22 @@ pub(crate) fn resolver_query(
 /// Look up a host by name.
 pub(crate) fn host_by_name(name: &[u8], af: i32) -> Option<HostEnt> {
     let name = core::str::from_utf8(name).ok()?;
-    with_env(|env, order| legacy::gethostbyname2(name, af, env, order).ok())
+    let resolver_af = raven_libc_net::netdb::resolver_family(af)?;
+    with_env(|env, order| {
+        let mut entry = legacy::gethostbyname2(name, resolver_af, env, order).ok()?;
+        entry.addr_type = raven_libc_net::netdb::public_family(entry.addr_type);
+        Some(entry)
+    })
 }
 
 /// Look up a host by address.
 pub(crate) fn host_by_addr(addr: &[u8], af: i32) -> Option<HostEnt> {
-    with_env(|env, order| legacy::gethostbyaddr(addr, af, env, order).ok())
+    let resolver_af = raven_libc_net::netdb::resolver_family(af)?;
+    with_env(|env, order| {
+        let mut entry = legacy::gethostbyaddr(addr, resolver_af, env, order).ok()?;
+        entry.addr_type = raven_libc_net::netdb::public_family(entry.addr_type);
+        Some(entry)
+    })
 }
 
 fn host_line(line: &HostLine) -> HostEnt {
@@ -443,11 +454,11 @@ fn host_line(line: &HostLine) -> HostEnt {
     let addr_type = match line.addr {
         IpAddr::V4(bytes) => {
             addrs.push(bytes.to_vec());
-            2
+            AF_INET
         }
         IpAddr::V6(bytes) => {
             addrs.push(bytes.to_vec());
-            10
+            AF_INET6
         }
     };
     HostEnt {

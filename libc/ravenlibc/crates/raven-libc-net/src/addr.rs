@@ -1,12 +1,29 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Linux `sockaddr` parsing and writing (DR-13; no BSD `sa_len`).
+//! FreeBSD `sockaddr` parsing and writing (DR-69): `sa_len` at 0, one-byte family at 1.
+//!
+//! The public records are parsed and encoded exactly as FreeBSD `sys/sys/socket.h`,
+//! `sys/netinet/in.h`, `sys/netinet6/in6.h` and `sys/sys/un.h` define them. Private
+//! `raven_proto_net` endpoint records never see an address family or a length byte.
 use crate::ErrnoExt;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::socket::{AF_INET, AF_INET6, AF_UNIX};
 use raven_proto_net::Endpoint;
+
+/// FreeBSD `SOCK_MAXADDRLEN`.
+pub const SOCK_MAXADDRLEN: usize = 255;
+/// `sizeof(struct sockaddr_in)`.
+pub const SOCKADDR_IN_LEN: usize = 16;
+/// `sizeof(struct sockaddr_in6)`.
+pub const SOCKADDR_IN6_LEN: usize = 28;
+/// `sizeof(struct sockaddr_un)`.
+pub const SOCKADDR_UN_LEN: usize = 106;
+/// FreeBSD `SUNPATHLEN`.
+pub const SUN_PATH_LEN: usize = 104;
+/// The unnamed Unix address is a plain `struct sockaddr` (`sun_noname`), 16 bytes.
+pub const SUN_NONAME_LEN: usize = 16;
 
 /// A socket address in host form.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,25 +48,32 @@ pub enum SockAddr {
     },
     /// A Unix-domain path; an empty path is an unnamed pair address.
     Un {
-        /// The raw path bytes, at most 108.
-        path: [u8; 108],
+        /// The raw path bytes, at most `SUN_PATH_LEN`.
+        path: [u8; SUN_PATH_LEN],
         /// The path length.
         len: usize,
     },
 }
 
 impl SockAddr {
-    /// The encoded size in bytes.
+    /// The encoded size in bytes (`SUN_LEN` for a Unix path).
     #[must_use]
     pub const fn encoded_len(&self) -> usize {
         match self {
-            Self::In { .. } => 16,
-            Self::In6 { .. } => 28,
-            Self::Un { .. } => 110,
+            Self::In { .. } => SOCKADDR_IN_LEN,
+            Self::In6 { .. } => SOCKADDR_IN6_LEN,
+            Self::Un { len, .. } => {
+                let len = if *len > SUN_PATH_LEN {
+                    SUN_PATH_LEN
+                } else {
+                    *len
+                };
+                2usize.saturating_add(len)
+            }
         }
     }
 
-    /// The Linux address family.
+    /// The public address family.
     #[must_use]
     pub const fn family(&self) -> u16 {
         match self {
@@ -108,12 +132,19 @@ impl SockAddr {
     }
 }
 
-/// Parse a Linux `sockaddr_in`, `sockaddr_in6` or `sockaddr_un`.
+/// Parse a FreeBSD `sockaddr_in`, `sockaddr_in6` or `sockaddr_un`.
+///
+/// `bytes` is the caller's `socklen`, which FreeBSD `getsockaddr` treats as authoritative and
+/// copies into `sa_len`. The address type therefore has to match its exact record size; a
+/// short or padded buffer is rejected instead of being parsed by an assumed width.
 pub fn parse_sockaddr(bytes: &[u8]) -> Result<SockAddr, Errno> {
-    let family = read_u16(bytes, 0).ok_or(Errno::EINVAL)?;
+    if bytes.len() > SOCK_MAXADDRLEN {
+        return Err(Errno::ENAMETOOLONG);
+    }
+    let family = *bytes.get(1).ok_or(Errno::EINVAL)?;
     match i32::from(family) {
         AF_INET => {
-            if bytes.len() < 16 {
+            if bytes.len() != SOCKADDR_IN_LEN {
                 return Err(Errno::EINVAL);
             }
             let port = read_be_u16(bytes, 2).ok_or(Errno::EINVAL)?;
@@ -121,17 +152,14 @@ pub fn parse_sockaddr(bytes: &[u8]) -> Result<SockAddr, Errno> {
             Ok(SockAddr::In { ip, port })
         }
         AF_INET6 => {
-            if bytes.len() < 28 {
+            if bytes.len() != SOCKADDR_IN6_LEN {
                 return Err(Errno::EINVAL);
             }
             let port = read_be_u16(bytes, 2).ok_or(Errno::EINVAL)?;
             let flowinfo = read_u32(bytes, 4).ok_or(Errno::EINVAL)?;
+            let source = bytes.get(8..24).ok_or(Errno::EINVAL)?;
             let mut ip = [0u8; 16];
-            if let Some(source) = bytes.get(8..24) {
-                ip.copy_from_slice(source);
-            } else {
-                return Err(Errno::EINVAL);
-            }
+            ip.copy_from_slice(source);
             let scope = read_u32(bytes, 24).ok_or(Errno::EINVAL)?;
             Ok(SockAddr::In6 {
                 ip,
@@ -140,19 +168,21 @@ pub fn parse_sockaddr(bytes: &[u8]) -> Result<SockAddr, Errno> {
                 flowinfo,
             })
         }
-        AF_UNIX => parse_unix(bytes),
+        AF_UNIX => {
+            if bytes.len() > SOCKADDR_UN_LEN {
+                return Err(Errno::EINVAL);
+            }
+            parse_unix(bytes)
+        }
         _ => Err(Errno::EAFNOSUPPORT),
     }
 }
 
 fn parse_unix(bytes: &[u8]) -> Result<SockAddr, Errno> {
-    if bytes.len() < 2 {
-        return Err(Errno::EINVAL);
-    }
-    let available = bytes.len().saturating_sub(2).min(108);
-    let mut path = [0u8; 108];
+    let source = bytes.get(2..).ok_or(Errno::EINVAL)?;
+    let mut path = [0u8; SUN_PATH_LEN];
     let mut len = 0usize;
-    for (index, byte) in bytes.iter().skip(2).take(available).enumerate() {
+    for (index, byte) in source.iter().take(SUN_PATH_LEN).enumerate() {
         if *byte == 0 {
             break;
         }
@@ -164,18 +194,19 @@ fn parse_unix(bytes: &[u8]) -> Result<SockAddr, Errno> {
     Ok(SockAddr::Un { path, len })
 }
 
-/// Write an address into `out`; returns the full encoded length.
+/// Write an address into `out`; returns the full encoded length (`sa_len`).
 ///
-/// The caller sees POSIX truncation: only `min(full, out.len())` bytes are written, but the
-/// full length is always returned.
+/// Only `min(full, out.len())` bytes are written; the full length is always returned, matching
+/// FreeBSD `user_getsockname`'s `min(ss_len, len)` copy with the full `ss_len` in `*alen`.
 pub fn write_sockaddr(addr: &SockAddr, out: &mut [u8]) -> usize {
     let full = addr.encoded_len();
     match addr {
         SockAddr::In { ip, port } => {
-            put_u16(out, 0, AF_INET as u16);
+            put_u8(out, 0, full as u8);
+            put_u8(out, 1, AF_INET as u8);
             put_be_u16(out, 2, *port);
             put_bytes(out, 4, ip);
-            if let Some(rest) = out.get_mut(8..16) {
+            if let Some(rest) = out.get_mut(8..full) {
                 rest.fill(0);
             }
         }
@@ -185,26 +216,32 @@ pub fn write_sockaddr(addr: &SockAddr, out: &mut [u8]) -> usize {
             scope,
             flowinfo,
         } => {
-            put_u16(out, 0, AF_INET6 as u16);
+            put_u8(out, 0, full as u8);
+            put_u8(out, 1, AF_INET6 as u8);
             put_be_u16(out, 2, *port);
             put_u32(out, 4, *flowinfo);
             put_bytes(out, 8, ip);
             put_u32(out, 24, *scope);
         }
         SockAddr::Un { path, len } => {
-            put_u16(out, 0, AF_UNIX as u16);
-            put_bytes(out, 2, path.get(..*len).unwrap_or(&[]));
-            if let Some(rest) = out.get_mut(2usize.saturating_add(*len)..110) {
-                rest.fill(0);
-            }
+            let path_len = (*len).min(SUN_PATH_LEN);
+            put_u8(out, 0, full as u8);
+            put_u8(out, 1, AF_UNIX as u8);
+            put_bytes(out, 2, path.get(..path_len).unwrap_or(&[]));
         }
     }
     full
 }
 
-fn read_u16(bytes: &[u8], at: usize) -> Option<u16> {
-    let pair = bytes.get(at..at.checked_add(2)?)?;
-    Some(u16::from_le_bytes([*pair.first()?, *pair.get(1)?]))
+/// Write FreeBSD's `sun_noname`: a 16-byte `struct sockaddr` for an unbound Unix socket.
+pub fn write_unnamed_unix(out: &mut [u8]) -> usize {
+    let full = SUN_NONAME_LEN;
+    put_u8(out, 0, full as u8);
+    put_u8(out, 1, AF_UNIX as u8);
+    if let Some(rest) = out.get_mut(2..full) {
+        rest.fill(0);
+    }
+    full
 }
 
 fn read_be_u16(bytes: &[u8], at: usize) -> Option<u16> {
@@ -227,9 +264,9 @@ fn read_four(bytes: &[u8], at: usize) -> Option<[u8; 4]> {
     Some([*quad.first()?, *quad.get(1)?, *quad.get(2)?, *quad.get(3)?])
 }
 
-fn put_u16(out: &mut [u8], at: usize, value: u16) {
-    if let Some(slot) = out.get_mut(at..at.saturating_add(2)) {
-        slot.copy_from_slice(&value.to_le_bytes());
+fn put_u8(out: &mut [u8], at: usize, value: u8) {
+    if let Some(slot) = out.get_mut(at) {
+        *slot = value;
     }
 }
 

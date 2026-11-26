@@ -178,27 +178,31 @@ const _: () = assert!(core::mem::offset_of!(Dirent, d_name) == 19);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Sockaddr {
-    pub sa_family: u16,
+    pub sa_len: u8,
+    pub sa_family: u8,
     pub sa_data: [core::ffi::c_char; 14],
 }
 
 impl Sockaddr {
     /// All-zero value.
     pub const ZERO: Self = Self {
+        sa_len: 0,
         sa_family: 0,
         sa_data: [0; 14],
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Sockaddr>() == 16 && core::mem::align_of::<Sockaddr>() == 2);
-const _: () = assert!(core::mem::offset_of!(Sockaddr, sa_family) == 0);
+    assert!(core::mem::size_of::<Sockaddr>() == 16 && core::mem::align_of::<Sockaddr>() == 1);
+const _: () = assert!(core::mem::offset_of!(Sockaddr, sa_len) == 0);
+const _: () = assert!(core::mem::offset_of!(Sockaddr, sa_family) == 1);
 const _: () = assert!(core::mem::offset_of!(Sockaddr, sa_data) == 2);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SockaddrIn {
-    pub sin_family: u16,
+    pub sin_len: u8,
+    pub sin_family: u8,
     pub sin_port: u16,
     pub sin_addr: u32,
     pub sin_zero: [u8; 8],
@@ -207,6 +211,7 @@ pub struct SockaddrIn {
 impl SockaddrIn {
     /// All-zero value.
     pub const ZERO: Self = Self {
+        sin_len: 0,
         sin_family: 0,
         sin_port: 0,
         sin_addr: 0,
@@ -216,7 +221,8 @@ impl SockaddrIn {
 
 const _: () =
     assert!(core::mem::size_of::<SockaddrIn>() == 16 && core::mem::align_of::<SockaddrIn>() == 4);
-const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_family) == 0);
+const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_len) == 0);
+const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_family) == 1);
 const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_port) == 2);
 const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_addr) == 4);
 const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_zero) == 8);
@@ -224,7 +230,8 @@ const _: () = assert!(core::mem::offset_of!(SockaddrIn, sin_zero) == 8);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SockaddrIn6 {
-    pub sin6_family: u16,
+    pub sin6_len: u8,
+    pub sin6_family: u8,
     pub sin6_port: u16,
     pub sin6_flowinfo: u32,
     pub sin6_addr: [u8; 16],
@@ -234,6 +241,7 @@ pub struct SockaddrIn6 {
 impl SockaddrIn6 {
     /// All-zero value.
     pub const ZERO: Self = Self {
+        sin6_len: 0,
         sin6_family: 0,
         sin6_port: 0,
         sin6_flowinfo: 0,
@@ -244,7 +252,8 @@ impl SockaddrIn6 {
 
 const _: () =
     assert!(core::mem::size_of::<SockaddrIn6>() == 28 && core::mem::align_of::<SockaddrIn6>() == 4);
-const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_family) == 0);
+const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_len) == 0);
+const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_family) == 1);
 const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_port) == 2);
 const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_flowinfo) == 4);
 const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_addr) == 8);
@@ -253,21 +262,24 @@ const _: () = assert!(core::mem::offset_of!(SockaddrIn6, sin6_scope_id) == 24);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SockaddrUn {
-    pub sun_family: u16,
-    pub sun_path: [core::ffi::c_char; 108],
+    pub sun_len: u8,
+    pub sun_family: u8,
+    pub sun_path: [core::ffi::c_char; 104],
 }
 
 impl SockaddrUn {
     /// All-zero value.
     pub const ZERO: Self = Self {
+        sun_len: 0,
         sun_family: 0,
-        sun_path: [0; 108],
+        sun_path: [0; 104],
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<SockaddrUn>() == 110 && core::mem::align_of::<SockaddrUn>() == 2);
-const _: () = assert!(core::mem::offset_of!(SockaddrUn, sun_family) == 0);
+    assert!(core::mem::size_of::<SockaddrUn>() == 106 && core::mem::align_of::<SockaddrUn>() == 1);
+const _: () = assert!(core::mem::offset_of!(SockaddrUn, sun_len) == 0);
+const _: () = assert!(core::mem::offset_of!(SockaddrUn, sun_family) == 1);
 const _: () = assert!(core::mem::offset_of!(SockaddrUn, sun_path) == 2);
 
 #[repr(C)]
@@ -277,10 +289,8 @@ pub struct Msghdr {
     pub msg_namelen: u32,
     pub msg_iov: *mut core::ffi::c_void,
     pub msg_iovlen: i32,
-    pub __pad1: i32,
     pub msg_control: *mut core::ffi::c_void,
     pub msg_controllen: u32,
-    pub __pad2: i32,
     pub msg_flags: i32,
 }
 
@@ -291,30 +301,45 @@ impl Msghdr {
         msg_namelen: 0,
         msg_iov: core::ptr::null_mut(),
         msg_iovlen: 0,
-        __pad1: 0,
         msg_control: core::ptr::null_mut(),
         msg_controllen: 0,
-        __pad2: 0,
         msg_flags: 0,
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Msghdr>() == 56 && core::mem::align_of::<Msghdr>() == 8);
+const _: () = assert!(core::mem::size_of::<Msghdr>() == 48 && core::mem::align_of::<Msghdr>() == 8);
 const _: () = assert!(core::mem::offset_of!(Msghdr, msg_name) == 0);
 const _: () = assert!(core::mem::offset_of!(Msghdr, msg_namelen) == 8);
 const _: () = assert!(core::mem::offset_of!(Msghdr, msg_iov) == 16);
 const _: () = assert!(core::mem::offset_of!(Msghdr, msg_iovlen) == 24);
-const _: () = assert!(core::mem::offset_of!(Msghdr, __pad1) == 28);
 const _: () = assert!(core::mem::offset_of!(Msghdr, msg_control) == 32);
 const _: () = assert!(core::mem::offset_of!(Msghdr, msg_controllen) == 40);
-const _: () = assert!(core::mem::offset_of!(Msghdr, __pad2) == 44);
-const _: () = assert!(core::mem::offset_of!(Msghdr, msg_flags) == 48);
+const _: () = assert!(core::mem::offset_of!(Msghdr, msg_flags) == 44);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mmsghdr {
+    pub msg_hdr: Msghdr,
+    pub msg_len: i64,
+}
+
+impl Mmsghdr {
+    /// All-zero value.
+    pub const ZERO: Self = Self {
+        msg_hdr: Msghdr::ZERO,
+        msg_len: 0,
+    };
+}
+
+const _: () =
+    assert!(core::mem::size_of::<Mmsghdr>() == 56 && core::mem::align_of::<Mmsghdr>() == 8);
+const _: () = assert!(core::mem::offset_of!(Mmsghdr, msg_hdr) == 0);
+const _: () = assert!(core::mem::offset_of!(Mmsghdr, msg_len) == 48);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cmsghdr {
     pub cmsg_len: u32,
-    pub __pad1: i32,
     pub cmsg_level: i32,
     pub cmsg_type: i32,
 }
@@ -323,18 +348,16 @@ impl Cmsghdr {
     /// All-zero value.
     pub const ZERO: Self = Self {
         cmsg_len: 0,
-        __pad1: 0,
         cmsg_level: 0,
         cmsg_type: 0,
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Cmsghdr>() == 16 && core::mem::align_of::<Cmsghdr>() == 4);
+    assert!(core::mem::size_of::<Cmsghdr>() == 12 && core::mem::align_of::<Cmsghdr>() == 4);
 const _: () = assert!(core::mem::offset_of!(Cmsghdr, cmsg_len) == 0);
-const _: () = assert!(core::mem::offset_of!(Cmsghdr, __pad1) == 4);
-const _: () = assert!(core::mem::offset_of!(Cmsghdr, cmsg_level) == 8);
-const _: () = assert!(core::mem::offset_of!(Cmsghdr, cmsg_type) == 12);
+const _: () = assert!(core::mem::offset_of!(Cmsghdr, cmsg_level) == 4);
+const _: () = assert!(core::mem::offset_of!(Cmsghdr, cmsg_type) == 8);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -344,8 +367,8 @@ pub struct Addrinfo {
     pub ai_socktype: i32,
     pub ai_protocol: i32,
     pub ai_addrlen: u32,
-    pub ai_addr: *mut core::ffi::c_void,
     pub ai_canonname: *mut core::ffi::c_void,
+    pub ai_addr: *mut core::ffi::c_void,
     pub ai_next: *mut core::ffi::c_void,
 }
 
@@ -357,8 +380,8 @@ impl Addrinfo {
         ai_socktype: 0,
         ai_protocol: 0,
         ai_addrlen: 0,
-        ai_addr: core::ptr::null_mut(),
         ai_canonname: core::ptr::null_mut(),
+        ai_addr: core::ptr::null_mut(),
         ai_next: core::ptr::null_mut(),
     };
 }
@@ -370,9 +393,39 @@ const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_family) == 4);
 const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_socktype) == 8);
 const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_protocol) == 12);
 const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_addrlen) == 16);
-const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_addr) == 24);
-const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_canonname) == 32);
+const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_canonname) == 24);
+const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_addr) == 32);
 const _: () = assert!(core::mem::offset_of!(Addrinfo, ai_next) == 40);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SockaddrStorage {
+    pub ss_len: u8,
+    pub ss_family: u8,
+    pub __ss_pad1: [u8; 6],
+    pub __ss_align: i64,
+    pub __ss_pad2: [u8; 112],
+}
+
+impl SockaddrStorage {
+    /// All-zero value.
+    pub const ZERO: Self = Self {
+        ss_len: 0,
+        ss_family: 0,
+        __ss_pad1: [0; 6],
+        __ss_align: 0,
+        __ss_pad2: [0; 112],
+    };
+}
+
+const _: () = assert!(
+    core::mem::size_of::<SockaddrStorage>() == 128 && core::mem::align_of::<SockaddrStorage>() == 8
+);
+const _: () = assert!(core::mem::offset_of!(SockaddrStorage, ss_len) == 0);
+const _: () = assert!(core::mem::offset_of!(SockaddrStorage, ss_family) == 1);
+const _: () = assert!(core::mem::offset_of!(SockaddrStorage, __ss_pad1) == 2);
+const _: () = assert!(core::mem::offset_of!(SockaddrStorage, __ss_align) == 8);
+const _: () = assert!(core::mem::offset_of!(SockaddrStorage, __ss_pad2) == 16);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1374,23 +1427,6 @@ impl MbstateT {
 
 const _: () =
     assert!(core::mem::size_of::<MbstateT>() == 8 && core::mem::align_of::<MbstateT>() == 4);
-
-/// C: `struct sockaddr_storage`
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SockaddrStorage {
-    /// Opaque bytes.
-    pub bytes: [u64; 16],
-}
-
-impl SockaddrStorage {
-    /// All-zero value.
-    pub const ZERO: Self = Self { bytes: [0; 16] };
-}
-
-const _: () = assert!(
-    core::mem::size_of::<SockaddrStorage>() == 128 && core::mem::align_of::<SockaddrStorage>() == 8
-);
 
 /// C: `posix_spawnattr_t`
 #[repr(C)]

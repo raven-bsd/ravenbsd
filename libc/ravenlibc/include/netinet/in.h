@@ -38,8 +38,10 @@ typedef uint16_t in_port_t;
 typedef uint32_t in_addr_t;
 struct in_addr { in_addr_t s_addr; };
 
+/* RavenBSD: DR-69 FreeBSD sys/netinet/in.h. */
 struct sockaddr_in {
-	sa_family_t sin_family;
+	uint8_t sin_len;
+	unsigned char sin_family;
 	in_port_t sin_port;
 	struct in_addr sin_addr;
 	uint8_t sin_zero[8];
@@ -56,8 +58,10 @@ struct in6_addr {
 #define s6_addr16 __in6_union.__s6_addr16
 #define s6_addr32 __in6_union.__s6_addr32
 
+/* RavenBSD: DR-69 FreeBSD sys/netinet6/in6.h. */
 struct sockaddr_in6 {
-	sa_family_t     sin6_family;
+	uint8_t         sin6_len;
+	unsigned char   sin6_family;
 	in_port_t       sin6_port;
 	uint32_t        sin6_flowinfo;
 	struct in6_addr sin6_addr;

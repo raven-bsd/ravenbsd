@@ -240,8 +240,18 @@ pub fn init_aarch64(gicd: u64, gicc: u64, uart: u64) {
             domain.max_bus_addr
         );
     }
+    let acpi = match crate::arch::pcie::acpi_boot_blob() {
+        Some(bytes) => match MemObject::from_bytes(bytes) {
+            Ok(object) => Some(object),
+            Err(error) => {
+                kprintln!("driver: acpi blob frames failed: {error:?}");
+                None
+            }
+        },
+        None => None,
+    };
     *BLOBS.lock() = Some(BlobSet {
-        acpi: None,
+        acpi,
         dtb,
         memory_map: build_memory_map_blob(),
     });

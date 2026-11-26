@@ -123,12 +123,7 @@ pub(crate) fn sync_exec_meta() {
     with_net(|net| net.sync_meta());
 }
 
-/// The ABI `struct mmsghdr`.
-#[repr(C)]
-pub(crate) struct Mmsghdr {
-    pub(crate) header: Msghdr,
-    pub(crate) len: u32,
-}
+pub(crate) use raven_libc_abi::structs::Mmsghdr;
 
 pub(crate) fn fault() -> Errno {
     Errno(EFAULT as u16)

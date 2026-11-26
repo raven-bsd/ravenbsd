@@ -46,7 +46,8 @@
 #define AF_IB 27
 #define AF_IEEE802154 36
 #define AF_INET 2
-#define AF_INET6 10
+/* DR-69/FreeBSD sys/sys/socket.h:256 */
+#define AF_INET6 28
 #define AF_IPX 4
 #define AF_IRDA 23
 #define AF_ISDN 34

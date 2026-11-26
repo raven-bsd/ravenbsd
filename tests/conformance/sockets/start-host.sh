@@ -11,7 +11,16 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 
-out=${SOCKET_CONFORMANCE_OUT:-build/fixtures/socket-conformance}
+arch=${RAVEN_QT_ARCH:-x86_64}
+case "$arch" in
+x86_64) default_out=build/fixtures/socket-conformance ;;
+aarch64) default_out=build/fixtures/socket-conformance-aarch64 ;;
+*)
+    echo "socket-conformance fixture: unsupported architecture $arch" >&2
+    exit 2
+    ;;
+esac
+out=${SOCKET_CONFORMANCE_OUT:-$default_out}
 mkdir -p "$out"
 rm -f "$out/host.result" "$out/host.log" "$out/host.stdout" "$out/monitor.sock"
 pkill -f "$root/tests/conformance/sockets/host.py" 2>/dev/null || true

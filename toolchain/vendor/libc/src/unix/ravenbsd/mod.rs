@@ -23,7 +23,7 @@ pub type pthread_t = *mut c_void;
 // should technically be *mut c_void
 pub type pthread_key_t = usize;
 pub type rlim_t = c_ulonglong;
-pub type sa_family_t = u16;
+pub type sa_family_t = u8;
 pub type sem_t = *mut c_void;
 pub type socklen_t = u32;
 pub type speed_t = u32;
@@ -64,14 +64,17 @@ s! {
     }
 
     pub struct sockaddr_un {
+        pub sun_len: c_uchar,
         pub sun_family: crate::sa_family_t,
-        pub sun_path: [c_char; 108],
+        pub sun_path: [c_char; 104],
     }
 
     pub struct sockaddr_storage {
+        pub ss_len: c_uchar,
         pub ss_family: crate::sa_family_t,
-        __ss_padding: Padding<[u8; 128 - size_of::<sa_family_t>() - size_of::<c_ulong>()]>,
-        __ss_align: c_ulong,
+        __ss_pad1: [c_char; 6],
+        __ss_align: c_longlong,
+        __ss_pad2: [c_char; 112],
     }
 
     pub struct addrinfo {
@@ -79,7 +82,7 @@ s! {
         pub ai_family: c_int,
         pub ai_socktype: c_int,
         pub ai_protocol: c_int,
-        pub ai_addrlen: size_t,
+        pub ai_addrlen: crate::socklen_t,
         pub ai_canonname: *mut c_char,
         pub ai_addr: *mut crate::sockaddr,
         pub ai_next: *mut crate::addrinfo,
@@ -136,14 +139,14 @@ s! {
         pub msg_name: *mut c_void,
         pub msg_namelen: crate::socklen_t,
         pub msg_iov: *mut crate::iovec,
-        pub msg_iovlen: size_t,
+        pub msg_iovlen: c_int,
         pub msg_control: *mut c_void,
-        pub msg_controllen: size_t,
+        pub msg_controllen: crate::socklen_t,
         pub msg_flags: c_int,
     }
 
     pub struct cmsghdr {
-        pub cmsg_len: size_t,
+        pub cmsg_len: crate::socklen_t,
         pub cmsg_level: c_int,
         pub cmsg_type: c_int,
     }
@@ -176,11 +179,13 @@ s! {
     }
 
     pub struct sockaddr {
+        pub sa_len: c_uchar,
         pub sa_family: crate::sa_family_t,
         pub sa_data: [c_char; 14],
     }
 
     pub struct sockaddr_in {
+        pub sin_len: c_uchar,
         pub sin_family: crate::sa_family_t,
         pub sin_port: crate::in_port_t,
         pub sin_addr: crate::in_addr,
@@ -188,6 +193,7 @@ s! {
     }
 
     pub struct sockaddr_in6 {
+        pub sin6_len: c_uchar,
         pub sin6_family: crate::sa_family_t,
         pub sin6_port: crate::in_port_t,
         pub sin6_flowinfo: u32,
@@ -1009,11 +1015,11 @@ pub const FD_SETSIZE: usize = 1024;
 
 // sys/socket.h
 pub const AF_INET: c_int = 2;
-pub const AF_INET6: c_int = 10;
+pub const AF_INET6: c_int = 28;
 pub const AF_UNIX: c_int = 1;
 pub const AF_UNSPEC: c_int = 0;
 pub const PF_INET: c_int = 2;
-pub const PF_INET6: c_int = 10;
+pub const PF_INET6: c_int = 28;
 pub const PF_UNIX: c_int = 1;
 pub const PF_UNSPEC: c_int = 0;
 pub const MSG_CTRUNC: c_int = 8;

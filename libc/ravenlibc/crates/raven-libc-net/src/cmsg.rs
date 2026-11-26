@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Linux `cmsghdr` arithmetic and iteration (`CMSG_ALIGN` is 8 bytes).
+//! FreeBSD `cmsghdr` arithmetic and iteration.
+//!
+//! `struct cmsghdr` is 12 bytes (`socklen_t cmsg_len`, then two `int`s), while `CMSG_DATA`
+//! starts at `_ALIGN(sizeof(struct cmsghdr))`: 16 bytes because FreeBSD aligns to
+//! `sizeof(void *)`. `CMSG_LEN(n)` is 16 + n and `CMSG_SPACE(n)` is 16 + `_ALIGN(n)`.
 use crate::ErrnoExt;
 
 use raven_libc_abi::errno::Errno;
 
-/// The fixed `cmsghdr` size.
+/// `_ALIGN(sizeof(struct cmsghdr))`: the `CMSG_DATA` offset.
 pub const HEADER_LEN: usize = 16;
+
+/// `sizeof(struct cmsghdr)`.
+pub const STRUCT_LEN: usize = 12;
 
 /// One control message header and its data.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,8 +66,8 @@ pub fn iter_cmsgs(mut buffer: &[u8]) -> impl Iterator<Item = Result<Cmsg<'_>, Er
             buffer = &[];
             return Some(Err(Errno::EINVAL));
         };
-        let level_bytes = message.get(8..12).unwrap_or(&[]);
-        let type_bytes = message.get(12..16).unwrap_or(&[]);
+        let level_bytes = message.get(4..8).unwrap_or(&[]);
+        let type_bytes = message.get(8..12).unwrap_or(&[]);
         let level = i32::from_le_bytes([
             *level_bytes.first().unwrap_or(&0),
             *level_bytes.get(1).unwrap_or(&0),
@@ -90,21 +97,23 @@ pub fn encode_cmsg(level: i32, ty: i32, data: &[u8], out: &mut [u8]) -> Option<u
     let header = out.get_mut(..HEADER_LEN)?;
     header.fill(0);
     header
-        .get_mut(..8)?
-        .copy_from_slice(&(full as u64).to_le_bytes());
-    header.get_mut(8..12)?.copy_from_slice(&level.to_le_bytes());
-    header.get_mut(12..16)?.copy_from_slice(&ty.to_le_bytes());
+        .get_mut(..4)?
+        .copy_from_slice(&(full as u32).to_le_bytes());
+    header.get_mut(4..8)?.copy_from_slice(&level.to_le_bytes());
+    header.get_mut(8..12)?.copy_from_slice(&ty.to_le_bytes());
     out.get_mut(HEADER_LEN..full)?.copy_from_slice(data);
     out.get_mut(full..total)?.fill(0);
     Some(full)
 }
 
 fn read_usize(bytes: &[u8]) -> usize {
+    let quad = match bytes.get(..4) {
+        Some(quad) => quad,
+        None => return 0,
+    };
     let mut value = 0usize;
-    for index in 0..8usize {
-        if let Some(byte) = bytes.get(index) {
-            value |= usize::from(*byte) << (index * 8);
-        }
+    for (index, byte) in quad.iter().enumerate() {
+        value |= usize::from(*byte) << (index * 8);
     }
     value
 }

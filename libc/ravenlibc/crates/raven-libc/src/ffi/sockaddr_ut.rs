@@ -12,11 +12,20 @@ fn address_types_match_the_c_layout() {
 }
 
 #[test]
-fn family_reads_the_first_word() {
+fn family_reads_the_byte_after_sa_len() {
+    // FreeBSD `struct sockaddr`: `sa_len` at 0, `sa_family` at 1.
+    let mut bytes = [0u8; 16];
+    bytes[0] = 16;
+    bytes[1] = AF_INET as u8;
+    assert_eq!(family(&bytes), Some(AF_INET));
+    assert_eq!(family(&bytes[..1]), None);
+}
+
+#[test]
+fn a_linux_family_word_is_not_read_at_offset_zero() {
     let mut bytes = [0u8; 16];
     bytes[0..2].copy_from_slice(&(AF_INET as u16).to_ne_bytes());
-    assert_eq!(family(&bytes), Some(AF_INET));
-    assert_eq!(family(&bytes[..2]), None);
+    assert_eq!(family(&bytes), Some(0));
 }
 
 #[test]
@@ -27,14 +36,39 @@ fn view_rejects_null_with_a_length() {
 }
 
 #[test]
-fn length_is_capped_by_the_caller() {
+fn control_rejects_null_with_a_length() {
+    // SAFETY: NULL with a non-zero length is the rejected condition.
+    let error = unsafe { control(core::ptr::null(), 1) }.expect_err("must reject");
+    assert_eq!(i32::from(error.0), raven_libc_abi::errno::EFAULT);
+    // SAFETY: NULL with a zero length is the empty view.
+    let empty = unsafe { control(core::ptr::null(), 0) }.expect("empty");
+    assert_eq!(empty, &[]);
+}
+
+#[test]
+fn control_views_the_caller_buffer() {
+    let bytes = [1u8, 2, 3];
+    // SAFETY: three readable bytes at the base.
+    let view = unsafe { control(bytes.as_ptr().cast(), 3) }.expect("view");
+    assert_eq!(view, &[1, 2, 3]);
+    let mut out = [0u8; 3];
+    // SAFETY: three writable bytes at the base.
+    let writable = unsafe { control_mut(out.as_mut_ptr().cast(), 3) }.expect("view");
+    writable.copy_from_slice(&bytes);
+    assert_eq!(out, bytes);
+}
+
+#[test]
+fn length_reports_the_required_size() {
+    // FreeBSD `user_getsockname`: only `min(ss_len, user_len)` bytes are copied out, but
+    // `*alen` is the full `ss_len` the caller needs.
     let mut out = 0u32;
     // SAFETY: one writable `socklen_t`.
-    unsafe { write_len(&mut out, 128, 16) };
-    assert_eq!(out, 16);
+    unsafe { write_len(&mut out, 128, 128) };
+    assert_eq!(out, 128);
     // SAFETY: one writable `socklen_t`.
-    unsafe { write_len(&mut out, 4, 16) };
-    assert_eq!(out, 4);
+    unsafe { write_len(&mut out, 128, 16) };
+    assert_eq!(out, 128);
 }
 
 const AF_INET: i32 = 2;
