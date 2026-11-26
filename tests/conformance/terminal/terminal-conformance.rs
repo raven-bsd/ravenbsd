@@ -180,6 +180,7 @@ unsafe extern "C" {
     fn tcsetpgrp(fd: c_int, pgrp: c_int) -> c_int;
     fn ioctl(fd: c_int, request: c_ulong, ...) -> c_int;
     fn getpgrp() -> c_int;
+    fn getpgid(pid: c_int) -> c_int;
     fn getuid() -> c_uint;
     fn fork() -> c_int;
     fn setsid() -> c_int;
@@ -870,8 +871,12 @@ fn row_sighup() {
         }
     };
     wait_ready(signals.ready);
+    let child_pgid = unsafe { getpgid(signals.child) };
+    let close_start = now_ms();
     unsafe { close(pair.master) };
+    let close_end = now_ms();
     let received = collect_signal(signals.result);
+    let result_at = now_ms();
     let mut status = 0;
     unsafe {
         waitpid(signals.child, &mut status, 0);
@@ -882,10 +887,19 @@ fn row_sighup() {
     if received == SIGHUP {
         pass(
             "sighup",
-            format_args!("master close delivered SIGHUP to the session leader"),
+            format_args!(
+                "master close delivered SIGHUP to child={} pgid={child_pgid} status={status}",
+                signals.child
+            ),
         );
     } else {
-        fail("sighup", format_args!("signal={received} (want SIGHUP)"));
+        fail(
+            "sighup",
+            format_args!(
+                "signal={received} (want SIGHUP) child={} pgid={child_pgid} status={status} close_start={close_start} close_end={close_end} result_at={result_at}",
+                signals.child
+            ),
+        );
     }
 }
 

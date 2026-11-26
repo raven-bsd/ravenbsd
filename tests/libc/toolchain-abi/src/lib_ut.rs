@@ -222,6 +222,21 @@ fn statvfs_layout_matches_the_abi() {
 }
 
 #[test]
+fn termios_ioctl_values_are_the_pinned_freebsd_encodings() {
+    // Pinned FreeBSD `sys/sys/ttycom.h` with the 44-byte termios record:
+    // `_IOR('t', 19, struct termios)` / `_IOW('t', 20..22, struct termios)`.
+    let toolchain = evaluate(TOOLCHAIN_LIBC);
+    for (name, value) in [
+        ("TIOCGETA", 0x402c_7413_u64),
+        ("TIOCSETA", 0x802c_7414_u64),
+        ("TIOCSETAW", 0x802c_7415_u64),
+        ("TIOCSETAF", 0x802c_7416_u64),
+    ] {
+        assert_eq!(toolchain.get(name).copied(), Some(value), "{name}");
+    }
+}
+
+#[test]
 fn termios_layout_matches_the_abi() {
     const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "[u8; 20]", "u32", "u32"];
     assert_clean(compare_struct("termios", FIELDS), "termios");
