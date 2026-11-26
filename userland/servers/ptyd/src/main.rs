@@ -55,9 +55,14 @@ mod program {
             };
             let result = Errno::from_ret(raw).map(|_| ());
             match result {
-                Ok(()) => raven_rt::println!("ptyd: signal pgrp={pgrp} signo={signo} ok"),
+                Ok(()) => {
+                    raven_rt::println!("ptyd: signal pgrp={pgrp} signo={signo} ok t={}", now_ns())
+                }
                 Err(error) => {
-                    raven_rt::println!("ptyd: signal pgrp={pgrp} signo={signo} errno={error:?}");
+                    raven_rt::println!(
+                        "ptyd: signal pgrp={pgrp} signo={signo} errno={error:?} t={}",
+                        now_ns()
+                    );
                 }
             }
             result
@@ -671,6 +676,13 @@ mod program {
                     .files
                     .values()
                     .any(|other| other.pair == entry.pair && other.role == Role::Slave);
+            raven_rt::println!(
+                "ptyd: close file={file} pair={} role={:?} last_master={last_master} last_slave={last_slave} files={} t={}",
+                entry.pair,
+                entry.role,
+                self.files.len(),
+                now_ns()
+            );
             if last_master || last_slave {
                 if let Some(pty) = self.pairs.get_mut(entry.pair) {
                     pty.hangup();
