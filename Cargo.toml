@@ -23,6 +23,7 @@ members = [
     "tests/fixtures/audio-tools/gen",
     "tests/fixtures/hw-sound/client",
     "tests/fixtures/s09-futex",
+    "tests/fixtures/futex-requeue",
     "tests/fixtures/echo-dialogue",
     "tests/fixtures/s24-spawn/parent",
     "tests/fixtures/s24-spawn/child",

@@ -3485,6 +3485,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s203-futex-requeue"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-s21-edu"
 version = "0.1.0"
 dependencies = [
