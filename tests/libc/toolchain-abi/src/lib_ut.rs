@@ -276,6 +276,49 @@ fn c64i_exports_are_in_the_abi_list() {
     }
 }
 
+const SPAWN_PATCH: &str =
+    include_str!("../../../../toolchain/patches/0003-posix-spawn-ravenbsd.patch");
+
+/// Apply the 0003 module hunks to the module produced by 0002, using the same
+/// `patch -p1` tool the toolchain build uses. The 0002 body is the pre-0003
+/// source; the vendor module is the post-0003 source, so the oracle must apply
+/// 0003 before comparing. Only the ravenbsd module section is applied.
+fn apply_spawn_patch(module: &str) -> String {
+    use std::io::Write as _;
+    let marker = "--- a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs\n";
+    let start = SPAWN_PATCH.find(marker).expect("0003 module section");
+    let body_start = start + marker.len();
+    let body_end = SPAWN_PATCH[body_start..]
+        .find("\n--- a/")
+        .map_or(SPAWN_PATCH.len(), |offset| body_start + offset);
+    let section = &SPAWN_PATCH[start..body_end];
+    let dir = std::env::temp_dir().join(format!("raven-s759-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let file = dir.join("library/libc-ravenbsd/src/unix/ravenbsd/mod.rs");
+    std::fs::create_dir_all(file.parent().expect("parent")).expect("temp tree");
+    std::fs::write(&file, module).expect("write module");
+    let mut child = std::process::Command::new("patch")
+        .args(["-p1", "-d"])
+        .arg(&dir)
+        .arg("--batch")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("run patch");
+    child
+        .stdin
+        .as_mut()
+        .expect("patch stdin")
+        .write_all(section.as_bytes())
+        .expect("write patch");
+    let status = child.wait().expect("patch status");
+    assert!(status.success(), "patch 0003 failed: {status}");
+    let patched = std::fs::read_to_string(&file).expect("read patched module");
+    let _ = std::fs::remove_dir_all(&dir);
+    patched
+}
+
 #[test]
 fn vendored_module_is_the_patched_toolchain_module() {
     let marker = "+++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs\n";
@@ -290,10 +333,12 @@ fn vendored_module_is_the_patched_toolchain_module() {
             module.push('\n');
         }
     }
-    let mut vendor = String::new();
-    for line in TOOLCHAIN_LIBC.lines().skip(3) {
-        vendor.push_str(line);
-        vendor.push('\n');
-    }
+    let patched = apply_spawn_patch(&module);
+    let module: String = patched.lines().map(|line| format!("{line}\n")).collect();
+    let vendor: String = TOOLCHAIN_LIBC
+        .lines()
+        .skip(3)
+        .map(|line| format!("{line}\n"))
+        .collect();
     assert_eq!(module, vendor, "toolchain patch and vendored module differ");
 }
