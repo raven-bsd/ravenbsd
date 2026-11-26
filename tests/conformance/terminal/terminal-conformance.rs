@@ -953,16 +953,23 @@ fn setup_target_vintr(fd: c_int) -> c_int {
     unsafe { tcsetattr(fd, TCSANOW, &termios) }
 }
 
-fn configure_raw(fd: c_int, vmin: u8, vtime: u8) -> bool {
+fn configure_raw(fd: c_int, vmin: u8, vtime: u8) -> Option<(u8, u8)> {
     let mut termios = Termios::ZERO;
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
-        return false;
+        return None;
     }
     termios.c_lflag &= !ICANON;
     termios.c_lflag &= !ECHO;
     termios.c_cc[TARGET_VMIN] = vmin;
     termios.c_cc[TARGET_VTIME] = vtime;
-    unsafe { tcsetattr(fd, TCSANOW, &termios) == 0 }
+    if unsafe { tcsetattr(fd, TCSANOW, &termios) } != 0 {
+        return None;
+    }
+    let mut back = Termios::ZERO;
+    if unsafe { tcgetattr(fd, &mut back) } != 0 {
+        return None;
+    }
+    Some((back.c_cc[TARGET_VMIN], back.c_cc[TARGET_VTIME]))
 }
 
 fn target_raw_mode(fd: c_int) -> bool {
@@ -1074,7 +1081,7 @@ fn row_target_vintr() {
     };
     let elapsed = now_ms().saturating_sub(start);
     immediate_pair.close();
-    if !immediate || sent != 1 || count != 1 || elapsed >= 100 {
+    if immediate != Some((1, 0)) || sent != 1 || count != 1 || elapsed >= 100 {
         ok = false;
         detail = "VMIN=1/VTIME=0 did not return one byte immediately";
     }
@@ -1098,7 +1105,7 @@ fn row_target_vintr() {
     let elapsed = now_ms().saturating_sub(start);
     let timed_errno = errno();
     timed_pair.close();
-    if !timed || count != 0 || elapsed < 50 || elapsed > 500 {
+    if timed != Some((0, 1)) || count != 0 || elapsed < 50 || elapsed > 500 {
         ok = false;
         detail = "VMIN=0/VTIME=1 did not return 0 after about 100 ms";
     }
@@ -1114,7 +1121,7 @@ fn row_target_vintr() {
         fail(
             "target-vintr",
             format_args!(
-                "{detail} (target VINTR={TARGET_VINTR} raw={raw} distinctive={target:?} old={old:?} vtime_count={count} vtime_ms={elapsed} vtime_errno={timed_errno})"
+                "{detail} (target VINTR={TARGET_VINTR} raw={raw} distinctive={target:?} old={old:?} back_vmin_vtime={timed:?} vtime_count={count} vtime_ms={elapsed} vtime_errno={timed_errno})"
             ),
         );
     }
