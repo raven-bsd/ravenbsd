@@ -19,6 +19,9 @@ ensure_libc_sysroot "$root" "$arch" "$sysroot" k571-signal
 out=$root/build/libc-test
 mkdir -p "$out"
 target_dir=$root/build/libc/signals/k571-target
+# The fixture links the packed libc.a through explicit link args, which cargo does not track;
+# drop the fixture target so a repacked libc is really relinked.
+rm -rf "$target_dir"
 
 RUSTUP_TOOLCHAIN=ravenbsd CARGO_TARGET_DIR="$target_dir" \
 RUSTFLAGS="--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static -C code-model=small \
