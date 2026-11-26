@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone qtest package: the S85n guest TCP probe is a test fixture, not a
+# product workspace member. The gate builds it for x86_64-unknown-none.
+[workspace]
+
+[package]
+name = "raven-net-gate-probe"
+version = "0.1.0"
+description = "S85n fixture: wait for the release eth0 interface and echo one host TCP payload."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-net-gate-probe"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-proto-net = { path = "../../../../crates/raven-proto-net" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+raven-scheme = { path = "../../../../crates/raven-scheme" }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
