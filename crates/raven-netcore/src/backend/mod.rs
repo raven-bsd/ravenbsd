@@ -194,4 +194,74 @@ pub trait StackBackend {
         let _ = s;
         Err(Errno::EOPNOTSUPP)
     }
+
+    /// Open a client MPTCP connection; backends without MPTCP reject it.
+    fn mptcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+    ) -> Result<SocketId, Errno> {
+        let _ = (remote, local);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Send on an MPTCP connection.
+    fn mptcp_send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        let _ = (s, data);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Receive from an MPTCP connection.
+    fn mptcp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        let _ = (s, buf);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Live MPTCP readiness.
+    fn mptcp_readiness(&self, s: SocketId) -> Result<crate::Readiness, Errno> {
+        let _ = s;
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Close an MPTCP connection.
+    fn mptcp_close(&mut self, s: SocketId) -> Result<(), Errno> {
+        let _ = s;
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Add one MPTCP path; the returned id is the backend's subflow id.
+    fn mptcp_add_path(
+        &mut self,
+        s: SocketId,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+        backup: bool,
+    ) -> Result<u32, Errno> {
+        let _ = (s, remote, local, backup);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Remove one MPTCP path.
+    fn mptcp_remove_path(&mut self, s: SocketId, subflow: u32) -> Result<(), Errno> {
+        let _ = (s, subflow);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Mark one MPTCP path backup or regular.
+    fn mptcp_set_backup(&mut self, s: SocketId, subflow: u32, backup: bool) -> Result<(), Errno> {
+        let _ = (s, subflow, backup);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// MPTCP connection state.
+    fn mptcp_info(&self, s: SocketId) -> Result<crate::MptcpInfo, Errno> {
+        let _ = s;
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Per-subflow MPTCP state.
+    fn mptcp_subflows(&self, s: SocketId) -> Result<Vec<crate::SubflowInfo>, Errno> {
+        let _ = s;
+        Err(Errno::EOPNOTSUPP)
+    }
 }

@@ -6,20 +6,23 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::rc::Rc;
 use alloc::vec::Vec;
-use core::cell::Cell;
+use core::cell::{Cell, Ref, RefCell, RefMut};
 
 use crate::backend::StackBackend;
 use crate::backend::counting::{CountingDevice, SharedCounters};
 use crate::{
-    CoreSocket, Event, InterfaceCounters, Ipv4Addr, RouteEntry, SocketId, SocketState,
+    CoreSocket, Event, InterfaceCounters, Ipv4Addr, Readiness, RouteEntry, SocketId, SocketState,
     SocketTransport,
 };
 use raven_abi::errno::Errno;
-use raven_tcpip::{self as native, Device, Instant, IpAddr, Ipv4Config, Stack, StackConfig};
+use raven_tcpip::{
+    self as native, AF_INET, Device, IPPROTO_MPTCP, Instant, IpAddr, Ipv4Config, MptcpSocket,
+    Stack, StackConfig,
+};
 
 /// The native stack behind [`StackBackend`].
-pub struct RavenTcpipBackend<D: Device> {
-    stack: Stack<CountingDevice<D>>,
+pub struct RavenTcpipBackend<D: Device + 'static> {
+    stack: Rc<RefCell<Stack<CountingDevice<D>>>>,
     counters: SharedCounters,
     rx_drops: u64,
     closed: BTreeSet<u32>,
@@ -32,9 +35,11 @@ pub struct RavenTcpipBackend<D: Device> {
     pending_udp: Vec<(SocketId, Vec<u8>, (Ipv4Addr, u16))>,
     pending_udp_bytes: usize,
     options: BTreeMap<(u32, u32), i32>,
+    mptcp: BTreeMap<u32, MptcpSocket<CountingDevice<D>>>,
+    next_mptcp: u32,
 }
 
-impl<D: Device> RavenTcpipBackend<D> {
+impl<D: Device + 'static> RavenTcpipBackend<D> {
     /// Create a native backend over `device` with Ethernet address `mac`.
     ///
     /// Time is a millisecond epoch: `now_ms` is converted directly to C15's
@@ -42,7 +47,7 @@ impl<D: Device> RavenTcpipBackend<D> {
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
         let seed = u64::from_le_bytes([mac[0], mac[1], mac[2], mac[3], mac[4], 0x5a, 0, 0]);
         let counters = Rc::new(Cell::new(InterfaceCounters::default()));
-        let stack = Stack::new(
+        let stack = Rc::new(RefCell::new(Stack::new(
             CountingDevice::new(device, Rc::clone(&counters)),
             StackConfig {
                 hardware_addr: Some(mac),
@@ -50,7 +55,7 @@ impl<D: Device> RavenTcpipBackend<D> {
             },
             seed,
             Instant::from_millis(now_ms),
-        );
+        )));
         Self {
             stack,
             counters,
@@ -65,13 +70,25 @@ impl<D: Device> RavenTcpipBackend<D> {
             pending_udp: Vec::new(),
             pending_udp_bytes: 0,
             options: BTreeMap::new(),
+            mptcp: BTreeMap::new(),
+            next_mptcp: 0,
         }
+    }
+
+    /// Borrow the shared stack for a mutating operation.
+    fn stack_mut(&mut self) -> RefMut<'_, Stack<CountingDevice<D>>> {
+        self.stack.borrow_mut()
+    }
+
+    /// Borrow the shared stack for a read-only operation.
+    fn stack_ref(&self) -> Ref<'_, Stack<CountingDevice<D>>> {
+        self.stack.borrow()
     }
 
     /// A send on a connection the peer already tore down reports `ENOTCONN` (the socket layer's
     /// long-standing contract), while an id the stack never issued stays `EBADF`.
     fn dead_connection_error(&self, s: SocketId, error: Errno) -> Errno {
-        if error == Errno::EBADF && self.stack.socket_info(Self::native(s)).is_ok() {
+        if error == Errno::EBADF && self.stack_ref().socket_info(Self::native(s)).is_ok() {
             Errno::ENOTCONN
         } else {
             error
@@ -93,12 +110,12 @@ impl<D: Device> RavenTcpipBackend<D> {
         reuse_addr: bool,
     ) -> Result<SocketId, Errno> {
         let socket = self
-            .stack
+            .stack_mut()
             .tcp_listen_reuse(port, backlog, reuse_addr)
             .map(Self::ours)?;
         self.listeners.insert(port, backlog.max(1));
         let _ = self
-            .stack
+            .stack_mut()
             .set_property("tcp.accept_queue_limit", backlog.max(1) as u64);
         Ok(socket)
     }
@@ -108,10 +125,10 @@ impl<D: Device> RavenTcpipBackend<D> {
         let mut again = Vec::new();
         for (socket, data, to) in pending.drain(..) {
             let destination = (IpAddr::V4(native::Ipv4Addr::new(to.0.octets())), to.1);
-            match self
-                .stack
-                .udp_send_to(Self::native(socket), &data, destination)
-            {
+            let result = self
+                .stack_mut()
+                .udp_send_to(Self::native(socket), &data, destination);
+            match result {
                 Ok(_) => {
                     self.pending_udp_bytes = self.pending_udp_bytes.saturating_sub(data.len());
                 }
@@ -133,12 +150,12 @@ impl<D: Device> RavenTcpipBackend<D> {
         for (port, backlog) in listeners {
             loop {
                 let mut pending: Vec<u32> =
-                    self.stack
+                    self.stack_ref()
                         .sockets()
                         .filter(|id| {
                             !self.accepted.contains(&id.0)
                                 && !self.closed.contains(&id.0)
-                                && self.stack.socket_info(*id).ok().is_some_and(|info| {
+                                && self.stack_ref().socket_info(*id).ok().is_some_and(|info| {
                                     info.local.1 == port && info.remote.is_some()
                                 })
                         })
@@ -149,7 +166,7 @@ impl<D: Device> RavenTcpipBackend<D> {
                 }
                 pending.sort_unstable();
                 if let Some(victim) = pending.last().copied() {
-                    let _ = self.stack.abort(native::SocketId(victim));
+                    let _ = self.stack_mut().abort(native::SocketId(victim));
                     self.closed.insert(victim);
                 } else {
                     break;
@@ -177,13 +194,122 @@ impl<D: Device> RavenTcpipBackend<D> {
             },
         }
     }
+
+    /// The backend id space is shared by native stack sockets and MPTCP meta-sockets. Native ids
+    /// are small counters, so the tag keeps the two allocators disjoint without a second type.
+    const MPTCP_ID_TAG: u32 = 0x8000_0000;
+
+    /// The MPTCP socket for one backend id.
+    fn mptcp_socket(&mut self, id: SocketId) -> Result<&mut MptcpSocket<CountingDevice<D>>, Errno> {
+        self.mptcp.get_mut(&id.0).ok_or(Errno::EBADF)
+    }
+
+    /// Open a client MPTCP connection over the shared stack.
+    pub fn mptcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+    ) -> Result<SocketId, Errno> {
+        let peer = (
+            IpAddr::V4(native::Ipv4Addr::new(remote.0.octets())),
+            remote.1,
+        );
+        let local_if = local.map(|ip| native::Ipv4Addr::new(ip.octets()));
+        let socket = MptcpSocket::open(
+            Rc::clone(&self.stack),
+            AF_INET,
+            IPPROTO_MPTCP,
+            peer,
+            local_if,
+            true,
+        )?;
+        let id = Self::MPTCP_ID_TAG | self.next_mptcp;
+        self.next_mptcp = self.next_mptcp.wrapping_add(1);
+        self.mptcp.insert(id, socket);
+        Ok(SocketId(id))
+    }
+
+    /// Send bytes on an MPTCP connection.
+    pub fn mptcp_send(&mut self, id: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        self.mptcp_socket(id)?.send(data)
+    }
+
+    /// Receive bytes from an MPTCP connection.
+    pub fn mptcp_recv(&mut self, id: SocketId, buffer: &mut [u8]) -> Result<usize, Errno> {
+        self.mptcp_socket(id)?.recv(buffer)
+    }
+
+    /// Live MPTCP readiness.
+    pub fn mptcp_readiness(&self, id: SocketId) -> Result<Readiness, Errno> {
+        self.mptcp
+            .get(&id.0)
+            .map(MptcpSocket::readiness)
+            .ok_or(Errno::EBADF)
+    }
+
+    /// Close and forget an MPTCP connection.
+    pub fn mptcp_close(&mut self, id: SocketId) -> Result<(), Errno> {
+        let mut socket = self.mptcp.remove(&id.0).ok_or(Errno::EBADF)?;
+        socket.close()
+    }
+
+    /// Add a path and return the actual subflow id.
+    pub fn mptcp_add_path(
+        &mut self,
+        id: SocketId,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+        backup: bool,
+    ) -> Result<u32, Errno> {
+        let peer = (
+            IpAddr::V4(native::Ipv4Addr::new(remote.0.octets())),
+            remote.1,
+        );
+        let local_if = local.map(|ip| native::Ipv4Addr::new(ip.octets()));
+        self.mptcp_socket(id)?.add_path(peer, local_if, backup)
+    }
+
+    /// Remove one MPTCP path.
+    pub fn mptcp_remove_path(&mut self, id: SocketId, subflow: u32) -> Result<(), Errno> {
+        self.mptcp_socket(id)?.remove_path(subflow)
+    }
+
+    /// Mark one path backup or regular.
+    pub fn mptcp_set_backup(
+        &mut self,
+        id: SocketId,
+        subflow: u32,
+        backup: bool,
+    ) -> Result<(), Errno> {
+        self.mptcp_socket(id)?.set_backup(subflow, backup)
+    }
+
+    /// Connection state for `MPTCP_INFO`.
+    pub fn mptcp_info(&self, id: SocketId) -> Result<crate::MptcpInfo, Errno> {
+        let socket = self.mptcp.get(&id.0).ok_or(Errno::EBADF)?;
+        let subflows = socket.subflows();
+        let active = subflows.iter().filter(|path| !path.backup).count();
+        Ok(crate::MptcpInfo {
+            state: 1,
+            subflows: u32::try_from(subflows.len()).unwrap_or(u32::MAX),
+            active: u32::try_from(active).unwrap_or(u32::MAX),
+        })
+    }
+
+    /// Per-subflow records for `MPTCP_SUBFLOW_ADDRS`.
+    pub fn mptcp_subflows(&self, id: SocketId) -> Result<Vec<raven_tcpip::SubflowInfo>, Errno> {
+        self.mptcp
+            .get(&id.0)
+            .map(MptcpSocket::subflows)
+            .ok_or(Errno::EBADF)
+    }
 }
 
-impl<D: Device> StackBackend for RavenTcpipBackend<D> {
+impl<D: Device + 'static> StackBackend for RavenTcpipBackend<D> {
     type Device = D;
 
     fn set_ipv4(&mut self, addr: Ipv4Addr, prefix: u8, gateway: Option<Ipv4Addr>) {
-        let _ = self.stack.set_ipv4(Ipv4Config {
+        let _ = self.stack_mut().set_ipv4(Ipv4Config {
             addr: native::Ipv4Addr::new(addr.octets()),
             prefix_len: prefix,
             gateway: gateway.map(|gateway| native::Ipv4Addr::new(gateway.octets())),
@@ -191,16 +317,17 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn enable_dhcp(&mut self) {
-        let _ = self.stack.dhcp_enable();
+        let _ = self.stack_mut().dhcp_enable();
     }
 
     fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
-        self.stack.dhcp_enable()
+        self.stack_mut().dhcp_enable()
     }
 
     fn dhcp_lease(&self) -> Option<crate::DhcpLease> {
-        let lease = self.stack.dhcp_lease()?;
-        let timers = self.stack.dhcp_timers();
+        let stack = self.stack_ref();
+        let lease = stack.dhcp_lease()?;
+        let timers = stack.dhcp_timers();
         Some(crate::DhcpLease {
             address: Ipv4Addr::from_octets(lease.address.octets()),
             prefix_len: lease.prefix_len,
@@ -219,7 +346,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn routes(&self) -> Vec<RouteEntry> {
-        self.stack
+        self.stack_ref()
             .routes()
             .entries()
             .iter()
@@ -239,7 +366,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
             return Err(Errno::EINVAL);
         }
         let native_dest = native::Ipv4Addr::new(route.dest.octets());
-        self.stack.routes_mut().add(native::Route {
+        self.stack_mut().routes_mut().add(native::Route {
             prefix: native::Ipv4Addr::new(canonical_prefix(native_dest, route.prefix_len)),
             prefix_len: route.prefix_len,
             gateway: route
@@ -254,7 +381,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
             return Err(Errno::EINVAL);
         }
         let native_dest = native::Ipv4Addr::new(dest.octets());
-        if self.stack.routes_mut().remove(
+        if self.stack_mut().routes_mut().remove(
             native::Ipv4Addr::new(canonical_prefix(native_dest, prefix_len)),
             prefix_len,
         ) {
@@ -266,13 +393,13 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
 
     fn socket_table(&self) -> Vec<CoreSocket> {
         let local_addr = self
-            .stack
+            .stack_ref()
             .ipv4_config()
             .map(|config| Ipv4Addr::from_octets(config.addr.octets()))
             .unwrap_or(Ipv4Addr::UNSPECIFIED);
         let mut entries = Vec::new();
-        for socket in self.stack.sockets() {
-            if let Ok(info) = self.stack.socket_info(socket) {
+        for socket in self.stack_ref().sockets() {
+            if let Ok(info) = self.stack_ref().socket_info(socket) {
                 let (transport, state) = if info.state == native::TcpState::Listen {
                     (SocketTransport::Tcp, SocketState::Listen)
                 } else {
@@ -313,7 +440,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn readiness(&self, s: SocketId) -> Result<crate::Readiness, Errno> {
-        self.stack.readiness(Self::native(s))
+        self.stack_ref().readiness(Self::native(s))
     }
 
     fn interface_counters(&self) -> Option<InterfaceCounters> {
@@ -323,7 +450,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno> {
-        let socket = self.stack.icmp_bind_echo(id).map(Self::ours)?;
+        let socket = self.stack_mut().icmp_bind_echo(id).map(Self::ours)?;
         self.icmp_ids.insert(socket.0, (id, None));
         Ok(socket)
     }
@@ -342,7 +469,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if *bound != id {
             return Err(Errno::EINVAL);
         }
-        self.stack
+        self.stack_mut()
             .icmp_echo_request(native::Ipv4Addr::new(to.octets()), id, seq, payload)?;
         if let Some(meta) = self.icmp_ids.get_mut(&s.0) {
             meta.1 = Some(to);
@@ -354,7 +481,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        self.stack.recv(Self::native(s), buf)
+        self.stack_mut().recv(Self::native(s), buf)
     }
 
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
@@ -375,7 +502,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
             return Err(Errno::EBADF);
         }
         let accepted = self
-            .stack
+            .stack_mut()
             .tcp_accept(Self::native(listener))
             .map(|socket| socket.map(Self::ours))?;
         if let Some(socket) = accepted {
@@ -393,23 +520,24 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
             IpAddr::V4(native::Ipv4Addr::new(remote.0.octets())),
             remote.1,
         );
-        self.stack.tcp_connect(remote, local_port).map(Self::ours)
+        self.stack_mut()
+            .tcp_connect(remote, local_port)
+            .map(Self::ours)
     }
 
     fn send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        self.stack
-            .send(Self::native(s), data)
-            .map_err(|error| self.dead_connection_error(s, map_wrong_type(error)))
+        let result = self.stack_mut().send(Self::native(s), data);
+        result.map_err(|error| self.dead_connection_error(s, map_wrong_type(error)))
     }
 
     fn recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        self.stack
+        self.stack_mut()
             .recv(Self::native(s), buf)
             .map_err(map_wrong_type)
     }
@@ -418,7 +546,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        self.stack
+        self.stack_mut()
             .shutdown_write(Self::native(s))
             .map_err(map_wrong_type)
     }
@@ -427,7 +555,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        self.stack.close(Self::native(s))?;
+        self.stack_mut().close(Self::native(s))?;
         self.closed.insert(s.0);
         self.options.retain(|(socket, _), _| *socket != s.0);
         self.udp_ports.remove(&s.0);
@@ -440,7 +568,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if port == 0 {
             return Err(Errno::EADDRNOTAVAIL);
         }
-        let socket = self.stack.udp_bind(port).map(Self::ours)?;
+        let socket = self.stack_mut().udp_bind(port).map(Self::ours)?;
         self.udp_ports.insert(socket.0, port);
         Ok(socket)
     }
@@ -455,7 +583,10 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
             return Err(Errno::EBADF);
         }
         let destination = (IpAddr::V4(native::Ipv4Addr::new(to.0.octets())), to.1);
-        let result = match self.stack.udp_send_to(Self::native(s), data, destination) {
+        let result = self
+            .stack_mut()
+            .udp_send_to(Self::native(s), data, destination);
+        let result = match result {
             Ok(length) => Ok(length),
             Err(Errno::EAGAIN) => {
                 if self.pending_udp_bytes.saturating_add(data.len()) > 65_535 {
@@ -481,7 +612,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        let (length, (source, port)) = self.stack.udp_recv_from(Self::native(s), buf)?;
+        let (length, (source, port)) = self.stack_mut().udp_recv_from(Self::native(s), buf)?;
         let IpAddr::V4(source) = source else {
             return Err(Errno::EAFNOSUPPORT);
         };
@@ -489,31 +620,37 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn poll(&mut self, now_ms: i64) -> Vec<Event> {
-        let result = self.stack.poll(Instant::from_millis(now_ms));
+        let result = self.stack_mut().poll(Instant::from_millis(now_ms));
         self.rx_drops = self
             .rx_drops
             .saturating_add(u64::try_from(result.dropped).unwrap_or(u64::MAX));
         self.enforce_backlog();
         self.flush_pending_udp();
-        let mut events: Vec<Event> = self
-            .stack
-            .take_events()
+        let raw_events: Vec<native::Event> = self.stack_mut().take_events().collect();
+        let mut events: Vec<Event> = raw_events
+            .into_iter()
             .filter(|event| !self.closed.contains(&event_socket(*event).0))
             .map(Self::map_event)
             .collect();
-        for socket in self.stack.sockets().collect::<Vec<_>>() {
+        let sockets: Vec<_> = self.stack_mut().sockets().collect();
+        for socket in sockets {
             if self.closed.contains(&socket.0) || self.notified_closed.contains(&socket.0) {
                 continue;
             }
-            if let Ok(info) = self.stack.socket_info(socket)
-                && matches!(
-                    info.state,
+            let state = self
+                .stack_mut()
+                .socket_info(socket)
+                .ok()
+                .map(|info| info.state);
+            if matches!(
+                state,
+                Some(
                     native::TcpState::CloseWait
                         | native::TcpState::LastAck
                         | native::TcpState::TimeWait
                         | native::TcpState::Closed
                 )
-            {
+            ) {
                 self.notified_closed.insert(socket.0);
                 events.push(Event::Closed(Self::ours(socket)));
             }
@@ -522,12 +659,12 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64> {
-        self.stack
+        self.stack_mut()
             .next_poll_delay(Instant::from_millis(now_ms))
             .map(|duration| duration.as_millis())
     }
     fn local_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
-        let info = self.stack.socket_info(Self::native(s)).ok()?;
+        let info = self.stack_ref().socket_info(Self::native(s)).ok()?;
         let (address, port) = info.local;
         match address {
             IpAddr::V4(address) => Some((Ipv4Addr::from_octets(address.octets()), port)),
@@ -536,7 +673,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn peer_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
-        let info = self.stack.socket_info(Self::native(s)).ok()?;
+        let info = self.stack_ref().socket_info(Self::native(s)).ok()?;
         let (address, port) = info.remote?;
         match address {
             IpAddr::V4(address) => Some((Ipv4Addr::from_octets(address.octets()), port)),
@@ -556,7 +693,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
                 Ok(())
             }
             4 => {
-                self.stack.set_nodelay(Self::native(s), value != 0)?;
+                self.stack_mut().set_nodelay(Self::native(s), value != 0)?;
                 self.options.insert((s.0, option), value);
                 Ok(())
             }
@@ -579,8 +716,58 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         if self.closed.contains(&s.0) {
             return Err(Errno::EBADF);
         }
-        let error = self.stack.take_error(Self::native(s))?;
+        let error = self.stack_mut().take_error(Self::native(s))?;
         Ok(error.map_or(0, |error| i32::try_from(-error.to_ret()).unwrap_or(0)))
+    }
+
+    fn mptcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+    ) -> Result<SocketId, Errno> {
+        RavenTcpipBackend::mptcp_connect(self, remote, local)
+    }
+
+    fn mptcp_send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        RavenTcpipBackend::mptcp_send(self, s, data)
+    }
+
+    fn mptcp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        RavenTcpipBackend::mptcp_recv(self, s, buf)
+    }
+
+    fn mptcp_readiness(&self, s: SocketId) -> Result<Readiness, Errno> {
+        RavenTcpipBackend::mptcp_readiness(self, s)
+    }
+
+    fn mptcp_close(&mut self, s: SocketId) -> Result<(), Errno> {
+        RavenTcpipBackend::mptcp_close(self, s)
+    }
+
+    fn mptcp_add_path(
+        &mut self,
+        s: SocketId,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+        backup: bool,
+    ) -> Result<u32, Errno> {
+        RavenTcpipBackend::mptcp_add_path(self, s, remote, local, backup)
+    }
+
+    fn mptcp_remove_path(&mut self, s: SocketId, subflow: u32) -> Result<(), Errno> {
+        RavenTcpipBackend::mptcp_remove_path(self, s, subflow)
+    }
+
+    fn mptcp_set_backup(&mut self, s: SocketId, subflow: u32, backup: bool) -> Result<(), Errno> {
+        RavenTcpipBackend::mptcp_set_backup(self, s, subflow, backup)
+    }
+
+    fn mptcp_info(&self, s: SocketId) -> Result<crate::MptcpInfo, Errno> {
+        RavenTcpipBackend::mptcp_info(self, s)
+    }
+
+    fn mptcp_subflows(&self, s: SocketId) -> Result<Vec<raven_tcpip::SubflowInfo>, Errno> {
+        RavenTcpipBackend::mptcp_subflows(self, s)
     }
 }
 

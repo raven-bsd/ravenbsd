@@ -28,7 +28,20 @@ pub use backend::raven::RavenTcpipBackend;
 pub use core::Core;
 
 pub use raven_abi::errno::Errno;
-pub use raven_tcpip::{ChecksumOffload, Device, DeviceCaps, Instant, Medium, Readiness, TxError};
+pub use raven_tcpip::{
+    ChecksumOffload, Device, DeviceCaps, Instant, IpAddr, Medium, Readiness, SubflowInfo, TxError,
+};
+
+/// MPTCP connection state reported to `MPTCP_INFO`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MptcpInfo {
+    /// Connection state (1 = established for the API surface).
+    pub state: u8,
+    /// Number of subflows, including the primary.
+    pub subflows: u32,
+    /// Number of active (regular) paths.
+    pub active: u32,
+}
 
 /// The native raven-tcpip-backed core.
 pub type NetCore<D> = Core<RavenTcpipBackend<D>>;

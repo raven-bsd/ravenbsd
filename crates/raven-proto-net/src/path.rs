@@ -7,6 +7,7 @@
 //!
 //! * `net:tcp/<ipv4>:<port>` - a TCP socket to a remote endpoint;
 //! * `net:udp/<ipv4>:<port>` - a UDP socket;
+//! * `net:mptcp[/<ipv4>:<port>]` - an MPTCP socket (`IPPROTO_MPTCP`) opened before its endpoint;
 //! * `net:icmp/<ipv4>` - an ICMP echo socket for one destination;
 //! * `net:` - the control channel (interface table, routes, ARP).
 //!
@@ -104,6 +105,19 @@ pub fn parse(path: &str) -> Result<SchemePath, PathError> {
                 ip: parse_ipv4(rest)?,
                 port: 0,
             }),
+        });
+    }
+    if rest == "mptcp" {
+        // The client opens the MPTCP socket before it knows an endpoint; bind/connect carry it.
+        return Ok(SchemePath {
+            transport: Transport::Tcp,
+            endpoint: None,
+        });
+    }
+    if let Some(rest) = rest.strip_prefix("mptcp/") {
+        return Ok(SchemePath {
+            transport: Transport::Tcp,
+            endpoint: Some(parse_endpoint(rest)?),
         });
     }
     let (transport, rest) = if let Some(rest) = rest.strip_prefix("tcp/") {

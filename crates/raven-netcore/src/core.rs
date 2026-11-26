@@ -140,6 +140,71 @@ impl<B: StackBackend> Core<B> {
         self.backend.tcp_connect(remote, local_port)
     }
 
+    /// Open a client MPTCP connection.
+    pub fn mptcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+    ) -> Result<SocketId, Errno> {
+        self.backend.mptcp_connect(remote, local)
+    }
+
+    /// Send on an MPTCP connection.
+    pub fn mptcp_send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        self.backend.mptcp_send(s, data)
+    }
+
+    /// Receive from an MPTCP connection.
+    pub fn mptcp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        self.backend.mptcp_recv(s, buf)
+    }
+
+    /// Live MPTCP readiness.
+    pub fn mptcp_readiness(&self, s: SocketId) -> Result<crate::Readiness, Errno> {
+        self.backend.mptcp_readiness(s)
+    }
+
+    /// Close an MPTCP connection.
+    pub fn mptcp_close(&mut self, s: SocketId) -> Result<(), Errno> {
+        self.backend.mptcp_close(s)
+    }
+
+    /// Add one MPTCP path.
+    pub fn mptcp_add_path(
+        &mut self,
+        s: SocketId,
+        remote: (Ipv4Addr, u16),
+        local: Option<Ipv4Addr>,
+        backup: bool,
+    ) -> Result<u32, Errno> {
+        self.backend.mptcp_add_path(s, remote, local, backup)
+    }
+
+    /// Remove one MPTCP path.
+    pub fn mptcp_remove_path(&mut self, s: SocketId, subflow: u32) -> Result<(), Errno> {
+        self.backend.mptcp_remove_path(s, subflow)
+    }
+
+    /// Mark one MPTCP path backup or regular.
+    pub fn mptcp_set_backup(
+        &mut self,
+        s: SocketId,
+        subflow: u32,
+        backup: bool,
+    ) -> Result<(), Errno> {
+        self.backend.mptcp_set_backup(s, subflow, backup)
+    }
+
+    /// MPTCP connection state.
+    pub fn mptcp_info(&self, s: SocketId) -> Result<crate::MptcpInfo, Errno> {
+        self.backend.mptcp_info(s)
+    }
+
+    /// Per-subflow MPTCP state.
+    pub fn mptcp_subflows(&self, s: SocketId) -> Result<Vec<crate::SubflowInfo>, Errno> {
+        self.backend.mptcp_subflows(s)
+    }
+
     /// Queue bytes on a TCP connection.
     pub fn send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
         self.backend.send(s, data)

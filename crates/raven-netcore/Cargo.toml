@@ -39,4 +39,4 @@ required-features = ["testutil"]
 
 [dependencies]
 raven-abi = { path = "../raven-abi" }
-raven-tcpip = { path = "../raven-tcpip" }
+raven-tcpip = { path = "../raven-tcpip", features = ["mptcp"] }

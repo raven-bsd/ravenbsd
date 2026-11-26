@@ -24,6 +24,29 @@ fn parses_tcp_and_udp_paths() {
 }
 
 #[test]
+fn parses_the_mptcp_paths() {
+    assert_eq!(
+        parse("net:mptcp"),
+        Ok(SchemePath {
+            transport: Transport::Tcp,
+            endpoint: None,
+        })
+    );
+    assert_eq!(
+        parse("net:mptcp/127.0.0.1:24080"),
+        Ok(SchemePath {
+            transport: Transport::Tcp,
+            endpoint: Some(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24080,
+            }),
+        })
+    );
+    assert_eq!(parse("net:mptcp/1.2.3.4"), Err(PathError::MissingAddress));
+    assert_eq!(parse("net:mptcp/1.2.3.4:0"), Err(PathError::BadPort));
+}
+
+#[test]
 fn control_path_has_no_endpoint() {
     assert_eq!(
         parse("net:"),

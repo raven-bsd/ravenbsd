@@ -1449,3 +1449,290 @@ fn a_filtered_server_drains_the_shared_filter_log() {
     );
     assert!(netd.take_filter_log().is_empty());
 }
+
+#[test]
+fn mptcp_bind_zero_allocates_and_getsockname_reports_the_port() {
+    let mut netd = new_netd();
+    let file = netd.open("net:mptcp").expect("mptcp open");
+    let bound = call_socket(
+        &mut netd,
+        file,
+        Call::Bind(Endpoint {
+            ip: [127, 0, 0, 1],
+            port: 0,
+        }),
+    );
+    assert_eq!(bound, Response::Ok);
+    match call_socket(&mut netd, file, Call::GetSockName) {
+        Response::Endpoint(endpoint) => assert_ne!(endpoint.port, 0),
+        other => panic!("unexpected getsockname: {other:?}"),
+    }
+    assert_eq!(
+        call_socket(&mut netd, file, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+}
+
+#[test]
+fn mptcp_listen_without_bind_allocates_a_port() {
+    let mut netd = new_netd();
+    let file = netd.open("net:mptcp").expect("mptcp open");
+    assert_eq!(
+        call_socket(&mut netd, file, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+    match call_socket(&mut netd, file, Call::GetSockName) {
+        Response::Endpoint(endpoint) => assert_ne!(endpoint.port, 0),
+        other => panic!("unexpected getsockname: {other:?}"),
+    }
+}
+
+#[test]
+fn mptcp_connect_to_a_loopback_listener_opens_a_meta_socket() {
+    let mut netd = new_netd();
+    let listener = netd.open("net:mptcp").expect("listener open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            listener,
+            Call::Bind(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24080,
+            }),
+        ),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+    let client = netd.open("net:mptcp").expect("client open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Connect(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24080,
+            }),
+        ),
+        Response::Ok
+    );
+    let mut now = 0;
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    assert_eq!(netd.write(accepted, 0, b"hello").unwrap(), 5);
+    let mut buffer = [0u8; 8];
+    let read = read_retry(&mut netd, client, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"hello");
+}
+
+#[test]
+fn mptcp_listener_poll_raises_the_accept_edge_for_its_file() {
+    let mut netd = new_netd();
+    let listener = netd.open("net:mptcp").expect("listener open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            listener,
+            Call::Bind(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24081,
+            }),
+        ),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 1 }),
+        Response::Ok
+    );
+    let client = netd.open("net:mptcp").expect("client open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Connect(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24081,
+            }),
+        ),
+        Response::Ok
+    );
+    let mut now = 0;
+    let mut rung = false;
+    for _ in 0..16 {
+        now += 1;
+        for ready in netd.poll(now) {
+            if let Event::Accepted {
+                listener: core_listener,
+                ..
+            } = ready.event
+            {
+                let files = netd.files_for_socket(ready.interface, core_listener);
+                assert!(
+                    files.contains(&listener),
+                    "accepted edge for {core_listener:?} did not reach the listener file: {files:?}"
+                );
+                rung = true;
+            }
+        }
+        if rung {
+            break;
+        }
+    }
+    assert!(rung, "the stack never raised an accepted edge");
+    assert!(
+        netd.socket_readiness(listener).expect("readiness").readable,
+        "the listener is not readable after the accepted edge"
+    );
+    match call_socket(&mut netd, listener, Call::Accept) {
+        Response::Socket { .. } => {}
+        other => panic!("unexpected accept response: {other:?}"),
+    }
+}
+
+fn call_raw(netd: &mut Netd<Loopback>, file: u64, request: &[u8]) -> Vec<u8> {
+    let mut response = [0u8; 512];
+    let read = netd.call(file, request, &mut response).expect("raw call");
+    response[..read].to_vec()
+}
+
+fn mptcp_request(op: u16, payload: &[u8]) -> Vec<u8> {
+    let mut request = alloc::vec![1u8, 0, 4, 0, op as u8, (op >> 8) as u8];
+    request.extend_from_slice(payload);
+    request
+}
+
+fn mptcp_pm_addr(id: u8, flags: u16, addr: [u8; 4]) -> [u8; 12] {
+    let mut bytes = [0u8; 12];
+    bytes[0] = 2; // AF_INET
+    bytes[1] = id;
+    bytes[2..4].copy_from_slice(&flags.to_le_bytes());
+    bytes[4..8].copy_from_slice(&addr);
+    bytes
+}
+
+fn mptcp_info(netd: &mut Netd<Loopback>, file: u64) -> (u8, u32, u32) {
+    let reply = call_raw(netd, file, &mptcp_request(OP_MPTCP_INFO, &[]));
+    assert_eq!(
+        u16::from_le_bytes([reply[0], reply[1]]),
+        MPTCP_REPLY_INFO,
+        "info tag"
+    );
+    assert_eq!(
+        usize::from(u16::from_le_bytes([reply[2], reply[3]])),
+        MPTCP_INFO_LEN
+    );
+    (
+        reply[4],
+        u32::from_le_bytes([reply[8], reply[9], reply[10], reply[11]]),
+        u32::from_le_bytes([reply[12], reply[13], reply[14], reply[15]]),
+    )
+}
+
+#[test]
+fn mptcp_sol_control_adds_marks_and_reports_paths() {
+    let mut netd = new_netd();
+    let listener = netd.open("net:mptcp").expect("listener open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            listener,
+            Call::Bind(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24082,
+            }),
+        ),
+        Response::Ok
+    );
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 2 }),
+        Response::Ok
+    );
+    let client = netd.open("net:mptcp").expect("client open");
+    assert_eq!(
+        call_socket(
+            &mut netd,
+            client,
+            Call::Connect(Endpoint {
+                ip: [127, 0, 0, 1],
+                port: 24082,
+            }),
+        ),
+        Response::Ok
+    );
+    let mut now = 0;
+    let _ = accept(&mut netd, listener, &mut now);
+
+    let reply = call_raw(
+        &mut netd,
+        client,
+        &mptcp_request(OP_MPTCP_ADD_ADDR, &mptcp_pm_addr(1, 0, [127, 0, 0, 1])),
+    );
+    assert_eq!(reply.as_slice(), &MPTCP_REPLY_OK.to_le_bytes());
+    assert_eq!(mptcp_info(&mut netd, client), (1, 2, 2));
+
+    let reply = call_raw(
+        &mut netd,
+        client,
+        &mptcp_request(OP_MPTCP_SET_FLAGS, &mptcp_pm_addr(1, 1, [127, 0, 0, 1])),
+    );
+    assert_eq!(reply.as_slice(), &MPTCP_REPLY_OK.to_le_bytes());
+    assert_eq!(mptcp_info(&mut netd, client), (1, 2, 1));
+
+    let reply = call_raw(&mut netd, client, &mptcp_request(OP_MPTCP_SUBFLOWS, &[]));
+    assert_eq!(
+        u16::from_le_bytes([reply[0], reply[1]]),
+        MPTCP_REPLY_SUBFLOWS
+    );
+    let length = usize::from(u16::from_le_bytes([reply[2], reply[3]]));
+    assert_eq!(length, 2 * MPTCP_SUBFLOW_LEN);
+    let backups = reply[4..4 + length]
+        .chunks_exact(MPTCP_SUBFLOW_LEN)
+        .filter(|record| record[4] == 1)
+        .count();
+    assert_eq!(backups, 1, "exactly the added path is backup");
+
+    let reply = call_raw(&mut netd, client, &mptcp_request(OP_MPTCP_DEL_ADDR, &[1]));
+    assert_eq!(reply.as_slice(), &MPTCP_REPLY_OK.to_le_bytes());
+    assert_eq!(mptcp_info(&mut netd, client), (1, 1, 1));
+
+    let reply = call_raw(
+        &mut netd,
+        client,
+        &mptcp_request(OP_MPTCP_SET_FLAGS, &mptcp_pm_addr(9, 1, [127, 0, 0, 1])),
+    );
+    assert_eq!(
+        u16::from_le_bytes([reply[0], reply[1]]),
+        MPTCP_REPLY_ERR,
+        "unknown path id"
+    );
+    assert_eq!(
+        u16::from_le_bytes([reply[2], reply[3]]),
+        Errno::ENOENT.0,
+        "unknown path id is ENOENT"
+    );
+
+    let reply = call_raw(
+        &mut netd,
+        client,
+        &mptcp_request(OP_MPTCP_ADD_ADDR, &[2, 1]),
+    );
+    assert_eq!(
+        u16::from_le_bytes([reply[0], reply[1]]),
+        MPTCP_REPLY_ERR,
+        "short mptcp_pm_addr"
+    );
+    assert_eq!(
+        u16::from_le_bytes([reply[2], reply[3]]),
+        Errno::EINVAL.0,
+        "short mptcp_pm_addr is EINVAL"
+    );
+
+    let mut response = [0u8; 64];
+    assert_eq!(
+        netd.call(client, &mptcp_request(99, &[]), &mut response),
+        Err(Errno::EINVAL),
+        "an unknown SOL_MPTCP opcode is EINVAL"
+    );
+}
