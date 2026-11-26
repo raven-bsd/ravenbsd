@@ -60,11 +60,7 @@ mod program {
     /// Idle pause between service-loop iterations.
     const SERVE_TICK_NS: u64 = 10_000_000;
 
-    /// Bounded diagnostics: completed EP1 events and timed-out waits.
-    static EVENTS: AtomicU32 = AtomicU32::new(0);
-    static TIMEOUTS: AtomicU32 = AtomicU32::new(0);
-    /// Bounded diagnostics: the first successful and the first failed `kbd:` push.
-    static PUSHED: AtomicU32 = AtomicU32::new(0);
+    /// Bounded diagnostics: report the first failed `kbd:` open, never the keystrokes.
     static OPEN_FAILED: AtomicU32 = AtomicU32::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
@@ -232,16 +228,16 @@ mod program {
     /// keyboard.
     fn serve_console(service: &mut KeyboardService<HidTransport>) -> Result<(), String> {
         println!("usb-keyboard: serving");
-        let mut pushed = 0usize;
+        let mut first = true;
         loop {
             service.poll().map_err(hid_text)?;
             let mut console = [0u8; 8];
             let count = service.read_console(&mut console);
             if count > 0 {
-                if pushed == 0 {
+                if first {
                     println!("usb-keyboard: first console bytes len={count}");
+                    first = false;
                 }
-                pushed = pushed.saturating_add(1);
                 push_console(&console[..count]);
             }
             let _ = raven_rt::nanosleep(SERVE_TICK_NS);
@@ -258,14 +254,8 @@ mod program {
         for _ in 0..PUSH_ATTEMPTS {
             match client.open("kbd:console", OPEN_WRITE) {
                 Ok(handle) => {
-                    let written = client.write(handle, 0, bytes);
+                    let _ = client.write(handle, 0, bytes);
                     let _ = client.close(handle);
-                    if PUSHED.fetch_add(1, Ordering::Relaxed) == 0 {
-                        println!(
-                            "usb-keyboard: pushed len={} written={written:?}",
-                            bytes.len()
-                        );
-                    }
                     return;
                 }
                 Err(open) => error = Some(open),
@@ -440,25 +430,7 @@ mod program {
         }
 
         fn next_report(&mut self) -> Option<[u8; 8]> {
-            let event = match self.controller.wait_interrupt() {
-                Ok(event) => {
-                    if EVENTS.fetch_add(1, Ordering::Relaxed) < 8 {
-                        println!(
-                            "usb-keyboard: event transfer={} ep={} code={}",
-                            event.kind() == raven_xhci::TrbType::TransferEvent,
-                            event.endpoint(),
-                            event.completion_code()
-                        );
-                    }
-                    event
-                }
-                Err(error) => {
-                    if TIMEOUTS.fetch_add(1, Ordering::Relaxed) < 2 {
-                        println!("usb-keyboard: wait {error}");
-                    }
-                    return None;
-                }
-            };
+            let event = self.controller.wait_interrupt().ok()?;
             if event.completion_code() != 1 && event.completion_code() != 13 {
                 return None;
             }
