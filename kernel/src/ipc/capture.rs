@@ -569,6 +569,7 @@ pub fn create(
     len: u64,
     writable: bool,
 ) -> Result<Capture, Errno> {
+    crate::kprintln!("capture: create addr={:#x} len={} writable={}", client_addr, len, writable);
     if len == 0 {
         return Err(Errno::EINVAL);
     }
@@ -739,6 +740,7 @@ pub fn create(
         };
         while mapped < pages {
             let Some(virt) = VirtAddr::new(base.saturating_add(mapped.saturating_mul(PAGE))) else {
+                crate::kprintln!("capture: virt invalid base={:#x} mapped={}", base, mapped);
                 if !unmap_partial(&mut mapper, base, mapped) {
                     frames.leak();
                 }

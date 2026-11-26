@@ -234,8 +234,18 @@ fn read_at(
     }
     let trace = super::trace_k147() && K147_RT.fetch_add(1, Ordering::Relaxed) < 64;
     let trace_start = if trace { crate::time::now_ns() } else { 0 };
-    ensure_server(&file.server)?;
-    let capture = capture::create(caller, &file.server, address, len, true)?;
+    crate::kprintln!("ipc-read: router len={} addr={:#x} pos={:?}", len, address, positional);
+    if let Err(error) = ensure_server(&file.server) {
+        crate::kprintln!("ipc-read: ensure_server failed {:?}", error);
+        return Err(error);
+    }
+    let capture = match capture::create(caller, &file.server, address, len, true) {
+        Ok(capture) => capture,
+        Err(error) => {
+            crate::kprintln!("ipc-read: capture failed {:?}", error);
+            return Err(error);
+        }
+    };
     let trace_capture = if trace { crate::time::now_ns() } else { 0 };
     let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.server_id());
     packet.trace_id = current_trace_id();
