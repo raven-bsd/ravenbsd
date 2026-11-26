@@ -120397,9 +120397,10 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..924ee11eba6db4430bf7ec0de50f0b984095f535
+index 0000000..e494ba1081a325a3d61a3e5f4400efb704884e0c
 --- /dev/null
-@@ -0,0 +1,2485 @@
++++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
+@@ -0,0 +1,2498 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -120878,8 +120879,13 @@ index 0000000..924ee11eba6db4430bf7ec0de50f0b984095f535
 +
 +pub const F_ADD_SEALS: i32 = 19;
 +pub const F_CANCELLK: i32 = 33;
++pub const F_DUP2FD: i32 = 10;
++pub const F_DUP2FD_CLOEXEC: i32 = 18;
++pub const F_DUP3FD: i32 = 24;
++pub const F_DUP3FD_SHIFT: i32 = 16;
 +pub const F_DUPFD: i32 = 0;
 +pub const F_DUPFD_CLOEXEC: i32 = 17;
++pub const F_DUPFD_CLOFORK: i32 = 23;
 +pub const F_GETFD: i32 = 1;
 +pub const F_GETFL: i32 = 3;
 +pub const F_GETLEASE: i32 = 35;
@@ -120893,16 +120899,23 @@ index 0000000..924ee11eba6db4430bf7ec0de50f0b984095f535
 +pub const F_GET_FILE_RW_HINT: i32 = 41;
 +pub const F_GET_RW_HINT: i32 = 39;
 +pub const F_GET_SEALS: i32 = 20;
++pub const F_ISUNIONSTACK: i32 = 21;
++pub const F_KINFO: i32 = 22;
 +pub const F_LOCK: i32 = 1;
 +pub const F_NOTIFY: i32 = 36;
 +pub const F_OFD_GETLK: i32 = 30;
 +pub const F_OFD_SETLK: i32 = 31;
 +pub const F_OFD_SETLKW: i32 = 32;
++pub const F_OGETLK: i32 = 7;
 +pub const F_OK: i32 = 0;
++pub const F_OSETLK: i32 = 8;
++pub const F_OSETLKW: i32 = 9;
 +pub const F_OWNER_GID: i32 = 2;
 +pub const F_OWNER_PGRP: i32 = 2;
 +pub const F_OWNER_PID: i32 = 1;
 +pub const F_OWNER_TID: i32 = 0;
++pub const F_RDAHEAD: i32 = 16;
++pub const F_READAHEAD: i32 = 15;
 +pub const F_RDLCK: i32 = 1;
 +pub const F_SEAL_FUTURE_WRITE: i32 = 16;
 +pub const F_SEAL_GROW: i32 = 4;
@@ -120916,6 +120929,7 @@ index 0000000..924ee11eba6db4430bf7ec0de50f0b984095f535
 +pub const F_SETLK64: i32 = F_SETLK;
 +pub const F_SETLKW: i32 = 13;
 +pub const F_SETLKW64: i32 = F_SETLKW;
++pub const F_SETLK_REMOTE: i32 = 14;
 +pub const F_SETOWN: i32 = 6;
 +pub const F_SETOWN_EX: i32 = 27;
 +pub const F_SETPIPE_SZ: i32 = 37;
