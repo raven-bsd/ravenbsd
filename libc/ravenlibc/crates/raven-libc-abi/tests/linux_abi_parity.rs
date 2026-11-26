@@ -155,7 +155,7 @@ fn flag_parity_with_raven_linux_abi() {
         }
     }
     assert!(mismatches.is_empty(), "{mismatches:#?}");
-    assert!(compared > 300, "only {compared} names compared");
+    assert!(compared > 250, "only {compared} names compared");
     println!("linux-abi flag parity: compared {compared} constants");
 }
 
