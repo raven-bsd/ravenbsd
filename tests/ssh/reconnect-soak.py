@@ -389,11 +389,16 @@ def selftest() -> int:
         False,
     )
     check("utc-format", utc_from_epoch(0).endswith("Z"), True)
-    check("connect-default", parse_args(["--sessions", "1"])["connect_timeout"], 8.0)
+    check("connect-default", parse_args(["--sessions", "1"])["connect_timeout"], 30.0)
+    check(
+        "session-default",
+        parse_args(["--sessions", "1"])["session_timeout"],
+        60.0,
+    )
     check(
         "connect-set",
-        parse_args(["--sessions", "1", "--connect-timeout", "30"])["connect_timeout"],
-        30.0,
+        parse_args(["--sessions", "1", "--connect-timeout", "45"])["connect_timeout"],
+        45.0,
     )
     check("accel-default", parse_args(["--sessions", "1"])["accel"], "tcg")
     check("accel-kvm-opt", parse_args(["--sessions", "1", "--accel", "kvm"])["accel"], "kvm")
