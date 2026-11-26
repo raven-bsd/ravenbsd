@@ -738,18 +738,10 @@ fn open_map_file(client: &Client) -> Result<Handle, Errno> {
     Err(Errno::ENOENT)
 }
 
-/// Map/unmap the same chunk through vfsd's file pager. The kernel gate on exit codes 88/89
-/// prints `frame::stats().allocated_bytes` before and after; a leak keeps the delta above one
-/// chunk and prints the forbidden `s36: mapcheck leak` line.
-fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
-    let base = spawn_role(initfs, "mapbase").map_err(|_| "mapbase spawn")?;
-    if proc_wait(base).unwrap_or(-1) != 88 {
-        return Err("mapbase wait");
-    }
-    handle_close(base);
-
-    let client = Client::new();
-    let file = open_map_file(&client).map_err(|_| "vfsd open")?;
+/// Map/unmap the same chunk `MAP_CYCLES` times through vfsd's file pager, then close the file
+/// and synchronously drain the server's queued CLOSE before returning.
+fn map_batch(client: &Client) -> Result<(), &'static str> {
+    let file = open_map_file(client).map_err(|_| "vfsd open")?;
     let request = CallRequest::new(Call::Mmap {
         offset: 0,
         len: PAGE as u64,
@@ -798,12 +790,36 @@ fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         cycle = cycle.saturating_add(1);
     }
     client.close(file).map_err(|_| "vfsd close")?;
-    // The scheme close is fire-and-forget: give vfsd a bounded window to retire the 1000 pager
-    // keys and let the final in-flight page-outs drop their object references before the exit-89
-    // frame sample, so the gate measures the steady state (pager=0) rather than a drained
-    // backlog. Under the current loaded host the 1 s window still sampled 17-25 pages of
-    // in-flight frames just above the gate; 2 s measures the drained steady state.
-    nanosleep(2_000_000_000);
+    // The map-file CLOSE is a queued notification, not a synchronous retire. A following
+    // synchronous request on the same server is handled after it, so its reply proves that
+    // `retire_pagers` has dropped the pager keys; no fixed sleep is needed and no unrelated
+    // background allocation falls inside the sample window.
+    let barrier = client
+        .open_flags("file:/init", OpenFlags::READ)
+        .map_err(|_| "barrier open")?;
+    client.fstat(barrier).map_err(|_| "barrier stat")?;
+    client.close(barrier).map_err(|_| "barrier close")?;
+    Ok(())
+}
+
+/// Map/unmap the same chunk through vfsd's file pager. The kernel gate on exit codes 88/89
+/// prints `frame::stats().allocated_bytes` before and after; a leak keeps the delta above one
+/// chunk and prints the forbidden `s36: mapcheck leak` line.
+///
+/// A full warm-up batch runs before the exit-88 baseline: the first batch grows the kernel heap
+/// and the server's pager bookkeeping to their steady state, so the measured batch only shows a
+/// retained pager frame, not one-time allocator growth.
+fn vfsd_map_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
+    let client = Client::new();
+    map_batch(&client)?;
+
+    let base = spawn_role(initfs, "mapbase").map_err(|_| "mapbase spawn")?;
+    if proc_wait(base).unwrap_or(-1) != 88 {
+        return Err("mapbase wait");
+    }
+    handle_close(base);
+
+    map_batch(&client)?;
     println!("s36: vfsd map done={}", MAP_CYCLES);
 
     let top = spawn_role(initfs, "maptop").map_err(|_| "maptop spawn")?;
