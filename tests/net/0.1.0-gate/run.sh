@@ -90,6 +90,16 @@ if [ -z "$evidence" ]; then
         probe=$(dirname "$probe")
     done
 fi
+# A minion clone may live outside the workspace tree (the workspace links it
+# into minions/<worker>/ravenbsd); the local directive names the bound report,
+# so its prjmgmt root is the next fallback. The explicit --evidence-dir and
+# RAVEN_EVIDENCE_DIR still take precedence.
+if [ -z "$evidence" ] && [ -f "$root/DIRECTIVE.md" ]; then
+    report=$(awk '/^Report file: /{print $3; exit}' "$root/DIRECTIVE.md")
+    case "$report" in
+        */tickets/*) evidence=${report%%/tickets/*}/tickets/evidence/artifacts/S85n ;;
+    esac
+fi
 if [ -z "$evidence" ]; then
     echo "run.sh: cannot locate ravenbsd-prjmgmt; set RAVEN_EVIDENCE_DIR" >&2
     exit 2
