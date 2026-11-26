@@ -68,10 +68,10 @@ pub const SCHED_FIFO: i32 = 1;
 pub const SCHED_IDLE: i32 = 5;
 pub const SCHED_OTHER: i32 = 0;
 pub const SCHED_RR: i32 = 2;
-pub const WCONTINUED: i32 = 8;
-pub const WEXITED: i32 = 4;
+pub const WCONTINUED: i32 = 4;
+pub const WEXITED: i32 = 16;
 pub const WNOHANG: i32 = 1;
-pub const WNOWAIT: i32 = 16777216;
+pub const WNOWAIT: i32 = 8;
 pub const WSTOPPED: i32 = 2;
 pub const WUNTRACED: i32 = 2;
 
@@ -120,10 +120,10 @@ pub const ALL: &[(&str, i128)] = &[
     ("SCHED_IDLE", 5i128),
     ("SCHED_OTHER", 0i128),
     ("SCHED_RR", 2i128),
-    ("WCONTINUED", 8i128),
-    ("WEXITED", 4i128),
+    ("WCONTINUED", 4i128),
+    ("WEXITED", 16i128),
     ("WNOHANG", 1i128),
-    ("WNOWAIT", 16777216i128),
+    ("WNOWAIT", 8i128),
     ("WSTOPPED", 2i128),
     ("WUNTRACED", 2i128),
 ];

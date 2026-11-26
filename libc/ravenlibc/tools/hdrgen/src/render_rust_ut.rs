@@ -100,7 +100,7 @@ fn musl_group_files_carry_the_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    for name in ["signal.rs", "limits.rs", "socket.rs"] {
+    for name in ["limits.rs", "socket.rs", "misc.rs"] {
         let text = &files[name];
         assert!(
             text.contains("Copyright © 2005-2020 Rich Felker, et al."),
@@ -116,24 +116,29 @@ fn musl_group_files_carry_the_notice_and_revision() {
 }
 
 #[test]
-fn freebsd_group_file_carries_the_reviewed_notice_and_revision() {
+fn freebsd_group_files_carry_the_reviewed_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    let text = &files["errno.rs"];
-    assert!(
-        text.contains("SPDX-License-Identifier: BSD-3-Clause"),
-        "{text}"
-    );
-    assert!(
-        text.contains("RavenBSD: derived from freebsd:sys/sys/errno.h"),
-        "{text}"
-    );
-    assert!(
-        text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
-        "{text}"
-    );
-    assert!(!text.contains("Permission is hereby granted"), "{text}");
+    for (name, donor) in [
+        ("errno.rs", "freebsd:sys/sys/errno.h"),
+        ("signal.rs", "freebsd:sys/sys/signal.h"),
+    ] {
+        let text = &files[name];
+        assert!(
+            text.contains("SPDX-License-Identifier: BSD-3-Clause"),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("RavenBSD: derived from {donor}")),
+            "{text}"
+        );
+        assert!(
+            text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
+            "{text}"
+        );
+        assert!(!text.contains("Permission is hereby granted"), "{text}");
+    }
 }
 
 #[test]

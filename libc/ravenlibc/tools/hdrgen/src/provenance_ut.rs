@@ -112,8 +112,8 @@ fn import_entries_cover_every_derived_file() {
         .iter()
         .filter(|entry| entry.upstream == "linux-raw-sys")
         .collect();
-    assert_eq!(musl.len(), 21);
-    assert_eq!(freebsd.len(), 21);
+    assert_eq!(musl.len(), 18);
+    assert_eq!(freebsd.len(), 24);
     assert_eq!(linux.len(), 3);
     assert!(entries.windows(2).all(|pair| pair[0].path < pair[1].path));
     for entry in &musl {

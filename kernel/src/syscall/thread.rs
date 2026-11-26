@@ -690,7 +690,7 @@ pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
         copy_from_user(bytes, source)?;
         let flags = input.ss_flags as u32;
-        if flags & !(process::SS_DISABLE | process::SS_AUTODISARM) != 0 {
+        if flags & !process::SS_DISABLE != 0 {
             return Err(Errno::EINVAL);
         }
         if flags & process::SS_DISABLE != 0 {

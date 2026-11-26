@@ -30,9 +30,17 @@ fn sigsetops_empty_fill_add_del_member() {
     assert!(!set.is_member(1).unwrap());
     set.add(1).unwrap();
     assert!(set.is_member(1).unwrap());
-    for sig in 32..=34 {
-        assert!(set.add(sig).is_err());
-        assert!(set.del(sig).is_err());
+    // FreeBSD `_SIG_VALID`: 1..=_SIG_MAXSIG (128), including SIGTHR (32) and the reserved
+    // real-time numbers; 129 is the first rejected value.
+    for sig in [32, 33, 34, 65, 126, 128] {
+        assert!(set.add(sig).is_ok(), "{sig}");
+        assert!(set.is_member(sig).unwrap(), "{sig}");
+        assert!(set.del(sig).is_ok(), "{sig}");
+        assert!(!set.is_member(sig).unwrap(), "{sig}");
+    }
+    for sig in [0, -1, 129, 200] {
+        assert!(set.add(sig).is_err(), "{sig}");
+        assert!(set.del(sig).is_err(), "{sig}");
     }
 }
 

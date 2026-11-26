@@ -8,12 +8,12 @@
 
 #![allow(dead_code)] // the shared constant table is exercised by the host tests
 
-/// `waitid`/`waitpid` id type: a single process id.
-pub const P_PID: u32 = 1;
-/// `waitid`/`waitpid` id type: a process group id.
+/// `waitid`/`waitpid` id type: a single process id (FreeBSD `P_PID`).
+pub const P_PID: u32 = 0;
+/// `waitid`/`waitpid` id type: a process group id (FreeBSD `P_PGID`).
 pub const P_PGID: u32 = 2;
-/// `waitid`/`waitpid` id type: any child.
-pub const P_ALL: u32 = 3;
+/// `waitid`/`waitpid` id type: any child (FreeBSD `P_ALL`).
+pub const P_ALL: u32 = 7;
 
 /// Return immediately when no child event is ready.
 pub const WNOHANG: u32 = 1;
@@ -24,32 +24,75 @@ pub const WCONTINUED: u32 = 4;
 /// The supported wait option bits.
 pub const WAIT_OPTIONS: u32 = WNOHANG | WUNTRACED | WCONTINUED;
 
+// The native signal domain is the FreeBSD numbering (`sys/sys/signal.h` at the S700 pin), not
+// the Linux numbering. Every kernel table and frame uses these values.
+
 /// Hangup.
 pub const SIGHUP: u32 = 1;
 /// Interrupt.
 pub const SIGINT: u32 = 2;
-/// Termination.
-pub const SIGTERM: u32 = 15;
+/// Quit (default core dump).
+pub const SIGQUIT: u32 = 3;
+/// Illegal instruction (default core dump).
+pub const SIGILL: u32 = 4;
+/// Trace trap (default core dump).
+pub const SIGTRAP: u32 = 5;
+/// Abort (default core dump).
+pub const SIGABRT: u32 = 6;
+/// EMT instruction (default core dump).
+pub const SIGEMT: u32 = 7;
+/// Floating-point exception (default core dump).
+pub const SIGFPE: u32 = 8;
 /// Uncatchable termination.
 pub const SIGKILL: u32 = 9;
-/// User-defined signal 1.
-pub const SIGUSR1: u32 = 10;
+/// Bus error (default core dump).
+pub const SIGBUS: u32 = 10;
 /// Segmentation violation (default core dump).
 pub const SIGSEGV: u32 = 11;
-/// Child exit/stop notification.
-pub const SIGCHLD: u32 = 17;
-/// Continue a stopped process.
-pub const SIGCONT: u32 = 18;
+/// Non-existent system call (default core dump).
+pub const SIGSYS: u32 = 12;
+/// Write on a pipe with no reader.
+pub const SIGPIPE: u32 = 13;
+/// Alarm clock.
+pub const SIGALRM: u32 = 14;
+/// Termination.
+pub const SIGTERM: u32 = 15;
+/// Urgent I/O condition (default ignore).
+pub const SIGURG: u32 = 16;
 /// Uncatchable stop.
-pub const SIGSTOP: u32 = 19;
+pub const SIGSTOP: u32 = 17;
 /// Terminal stop.
-pub const SIGTSTP: u32 = 20;
+pub const SIGTSTP: u32 = 18;
+/// Continue a stopped process.
+pub const SIGCONT: u32 = 19;
+/// Child exit/stop notification (default ignore).
+pub const SIGCHLD: u32 = 20;
 /// Background read stop.
 pub const SIGTTIN: u32 = 21;
 /// Background write stop.
 pub const SIGTTOU: u32 = 22;
-/// Highest accepted signal number.
-pub const SIG_MAX: u32 = 64;
+/// Asynchronous I/O (default ignore).
+pub const SIGIO: u32 = 23;
+/// Exceeded CPU time limit.
+pub const SIGXCPU: u32 = 24;
+/// Exceeded file size limit.
+pub const SIGXFSZ: u32 = 25;
+/// Virtual time alarm.
+pub const SIGVTALRM: u32 = 26;
+/// Profiling timer alarm.
+pub const SIGPROF: u32 = 27;
+/// Window size change (default ignore).
+pub const SIGWINCH: u32 = 28;
+/// Status request (default ignore).
+pub const SIGINFO: u32 = 29;
+/// User-defined signal 1.
+pub const SIGUSR1: u32 = 30;
+/// User-defined signal 2.
+pub const SIGUSR2: u32 = 31;
+/// Reserved by the thread library.
+pub const SIGTHR: u32 = 32;
+/// Highest accepted native signal number; FreeBSD reserves 32 for `SIGTHR`.
+pub const SIG_MAX: u32 = 32;
 
 /// True for a signal number the kernel accepts.
 #[must_use]
@@ -169,18 +212,17 @@ const DEFAULT_IGNORE: u8 = 3;
 const DEFAULT_STOP: u8 = 4;
 const DEFAULT_CONTINUE: u8 = 5;
 
-/// Signals 0..=64 (Linux numbering; 32..34 are libc-internal).
-const DEFAULT_ACTIONS: [u8; 65] = [
-    0, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 3, 5, 4, 4, 4, 4, 3, 2, 2, 1, 1, 3, 1, 1, 2,
-    0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1,
+/// Signals 0..=32 in the FreeBSD numbering (`sys/kern/kern_sig.c` `sigproptbl`).
+const DEFAULT_ACTIONS: [u8; 33] = [
+    0, 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 1, 1, 3, 4, 4, 5, 3, 4, 4, 3, 1, 1, 1, 1, 3, 3, 1, 1,
+    0,
 ];
 
-/// The default action of `signo`, or `None` for 0, 32..34 and values above 64.
+/// The default action of `signo`, or `None` for 0, 32 and values above 32.
 #[must_use]
 #[allow(clippy::indexing_slicing)] // the range is checked before the index
 pub const fn default_action(signo: u32) -> Option<DefaultAction> {
-    if signo == 0 || signo > 64 {
+    if signo == 0 || signo > SIG_MAX {
         return None;
     }
     match DEFAULT_ACTIONS[signo as usize] {
@@ -199,8 +241,8 @@ pub const fn stop_status(signo: u32) -> i32 {
     (((signo & 0x7f) as i32) << 8) | 0x7f
 }
 
-/// The POSIX wait status for a continued child.
-pub const CONTINUED_STATUS: i32 = 0xffff;
+/// The FreeBSD `W_CONTINUED` wait status (`0x13`, the `SIGCONT` number).
+pub const CONTINUED_STATUS: i32 = 0x13;
 
 /// One observable child event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

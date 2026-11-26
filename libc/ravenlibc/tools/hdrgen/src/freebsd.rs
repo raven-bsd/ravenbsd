@@ -16,7 +16,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 
-use crate::model::{ConstDef, RecordDef};
+use crate::model::{ARCHES, ConstDef, RecordDef};
 use crate::probe::{
     Report, copy_tree, copy_tree_missing, parse_assembly, run_command, same_mod_64,
 };
@@ -1230,35 +1230,46 @@ fn measure_side(
     measure_runtime(includes, temp, side);
 }
 
-/// Read the generated `ALL` table from a Rust ABI file.
+/// Read the generated Rust ABI values per architecture.
 ///
-/// The table stores every evaluated value, including alias and expression rows (`POLLWRNORM =
-/// POLLOUT`), so the oracle compares the generated value rather than trying to parse Rust
-/// expressions. A file without `ALL` falls back to literal `pub const` rows.
+/// The `ALL` table stores every evaluated value, including alias and expression rows
+/// (`POLLWRNORM = POLLOUT`), with the architecture `#[cfg]` guard on the row. A file without
+/// `ALL` falls back to literal `pub const` rows, keeping the same per-architecture guard.
 #[must_use]
-pub fn parse_rust_constants(text: &str) -> BTreeMap<String, i128> {
-    let mut values = BTreeMap::new();
+pub fn parse_rust_constants(text: &str) -> BTreeMap<String, BTreeMap<String, i128>> {
+    let mut values: BTreeMap<String, BTreeMap<String, i128>> = BTreeMap::new();
+    let mut cfg_arches: Option<Vec<String>> = None;
     for line in text.lines() {
-        let line = line.trim();
-        let Some(rest) = line.strip_prefix("(\"") else {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("#[cfg(") {
+            let inner = rest.strip_suffix(")]").unwrap_or(rest);
+            cfg_arches = Some(cfg_arches_of(inner));
             continue;
-        };
-        let Some((name, rest)) = rest.split_once("\", ") else {
-            continue;
-        };
-        let value = rest
-            .trim_end_matches(',')
-            .trim_end_matches(')')
-            .trim_end_matches("i128");
-        if let Ok(parsed) = value.parse::<i128>() {
-            values.insert(name.to_string(), parsed);
         }
-    }
-    if !values.is_empty() {
-        return values;
-    }
-    for line in text.lines() {
-        let Some(rest) = line.trim().strip_prefix("pub const ") else {
+        if let Some(rest) = trimmed.strip_prefix("(\"") {
+            let Some((name, rest)) = rest.split_once("\", ") else {
+                continue;
+            };
+            let value = rest
+                .trim_end_matches(',')
+                .trim_end_matches(')')
+                .trim_end_matches("i128");
+            let Ok(parsed) = value.parse::<i128>() else {
+                continue;
+            };
+            let arches = cfg_arches.take().unwrap_or_else(|| {
+                ARCHES
+                    .iter()
+                    .map(|arch| (*arch).to_string())
+                    .collect::<Vec<_>>()
+            });
+            let entry = values.entry(name.to_string()).or_default();
+            for arch in arches {
+                entry.insert(arch, parsed);
+            }
+            continue;
+        }
+        let Some(rest) = trimmed.strip_prefix("pub const ") else {
             continue;
         };
         let Some((name, rest)) = rest.split_once(':') else {
@@ -1268,16 +1279,54 @@ pub fn parse_rust_constants(text: &str) -> BTreeMap<String, i128> {
             continue;
         };
         let value = value.trim().trim_end_matches(';').trim();
-        if let Ok(parsed) = crate::values::parse_int_literal(value) {
-            values.insert(name.trim().to_string(), parsed);
+        let Ok(parsed) = crate::values::parse_int_literal(value) else {
+            continue;
+        };
+        let arches = cfg_arches.take().unwrap_or_else(|| {
+            ARCHES
+                .iter()
+                .map(|arch| (*arch).to_string())
+                .collect::<Vec<_>>()
+        });
+        let entry = values.entry(name.trim().to_string()).or_default();
+        for arch in arches {
+            entry.insert(arch, parsed);
         }
     }
     values
 }
 
+/// The architectures a `#[cfg(...)]` condition applies to.
+fn cfg_arches_of(inner: &str) -> Vec<String> {
+    let mut named = Vec::new();
+    let mut rest = inner;
+    while let Some(index) = rest.find("target_arch = \"") {
+        let after = &rest[index + "target_arch = \"".len()..];
+        let Some(end) = after.find('"') else {
+            break;
+        };
+        named.push(after[..end].to_string());
+        rest = &after[end + 1..];
+    }
+    if inner.trim_start().starts_with("not(") {
+        ARCHES
+            .iter()
+            .filter(|arch| !named.iter().any(|candidate| candidate == *arch))
+            .map(|arch| (*arch).to_string())
+            .collect()
+    } else if named.is_empty() {
+        ARCHES.iter().map(|arch| (*arch).to_string()).collect()
+    } else {
+        named
+    }
+}
+
 fn raven_includes(clang: &str, arch: &str, root: &Path, abi: &Path) -> Result<Includes> {
-    // Match `libc-pack`: the generated ABI header wins over the hand-written tree and the
-    // architecture overlay, exactly as the staged sysroot's copy order does.
+    // The generated include tree is the authoritative output of the ABI tables; the installed
+    // tree holds the hand-written headers and byte-identical distribution copies. Listing the
+    // generated tree first keeps a mutated `--abi` table visible to the oracle instead of being
+    // shadowed by the stale installed copy, matching `libc-pack`'s generated-last copy. The
+    // public clock limit is still visible because <time.h> includes bits/abi_limits.h.
     let dirs = vec![
         abi.join("generated/include"),
         root.join("libc/ravenlibc/include"),
@@ -1362,7 +1411,7 @@ fn compare(
     arch: &str,
     donor: &Side,
     raven: &Side,
-    rust: &BTreeMap<String, i128>,
+    rust: &BTreeMap<String, BTreeMap<String, i128>>,
     rust_layouts: &BTreeMap<String, RustRecord>,
     inventory: &mut Inventory,
 ) {
@@ -1449,8 +1498,10 @@ fn compare(
                     }
                 }
             }
-            if let (Some(expected), Some(rust)) = (donor.constants.get(name), rust.get(name))
-                && !same_mod_64(*expected, *rust)
+            if let (Some(expected), Some(rust)) = (
+                donor.constants.get(name),
+                rust.get(name).and_then(|by_arch| by_arch.get(arch)),
+            ) && !same_mod_64(*expected, *rust)
                 && raven.constants.get(name) == Some(expected)
             {
                 push_diff(
@@ -1981,7 +2032,7 @@ fn compare_rust_records(
     }
 }
 
-fn read_rust_constants(root: &Path, stem: &str) -> BTreeMap<String, i128> {
+fn read_rust_constants(root: &Path, stem: &str) -> BTreeMap<String, BTreeMap<String, i128>> {
     let path = root.join(format!(
         "libc/ravenlibc/crates/raven-libc-abi/src/generated/{stem}.rs"
     ));

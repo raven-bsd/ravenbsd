@@ -7,77 +7,52 @@ use raven_linux_abi::errno;
 
 mod support;
 
-macro_rules! check_raven_abi {
-    ($($name:ident),+ $(,)?) => {
-        $(
-            assert_eq!(
-                raven_abi::errno::Errno::$name.0,
-                errno::$name,
-                "{} differs between raven-abi and raven-linux-abi",
-                stringify!($name)
-            );
-        )+
-    };
-}
-
 #[test]
-fn raven_abi_errno_values_match() {
-    check_raven_abi!(
-        EPERM,
-        ENOENT,
-        ESRCH,
-        EINTR,
-        EIO,
-        ENXIO,
-        E2BIG,
-        ENOEXEC,
-        EBADF,
-        ECHILD,
-        EAGAIN,
-        ENOMEM,
-        EACCES,
-        EFAULT,
-        EBUSY,
-        EEXIST,
-        EXDEV,
-        ENODEV,
-        ENOTDIR,
-        EISDIR,
-        EINVAL,
-        ENFILE,
-        EMFILE,
-        ENOTTY,
-        EFBIG,
-        ENOSPC,
-        ESPIPE,
-        EROFS,
-        EMLINK,
-        EPIPE,
-        EDOM,
-        ERANGE,
-        ENAMETOOLONG,
-        ENOSYS,
-        ENOTEMPTY,
-        ELOOP,
-        EPROTO,
-        EOVERFLOW,
-        ENOTSOCK,
-        EOPNOTSUPP,
-        EAFNOSUPPORT,
-        EADDRINUSE,
-        EADDRNOTAVAIL,
-        ENETUNREACH,
-        ECONNABORTED,
-        ECONNRESET,
-        ENOBUFS,
-        EISCONN,
-        ENOTCONN,
-        ETIMEDOUT,
-        ECONNREFUSED,
-        EHOSTUNREACH,
-        EALREADY,
-        EINPROGRESS,
+fn native_and_linux_errno_domains_are_separate() {
+    // DR-69: raven-abi is the FreeBSD native domain; raven-linux-abi is the Linux UAPI table.
+    for (name, native, linux) in [
+        ("EPERM", 1, 1),
+        ("ENOENT", 2, 2),
+        ("EAGAIN", 35, 11),
+        ("EDEADLK", 11, 35),
+        ("ENOSYS", 78, 38),
+        ("EADDRINUSE", 48, 98),
+        ("EOVERFLOW", 84, 75),
+        ("EILSEQ", 86, 84),
+    ] {
+        let ours = match name {
+            "EPERM" => raven_abi::errno::Errno::EPERM.0,
+            "ENOENT" => raven_abi::errno::Errno::ENOENT.0,
+            "EAGAIN" => raven_abi::errno::Errno::EAGAIN.0,
+            "EDEADLK" => raven_abi::errno::Errno::EDEADLK.0,
+            "ENOSYS" => raven_abi::errno::Errno::ENOSYS.0,
+            "EADDRINUSE" => raven_abi::errno::Errno::EADDRINUSE.0,
+            "EOVERFLOW" => raven_abi::errno::Errno::EOVERFLOW.0,
+            "EILSEQ" => raven_abi::errno::Errno::EILSEQ.0,
+            _ => unreachable!(),
+        };
+        assert_eq!(ours, native, "native {name}");
+        let theirs = match name {
+            "EPERM" => errno::EPERM,
+            "ENOENT" => errno::ENOENT,
+            "EAGAIN" => errno::EAGAIN,
+            "EDEADLK" => errno::EDEADLK,
+            "ENOSYS" => errno::ENOSYS,
+            "EADDRINUSE" => errno::EADDRINUSE,
+            "EOVERFLOW" => errno::EOVERFLOW,
+            "EILSEQ" => errno::EILSEQ,
+            _ => unreachable!(),
+        };
+        assert_eq!(theirs, linux, "linux {name}");
+        if native != linux {
+            assert_ne!(ours, theirs, "{name} domains aliased");
+        }
+    }
+    assert_eq!(
+        raven_abi::errno::Errno::EWOULDBLOCK.0,
+        raven_abi::errno::Errno::EAGAIN.0
     );
+    assert_eq!(errno::EWOULDBLOCK, errno::EAGAIN);
 }
 
 #[test]

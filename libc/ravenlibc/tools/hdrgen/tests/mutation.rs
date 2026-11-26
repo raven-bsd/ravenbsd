@@ -161,10 +161,12 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
     let Some((temp, resources)) = setup("constant") else {
         return;
     };
+    // The signal and fcntl tables are FreeBSD-leased and measured by the FreeBSD oracle; the
+    // musl verify measures the musl-derived groups, so mutate a limits row here.
     temp.mutate(
-        "signal.toml",
-        "{ name = \"SIGABRT\", value = 6 }",
-        "{ name = \"SIGABRT\", value = 7 }",
+        "limits.toml",
+        "{ name = \"PATH_MAX\", value = 4096 }",
+        "{ name = \"PATH_MAX\", value = 4097 }",
     );
     let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
@@ -173,7 +175,7 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
         return;
     }
     assert_eq!(output.status.code(), Some(1));
-    assert!(stderr(&output).contains("SIGABRT"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("PATH_MAX"), "{}", stderr(&output));
 }
 
 #[test]
@@ -242,9 +244,9 @@ fn a_stale_deviation_row_fails_verify() {
         return;
     };
     temp.mutate(
-        "signal.toml",
-        "{ name = \"MINSIGSTKSZ\", value = 6144",
-        "{ name = \"MINSIGSTKSZ\", value = 2048",
+        "limits.toml",
+        "{ name = \"NGROUPS_MAX\", value = 1023 }",
+        "{ name = \"NGROUPS_MAX\", value = 32 }",
     );
     let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
@@ -254,7 +256,7 @@ fn a_stale_deviation_row_fails_verify() {
     }
     assert_eq!(output.status.code(), Some(1));
     assert!(
-        stderr(&output).contains("MINSIGSTKSZ"),
+        stderr(&output).contains("NGROUPS_MAX"),
         "{}",
         stderr(&output)
     );

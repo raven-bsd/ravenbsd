@@ -345,7 +345,7 @@ pub struct DeviationFile {
 pub struct Deviation {
     /// Constant, type, record or opaque name.
     pub name: String,
-    /// `musl` or `linux-abi`.
+    /// `musl`, `linux-abi` or `freebsd`.
     pub against: String,
     /// Our value: an integer, a "size/align" string, or a per-architecture table.
     pub ours: toml::Value,
