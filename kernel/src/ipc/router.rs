@@ -112,6 +112,14 @@ pub fn open(
     flags: u32,
     mode: u32,
 ) -> Result<Handle, Errno> {
+    if path.contains("urandom") {
+        crate::kprintln!(
+            "router-open: path={} flags={:#x} mask={:#x}",
+            path,
+            flags,
+            WIRE_OPEN_MASK
+        );
+    }
     if flags & !WIRE_OPEN_MASK != 0 {
         return Err(Errno::EINVAL);
     }

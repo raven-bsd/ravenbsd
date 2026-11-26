@@ -73,6 +73,9 @@ fn register(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno>
 
 fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
+    if path.contains("urandom") {
+        crate::kprintln!("ipc-open: path={} flags={:#x}", path, frame.rdx);
+    }
     let (scheme, suffix) = model::split_path(&path).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
     let mode = u32::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
