@@ -825,6 +825,16 @@ pub fn verify(
         if group.def.source.is_empty() {
             continue;
         }
+        // The H1/H2/H3 probes measure musl. A table leased to another donor has donor-relative
+        // source paths and is verified by that donor's profile oracle, not against musl.
+        if group
+            .def
+            .donor
+            .as_ref()
+            .is_some_and(|spec| spec.name != "musl")
+        {
+            continue;
+        }
         let files = musl_source_files(&musl, &group.def.source);
         let define_set = DefineSet::from_files(&files)?;
         let arches: &[&str] = if group.stem == "fcntl" {

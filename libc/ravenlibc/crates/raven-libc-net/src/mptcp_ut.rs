@@ -65,10 +65,12 @@ fn info_reply_copies_the_c_layout() {
 
 #[test]
 fn error_reply_maps_to_errno() {
-    let reply = [6u8, 0, 95, 0];
+    // The private reply carries the native error number: 45 is FreeBSD EOPNOTSUPP (the Linux
+    // number 95 is not the native domain and must never be produced here).
+    let reply = [6u8, 0, 45, 0];
     assert_eq!(
         decode_reply(&reply, MPTCP_INFO, &mut [0u8; 4]),
-        Err(Errno(95))
+        Err(Errno::EOPNOTSUPP)
     );
 }
 

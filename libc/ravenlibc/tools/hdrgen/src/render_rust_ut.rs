@@ -100,7 +100,7 @@ fn musl_group_files_carry_the_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    for name in ["errno.rs", "signal.rs", "fcntl.rs", "sysconf.rs"] {
+    for name in ["signal.rs", "fcntl.rs", "sysconf.rs"] {
         let text = &files[name];
         assert!(
             text.contains("Copyright © 2005-2020 Rich Felker, et al."),
@@ -113,6 +113,27 @@ fn musl_group_files_carry_the_notice_and_revision() {
         );
         assert!(text.contains("Permission is hereby granted"), "{name}");
     }
+}
+
+#[test]
+fn freebsd_group_file_carries_the_reviewed_notice_and_revision() {
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["errno.rs"];
+    assert!(
+        text.contains("SPDX-License-Identifier: BSD-3-Clause"),
+        "{text}"
+    );
+    assert!(
+        text.contains("RavenBSD: derived from freebsd:sys/sys/errno.h"),
+        "{text}"
+    );
+    assert!(
+        text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
+        "{text}"
+    );
+    assert!(!text.contains("Permission is hereby granted"), "{text}");
 }
 
 #[test]
@@ -191,7 +212,7 @@ fn group_file_has_constants_and_all() {
     };
     let text = &files["errno.rs"];
     assert!(text.contains("pub const EPERM: i32 = 1;"));
-    assert!(text.contains("pub const EWOULDBLOCK: i32 = EAGAIN;"));
+    assert!(text.contains("pub const EWOULDBLOCK: i32 = 35;"));
     assert!(text.contains("pub const ALL: &[(&str, i128)]"));
     assert!(text.contains("(\"EPERM\", 1i128),"));
 }

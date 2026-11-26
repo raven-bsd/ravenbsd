@@ -53,7 +53,7 @@ pub(crate) unsafe extern "C" fn fopen_impl(
     mode: *const c_char,
 ) -> *mut ShellFile {
     if path.is_null() || mode.is_null() {
-        return crate::ffi::ret::null(Errno(22));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EINVAL));
     }
     // SAFETY: both arguments are NUL-terminated by the C contract.
     let path = unsafe { crate::ffi::cstr::slice(path) };
@@ -70,7 +70,7 @@ pub(crate) unsafe extern "C" fn fopen_impl(
 /// `mode` is NUL terminated.
 pub(crate) unsafe extern "C" fn fdopen_impl(fd: c_int, mode: *const c_char) -> *mut ShellFile {
     if mode.is_null() {
-        return crate::ffi::ret::null(Errno(22));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EINVAL));
     }
     // SAFETY: the mode is NUL terminated by the C contract.
     let mode = unsafe { crate::ffi::cstr::slice(mode) };
@@ -90,10 +90,10 @@ pub(crate) unsafe extern "C" fn freopen_impl(
     stream: *mut c_void,
 ) -> *mut ShellFile {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::null(Errno(22));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EINVAL));
     };
     if mode.is_null() {
-        return crate::ffi::ret::null(Errno(22));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EINVAL));
     }
     // SAFETY: the C contract gives NUL-terminated strings.
     let name = if path.is_null() {
@@ -114,7 +114,7 @@ pub(crate) unsafe extern "C" fn freopen_impl(
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn fclose_impl(stream: *mut c_void) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::fclose(target) {
         Ok(()) => 0,
@@ -129,7 +129,7 @@ pub(crate) unsafe extern "C" fn fclose_impl(stream: *mut c_void) -> c_int {
 pub(crate) unsafe extern "C" fn fflush_impl(stream: *mut c_void) -> c_int {
     let target = if stream.is_null() { None } else { file(stream) };
     if !stream.is_null() && target.is_none() {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     }
     match raven_libc_stdio::fflush(streams().state(), target) {
         Ok(()) => 0,
@@ -148,10 +148,10 @@ pub(crate) unsafe extern "C" fn fread_impl(
     stream: *mut c_void,
 ) -> usize {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::size(Err(Errno(9)));
+        return crate::ffi::ret::size(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     let Some(length) = size.checked_mul(nmemb) else {
-        return crate::ffi::ret::size(Err(Errno(75)));
+        return crate::ffi::ret::size(Err(Errno::from_generated(raven_libc_abi::errno::EOVERFLOW)));
     };
     if length == 0 {
         return 0;
@@ -175,10 +175,10 @@ pub(crate) unsafe extern "C" fn fwrite_impl(
     stream: *mut c_void,
 ) -> usize {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::size(Err(Errno(9)));
+        return crate::ffi::ret::size(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     let Some(length) = size.checked_mul(nmemb) else {
-        return crate::ffi::ret::size(Err(Errno(75)));
+        return crate::ffi::ret::size(Err(Errno::from_generated(raven_libc_abi::errno::EOVERFLOW)));
     };
     if length == 0 {
         return 0;
@@ -201,7 +201,7 @@ pub(crate) unsafe extern "C" fn fseek_impl(
     whence: c_int,
 ) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::fseek(target, offset, whence) {
         Ok(()) => 0,
@@ -215,7 +215,7 @@ pub(crate) unsafe extern "C" fn fseek_impl(
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn ftell_impl(stream: *mut c_void) -> c_long {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::long(Err(Errno(9)));
+        return crate::ffi::ret::long(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::ftell(target) {
         Ok(value) => value,
@@ -239,7 +239,7 @@ pub(crate) unsafe extern "C" fn setvbuf_impl(
     size: usize,
 ) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     let buffer = if buf.is_null() {
         None
@@ -258,7 +258,7 @@ pub(crate) unsafe extern "C" fn setvbuf_impl(
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn ungetc_impl(c: c_int, stream: *mut c_void) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::ungetc(target, c) {
         Ok(value) => value,
@@ -272,7 +272,7 @@ pub(crate) unsafe extern "C" fn ungetc_impl(c: c_int, stream: *mut c_void) -> c_
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn fgetc_impl(stream: *mut c_void) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::fgetc(target) {
         Ok(value) => value,
@@ -286,7 +286,7 @@ pub(crate) unsafe extern "C" fn fgetc_impl(stream: *mut c_void) -> c_int {
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn fputc_impl(c: c_int, stream: *mut c_void) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::fputc(target, c) {
         Ok(value) => value,
@@ -320,10 +320,10 @@ pub(crate) unsafe extern "C" fn fgets_impl(
     stream: *mut c_void,
 ) -> *mut c_char {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::null(Errno(9));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EBADF));
     };
     if size <= 0 || dst.is_null() {
-        return crate::ffi::ret::null(Errno(22));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EINVAL));
     }
     let length = usize::try_from(size).unwrap_or(0);
     // SAFETY: the caller granted `length` writable bytes.
@@ -343,7 +343,7 @@ pub(crate) unsafe extern "C" fn fgetln_impl(
     length: *mut usize,
 ) -> *mut c_char {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::null(Errno(9));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EBADF));
     };
     match raven_libc_stdio::fgetln(target) {
         Ok(_) => {
@@ -369,10 +369,10 @@ pub(crate) unsafe extern "C" fn getline_impl(
     stream: *mut c_void,
 ) -> isize {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::ssize(Err(Errno(9)));
+        return crate::ffi::ret::ssize(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     if lineptr.is_null() || capacity.is_null() {
-        return crate::ffi::ret::ssize(Err(Errno(22)));
+        return crate::ffi::ret::ssize(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL)));
     }
     // SAFETY: the caller's `char **` and `size_t *` are writable and hold the C buffer pair.
     let (old, old_capacity) = unsafe { (*lineptr, *capacity) };
@@ -389,7 +389,7 @@ pub(crate) unsafe extern "C" fn getline_impl(
                 crate::malloc::heap::api().realloc(old as usize, needed) as *mut u8
             };
             if block.is_null() {
-                crate::ffi::errno::set(Errno(12));
+                crate::ffi::errno::set(Errno::from_generated(raven_libc_abi::errno::ENOMEM));
                 return -1;
             }
             // SAFETY: `block` has `needed >= bytes.len()` writable bytes and the caller's
@@ -421,10 +421,10 @@ pub(crate) unsafe extern "C" fn getdelim_impl(
     stream: *mut c_void,
 ) -> isize {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::ssize(Err(Errno(9)));
+        return crate::ffi::ret::ssize(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     if lineptr.is_null() || capacity.is_null() {
-        return crate::ffi::ret::ssize(Err(Errno(22)));
+        return crate::ffi::ret::ssize(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL)));
     }
     // SAFETY: the caller's `char **` and `size_t *` are writable and hold the C buffer pair.
     let (old, old_capacity) = unsafe { (*lineptr, *capacity) };
@@ -441,7 +441,7 @@ pub(crate) unsafe extern "C" fn getdelim_impl(
                 crate::malloc::heap::api().realloc(old as usize, needed) as *mut u8
             };
             if block.is_null() {
-                crate::ffi::errno::set(Errno(12));
+                crate::ffi::errno::set(Errno::from_generated(raven_libc_abi::errno::ENOMEM));
                 return -1;
             }
             // SAFETY: `block` has `needed >= bytes.len()` writable bytes and the caller's
@@ -467,7 +467,7 @@ pub(crate) unsafe extern "C" fn getdelim_impl(
 /// `path` is NUL terminated.
 pub(crate) unsafe extern "C" fn remove_impl(path: *const c_char) -> c_int {
     if path.is_null() {
-        return crate::ffi::ret::int(Err(Errno(22)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL)));
     }
     // SAFETY: the C string contract.
     let path = unsafe { crate::ffi::cstr::slice(path) };
@@ -483,7 +483,7 @@ pub(crate) unsafe extern "C" fn remove_impl(path: *const c_char) -> c_int {
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn rewind_impl(stream: *mut c_void) {
     let Some(target) = file(stream) else {
-        errno::set(Errno(9));
+        errno::set(Errno::from_generated(raven_libc_abi::errno::EBADF));
         return;
     };
     raven_libc_stdio::rewind(target);
@@ -495,10 +495,10 @@ pub(crate) unsafe extern "C" fn rewind_impl(stream: *mut c_void) {
 /// `text` is NUL terminated and `stream` is a FILE.
 pub(crate) unsafe extern "C" fn fputs_impl(text: *const c_char, stream: *mut c_void) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     if text.is_null() {
-        return crate::ffi::ret::int(Err(Errno(22)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL)));
     }
     // SAFETY: the string is NUL terminated.
     let text = unsafe { crate::ffi::cstr::slice(text) };
@@ -514,7 +514,7 @@ pub(crate) unsafe extern "C" fn fputs_impl(text: *const c_char, stream: *mut c_v
 /// `text` is NUL terminated.
 pub(crate) unsafe extern "C" fn puts_impl(text: *const c_char) -> c_int {
     if text.is_null() {
-        return crate::ffi::ret::int(Err(Errno(22)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EINVAL)));
     }
     // SAFETY: the string is NUL terminated.
     let text = unsafe { crate::ffi::cstr::slice(text) };
@@ -556,7 +556,7 @@ pub(crate) unsafe extern "C" fn clearerr_impl(stream: *mut c_void) {
 /// `stream` is a FILE.
 pub(crate) unsafe extern "C" fn fileno_impl(stream: *mut c_void) -> c_int {
     let Some(target) = file(stream) else {
-        return crate::ffi::ret::int(Err(Errno(9)));
+        return crate::ffi::ret::int(Err(Errno::from_generated(raven_libc_abi::errno::EBADF)));
     };
     match raven_libc_stdio::fileno(target) {
         Ok(value) => value,
@@ -592,7 +592,7 @@ pub(crate) unsafe extern "C" fn fmemopen_impl(
     mode: *const c_char,
 ) -> *mut ShellFile {
     if mode.is_null() {
-        return crate::ffi::ret::null(Errno(22));
+        return crate::ffi::ret::null(Errno::from_generated(raven_libc_abi::errno::EINVAL));
     }
     // SAFETY: the mode is NUL terminated.
     let mode = unsafe { crate::ffi::cstr::slice(mode) };
