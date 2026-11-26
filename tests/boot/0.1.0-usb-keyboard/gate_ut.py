@@ -94,6 +94,14 @@ class StageTests(unittest.TestCase):
             gate.MARKER,
         )
 
+    def test_marker_on_a_crlf_console_is_the_marker_stage(self):
+        self.assertEqual(
+            gate.console_stage(
+                "login: \r\nPassword: \r\nraven# \r\ns85p-usb-ok\r\nraven# \r\n"
+            ),
+            gate.MARKER,
+        )
+
     def test_missing_login_prompt_is_boot(self):
         self.assertEqual(gate.console_stage("RavenBSD kernel 0.1\n"), gate.BOOT)
 

@@ -65,7 +65,7 @@ PASSWORD_PROMPT = r"(?i)password: ?"
 SHELL_PROMPT = r"raven# "
 MARKER_TEXT = "s85p-usb-ok"
 MARKER_COMMAND = "echo " + MARKER_TEXT
-MARKER_LINE = r"(?m)^" + re.escape(MARKER_TEXT) + r"$"
+MARKER_LINE = r"(?m)^" + re.escape(MARKER_TEXT) + r"\r?$"
 REJECTED = r"(?i)login incorrect"
 
 PANIC_PATTERN = r"(?i)kernel panic|panicked at|\bpanic:|EXCEPTION"
