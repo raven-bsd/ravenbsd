@@ -37,11 +37,12 @@ mod program {
         ) -> HandlerResult<Opened> {
             // `/dev/urandom` is a character device: the create/close-on-exec bits are not a
             // reason to refuse the open. Rust std opens it O_RDONLY and expects the stream.
-            let _ = flags;
+            raven_rt::eprintln!("randd: open flags={flags}");
             Ok(Opened::File(0))
         }
 
         fn read(&mut self, _file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            raven_rt::eprintln!("randd: read len={}", buffer.len());
             Ok(self.source.fill(buffer, now_ns()))
         }
 
