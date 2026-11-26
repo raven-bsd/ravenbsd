@@ -38,6 +38,7 @@ mod program {
     const PARTITION_LAST: u64 = 1800;
     const DATA_FIRST: u64 = 2048;
     const CHUNK_SECTORS: u32 = 64;
+    const OPEN_ATTEMPTS: u32 = 600;
     const PARTITION_FILL: u8 = 0x3C;
     const DATA_FILL: u8 = 0xA5;
     const RESPONSE_LEN: usize =
@@ -103,7 +104,7 @@ mod program {
                         raven_rt::println!("s205: waiting for disk:0: {}", error.description());
                     }
                     attempts = attempts.saturating_add(1);
-                    if attempts >= 3000 {
+                    if attempts >= OPEN_ATTEMPTS {
                         return Err(format!("open disk:0: {}", error.description()));
                     }
                     let _ = raven_rt::nanosleep(100_000_000);
