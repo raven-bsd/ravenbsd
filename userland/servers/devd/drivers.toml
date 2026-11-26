@@ -14,18 +14,34 @@ name = "genet"
 compatible = "brcm,bcm2711-genet-v5"
 exec = "/sbin/genet"
 args = ["bar=0", "resources=dma+irq", "serve", "slots=platform"]
+abi = 1
+version = 1
+ops_version = 1
+capabilities = ["mmio", "dma", "irq"]
 
 [[driver]]
 name = "emmc2"
 compatible = "brcm,bcm2711-emmc2"
 exec = "/sbin/emmc2"
+abi = 1
+version = 1
+ops_version = 1
+capabilities = ["mmio"]
 
 [[driver]]
 name = "pwm1"
 compatible = "brcm,bcm2835-pwm"
 exec = "/sbin/pwm"
+abi = 1
+version = 1
+ops_version = 1
+capabilities = ["mmio"]
 
 [[driver]]
 name = "rng200"
 compatible = "brcm,bcm2711-rng200"
 exec = "/sbin/rng200"
+abi = 1
+version = 1
+ops_version = 1
+capabilities = ["mmio"]

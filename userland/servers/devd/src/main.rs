@@ -26,6 +26,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights};
     use raven_devd::dtb;
+    use raven_devd::manifest;
     use raven_devd::pci::{Matched, match_drivers};
     use raven_devd::platform;
     use raven_initfs::Initfs;
@@ -845,8 +846,13 @@ mod program {
         };
         let text = core::str::from_utf8(entry.data)
             .map_err(|_| "drivers.toml is not UTF-8".to_string())?;
-        parse_drivers(text)
-            .map_err(|error| alloc::format!("drivers.toml line {}: invalid", error.line))
+        let manifest =
+            manifest::parse(text).map_err(|error| alloc::format!("drivers.toml: {error}"))?;
+        let drivers = parse_drivers(&manifest.drivers)
+            .map_err(|error| alloc::format!("drivers.toml line {}: invalid", error.line))?;
+        manifest::validate(&drivers, &manifest.abi)
+            .map_err(|error| alloc::format!("drivers.toml: {error}"))?;
+        Ok(drivers)
     }
 
     fn devices(client: &Client) -> Result<Vec<DeviceInfo>, String> {
