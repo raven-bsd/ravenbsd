@@ -121,7 +121,7 @@ fn fault_in_read_buffer(address: u64, len: u64) {
 }
 
 fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
-    if frame.rdx < 64 {
+    if frame.rdx <= 64 {
         crate::kprintln!("ipc-read: small handle={} addr={:#x} len={}", frame.rdi, frame.rsi, frame.rdx);
     }
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
