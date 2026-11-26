@@ -215,6 +215,19 @@ pub const TRACE_SET: usize = 0x0B;
 /// exact.
 pub const RECORD_LOCK: usize = 0x0C;
 
+/// `klog_read(cursor: u64, buf: *mut u8, len: usize, info: *mut KlogInfo) -> usize`.
+///
+/// Copies complete kernel log records starting at the absolute byte `cursor`. Returns the number
+/// of bytes copied (0 when caught up) or a negative errno. `info` is [`crate::types::klog::KlogInfo`]
+/// and reports `LOST`, `MORE`, `next_cursor`, `first_cursor`, `last_cursor` and the cumulative
+/// `dropped` count. A buffer shorter than one record copies nothing for that record and sets
+/// `MORE`; `len < 16` is `ENOBUFS`. The caller needs `ADMIN` on the root device capability.
+///
+/// Raw constant, not a [`Syscall`] variant. The S51b proposal named `0x0C`, but that number is
+/// already [`RECORD_LOCK`] and `0x0D` is `PROC_CHROOT`; `0x0E` is the next free basic number.
+/// The reviewer signs the final ABI.
+pub const KLOG_READ: usize = 0x0E;
+
 /// `proc_chroot(path: *const u8, len: usize) -> 0` sets the calling process's root.
 ///
 /// Root-only (`euid == 0`); the path is resolved inside the current root, must name a directory
