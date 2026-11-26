@@ -23,8 +23,8 @@ tests.
   `SET_BUFFER` the client first installs the memory object in `audiod` with
   `HANDLE_TRANSFER_FILE` (or `raven_scheme::Client::transfer_to_server`) and puts the
   **destination-valid** handle value in the message.
-* Errno values are `raven-abi` numbers (Linux values, DR-13). The audio protocol's `ENOTSUP` is
-  the ABI's `EOPNOTSUPP` (95).
+* Errno values are `raven-abi` numbers (FreeBSD values, DR-69). The audio protocol's `ENOTSUP` is
+  the ABI's `EOPNOTSUPP` (45).
 * Decoders consume exactly the whole input; trailing bytes are an error.
 
 ## Stream requests

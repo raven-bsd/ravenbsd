@@ -1,28 +1,9 @@
-# SPDX-License-Identifier: MIT
-# Copyright © 2005-2020 Rich Felker, et al.
+# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# RavenBSD: transpiled from musl:include/poll.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
-# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# RavenBSD: native poll bits transcribed from freebsd:sys/sys/poll.h @
+# 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-3-Clause, tier A, DR-69). Constants are
+# transcribed to TOML and generated, not copied.
 
 schema = 1
 group = "poll"
@@ -30,7 +11,9 @@ c_header = "bits/abi_poll.h"
 guard = "_RAVEN_BITS_ABI_POLL_H"
 rust_type = "i32"
 base = "hex"
-source = ["include/poll.h"]
+source = ["freebsd:sys/sys/poll.h"]
+donor = { name = "freebsd", revision = "133344405f532bd54ff3629a77d4c4e062f01fdb", license = "BSD-3-Clause" }
+donor_absent = "POLLMSG has no FreeBSD equivalent; kept as an explicit Raven extension"
 prefixes = ["POLL"]
 
 consts = [
@@ -42,8 +25,10 @@ consts = [
   { name = "POLLNVAL", value = 0x020 },
   { name = "POLLRDNORM", value = 0x040 },
   { name = "POLLRDBAND", value = 0x080 },
-  { name = "POLLWRNORM", value = 0x100 },
-  { name = "POLLWRBAND", value = 0x200 },
+  { name = "POLLWRNORM", alias = "POLLOUT" },
+  { name = "POLLWRBAND", value = 0x100 },
   { name = "POLLMSG", value = 0x400 },
-  { name = "POLLRDHUP", value = 0x2000 },
+  { name = "POLLINIGNEOF", value = 0x2000 },
+  { name = "POLLRDHUP", value = 0x4000 },
+  { name = "POLLSTANDARD", value = 0x1ff, base = "hex" },
 ]

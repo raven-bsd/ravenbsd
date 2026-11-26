@@ -2010,7 +2010,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         if flags & !known != 0 {
             return Err(Errno::EINVAL);
         }
-        let kernel_flags = flags | fcntl::O_NONBLOCK as u32;
+        // The kernel pipe flags are a private wire encoding, not the public open flags.
+        const KERNEL_PIPE_CLOEXEC: u32 = 0o2000000;
+        const KERNEL_PIPE_NONBLOCK: u32 = 0o4000;
+        let mut kernel_flags = KERNEL_PIPE_NONBLOCK;
+        if flags & fcntl::O_CLOEXEC as u32 != 0 {
+            kernel_flags |= KERNEL_PIPE_CLOEXEC;
+        }
         let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(kernel_flags)?;
         let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
         let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
