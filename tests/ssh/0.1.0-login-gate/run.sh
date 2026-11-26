@@ -27,8 +27,8 @@
 
 set -eu
 
-here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-root=$(CDPATH= cd -- "$here/../../.." && pwd -P)
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+root=$(CDPATH= cd -- "$here/../../.." && pwd)
 
 arch=x86_64
 accel=kvm
