@@ -3,7 +3,6 @@
 
 //! Handler tests: every B20 syscall, the error paths and the dispatcher counters.
 
-use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_linux_abi::flags::clone as clone_flags;
 use raven_linux_dispatch::SyscallArgs;
@@ -50,7 +49,7 @@ fn write_to_a_bad_descriptor_is_ebadf() {
     process.user_buffer.extend_from_slice(b"x");
     assert_eq!(
         dispatch(&mut process, 1, [9, 0x1000, 1, 0, 0, 0]),
-        -(Errno::EBADF.0 as isize)
+        -(raven_linux_abi::errno::EBADF as isize)
     );
     assert!(process.output.is_empty());
 }
@@ -90,7 +89,7 @@ fn anonymous_mmap_hands_out_the_arena_in_pages() {
     // The 4 KiB arena is exhausted; the call fails without moving the cursor.
     assert_eq!(
         dispatch(&mut process, 9, [0, 4096, 3, 0x22, usize::MAX, 0]),
-        -(Errno::ENOMEM.0 as isize)
+        -(raven_linux_abi::errno::ENOMEM as isize)
     );
     assert_eq!(process.mmap_next, 0x9000);
 }
@@ -100,11 +99,11 @@ fn file_backed_and_executable_mmap_are_refused() {
     let mut process = process();
     assert_eq!(
         dispatch(&mut process, 9, [0, 4096, 3, 0, 3, 0]),
-        -(Errno::ENOSYS.0 as isize)
+        -(raven_linux_abi::errno::ENOSYS as isize)
     );
     assert_eq!(
         dispatch(&mut process, 9, [0, 4096, 5, 0x22, usize::MAX, 0]),
-        -(Errno::ENOSYS.0 as isize)
+        -(raven_linux_abi::errno::ENOSYS as isize)
     );
     assert_eq!(process.mmap_next, 0x8000);
 }
@@ -135,7 +134,7 @@ fn rt_sigprocmask_checks_the_set_size() {
     assert_eq!(dispatch(&mut process, 14, [0, 0, 0, 8, 0, 0]), 0);
     assert_eq!(
         dispatch(&mut process, 14, [0, 0, 0, 4, 0, 0]),
-        -(Errno::EINVAL.0 as isize)
+        -(raven_linux_abi::errno::EINVAL as isize)
     );
 }
 
@@ -147,7 +146,7 @@ fn arch_prctl_queues_the_tls_base_for_the_trap_loop() {
     assert_eq!(process.fs_base, 0);
     assert_eq!(
         dispatch(&mut process, 158, [0x9999, 0x7000, 0, 0, 0, 0]),
-        -(Errno::EINVAL.0 as isize)
+        -(raven_linux_abi::errno::EINVAL as isize)
     );
 }
 
@@ -172,7 +171,7 @@ fn process_identity_handlers_record_the_linux_state() {
     assert_eq!(process.robust_list_len, 24);
     assert_eq!(
         dispatch(&mut process, 273, [0x4000, 16, 0, 0, 0, 0]),
-        -(Errno::EINVAL.0 as isize)
+        -(raven_linux_abi::errno::EINVAL as isize)
     );
     process.user_buffer.extend_from_slice(b"worker\0");
     assert_eq!(dispatch(&mut process, 157, [15, 0x5000, 0, 0, 0, 0]), 0);
@@ -218,12 +217,12 @@ fn clone_without_a_frame_or_with_bad_flags_is_rejected() {
     let mut process = process();
     assert_eq!(
         dispatch(&mut process, 56, [17, 0, 0, 0, 0, 0]),
-        -(Errno::ENOSYS.0 as isize)
+        -(raven_linux_abi::errno::ENOSYS as isize)
     );
     process.frame = Some(clone_frame());
     assert_eq!(
         dispatch(&mut process, 56, [0xdead_beef, 0, 0, 0, 0, 0]),
-        -(Errno::EINVAL.0 as isize)
+        -(raven_linux_abi::errno::EINVAL as isize)
     );
     assert!(process.pending_clone.is_none());
 }
@@ -234,7 +233,7 @@ fn an_unknown_number_is_enosys_and_counted() {
     let mut dispatcher = dispatcher();
     assert_eq!(
         dispatcher.dispatch(&mut process, &call(60, [0; 6])),
-        -(Errno::ENOSYS.0 as isize)
+        -(raven_linux_abi::errno::ENOSYS as isize)
     );
     let hits = dispatcher.unimplemented_hits();
     assert_eq!(hits.len(), 1);
@@ -481,7 +480,7 @@ fn fcntl_and_dup3_queue_descriptor_operations() {
     );
     assert_eq!(
         dispatch(&mut process, 292, [fd as usize, fd as usize, 0, 0, 0, 0]),
-        -(Errno::EINVAL.0 as isize)
+        -(raven_linux_abi::errno::EINVAL as isize)
     );
 }
 
@@ -512,7 +511,7 @@ fn a_directory_getdents64_lists_its_entries() {
     assert!(bytes.windows(2).any(|window| window == b"2\0"));
     assert_eq!(
         dispatch(&mut process, 0, [3, 0x5000, 16, 0, 0, 0]),
-        -(Errno::EISDIR.0 as isize)
+        -(raven_linux_abi::errno::EISDIR as isize)
     );
 }
 
@@ -542,20 +541,36 @@ fn open_errors_are_reported_without_state() {
     set_path(&mut process, b"/proc/nope");
     assert_eq!(
         dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 0, 0, 0, 0]),
-        -(Errno::ENOENT.0 as isize)
+        -(raven_linux_abi::errno::ENOENT as isize)
     );
     set_path(&mut process, b"/proc/self/status");
     assert_eq!(
         dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 1, 0, 0, 0]),
-        -(Errno::EROFS.0 as isize)
+        -(raven_linux_abi::errno::EROFS as isize)
     );
     set_path(&mut process, b"/proc/self/exe");
     assert_eq!(
         dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 0, 0, 0, 0]),
-        -(Errno::ELOOP.0 as isize)
+        -(raven_linux_abi::errno::ELOOP as isize)
     );
     assert_eq!(
         dispatch(&mut process, 3, [3, 0, 0, 0, 0, 0]),
-        -(Errno::EBADF.0 as isize)
+        -(raven_linux_abi::errno::EBADF as isize)
     );
+}
+
+#[test]
+fn boundary_errors_are_linux_numbers_not_native_numbers() {
+    // The native domain is FreeBSD-valued (RAVEN-ABI contract); the Linux process must observe
+    // Linux numbers. These two rows differ between the domains, so an unchanged passthrough of
+    // the native value is caught here, not merely by a source-text scan.
+    assert_eq!(raven_abi::errno::Errno::ENAMETOOLONG.0, 63);
+    assert_eq!(
+        crate::linux_error(raven_abi::errno::Errno::ENAMETOOLONG),
+        -36
+    );
+    assert_eq!(raven_abi::errno::Errno::ENOSYS.0, 78);
+    assert_eq!(crate::linux_error(raven_abi::errno::Errno::ENOSYS), -38);
+    assert_eq!(raven_abi::errno::Errno::EAGAIN.0, 35);
+    assert_eq!(crate::linux_error(raven_abi::errno::Errno::EAGAIN), -11);
 }

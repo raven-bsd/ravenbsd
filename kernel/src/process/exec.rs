@@ -4,10 +4,10 @@
 //! Same-pid image replacement (`PROC_EXEC`).
 //!
 //! The new image is parsed and mapped into a fresh address space before the caller's live space
-//! is touched. On success the process keeps its pid, ids, credentials, namespace and handle
-//! table; the old address space is freed, the current thread's cached root is updated, and the
-//! syscall-return path installs the new entry/stack. Any failure drops the temporary space and
-//! returns the error with the old image and registers intact.
+//! is touched. On success the process keeps its pid, ids, credentials, file-creation mask,
+//! namespace and handle table; the old address space is freed, the current thread's cached root
+//! is updated, and the syscall-return path installs the new entry/stack. Any failure drops the
+//! temporary space and returns the error with the old image and registers intact.
 //!
 //! The loader uses the kernel's `raven-elf` planner and the C8 stack builder used by `/init`.
 //! Only the ELF header, program headers and `PT_INTERP` string are copied into kernel memory;

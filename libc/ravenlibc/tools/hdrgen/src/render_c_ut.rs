@@ -83,8 +83,8 @@ fn headers_have_a_notice_and_guard() {
         return;
     };
     for (name, text) in files {
-        if name == "bits/signum.h" {
-            // The native signal table is the FreeBSD profile, not the musl one.
+        if name == "bits/errno.h" || name == "bits/signum.h" {
+            // The errno and signal tables are FreeBSD-derived, not musl.
             assert!(
                 text.starts_with("/*\n * SPDX-License-Identifier: BSD-3-Clause"),
                 "{name}"
@@ -115,8 +115,10 @@ fn errno_header_has_the_values() {
     };
     let text = &files["bits/errno.h"];
     assert!(text.contains("#define EPERM 1\n"));
-    assert!(text.contains("#define EWOULDBLOCK EAGAIN\n"));
-    assert!(text.contains("#define ENOATTR ENODATA\n"));
+    assert!(text.contains("#define EWOULDBLOCK 35\n"));
+    assert!(text.contains("#define ENOTSUP 45\n"));
+    assert!(text.contains("#define ENOATTR 87\n"));
+    assert!(!text.contains("#define ENOATTR ENODATA"));
     assert!(!text.contains("#define ENOATTR 61"));
 }
 

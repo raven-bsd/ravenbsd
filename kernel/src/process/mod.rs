@@ -676,6 +676,12 @@ pub struct Process {
     pub id: u64,
     /// Parent, group, session and credentials.
     pub ids: Mutex<ProcessIds>,
+    /// File-creation mask (FreeBSD `p_pd->pd_cmask`).
+    ///
+    /// Kernel state, not a libc cell: `PROC_UMASK` swaps it atomically, `PROC_CREATE` and
+    /// `PROC_FORK` inherit it, and `PROC_EXEC` preserves it. Only [`raven_abi::types::umask`]
+    /// permission bits are ever stored.
+    pub umask: AtomicU32,
     /// Path used to start the process.
     pub path: String,
     /// Command name shown to `ps` (argv[0], replaced by exec and copied by fork).
@@ -793,6 +799,20 @@ pub struct Process {
 }
 
 impl Process {
+    /// The process file-creation mask (`p_pd->pd_cmask`).
+    pub fn umask(&self) -> u32 {
+        self.umask.load(Ordering::Acquire)
+    }
+
+    /// Swap the mask and return the previous value, limited to `ALLPERMS`.
+    ///
+    /// FreeBSD `sys_umask` takes the exclusive `PWDDESC` lock for the read-and-write pair; a
+    /// single atomic exchange gives the same result without a second lock on the syscall path.
+    pub fn swap_umask(&self, mask: u32) -> u32 {
+        self.umask
+            .swap(raven_abi::types::umask::normalize(mask), Ordering::AcqRel)
+    }
+
     /// Resident user pages for this process, in bytes, from the page tables.
     ///
     /// `UserAddressSpace::mapped_pages` walks the VMA tree and counts present 4 KiB leaves; it
@@ -991,6 +1011,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
     Ok(Arc::new(Process {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
+        umask: AtomicU32::new(raven_abi::types::umask::CMASK),
         path: String::from("/kernel"),
         command: Mutex::new(String::from("/kernel")),
         nice: AtomicI32::new(0),
@@ -1051,15 +1072,19 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, root, ids, limits) = if let Some(parent) = current() {
+    let (namespace, root, ids, umask, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         let root = parent.root.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
+        // FreeBSD `pdcopy` (`sys/kern/kern_descrip.c`): a new descriptor set starts at `CMASK`
+        // and then takes the parent's `pd_cmask`, so both `PROC_CREATE` and `PROC_FORK` inherit.
+        let umask = parent.umask();
         let limits = *parent.limits.lock();
         (
             snapshot.child_snapshot(&ipc::registry::names()),
             root,
             ids,
+            umask,
             limits,
         )
     } else {
@@ -1067,6 +1092,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
             Namespace::root(),
             String::from("/"),
             ProcessIds::kernel(),
+            raven_abi::types::umask::CMASK,
             default_limits(),
         )
     };
@@ -1081,6 +1107,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
+        umask: AtomicU32::new(umask),
         path: String::from("child"),
         command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
@@ -1157,6 +1184,7 @@ fn build_forked_process(source: &Arc<Process>, address_space: AddressSpace) -> A
     Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
+        umask: AtomicU32::new(source.umask()),
         path: source.path.clone(),
         command: Mutex::new(source.command.lock().clone()),
         nice: AtomicI32::new(source.nice()),
@@ -1963,6 +1991,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     let process = Arc::new(Process {
         id,
         ids: Mutex::new(ids),
+        umask: AtomicU32::new(raven_abi::types::umask::CMASK),
         path: String::from(path),
         command: Mutex::new(String::from(path)),
         nice: AtomicI32::new(0),

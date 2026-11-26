@@ -6,7 +6,7 @@
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::generated::errno;
 
-/// Build an [`Errno`] from a generated Linux error number.
+/// Build an [`Errno`] from a generated native error number.
 #[must_use]
 pub const fn errno(number: i32) -> Errno {
     Errno(number as u16)

@@ -70,7 +70,7 @@ pub fn dispatch(
     call: &LinuxSyscallV1,
 ) -> TrapAction {
     let Ok(nr) = usize::try_from(call.nr) else {
-        return TrapAction::Reply(-(raven_abi::errno::Errno::ENOSYS.0 as isize));
+        return TrapAction::Reply(-(raven_linux_abi::errno::ENOSYS as isize));
     };
     let args = SyscallArgs {
         nr,

@@ -256,6 +256,28 @@ pub const MSYNC: usize = 0x44;
 /// file/server and is duplicated into `proc`.
 pub const PROC_SET_PERSONALITY: usize = 0x34;
 
+/// `proc_umask(mask: u32) -> previous` (raw 0x47).
+///
+/// Atomically swaps the calling process's file-creation mask and returns the previous value. The
+/// stored value is the new mask limited to [`crate::types::umask::ALLPERMS`], exactly FreeBSD
+/// `sys_umask` (`sys/kern/vfs_syscalls.c`). `PROC_CREATE` and `PROC_FORK` inherit the mask;
+/// `PROC_EXEC` preserves it. A raw constant, not a [`Syscall`] variant, so existing exhaustive
+/// matches downstream stay intact.
+pub const PROC_UMASK: usize = 0x47;
+
+/// `proc_creation_context(request: Handle, mode: u32, out: *mut Context, len: usize) -> 0` (raw 0x83).
+///
+/// Returns the kernel-authenticated creation context of the scheme request the caller is serving.
+/// `request` is the server-side handle returned by `RECV`; possession of it is the delegation
+/// right, and it is retired with the request. The kernel reads the client's credentials and mask
+/// from its own process state and writes a [`crate::types::creation::Context`] with
+/// [`crate::types::umask::open_create_mode`] applied to `mode`. A handle that is not a live request
+/// this process serves as a creation (`Open`) request is `EINVAL`; a request served by another
+/// process is `EPERM`. Illumos `door_ucred` is the behaviour donor: the caller of the operation is
+/// the immediate request caller, never a userspace-supplied identity. A raw constant, not a
+/// [`Syscall`] variant, so existing exhaustive matches downstream stay intact.
+pub const PROC_CREATION_CONTEXT: usize = 0x83;
+
 /// `thread_set_tls(thread: Handle, tp: usize) -> 0`.
 ///
 /// Sets the per-thread user TLS base (`IA32_FS_BASE` on x86-64, `TPIDR_EL0`

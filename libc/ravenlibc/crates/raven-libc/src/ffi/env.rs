@@ -77,7 +77,7 @@ impl SysFile for ShellEnv {
         let value = platform::global()
             .fcntl(fd, raven_libc_abi::fcntl::F_GETFL, 0)
             .map_err(error)?;
-        i32::try_from(value).map_err(|_| Errno(22))
+        i32::try_from(value).map_err(|_| Errno::from_generated(raven_libc_abi::errno::EINVAL))
     }
 
     fn setfl(&self, fd: i32, flags: i32) -> Result<(), Errno> {

@@ -44,11 +44,11 @@ fn parse_raven_abi(text: &str) -> BTreeMap<String, u16> {
 }
 
 #[test]
-fn subset_is_the_observed_84_entries() {
-    // Doc 14 3.A.4 and ticket C36 called this a 62-value subset; the contract crate had 54
-    // rows before PG-29. PG-29 added the 30 Linux values this test now freezes (54 + 30 = 84).
+fn subset_is_the_observed_97_entries() {
+    // The FreeBSD donor `sys/sys/errno.h` defines 1..97; S722 makes raven-abi carry that full
+    // set, so the parsed row count is exactly the donor's error range.
     let rows = parse_raven_abi(&raven_abi_source());
-    assert_eq!(rows.len(), 84, "raven-abi errno subset changed size");
+    assert_eq!(rows.len(), 97, "raven-abi errno subset changed size");
 }
 
 #[test]
@@ -77,12 +77,12 @@ fn description_counter_equals_the_parsed_count() {
 }
 
 #[test]
-fn every_described_value_is_a_linux_value_in_our_table() {
+fn every_described_value_is_a_native_value_in_our_table() {
     let rows = parse_raven_abi(&raven_abi_source());
     for value in rows.values() {
         assert!(
-            raven_libc_abi::errno::Errno(*value).is_linux(),
-            "raven-abi value {value} is not a Linux errno in the libc table"
+            raven_libc_abi::errno::Errno(*value).name().is_some(),
+            "raven-abi value {value} has no native libc name"
         );
         assert!(
             raven_libc_abi::errno::ALL
@@ -99,8 +99,8 @@ fn the_four_former_kernel_gaps_are_now_present() {
     for (name, value) in [
         ("ENOTBLK", 15),
         ("ETXTBSY", 26),
-        ("EDEADLK", 35),
-        ("ENOLCK", 37),
+        ("EDEADLK", 11),
+        ("ENOLCK", 77),
     ] {
         let found = raven_libc_abi::errno::ALL
             .iter()
@@ -112,17 +112,20 @@ fn the_four_former_kernel_gaps_are_now_present() {
 }
 
 #[test]
-fn the_raven_abi_type_still_agrees_on_the_common_values() {
+fn the_native_type_still_agrees_on_the_native_values() {
     // The dev-dependency is used directly as well as through the source parse, so a source
     // reformat cannot hide a semantic change.
-    for &(name, value) in raven_linux_abi::errno::ERRNOS {
-        let found = raven_libc_abi::errno::ALL
-            .iter()
-            .find(|(candidate, _)| *candidate == name)
-            .unwrap_or_else(|| panic!("libc errno table lacks {name}"));
-        assert_eq!(found.1, i128::from(value), "{name}");
+    let rows = parse_raven_abi(&raven_abi_source());
+    for &(name, value) in raven_libc_abi::errno::ALL {
+        // The two alias rows have no separate `errnos!` entry in raven-abi.
+        if let Some(native) = rows.get(name) {
+            assert_eq!(i128::from(*native), value, "{name}");
+        }
     }
     let eperm = raven_abi::errno::Errno::EPERM;
     assert_eq!(eperm.0, 1);
     assert_eq!(raven_libc_abi::errno::Errno(eperm.0).name(), Some("EPERM"));
+    let again = raven_abi::errno::Errno::EAGAIN;
+    assert_eq!(again.0, 35);
+    assert_eq!(raven_libc_abi::errno::Errno(again.0).name(), Some("EAGAIN"));
 }

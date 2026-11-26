@@ -526,6 +526,111 @@ pub fn cred_info(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// `proc_umask(mask: u32) -> previous` (raw 0x47).
+///
+/// The mask is authoritative kernel process state, not a libc cell. FreeBSD `sys_umask`
+/// (`sys/kern/vfs_syscalls.c`) stores `newmask & ALLPERMS` and returns the previous value; the
+/// atomic exchange gives the same pair of observations without a second lock.
+pub fn umask(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let mask = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    Ok(caller.swap_umask(mask) as usize)
+}
+
+/// `proc_creation_context(request, mode, out, len) -> 0` (raw 0x83).
+///
+/// Returns the kernel-authenticated context of the scheme request the caller is serving. The
+/// behaviour follows Illumos `door_ucred` (`usr/src/lib/libc/port/threads/door_calls.c`): the
+/// credentials belong to the immediate caller of the request and are recorded by the kernel, not
+/// supplied by either userspace side. The server-side request handle is the delegation right; it
+/// is inserted only by `RECV` and retired by `SEND`, so a forged, foreign, completed or
+/// non-creation request cannot obtain a context.
+pub fn creation_context(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let requested = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let length = usize::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
+    if length != raven_abi::types::creation::SIZE {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(
+        frame.rdx,
+        u64::try_from(raven_abi::types::creation::SIZE).map_err(|_| Errno::EINVAL)?,
+    )?;
+    let object = caller
+        .handles
+        .lock()
+        .get(handle, Rights::NONE)
+        .map(|object| object.clone())?;
+    let Object::SchemeRequest(request) = object else {
+        return Err(Errno::EINVAL);
+    };
+    // The server-side request is inserted with WRITE. A reduced handle is a lost delegation
+    // right, not a different object type.
+    if caller.handles.lock().get(handle, Rights::WRITE).is_err() {
+        return Err(Errno::EPERM);
+    }
+    // A request is served by exactly one process. A duplicated handle in another process is a
+    // forwarding attempt: refuse it rather than borrowing another server's client authority.
+    if request.server.id != caller.id {
+        return Err(Errno::EPERM);
+    }
+    if request.opcode != crate::ipc::protocol::Opcode::Open
+        || request.done.load(Ordering::Acquire)
+        || request.cancelled.load(Ordering::Acquire)
+    {
+        return Err(Errno::EINVAL);
+    }
+    let ids = *request.client.ids.lock();
+    let mask = request.client.umask();
+    let context = raven_abi::types::creation::Context {
+        version: raven_abi::types::creation::VERSION,
+        size: raven_abi::types::creation::SIZE as u32,
+        request_id: request.id,
+        pid: request.client.id,
+        uid: ids.uid,
+        euid: ids.euid,
+        gid: ids.gid,
+        egid: ids.egid,
+        umask: mask,
+        mode: raven_abi::types::umask::open_create_mode(requested, mask),
+        group_count: ids
+            .group_count
+            .min(raven_abi::types::creation::MAX_GROUPS as u32),
+        reserved: 0,
+        groups: ids.groups,
+    };
+    // Encode in the record's declared little-endian field order; the layout asserts in
+    // `raven-abi` keep the offsets and `SIZE` fixed.
+    let mut bytes = Vec::with_capacity(raven_abi::types::creation::SIZE);
+    for word in [context.version, context.size] {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    for word in [context.request_id, context.pid] {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    for word in [
+        context.uid,
+        context.euid,
+        context.gid,
+        context.egid,
+        context.umask,
+        context.mode,
+        context.group_count,
+        context.reserved,
+    ] {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    for group in context.groups {
+        bytes.extend_from_slice(&group.to_le_bytes());
+    }
+    if bytes.len() != raven_abi::types::creation::SIZE {
+        return Err(Errno::EINVAL);
+    }
+    copy_to_user(destination, &bytes)?;
+    Ok(0)
+}
+
 /// `proc_getgroups(out: *mut u32, size: usize) -> count`.
 ///
 /// `size == 0` returns the count without touching user memory. A smaller buffer is `EINVAL`;

@@ -100,7 +100,7 @@ fn musl_group_files_carry_the_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    for name in ["errno.rs", "fcntl.rs", "sysconf.rs"] {
+    for name in ["fcntl.rs", "sysconf.rs"] {
         let text = &files[name];
         assert!(
             text.contains("Copyright © 2005-2020 Rich Felker, et al."),
@@ -116,23 +116,29 @@ fn musl_group_files_carry_the_notice_and_revision() {
 }
 
 #[test]
-fn freebsd_signal_group_carries_the_donor_notice_and_revision() {
+fn freebsd_group_files_carry_the_reviewed_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    let text = &files["signal.rs"];
-    assert!(
-        text.contains("Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors"),
-        "signal.rs"
-    );
-    assert!(
-        text.contains("RavenBSD: derived from freebsd:sys/sys/signal.h"),
-        "signal.rs"
-    );
-    assert!(
-        text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
-        "signal.rs"
-    );
+    for (name, donor) in [
+        ("errno.rs", "freebsd:sys/sys/errno.h"),
+        ("signal.rs", "freebsd:sys/sys/signal.h"),
+    ] {
+        let text = &files[name];
+        assert!(
+            text.contains("SPDX-License-Identifier: BSD-3-Clause"),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("RavenBSD: derived from {donor}")),
+            "{text}"
+        );
+        assert!(
+            text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
+            "{text}"
+        );
+        assert!(!text.contains("Permission is hereby granted"), "{text}");
+    }
 }
 
 #[test]
@@ -211,7 +217,7 @@ fn group_file_has_constants_and_all() {
     };
     let text = &files["errno.rs"];
     assert!(text.contains("pub const EPERM: i32 = 1;"));
-    assert!(text.contains("pub const EWOULDBLOCK: i32 = EAGAIN;"));
+    assert!(text.contains("pub const EWOULDBLOCK: i32 = 35;"));
     assert!(text.contains("pub const ALL: &[(&str, i128)]"));
     assert!(text.contains("(\"EPERM\", 1i128),"));
 }

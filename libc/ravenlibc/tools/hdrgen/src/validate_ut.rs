@@ -59,7 +59,7 @@ fn the_constant_count_is_frozen() {
         .iter()
         .map(|group| group.def.consts.len())
         .sum();
-    assert_eq!(total, 1331);
+    assert_eq!(total, 1281);
     let counts: Vec<(&str, usize)> = tables
         .groups
         .iter()
@@ -68,7 +68,7 @@ fn the_constant_count_is_frozen() {
     assert_eq!(
         counts,
         vec![
-            ("errno", 149),
+            ("errno", 99),
             ("signal", 106),
             ("fcntl", 111),
             ("mman", 86),
@@ -90,7 +90,7 @@ fn the_constant_count_is_frozen() {
 fn values_resolve_for_every_group() {
     let tables = real();
     let values = validate(&tables).expect("values");
-    assert_eq!(values.by_name.len(), 1329);
+    assert_eq!(values.by_name.len(), 1279);
     assert_eq!(values.by_name["EPERM"].value, 1);
     assert_eq!(values.by_name["O_ACCMODE"].value, 0o10000003);
     assert_eq!(values.by_name["RLIM_INFINITY"].value, i128::from(u64::MAX));
@@ -125,6 +125,7 @@ fn an_unknown_alias_is_rejected() {
         .iter_mut()
         .find(|constant| constant.name == "EWOULDBLOCK")
         .expect("EWOULDBLOCK");
+    entry.value = None;
     entry.alias = Some("NOPE".to_string());
     let error = validate(&tables).unwrap_err().to_string();
     assert!(error.contains("NOPE"), "{error}");
@@ -141,6 +142,14 @@ fn an_alias_cycle_is_rejected() {
         .expect("EAGAIN");
     entry.value = None;
     entry.alias = Some("EWOULDBLOCK".to_string());
+    let reverse = tables.groups[0]
+        .def
+        .consts
+        .iter_mut()
+        .find(|constant| constant.name == "EWOULDBLOCK")
+        .expect("EWOULDBLOCK");
+    reverse.value = None;
+    reverse.alias = Some("EAGAIN".to_string());
     let error = validate(&tables).unwrap_err().to_string();
     assert!(error.contains("cycle"), "{error}");
 }

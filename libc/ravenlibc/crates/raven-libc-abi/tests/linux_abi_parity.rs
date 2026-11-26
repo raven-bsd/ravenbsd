@@ -205,24 +205,52 @@ fn native_wait_selectors_are_freebsd() {
 }
 
 #[test]
-fn errno_parity_with_raven_linux_abi() {
+fn errno_domains_are_separate() {
+    // `raven-linux-abi` is the Linux UAPI table and must not follow the native cutover. The
+    // native table is FreeBSD-valued (DR-69); these boundary facts prove neither domain
+    // silently aliased the other.
     let linux = parse_errno();
     assert_eq!(linux.len(), 133, "raven-linux-abi errno table changed");
-    let mut compared = 0usize;
-    for (name, value) in &linux {
-        let found = raven_libc_abi::errno::ALL
-            .iter()
-            .find(|(candidate, _)| *candidate == name);
-        assert!(found.is_some(), "libc errno lacks {name}");
-        assert_eq!(
-            found.expect("checked").1,
-            i128::from(*value),
-            "{name} differs"
+    for name in [
+        "EAGAIN",
+        "EDEADLK",
+        "ENOSYS",
+        "EADDRINUSE",
+        "EOVERFLOW",
+        "EILSEQ",
+    ] {
+        assert!(linux.contains_key(name), "raven-linux-abi lacks {name}");
+        assert!(
+            raven_libc_abi::errno::ALL
+                .iter()
+                .any(|(candidate, _)| *candidate == name),
+            "libc native errno lacks {name}"
         );
-        compared += 1;
     }
-    assert_eq!(compared, 133);
-    println!("linux-abi errno parity: compared {compared} constants");
+    for (name, native, linux_value) in [
+        ("EAGAIN", 35, 11),
+        ("EDEADLK", 11, 35),
+        ("ENOSYS", 78, 38),
+        ("EADDRINUSE", 48, 98),
+        ("EOVERFLOW", 84, 75),
+        ("EILSEQ", 86, 84),
+    ] {
+        let ours = raven_libc_abi::errno::ALL
+            .iter()
+            .find(|(candidate, _)| *candidate == name)
+            .expect("checked above")
+            .1;
+        let theirs = i128::from(*linux.get(name).expect("checked above"));
+        assert_eq!(ours, i128::from(native), "native {name}");
+        assert_eq!(theirs, i128::from(linux_value), "linux {name}");
+        assert_ne!(ours, theirs, "{name} domains aliased");
+    }
+    assert_eq!(
+        raven_libc_abi::errno::EWOULDBLOCK,
+        raven_libc_abi::errno::EAGAIN
+    );
+    assert_eq!(*linux.get("EWOULDBLOCK").expect("linux alias"), 11);
+    println!("native and Linux errno domains are separate");
 }
 
 #[test]
@@ -254,31 +282,31 @@ fn no_linux_abi_deviation_is_stale() {
 fn errno_values_are_the_frozen_table() {
     assert_eq!(raven_libc_abi::errno::EPERM, 1);
     assert_eq!(raven_libc_abi::errno::ENOENT, 2);
-    assert_eq!(raven_libc_abi::errno::EAGAIN, 11);
+    assert_eq!(raven_libc_abi::errno::EAGAIN, 35);
     assert_eq!(
         raven_libc_abi::errno::EAGAIN,
         raven_libc_abi::errno::EWOULDBLOCK
     );
-    assert_eq!(raven_libc_abi::errno::ENOTSUP, 95);
+    assert_eq!(raven_libc_abi::errno::ENOTSUP, 45);
     assert_eq!(
         raven_libc_abi::errno::ENOTSUP,
         raven_libc_abi::errno::EOPNOTSUPP
     );
-    assert_eq!(
-        raven_libc_abi::errno::ENOATTR,
-        raven_libc_abi::errno::ENODATA
-    );
-    assert_eq!(raven_libc_abi::errno::EDOOFUS, 1000);
-    assert_eq!(raven_libc_abi::errno::EIPSEC, 1013);
-    for absent in [41i128, 58] {
+    assert_eq!(raven_libc_abi::errno::ENOATTR, 87);
+    assert_eq!(raven_libc_abi::errno::EDOOFUS, 88);
+    assert_eq!(raven_libc_abi::errno::EDEADLK, 11);
+    assert_eq!(raven_libc_abi::errno::ENOLCK, 77);
+    assert_eq!(raven_libc_abi::errno::EINTEGRITY, 97);
+    for value in 1i128..=97 {
         assert!(
-            !raven_libc_abi::errno::ALL
+            raven_libc_abi::errno::ALL
                 .iter()
-                .any(|(_, value)| *value == absent),
-            "errno {absent} must be unused"
+                .any(|(_, candidate)| *candidate == value),
+            "native errno {value} is missing"
         );
     }
-    assert_eq!(raven_libc_abi::errno::ALL.len(), 149);
+    // 97 donor names plus the EWOULDBLOCK and ENOTSUP alias rows.
+    assert_eq!(raven_libc_abi::errno::ALL.len(), 99);
 }
 
 #[test]

@@ -1294,9 +1294,13 @@ fn cfg_arches_of(inner: &str) -> Vec<String> {
 }
 
 fn raven_includes(clang: &str, arch: &str, root: &Path, abi: &Path) -> Result<Includes> {
+    // The generated include tree is the authoritative output of the ABI tables; the installed
+    // tree holds the hand-written headers and byte-identical distribution copies. Listing the
+    // generated tree first keeps a mutated `--abi` table visible to the oracle instead of being
+    // shadowed by the stale installed copy.
     let dirs = vec![
-        root.join("libc/ravenlibc/include"),
         abi.join("generated/include"),
+        root.join("libc/ravenlibc/include"),
         root.join(format!("libc/ravenlibc/arch/{arch}/include")),
     ];
     for dir in &dirs {
