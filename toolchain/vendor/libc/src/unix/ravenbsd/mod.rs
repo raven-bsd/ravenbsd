@@ -6,6 +6,15 @@ use crate::prelude::*;
 
 pub type wchar_t = i32;
 
+// The kernel signal.h layout contract: handler at 0, the 128-byte mask at 8, flags at
+// 136 and the restorer at 144 (libc-ravenlibc-abi Sigaction). Array lengths are the
+// macro-free static assertion: a mismatched layout fails to compile.
+const _: [(); 152] = [(); core::mem::size_of::<sigaction>()];
+const _: [(); 0] = [(); core::mem::offset_of!(sigaction, sa_sigaction)];
+const _: [(); 8] = [(); core::mem::offset_of!(sigaction, sa_mask)];
+const _: [(); 136] = [(); core::mem::offset_of!(sigaction, sa_flags)];
+const _: [(); 144] = [(); core::mem::offset_of!(sigaction, sa_restorer)];
+
 pub type blkcnt_t = c_longlong;
 pub type blksize_t = i32;
 pub type clock_t = c_long;
