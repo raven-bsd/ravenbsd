@@ -118,6 +118,7 @@ static mut TW_HELPER_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut TW_SLEEP_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut WAIT_SIGNAL_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 static mut LOCK_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
+static mut LOCK_WARM_STACK: HelperStack = HelperStack([0; HELPER_STACK_SIZE]);
 
 #[repr(align(16))]
 struct SignalContext(#[allow(dead_code)] [u8; SIGNAL_CONTEXT_SIZE]);
@@ -1045,7 +1046,7 @@ fn wait_lock_flag(flag: &AtomicU32, value: u32) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn lock_churn_body(announce: bool) -> Result<(), &'static str> {
+fn lock_churn_body(stack: *mut HelperStack, announce: bool) -> Result<(), &'static str> {
     LOCK_STOP.store(false, Ordering::Release);
     LOCK_EXITED.store(false, Ordering::Release);
     LOCK_READY.store(0, Ordering::Release);
@@ -1054,7 +1055,7 @@ fn lock_churn_body(announce: bool) -> Result<(), &'static str> {
     LOCK_TIMEOUT.store(0, Ordering::Release);
 
     let entry: extern "C" fn(usize) -> ! = lock_waiter;
-    let stack_top = helper_stack_top(core::ptr::addr_of_mut!(LOCK_STACK));
+    let stack_top = helper_stack_top(stack);
     let worker = thread_create(Handle::SELF_PROC, entry as usize, stack_top, 0)
         .map_err(|_| "lock worker")?;
     let mut cycle = 0u32;
@@ -1070,7 +1071,7 @@ fn lock_churn_body(announce: bool) -> Result<(), &'static str> {
     LOCK_FUTEX.fetch_add(1, Ordering::AcqRel);
     futex_wake(&LOCK_FUTEX, 1);
     nanosleep(LOCK_DELAY_NS);
-    // Reap the worker before the caller reuses LOCK_STACK or samples the row.
+    // Reap the worker before the caller samples the row.
     let mut spins = 0usize;
     while !LOCK_EXITED.load(Ordering::Acquire) {
         yield_now();
@@ -1103,7 +1104,7 @@ fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     // Warm the futex/timer paths and give the late boot services their resident frames before
     // the baseline sample, so the row measures the churn and not one-time service startup.
     // The pager lifetime rows use the same steady-state-before-baseline rule.
-    lock_churn_body(false)?;
+    lock_churn_body(core::ptr::addr_of_mut!(LOCK_WARM_STACK), false)?;
     nanosleep(3_000_000_000);
     let base = spawn_role(initfs, "lockbase").map_err(|_| "lockbase spawn")?;
     if proc_wait(base).unwrap_or(-1) != 90 {
@@ -1111,7 +1112,7 @@ fn lock_churn_part(initfs: &Initfs<'_>) -> Result<(), &'static str> {
     }
     handle_close(base);
 
-    lock_churn_body(true)?;
+    lock_churn_body(core::ptr::addr_of_mut!(LOCK_STACK), true)?;
 
     let top = spawn_role(initfs, "locktop").map_err(|_| "locktop spawn")?;
     if proc_wait(top).unwrap_or(-1) != 91 {
