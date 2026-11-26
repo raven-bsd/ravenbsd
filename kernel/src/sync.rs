@@ -407,6 +407,10 @@ pub fn unregister_thread(tid: ThreadId) {
 /// `graph_threads` is the base/effective/call graph size; `weak_threads` is the boost map. Both
 /// must return to their baseline after a session's threads exit.
 #[must_use]
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(dead_code) // K449 diagnostic; its only readers are x86_64-only.
+)]
 pub fn turnstile_counts() -> (usize, usize) {
     let guard = TURNSTILES.lock();
     guard.as_ref().map_or((0, 0), |kernel| {
@@ -415,6 +419,10 @@ pub fn turnstile_counts() -> (usize, usize) {
 }
 
 /// Number of donation-registered thread ids in the graph (K449 diagnostic).
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(dead_code) // K449 diagnostic; its only readers are x86_64-only.
+)]
 pub fn registered_count() -> usize {
     turnstile_counts().0
 }

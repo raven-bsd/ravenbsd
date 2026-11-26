@@ -18,6 +18,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::generated::errno::{EBADF, EINVAL, ENOENT, ESPIPE};
+use raven_libc_abi::generated::fcntl::{O_ACCMODE, O_APPEND, O_CREAT, O_TRUNC};
 use raven_libc_stdio::{Env, File, Lock, StatLite, State, SysFile};
 
 /// One fake descriptor.
@@ -154,7 +155,7 @@ impl SysFile for MemEnv {
     fn write(&self, fd: i32, buf: &[u8]) -> Result<usize, Errno> {
         let mut files = self.files.lock().unwrap();
         let entry = files.get_mut(&fd).ok_or(Errno(EBADF as u16))?;
-        if entry.fl & 0o2000 != 0 {
+        if entry.fl & O_APPEND != 0 {
             entry.pos = entry.data.len();
         }
         let count = buf.len();
@@ -212,8 +213,8 @@ impl SysFile for MemEnv {
     }
 
     fn open(&self, path: &[u8], flags: i32, _mode: u32) -> Result<i32, Errno> {
-        let create = flags & 0o100 != 0;
-        let truncate = flags & 0o1000 != 0;
+        let create = flags & O_CREAT != 0;
+        let truncate = flags & O_TRUNC != 0;
         let data = match self.contents.lock().unwrap().get(path) {
             Some(data) => {
                 if truncate {
@@ -234,9 +235,9 @@ impl SysFile for MemEnv {
         let mut next = self.next_fd.lock().unwrap();
         let fd = *next;
         *next += 1;
-        let mut fl = flags & 3;
-        if flags & 0o2000 != 0 {
-            fl |= 0o2000;
+        let mut fl = flags & O_ACCMODE;
+        if flags & O_APPEND != 0 {
+            fl |= O_APPEND;
         }
         self.files.lock().unwrap().insert(
             fd,

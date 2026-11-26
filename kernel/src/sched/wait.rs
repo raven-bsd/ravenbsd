@@ -455,7 +455,10 @@ fn requeue_in_place(
     let mut requeued = 0usize;
     let mut index = 0usize;
     while index < waiters.len() {
-        if waiters[index].space != source.0 || waiters[index].addr != source.1 {
+        let Some(waiter) = waiters.get(index) else {
+            break;
+        };
+        if waiter.space != source.0 || waiter.addr != source.1 {
             index = index.saturating_add(1);
             continue;
         }
@@ -465,7 +468,9 @@ fn requeue_in_place(
             continue;
         }
         if requeued < max {
-            let waiter = &mut waiters[index];
+            let Some(waiter) = waiters.get_mut(index) else {
+                break;
+            };
             waiter.space = destination.0;
             waiter.addr = destination.1;
             requeued = requeued.saturating_add(1);
@@ -491,7 +496,10 @@ fn requeue_move(
     let mut requeued = 0usize;
     let mut index = 0usize;
     while index < source_waiters.len() {
-        if source_waiters[index].space != source.0 || source_waiters[index].addr != source.1 {
+        let Some(waiter) = source_waiters.get(index) else {
+            break;
+        };
+        if waiter.space != source.0 || waiter.addr != source.1 {
             index = index.saturating_add(1);
             continue;
         }
