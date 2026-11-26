@@ -43,6 +43,8 @@ mod program {
     const IO_RETRY_LIMIT: u32 = 50;
     /// Backoff between UART backend I/O retries.
     const IO_RETRY_DELAY_NS: u64 = 10_000_000;
+    /// Poll interval for the keyboard scheme, whose empty queue is `EAGAIN`.
+    const KBD_POLL_DELAY_NS: u64 = 10_000_000;
     /// Reader thread stack.
     const READER_STACK: usize = 32 * 1024;
 
@@ -111,7 +113,7 @@ mod program {
             match self.file.read(out) {
                 Ok(0) => Err(InputError::EndOfFile),
                 Ok(count) => Ok(count),
-                Err(Errno::EINTR) => Err(InputError::WouldBlock),
+                Err(Errno::EINTR | Errno::EAGAIN) => Err(InputError::WouldBlock),
                 Err(_) => Err(InputError::Io),
             }
         }
@@ -177,7 +179,9 @@ mod program {
                         publish();
                     }
                 }
-                Err(InputError::WouldBlock) => continue,
+                Err(InputError::WouldBlock) => {
+                    let _ = raven_rt::nanosleep(KBD_POLL_DELAY_NS);
+                }
                 Err(InputError::EndOfFile | InputError::Closed | InputError::Io) => break,
             }
         }
