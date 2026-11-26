@@ -330,7 +330,7 @@ mod program {
             let mut next = None;
             {
                 let mut map = jobs.lock();
-                for (_, list) in map.iter_mut() {
+                for list in map.values_mut() {
                     let mut keep = Vec::new();
                     for job in list.drain(..) {
                         if job.vtime_ns != 0 && now.saturating_sub(job.start_ns) >= job.vtime_ns {
