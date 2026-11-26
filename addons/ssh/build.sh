@@ -13,9 +13,9 @@
 #   sh addons/ssh/build.sh [--arch x86_64|aarch64] --qtest   stage a minimal initfs
 #
 # The aarch64 build uses the aarch64 libc sysroot, userland/linker/aarch64.ld, the cross aarch64
-# libgcc builtins and the aarch64 T1 OpenSSL (build/tls/aarch64). The ssh-version qtest wrapper is
-# x86_64-only; the aarch64 lane builds the image binaries only. No upstream OpenSSH source is
-# modified.
+# libgcc builtins and the aarch64 T1 OpenSSL (build/tls/aarch64). `--arch` selects the target and
+# defaults to RAVEN_QT_ARCH so a qtest `pre` step builds the case's architecture, x86_64 otherwise.
+# The ssh-version qtest wrapper is built for both arches. No upstream OpenSSH source is modified.
 #
 # OpenSSH 10.6 splits the server into `sshd` (the listener), `sshd-session` and `sshd-auth`.
 # The target runtime paths are `/usr/libexec/sshd-session` and `/usr/libexec/sshd-auth`; the
@@ -27,7 +27,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
-arch=x86_64
+arch=${RAVEN_QT_ARCH:-x86_64}
 mode=--build
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -232,19 +232,16 @@ build() {
 }
 
 build_version_wrapper() {
-    if [ "$arch" != x86_64 ]; then
-        die "the ssh-version wrapper is x86_64-only; the aarch64 lane builds the image binaries only"
-    fi
     [ -f "$build/sshd.o" ] || die "sshd.o missing; run --build first"
     llvm-objcopy --redefine-sym main=sshd_main "$build/sshd.o" "$build/sshd_version.o" ||
         die "cannot rename the upstream sshd main"
-    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
-        -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector \
+    clang --target="$target" --sysroot="$sysroot" \
+        -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector $fp_flags \
         -I"$t1_stage/include" -include "$compat/ssh_compat.h" -std=gnu11 -O1 \
         -c "$version_src" -o "$build/ssh_version_main.o" ||
         die "cannot compile the ssh-version wrapper"
-    clang --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-        -nostdlib -nostartfiles -static -T"$root/tests/libc/target/x86_64.ld" \
+    clang --target="$target" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
+        -nostdlib -nostartfiles -static -T"$ld_script" \
         -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
         "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" \
         "$build/ssh_version_main.o" "$build/sshd_version.o" \
