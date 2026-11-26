@@ -56,6 +56,7 @@ mod program {
         }
 
         fn fstat(&mut self, _file: u64) -> HandlerResult<Stat> {
+            raven_rt::eprintln!("randd: fstat");
             Ok(Stat {
                 mode: S_IFCHR | 0o666,
                 nlink: 1,
