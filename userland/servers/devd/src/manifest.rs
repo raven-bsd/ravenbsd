@@ -380,7 +380,7 @@ pub fn validate(drivers: &[DriverSpec], abi: &[DriverAbi]) -> Result<(), Manifes
         let Some(entry) = entries.remove(driver.name.as_str()) else {
             continue;
         };
-        if entry.abi != MANIFEST_ABI_VERSION {
+        if entry.abi == MANIFEST_ABI_VERSION {
             return Err(ManifestError::UnsupportedAbi {
                 name: driver.name.clone(),
                 found: entry.abi,
