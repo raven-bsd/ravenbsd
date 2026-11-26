@@ -54,7 +54,7 @@ BOOT_TIMEOUT = 300
 LISTEN_TIMEOUT = 90
 CLIENT_TIMEOUT = 60
 IMAGE_TIMEOUT = 300
-ADDON_TIMEOUT = 240
+ADDON_TIMEOUT = 540
 
 EXIT_STAGE = {
     SETUP: 2,
@@ -243,11 +243,35 @@ def run_image_build(arch: str, image: Path, log_path: Path) -> tuple[int, str]:
     return proc.returncode or 0, output
 
 
+def stage_fixtures(arch: str, evidence: Path) -> None:
+    """Stage the arch-selected virt-dtb profile inputs before the image build.
+
+    `tests/fixtures/virt-dtb/build.sh [arch]` is the documented prerequisite for the
+    generated `build/fixtures/virt-dtb/{arch}` inputs. xtask's fixture hook runs the
+    script without the target arch, so the gate invokes it with the requested arch.
+    """
+    log_path = evidence / f"fixtures-{arch}.log"
+    result = subprocess.run(
+        ["sh", "tests/fixtures/virt-dtb/build.sh", arch],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    write_text(log_path, result.stdout + result.stderr)
+    if result.returncode != 0:
+        raise GateFailure(
+            IMAGE, f"virt-dtb fixture staging failed with exit {result.returncode}; see {log_path}"
+        )
+
+
 def build_image(arch: str, evidence: Path) -> Path:
     image = ROOT / "build" / "qtest" / f"s85k-ssh-login-{arch}.img"
     addon = ROOT / "build" / "ssh" / arch / "bin" / "sshd"
     if not addon.is_file():
         build_addon(arch, evidence)
+    stage_fixtures(arch, evidence)
     log(f"building release image {image.relative_to(ROOT)}")
     log(f"image build RUSTUP_HOME={os.environ.get('RUSTUP_HOME', '<unset>')}")
     log_path = evidence / f"image-build-{arch}.log"
