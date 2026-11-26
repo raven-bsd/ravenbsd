@@ -81,8 +81,14 @@ fn filter_numbers_match_the_header() {
         ("EVFILT_PROC", EVFILT_PROC),
         ("EVFILT_SIGNAL", EVFILT_SIGNAL),
         ("EVFILT_TIMER", EVFILT_TIMER),
+        ("EVFILT_PROCDESC", EVFILT_PROCDESC),
+        ("EVFILT_FS", EVFILT_FS),
+        ("EVFILT_LIO", EVFILT_LIO),
         ("EVFILT_USER", EVFILT_USER),
         ("EVFILT_SENDFILE", EVFILT_SENDFILE),
+        ("EVFILT_EMPTY", EVFILT_EMPTY),
+        ("EVFILT_JAIL", EVFILT_JAIL),
+        ("EVFILT_JAILDESC", EVFILT_JAILDESC),
     ] {
         assert_eq!(
             header_define(EVENT_H, name),
@@ -90,6 +96,10 @@ fn filter_numbers_match_the_header() {
             "{name}"
         );
     }
+    assert_eq!(
+        header_define(EVENT_H, "EVFILT_SYSCOUNT"),
+        Some(i64::from(EVFILT_SYSCOUNT))
+    );
 }
 
 #[test]
@@ -249,7 +259,7 @@ fn add_write_registers_writable() {
 }
 
 #[test]
-fn add_regular_file_reports_eperm() {
+fn add_regular_file_is_eopnotsupp() {
     let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
     table.insert(10, Handle(710), FdKind::File);
     let mut events = [Kevent::default(); 1];
@@ -266,7 +276,7 @@ fn add_regular_file_reports_eperm() {
     .unwrap();
     assert_eq!(count, 1);
     assert_eq!(events[0].flags, EV_ERROR);
-    assert_eq!(events[0].data, i64::from(Errno::EPERM.0));
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
 }
 
 #[test]
@@ -309,7 +319,7 @@ fn timer_units_are_converted() {
 }
 
 #[test]
-fn timer_abstime_is_rejected() {
+fn timer_abstime_is_eopnotsupp() {
     let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
     let mut events = [Kevent::default(); 1];
     kevent(
@@ -324,7 +334,7 @@ fn timer_abstime_is_rejected() {
     )
     .unwrap();
     assert_eq!(events[0].flags, EV_ERROR);
-    assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
 }
 
 #[test]
@@ -457,7 +467,7 @@ fn unknown_filter_is_einval() {
 }
 
 #[test]
-fn unknown_flags_are_einval() {
+fn undefined_flag_bits_are_einval() {
     let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
     table.insert(10, Handle(710), FdKind::Pipe);
     let mut events = [Kevent::default(); 1];
@@ -467,12 +477,38 @@ fn unknown_flags_are_einval() {
         &mut source,
         &mut kqueue,
         kqfd,
-        &[change(10, EVFILT_READ, EV_ADD | 0x8000, 0, 0)],
+        &[change(10, EVFILT_READ, EV_ADD | 0x0400, 0, 0)],
         &mut events,
         None,
     )
     .unwrap();
     assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn system_flag_bits_are_masked() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD | EV_EOF, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert!(
+        kqueue
+            .registrations(kqfd)
+            .unwrap()
+            .regs
+            .contains_key(&(10, EVFILT_READ))
+    );
 }
 
 #[test]
@@ -546,7 +582,7 @@ fn receipt_echoes_success() {
 }
 
 #[test]
-fn error_without_room_is_a_global_error() {
+fn error_without_room_returns_the_change_error() {
     let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
     assert_eq!(
         kevent(
@@ -559,7 +595,7 @@ fn error_without_room_is_a_global_error() {
             &mut [],
             None,
         ),
-        Err(Errno::ENOMEM)
+        Err(Errno::ENOENT)
     );
 }
 
@@ -930,3 +966,770 @@ fn kqueue_fd_is_not_inherited_semantics_are_not_faked() {
         Err(Errno::EBADF)
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Pinned FreeBSD `sys/kern/kern_event.c` `kqueue_register`/`kqueue_kevent` contract rows (S743).
+
+fn add_read(evq: &mut FakeEvq, table: &FakeFdTable, source: &mut FakeSrc, kqueue: &mut Kqueue, kqfd: i32) {
+    let mut events = [Kevent::default(); 2];
+    let count = kevent(
+        evq,
+        table,
+        source,
+        kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn read_and_write_on_one_fd_register_together() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 2];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[
+            change(10, EVFILT_READ, EV_ADD, 0, 0),
+            change(10, EVFILT_WRITE, EV_ADD, 0, 0),
+        ],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    let instance = kqueue.registrations(kqfd).unwrap();
+    assert!(instance.regs.contains_key(&(10, EVFILT_READ)));
+    assert!(instance.regs.contains_key(&(10, EVFILT_WRITE)));
+    assert_eq!(
+        evq.ops
+            .iter()
+            .filter(|(op, handle, _, _)| *op == EvqCtl::Add && handle.0 == 710)
+            .count(),
+        1
+    );
+    let cookie = evq.cookie_of(Handle(710)).unwrap();
+    let mask = evq.last_mask(EvqCtl::Add, cookie).unwrap();
+    assert_eq!(
+        mask & (EV_READABLE | EV_WRITABLE | EV_HUP),
+        EV_READABLE | EV_WRITABLE | EV_HUP
+    );
+}
+
+#[test]
+fn read_and_write_delivery_is_per_filter() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 2];
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[
+            change(10, EVFILT_READ, EV_ADD, 0, 0),
+            change(10, EVFILT_WRITE, EV_ADD, 0, 0),
+        ],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    let cookie = evq.cookie_of(Handle(710)).unwrap();
+    evq.push(cookie, EV_READABLE | EV_WRITABLE);
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 2);
+    assert_eq!(events[0].filter, EVFILT_READ);
+    assert_eq!(events[1].filter, EVFILT_WRITE);
+}
+
+#[test]
+fn readd_updates_udata_and_flags() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    add_read(&mut evq, &table, &mut source, &mut kqueue, kqfd);
+    let mut events = [Kevent::default(); 2];
+    let mut updated = change(10, EVFILT_READ, EV_ADD, 0, 0);
+    updated.udata = 9;
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[updated],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert_eq!(
+        kqueue
+            .registrations(kqfd)
+            .unwrap()
+            .regs
+            .get(&(10, EVFILT_READ))
+            .unwrap()
+            .udata,
+        9
+    );
+}
+
+#[test]
+fn modify_without_keepudata_replaces_udata() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut first = change(10, EVFILT_READ, EV_ADD, 0, 0);
+    first.udata = 7;
+    let mut events = [Kevent::default(); 2];
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[first],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    let mut second = change(10, EVFILT_READ, 0, 0, 0);
+    second.udata = 8;
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[second],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        kqueue
+            .registrations(kqfd)
+            .unwrap()
+            .regs
+            .get(&(10, EVFILT_READ))
+            .unwrap()
+            .udata,
+        8
+    );
+}
+
+#[test]
+fn modify_with_keepudata_keeps_udata() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut first = change(10, EVFILT_READ, EV_ADD, 0, 0);
+    first.udata = 7;
+    let mut events = [Kevent::default(); 2];
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[first],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    let mut second = change(10, EVFILT_READ, EV_KEEPUDATA, 0, 0);
+    second.udata = 8;
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[second],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        kqueue
+            .registrations(kqfd)
+            .unwrap()
+            .regs
+            .get(&(10, EVFILT_READ))
+            .unwrap()
+            .udata,
+        7
+    );
+}
+
+#[test]
+fn keepudata_with_add_is_einval() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD | EV_KEEPUDATA, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn enable_and_disable_together_is_einval() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD | EV_ENABLE | EV_DISABLE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn enable_without_add_on_missing_is_enoent() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ENABLE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::ENOENT.0));
+}
+
+#[test]
+fn disable_removes_the_watch_and_enable_restores_it() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    add_read(&mut evq, &table, &mut source, &mut kqueue, kqfd);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_DISABLE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert_eq!(evq.cookie_of(Handle(710)), None);
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ENABLE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    let cookie = evq.cookie_of(Handle(710)).unwrap();
+    evq.push(cookie, EV_READABLE);
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+}
+
+#[test]
+fn timer_zero_period_is_one_unit() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert_eq!(
+        source.timer_sets.last(),
+        Some(&(Handle(901), 1_000_000, 1_000_000))
+    );
+}
+
+#[test]
+fn timer_negative_data_is_einval() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD, 0, -1)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn timer_unsupported_fflags_is_einval() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD, 0x100, 5)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn read_lowat_is_eopnotsupp() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD, NOTE_LOWAT, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
+}
+
+#[test]
+fn user_ff_control_is_eopnotsupp() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_USER, EV_ADD, NOTE_FFOR, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
+}
+
+#[test]
+fn proc_extra_fflags_is_eopnotsupp() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    source.process_available = true;
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_PROC, EV_ADD, NOTE_EXIT | NOTE_FORK, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
+}
+
+#[test]
+fn receipt_returns_without_waiting() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 2];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD | EV_RECEIPT, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].flags, EV_ERROR);
+    assert_eq!(events[0].data, 0);
+    assert_eq!(evq.last_timeout_ns, None);
+}
+
+#[test]
+fn change_error_returns_without_waiting() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 2];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_DELETE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::ENOENT.0));
+    assert_eq!(evq.last_timeout_ns, None);
+}
+
+#[test]
+fn filter_zero_is_skipped() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, 0, EV_ADD, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert!(kqueue.is_empty(kqfd));
+}
+
+#[test]
+fn stale_fd_delete_is_enoent() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    add_read(&mut evq, &table, &mut source, &mut kqueue, kqfd);
+    table.close_fd(10).unwrap();
+    table.insert(10, Handle(711), FdKind::Pipe);
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_DELETE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::ENOENT.0));
+}
+
+#[test]
+fn delete_closes_the_timer_source() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 2];
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD, 0, 5)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_DELETE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(source.closed, [Handle(901)]);
+}
+
+#[test]
+fn oneshot_timer_closes_its_source_after_delivery() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0, 5)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    let cookie = evq.cookie_of(Handle(901)).unwrap();
+    evq.push(cookie, EV_SIGNALED);
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(source.closed, [Handle(901)]);
+}
+
+#[test]
+fn readd_of_timer_rearms_the_same_source() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 2];
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD, 0, 5)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_TIMER, EV_ADD, 0, 9)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(source.timers, 1);
+    assert_eq!(source.timer_sets.last(), Some(&(Handle(901), 9_000_000, 9_000_000)));
+}
+
+#[test]
+fn eintr_is_propagated() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    evq.wait_error = Some(Errno::EINTR);
+    let mut events = [Kevent::default(); 1];
+    assert_eq!(
+        kevent(
+            &mut evq,
+            &table,
+            &mut source,
+            &mut kqueue,
+            kqfd,
+            &[],
+            &mut events,
+            Some(Timespec {
+                tv_sec: 5,
+                tv_nsec: 0,
+            })
+        ),
+        Err(Errno::EINTR)
+    );
+}
+
+#[test]
+fn kqueue1_accepts_o_nonblock() {
+    let mut evq = FakeEvq::new();
+    let mut table = FakeFdTable::new();
+    assert!(kqueue1(&mut evq, &mut table, raven_libc_abi::fcntl::O_NONBLOCK).is_ok());
+    let fd = kqueue1(&mut evq, &mut table, raven_libc_abi::fcntl::O_NONBLOCK).unwrap();
+    assert!(!table.cloexec(fd));
+}
+
+#[test]
+fn known_filter_boundary_is_explicit() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, -16, EV_ADD, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].data, i64::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn proc_note_exit_delivers_eof() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    source.process_available = true;
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(42, EVFILT_PROC, EV_ADD, NOTE_EXIT, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    let cookie = evq.cookie_of(Handle(1012)).unwrap();
+    evq.push(cookie, EV_HUP);
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].ident, 42);
+    assert_eq!(events[0].flags & EV_EOF, EV_EOF);
+    assert!(source.closed.is_empty());
+}
+
+#[test]
+fn user_trigger_delivers_registered_fflags() {
+    let (mut evq, table, mut source, mut kqueue, kqfd) = setup();
+    let mut events = [Kevent::default(); 1];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(1, EVFILT_USER, EV_ADD, NOTE_TRIGGER, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    let cookie = evq.cookie_of(Handle(951)).unwrap();
+    evq.push(cookie, EV_SIGNALED);
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(events[0].fflags, NOTE_TRIGGER);
+    assert_eq!(events[0].data, 0);
+}
+
+#[test]
+fn add_disabled_creates_no_watch_until_enabled() {
+    let (mut evq, mut table, mut source, mut kqueue, kqfd) = setup();
+    table.insert(10, Handle(710), FdKind::Pipe);
+    let mut events = [Kevent::default(); 2];
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ADD | EV_DISABLE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert_eq!(evq.cookie_of(Handle(710)), None);
+    let count = kevent(
+        &mut evq,
+        &table,
+        &mut source,
+        &mut kqueue,
+        kqfd,
+        &[change(10, EVFILT_READ, EV_ENABLE, 0, 0)],
+        &mut events,
+        None,
+    )
+    .unwrap();
+    assert_eq!(count, 0);
+    assert!(evq.cookie_of(Handle(710)).is_some());
+}
+

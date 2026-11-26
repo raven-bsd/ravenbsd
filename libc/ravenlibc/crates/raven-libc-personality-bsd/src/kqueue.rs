@@ -31,10 +31,24 @@ pub const EVFILT_PROC: i16 = -5;
 pub const EVFILT_SIGNAL: i16 = -6;
 /// `EVFILT_TIMER`.
 pub const EVFILT_TIMER: i16 = -7;
+/// `EVFILT_PROCDESC`.
+pub const EVFILT_PROCDESC: i16 = -8;
+/// `EVFILT_FS`.
+pub const EVFILT_FS: i16 = -9;
+/// `EVFILT_LIO`.
+pub const EVFILT_LIO: i16 = -10;
 /// `EVFILT_USER`.
 pub const EVFILT_USER: i16 = -11;
 /// `EVFILT_SENDFILE`.
 pub const EVFILT_SENDFILE: i16 = -12;
+/// `EVFILT_EMPTY`.
+pub const EVFILT_EMPTY: i16 = -13;
+/// `EVFILT_JAIL`.
+pub const EVFILT_JAIL: i16 = -14;
+/// `EVFILT_JAILDESC`.
+pub const EVFILT_JAILDESC: i16 = -15;
+/// `EVFILT_SYSCOUNT`.
+pub const EVFILT_SYSCOUNT: i16 = 15;
 
 /// `EV_ADD`.
 pub const EV_ADD: u16 = 0x0001;
@@ -92,6 +106,11 @@ pub const NOTE_USECONDS: u32 = 0x4;
 pub const NOTE_NSECONDS: u32 = 0x8;
 /// `NOTE_ABSTIME`.
 pub const NOTE_ABSTIME: u32 = 0x10;
+
+/// `NOTE_LOWAT` (EVFILT_READ/WRITE low-water mark).
+pub const NOTE_LOWAT: u32 = 0x0001;
+/// `NOTE_FILE_POLL` (EVFILT_READ/WRITE poll-compatible behaviour).
+pub const NOTE_FILE_POLL: u32 = 0x0002;
 
 /// `KQUEUE_CLOEXEC`.
 pub const KQUEUE_CLOEXEC: i32 = 0x1;
