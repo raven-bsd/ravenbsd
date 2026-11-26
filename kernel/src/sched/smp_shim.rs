@@ -172,8 +172,9 @@ pub mod bringup {
 ///   A second shooter waits with interrupts enabled (preemption stays disabled), so it can take
 ///   the active shooter's TLB SGI instead of timing out. The acknowledgement wait also enables
 ///   interrupts; the guard restores the caller's original DAIF on every path.
-/// * A missing acknowledgement times out after 100 ms. The target's pending slot is cleared so a
-///   late SGI acknowledges nothing, the timeout counter is bumped, and `false` is returned.
+/// * The 100 ms deadline is diagnostic only. A late acknowledgement is still an acknowledgement:
+///   the pending sequence stays published and the shooter waits for it. `false` is returned only
+///   when a target could not be signalled at all.
 ///
 /// Memory ordering: the shooter stores the range and the per-CPU pending sequence with `SeqCst`
 /// before sending the SGI; the handler loads them with `SeqCst`, invalidates the range, then
@@ -189,8 +190,8 @@ pub mod shootdown {
 
     use super::MAX_CPUS;
 
-    /// Acknowledgement deadline. The x86-64 mailbox uses the same bound.
-    const TIMEOUT_NS: u64 = 100_000_000;
+    /// Diagnostic acknowledgement-delay bound, not a give-up bound.
+    const ACK_DELAY_NS: u64 = 100_000_000;
 
     /// Save DAIF and mask all interrupts, mirroring `sync::disable_interrupts` without changing
     /// the shared lock module. The guard restores the exact caller state.
@@ -276,7 +277,7 @@ pub mod shootdown {
     static FLUSHES: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
     static SHOOTDOWNS: AtomicU64 = AtomicU64::new(0);
     static IPIS: AtomicU64 = AtomicU64::new(0);
-    static TIMEOUTS: AtomicU64 = AtomicU64::new(0);
+    static DELIVERY_FAILURES: AtomicU64 = AtomicU64::new(0);
 
     /// Invalidate `start..start + len` on every online CPU.
     ///
@@ -316,11 +317,18 @@ pub mod shootdown {
             cpu = cpu.saturating_add(1);
         }
 
+        let mut delivered = [false; MAX_CPUS];
         let mut sent = 0u64;
         cpu = 0;
         while cpu < online {
-            if cpu != me && gic::send_sgi(cpu, super::SGI_TLB).is_ok() {
-                sent = sent.saturating_add(1);
+            if cpu != me {
+                let ok = gic::send_sgi(cpu, super::SGI_TLB).is_ok();
+                if let Some(slot) = delivered.get_mut(cpu) {
+                    *slot = ok;
+                }
+                if ok {
+                    sent = sent.saturating_add(1);
+                }
             }
             cpu = cpu.saturating_add(1);
         }
@@ -330,24 +338,33 @@ pub mod shootdown {
         // A target that is inside this module waiting for the active slot must be able to take
         // the SGI. The guard restores the caller's original DAIF when this function returns.
         enable_local_interrupts();
-        let deadline = time::now_ns().saturating_add(TIMEOUT_NS);
+        let deadline = time::now_ns().saturating_add(ACK_DELAY_NS);
         let mut all_acked = true;
+        let mut warned = false;
         cpu = 0;
         while cpu < online {
             if cpu != me {
+                if !delivered.get(cpu).copied().unwrap_or(false) {
+                    // A target that could not be signalled never acknowledges. Clear its
+                    // mailbox and report the failed delivery without waiting for an ack.
+                    if let Some(pending) = PENDING.get(cpu) {
+                        pending.store(0, Ordering::SeqCst);
+                    }
+                    DELIVERY_FAILURES.fetch_add(1, Ordering::SeqCst);
+                    all_acked = false;
+                    cpu = cpu.saturating_add(1);
+                    continue;
+                }
                 let Some(acked) = ACKED.get(cpu) else {
                     cpu = cpu.saturating_add(1);
                     continue;
                 };
                 while acked.load(Ordering::SeqCst) != sequence {
-                    if time::now_ns() > deadline {
-                        if let Some(pending) = PENDING.get(cpu) {
-                            pending.store(0, Ordering::SeqCst);
-                        }
-                        TIMEOUTS.fetch_add(1, Ordering::SeqCst);
-                        kprintln!("aarch64-smp: tlb shootdown timeout on cpu {cpu}");
-                        all_acked = false;
-                        break;
+                    if time::now_ns() > deadline && !warned {
+                        // The target is late, not lost. Keep the request published and wait for
+                        // the acknowledgement; the SGI remains pending in the GIC.
+                        warned = true;
+                        kprintln!("aarch64-smp: tlb shootdown ack delay on cpu {cpu}");
                     }
                     core::hint::spin_loop();
                 }
@@ -401,9 +418,10 @@ pub mod shootdown {
         IPIS.load(Ordering::Relaxed)
     }
 
-    /// Number of remote CPUs that did not acknowledge in time.
+    /// Number of remote CPUs that could not be signalled. A late acknowledgement is not a
+    /// failure; only a failed SGI delivery is counted here.
     pub fn timeout_count() -> u64 {
-        TIMEOUTS.load(Ordering::Relaxed)
+        DELIVERY_FAILURES.load(Ordering::Relaxed)
     }
 }
 
