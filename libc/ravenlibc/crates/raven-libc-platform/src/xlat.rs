@@ -276,14 +276,14 @@ pub enum IoctlAction {
     Unknown,
 }
 
-/// `TIOCGETA`: the FreeBSD `_IOR('t', 19, struct termios)` encoding, 44-byte record.
-pub const TIOCGETA: u32 = 0x402c_7413;
+/// `TIOCGETA`: the FreeBSD `_IOR('t', 19, struct termios)` encoding of the native 60-byte record.
+pub const TIOCGETA: u32 = 0x403c_7413;
 /// `TIOCSETA`: the FreeBSD `_IOW('t', 20, struct termios)` encoding.
-pub const TIOCSETA: u32 = 0x802c_7414;
+pub const TIOCSETA: u32 = 0x803c_7414;
 /// `TIOCSETAW`: write and drain.
-pub const TIOCSETAW: u32 = 0x802c_7415;
+pub const TIOCSETAW: u32 = 0x803c_7415;
 /// `TIOCSETAF`: write and flush.
-pub const TIOCSETAF: u32 = 0x802c_7416;
+pub const TIOCSETAF: u32 = 0x803c_7416;
 /// `TCGETS`: compatibility alias of [`TIOCGETA`].
 pub const TCGETS: u32 = TIOCGETA;
 /// `TCSETS`: compatibility alias of [`TIOCSETA`].

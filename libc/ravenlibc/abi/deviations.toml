@@ -58,13 +58,6 @@ ours = "392/8"
 theirs = { x86_64 = "200/8", aarch64 = "312/8", riscv64 = "344/8" }
 reason = "DV3/RD-new: same blob as jmp_buf on all arches"
 
-[[deviation]]
-name = "termios"
-against = "musl"
-ours = "44/4"
-theirs = { x86_64 = "60/4", aarch64 = "60/4", riscv64 = "60/4" }
-reason = "S742/DR-69: the native struct termios is FreeBSD 13334440 (NCCS=20, no c_line, c_cc at 16, speeds at 36/40); the 60-byte musl record is the private tty wire shape"
-
 # --- Against musl constants (H1 x86_64, H3 aarch64 fcntl) ----------------------------------
 
 [[deviation]]
