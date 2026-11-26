@@ -12,6 +12,7 @@
 extern crate alloc;
 
 pub mod dtb;
+pub mod manifest;
 pub mod pci;
 pub mod platform;
 
