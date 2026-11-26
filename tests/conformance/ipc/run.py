@@ -13,6 +13,7 @@ from the 2026-11-24 re-evaluation note in the S180 ticket.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import signal
@@ -41,6 +42,19 @@ def choose_port() -> int:
 
 PORT = choose_port()
 SERIAL = OUT / "serial.log"
+STAMP = OUT / "image.stamp"
+
+
+def image_inputs() -> str:
+    """The inputs that make the guest image: product HEAD and the probe sources."""
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=str(ROOT), capture_output=True, text=True,
+        check=False,
+    ).stdout.strip()
+    digests = [head]
+    for name in ("ipc-conformance.c", "build.sh"):
+        digests.append(hashlib.sha256((ROOT / "tests/conformance/ipc" / name).read_bytes()).hexdigest())
+    return "\n".join(digests) + "\n"
 
 
 def step(label: str, argv: list[str], timeout: int) -> None:
@@ -79,6 +93,7 @@ def build_image() -> None:
         ],
         900,
     )
+    STAMP.write_text(image_inputs(), encoding="utf-8")
 
 
 def run_probe(command: str, timeout: int = 20) -> tuple[int, str, str, bool]:
@@ -128,10 +143,10 @@ def rows(output: str) -> dict[str, str]:
 
 
 def main() -> int:
-    if not IMAGE.is_file():
-        build_image()
-    else:
+    if IMAGE.is_file() and STAMP.is_file() and STAMP.read_text(encoding="utf-8") == image_inputs():
         print(f"S180-RUN image reuse {IMAGE}", flush=True)
+    else:
+        build_image()
 
     OUT.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(OVMF_VARS, OUT / "vars.fd")
