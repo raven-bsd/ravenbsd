@@ -25,7 +25,7 @@ fn fill_sets_every_supported_bit() {
 }
 
 #[test]
-fn words_one_to_fifteen_stay_zero() {
+fn words_beyond_the_freebsd_set_stay_zero() {
     let mut set = SigSet::empty();
     set.fill();
     set.add(1).unwrap();

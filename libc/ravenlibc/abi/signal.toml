@@ -95,6 +95,10 @@ consts = [
   { name = "SA_RESETHAND", base = "hex", value = 0x0004 },
   { name = "SS_ONSTACK", value = 1 },
   { name = "SS_DISABLE", value = 4 },
+  # FreeBSD sys/sys/_sigaltstack.h with sys/x86/include/_limits.h and
+  # sys/arm64/include/_limits.h. The rows are per architecture; the current hdrgen evaluator
+  # keeps one value per name, so the x86 row is last and wins until validate.rs carries the
+  # per-arch value (S713 round-2 blocker 1, aarch64 output still needs the generator fix).
   { name = "MINSIGSTKSZ", arch = ["aarch64", "riscv64"], value = 4096 },
   { name = "MINSIGSTKSZ", arch = ["x86_64"], value = 2048 },
   { name = "SIGSTKSZ", arch = ["aarch64", "riscv64"], value = 36864 },
