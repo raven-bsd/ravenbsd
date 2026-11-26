@@ -34,6 +34,13 @@ VIOLATION = re.compile(
     r"(?i)panicked|EXCEPTION|SegmentOutsideUserRange|no UFS root device|bad superblock"
 )
 
+# The login/getty prompts are written without a trailing newline, so a service
+# line can follow on the same serial line (`login: svcd: resolvd up`). Their
+# patterns must not anchor at end-of-line.
+LOGIN_PROMPT = r"(?m)^login: ?"
+PASSWORD_PROMPT = r"(?m)^Password: ?"
+SHELL_PROMPT = r"(?m)^raven# ?"
+
 
 class GateFailure(Exception):
     """A gate stage did not pass."""
@@ -218,12 +225,12 @@ def run(args):
         stage = "ufs-mount"
         serial.expect(r"^svcd: root pivoted to UFS at /$", 180, "ufs-mount")
         stage = "login"
-        serial.expect(r"(?mi)^login: ?$", 180, "login")
+        serial.expect(LOGIN_PROMPT, 180, "login")
         serial.send("root")
-        serial.expect(r"(?mi)^Password: ?$", 30, "login")
+        serial.expect(PASSWORD_PROMPT, 30, "login")
         serial.send("raven")
         stage = "session"
-        serial.expect(r"(?m)^raven# $", 120, "session")
+        serial.expect(SHELL_PROMPT, 120, "session")
         boot_to_login = round(time.monotonic() - started, 1)
         serial.send("echo S85M-MARKER-OK")
         serial.expect(r"(?m)^S85M-MARKER-OK$", 30, "session")

@@ -3,6 +3,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 """Unit checks for the 0.1.0 UFS gate driver (no QEMU)."""
 
+import re
 import unittest
 
 import gate
@@ -78,6 +79,23 @@ class QemuArgsTest(unittest.TestCase):
     def test_unknown_mutation_is_rejected(self):
         with self.assertRaises(ValueError):
             self.args("kvm", "no-login")
+
+
+class PromptTest(unittest.TestCase):
+    def match(self, pattern, text):
+        return re.search(pattern, text)
+
+    def test_login_prompt_survives_a_trailing_service_line(self):
+        self.assertIsNotNone(self.match(gate.LOGIN_PROMPT, "boot report\nlogin: svcd: resolvd up\n"))
+
+    def test_login_prompt_at_end_of_stream(self):
+        self.assertIsNotNone(self.match(gate.LOGIN_PROMPT, "boot report\nlogin: "))
+
+    def test_password_prompt_at_end_of_stream(self):
+        self.assertIsNotNone(self.match(gate.PASSWORD_PROMPT, "Password: "))
+
+    def test_shell_prompt_with_ansi_stripped(self):
+        self.assertIsNotNone(self.match(gate.SHELL_PROMPT, "raven# "))
 
 
 class ImageMarkerTest(unittest.TestCase):
