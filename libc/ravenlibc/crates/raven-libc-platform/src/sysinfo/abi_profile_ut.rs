@@ -6,8 +6,8 @@
 //! Expected values are the FreeBSD 133344405 donor definitions:
 //! `sys/sys/utsname.h` (`SYS_NMLN` 256, five fields, no `domainname`),
 //! `include/pwd.h` (eleven-field `struct passwd`), `include/grp.h`,
-//! `include/pthread.h` and `sys/sys/_pthreadtypes.h`. These rows are red until the
-//! S746 fix lands.
+//! `include/pthread.h` and `sys/sys/_pthreadtypes.h`. These rows pin the
+//! S746 fix and its consumers.
 
 use core::mem::{align_of, size_of};
 
@@ -56,4 +56,13 @@ fn pthread_mutex_default_and_cancel_type_are_the_freebsd_values() {
 fn pthread_key_and_spinlock_are_the_freebsd_types() {
     assert_eq!(size_of::<pthread_key_t>(), 4);
     assert_eq!(size_of::<pthread_spinlock_t>(), 8);
+}
+
+#[test]
+fn sem_limits_are_the_donor_values() {
+    // FreeBSD include/semaphore.h: SEM_VALUE_MAX is __INT_MAX (a signed int).
+    assert_eq!(raven_libc_abi::limits::SEM_VALUE_MAX, i32::MAX);
+    // FreeBSD include/unistd.h: _SC_SEM_NSEMS_MAX 49 and _SC_SEM_VALUE_MAX 50.
+    assert_eq!(raven_libc_abi::sysconf::_SC_SEM_NSEMS_MAX, 49);
+    assert_eq!(raven_libc_abi::sysconf::_SC_SEM_VALUE_MAX, 50);
 }

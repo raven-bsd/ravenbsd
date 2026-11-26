@@ -4,24 +4,27 @@
 use super::*;
 
 #[test]
-fn abort_error_values_match_linux() {
-    assert_eq!(EINVAL.0, 22);
-    assert_eq!(EAGAIN.0, 11);
-    assert_eq!(EBUSY.0, 16);
-    assert_eq!(EDEADLK.0, 35);
-    assert_eq!(EPERM.0, 1);
-    assert_eq!(ESRCH.0, 3);
-    assert_eq!(EINTR.0, 4);
-    assert_eq!(ETIMEDOUT.0, 110);
-    assert_eq!(ENOTSUP.0, 95);
-    assert_eq!(ENOSYS.0, 38);
-    assert_eq!(EOWNERDEAD.0, 130);
-    assert_eq!(ENOTRECOVERABLE.0, 131);
-    assert_eq!(ECANCELED.0, 125);
-    assert_eq!(EOVERFLOW.0, 75);
-    assert_eq!(ERANGE.0, 34);
-    assert_eq!(ENOMEM.0, 12);
-    assert_eq!(ENOEXEC.0, 8);
+fn abort_error_values_match_the_native_abi() {
+    assert_eq!(i32::from(EINVAL.0), raven_libc_abi::errno::EINVAL);
+    assert_eq!(i32::from(EAGAIN.0), raven_libc_abi::errno::EAGAIN);
+    assert_eq!(i32::from(EBUSY.0), raven_libc_abi::errno::EBUSY);
+    assert_eq!(i32::from(EDEADLK.0), raven_libc_abi::errno::EDEADLK);
+    assert_eq!(i32::from(EPERM.0), raven_libc_abi::errno::EPERM);
+    assert_eq!(i32::from(ESRCH.0), raven_libc_abi::errno::ESRCH);
+    assert_eq!(i32::from(EINTR.0), raven_libc_abi::errno::EINTR);
+    assert_eq!(i32::from(ETIMEDOUT.0), raven_libc_abi::errno::ETIMEDOUT);
+    assert_eq!(i32::from(ENOTSUP.0), raven_libc_abi::errno::ENOTSUP);
+    assert_eq!(i32::from(ENOSYS.0), raven_libc_abi::errno::ENOSYS);
+    assert_eq!(i32::from(EOWNERDEAD.0), raven_libc_abi::errno::EOWNERDEAD);
+    assert_eq!(
+        i32::from(ENOTRECOVERABLE.0),
+        raven_libc_abi::errno::ENOTRECOVERABLE
+    );
+    assert_eq!(i32::from(ECANCELED.0), raven_libc_abi::errno::ECANCELED);
+    assert_eq!(i32::from(EOVERFLOW.0), raven_libc_abi::errno::EOVERFLOW);
+    assert_eq!(i32::from(ERANGE.0), raven_libc_abi::errno::ERANGE);
+    assert_eq!(i32::from(ENOMEM.0), raven_libc_abi::errno::ENOMEM);
+    assert_eq!(i32::from(ENOEXEC.0), raven_libc_abi::errno::ENOEXEC);
 }
 
 #[test]
@@ -59,9 +62,12 @@ fn semaphore_and_barrier_limits() {
 
 #[test]
 fn mutex_type_bits_are_the_donor_layout() {
-    assert_eq!(PTHREAD_MUTEX_NORMAL, 0);
-    assert_eq!(PTHREAD_MUTEX_RECURSIVE, 1);
-    assert_eq!(PTHREAD_MUTEX_ERRORCHECK, 2);
+    assert_eq!(PTHREAD_MUTEX_NORMAL, 3);
+    assert_eq!(PTHREAD_MUTEX_RECURSIVE, 2);
+    assert_eq!(PTHREAD_MUTEX_ERRORCHECK, 1);
+    assert_eq!(MUTEX_KIND_DEFAULT, 0);
+    assert_eq!(MUTEX_KIND_RECURSIVE, 1);
+    assert_eq!(MUTEX_KIND_NORMAL, 2);
     assert_eq!(MUTEX_TYPE_ROBUST, 4);
     assert_eq!(MUTEX_TYPE_PI, 8);
     assert_eq!(MUTEX_TYPE_SHARED, 128);
@@ -88,7 +94,7 @@ fn cancel_bits_are_distinct() {
     assert_eq!(PTHREAD_CANCEL_DISABLE, 1);
     assert_eq!(PTHREAD_CANCEL_MASKED, 2);
     assert_eq!(PTHREAD_CANCEL_DEFERRED, 0);
-    assert_eq!(PTHREAD_CANCEL_ASYNCHRONOUS, 1);
+    assert_eq!(PTHREAD_CANCEL_ASYNCHRONOUS, 2);
 }
 
 #[test]
@@ -156,8 +162,8 @@ fn relative_ns_handles_the_wrap_boundary() {
 fn ids_and_scheduling_constants() {
     assert_eq!(PTHREAD_CREATE_JOINABLE, 0);
     assert_eq!(PTHREAD_CREATE_DETACHED, 1);
-    assert_eq!(PTHREAD_SCOPE_SYSTEM, 0);
-    assert_eq!(PTHREAD_SCOPE_PROCESS, 1);
+    assert_eq!(PTHREAD_SCOPE_SYSTEM, 2);
+    assert_eq!(PTHREAD_SCOPE_PROCESS, 0);
     assert_eq!(PTHREAD_PRIO_NONE, 0);
     assert_eq!(PTHREAD_PRIO_INHERIT, 1);
     assert_eq!(PTHREAD_PRIO_PROTECT, 2);

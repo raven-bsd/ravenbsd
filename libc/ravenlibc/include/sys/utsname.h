@@ -30,13 +30,16 @@
 
 __BEGIN_DECLS
 
+/* S746: the public record is the FreeBSD 133344405 sys/sys/utsname.h shape:
+ * SYS_NMLN 256 and five fields; musl's domainname field is not part of it. */
+#define	SYS_NMLN	256
+
 struct utsname {
-	char sysname[65];
-	char nodename[65];
-	char release[65];
-	char version[65];
-	char machine[65];
-	char domainname[65];
+	char sysname[SYS_NMLN];
+	char nodename[SYS_NMLN];
+	char release[SYS_NMLN];
+	char version[SYS_NMLN];
+	char machine[SYS_NMLN];
 };
 
 int uname (struct utsname *);

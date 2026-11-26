@@ -21,7 +21,9 @@ pub type off_t = c_longlong;
 pub type pthread_t = *mut c_void;
 // Must be usize due to library/std/sys_common/thread_local.rs,
 // should technically be *mut c_void
-pub type pthread_key_t = usize;
+pub type pthread_key_t = c_int;
+#[doc = "FreeBSD pthread_spinlock_t is a pointer to the opaque struct"]
+pub type pthread_spinlock_t = *mut c_void;
 pub type rlim_t = c_ulonglong;
 pub type sa_family_t = u16;
 pub type sem_t = *mut c_void;
@@ -48,7 +50,6 @@ s! {
         pub release: [c_char; UTSLENGTH],
         pub version: [c_char; UTSLENGTH],
         pub machine: [c_char; UTSLENGTH],
-        pub domainname: [c_char; UTSLENGTH],
     }
 
     pub struct sigset_t {
@@ -156,9 +157,13 @@ s! {
         pub pw_passwd: *mut c_char,
         pub pw_uid: crate::uid_t,
         pub pw_gid: crate::gid_t,
+        pub pw_change: crate::time_t,
+        pub pw_class: *mut c_char,
         pub pw_gecos: *mut c_char,
         pub pw_dir: *mut c_char,
         pub pw_shell: *mut c_char,
+        pub pw_expire: crate::time_t,
+        pub pw_fields: c_int,
     }
 
     // FIXME(1.0): This should not implement `PartialEq`
@@ -323,11 +328,6 @@ s! {
     pub struct pthread_once_t {
         bytes: [u8; _PTHREAD_ONCE_SIZE],
     }
-    #[repr(C)]
-    #[repr(align(4))]
-    pub struct pthread_spinlock_t {
-        bytes: [u8; _PTHREAD_SPINLOCK_SIZE],
-    }
 
     pub struct rlimit {
         pub rlim_cur: crate::rlim_t,
@@ -397,7 +397,6 @@ const _PTHREAD_COND_SIZE: usize = 48;
 const _PTHREAD_MUTEX_SIZE: usize = 40;
 const _PTHREAD_MUTEXATTR_SIZE: usize = 4;
 const _PTHREAD_ONCE_SIZE: usize = 4;
-const _PTHREAD_SPINLOCK_SIZE: usize = 4;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -447,7 +446,7 @@ impl siginfo_t {
     }
 }
 
-pub const UTSLENGTH: usize = 65;
+pub const UTSLENGTH: usize = 256;
 
 // intentionally not public, only used for fd_set
 cfg_if! {
