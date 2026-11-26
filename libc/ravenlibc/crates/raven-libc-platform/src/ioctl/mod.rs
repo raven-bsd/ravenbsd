@@ -49,9 +49,12 @@ pub fn ioctl<B: SysBackend, L: Lock>(
             platform.set_cloexec(fd, false)?;
             Ok(0)
         }
-        IoctlAction::TiocGWinsz | IoctlAction::TiocSWinsz | IoctlAction::FionRead => {
-            Err(Errno::ENOTTY)
-        }
+        IoctlAction::TiocGWinsz
+        | IoctlAction::TiocSWinsz
+        | IoctlAction::FionRead
+        | IoctlAction::TiocSctty
+        | IoctlAction::TiocGPgrp
+        | IoctlAction::TiocSPgrp => Err(Errno::ENOTTY),
         IoctlAction::Unknown => Err(Errno::ENOTTY),
         // Pointer-bearing requests need `&mut Termios`; the shell calls `tcgetattr`.
         IoctlAction::TcGets | IoctlAction::TcSets | IoctlAction::TcSetSw | IoctlAction::TcSetSf => {

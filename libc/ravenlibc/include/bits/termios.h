@@ -35,23 +35,29 @@ struct termios {
 	speed_t __c_ospeed;
 };
 
-#define VINTR     0
-#define VQUIT     1
-#define VERASE    2
-#define VKILL     3
-#define VEOF      4
-#define VTIME     5
-#define VMIN      6
+/* Control-character indexes: the pinned FreeBSD/NetBSD `sys/sys/_termios.h` order.
+ * The public record keeps the native 60-byte layout; the internal `raven-proto-tty`
+ * wire keeps its own order and `raven-libc-platform` maps between the two. */
+#define VEOF      0
+#define VEOL      1
+#define VEOL2     2
+#define VERASE    3
+#define VWERASE   4
+#define VKILL     5
+#define VREPRINT  6
+#define VERASE2   7
 #define VSWTC     7
-#define VSTART    8
-#define VSTOP     9
+#define VINTR     8
+#define VQUIT     9
 #define VSUSP    10
-#define VEOL     11
-#define VREPRINT 12
-#define VDISCARD 13
-#define VWERASE  14
-#define VLNEXT   15
-#define VEOL2    16
+#define VDSUSP   11
+#define VSTART   12
+#define VSTOP    13
+#define VLNEXT   14
+#define VDISCARD 15
+#define VMIN     16
+#define VTIME    17
+#define VSTATUS  18
 
 #define IGNBRK  0000001
 #define BRKINT  0000002

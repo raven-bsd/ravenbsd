@@ -8,9 +8,9 @@ use raven_libc_abi::fcntl;
 
 use crate::backend::FakeSys;
 use crate::ioctl::tty::{
-    B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VMIN, VTIME, Winsize, cfgetispeed, cfgetospeed,
-    cfmakeraw, cfsetispeed, cfsetospeed, custom_arg0, custom_body, default_termios, tcdrain,
-    tcflush, tcgetattr, tcgetwinsize, tcsetattr, tcsetwinsize,
+    B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VEOF, VINTR, VMIN, VTIME, Winsize, cfgetispeed,
+    cfgetospeed, cfmakeraw, cfsetispeed, cfsetospeed, custom_arg0, custom_body, default_termios,
+    tcdrain, tcflush, tcgetattr, tcgetwinsize, tcsetattr, tcsetwinsize,
 };
 use crate::platform::Platform;
 
@@ -191,6 +191,42 @@ fn cfmakeraw_clears_the_input_flags() {
     assert_eq!(termios.c_lflag, 0);
     assert_eq!(termios.c_cc[VMIN], 1);
     assert_eq!(termios.c_cc[VTIME], 0);
+}
+
+#[test]
+fn public_bsd_indexes_read_the_wire_control_characters() {
+    let termios = default_termios();
+    assert_eq!(termios.c_cc[VINTR], 3, "public VINTR reads the wire ^C");
+    assert_eq!(termios.c_cc[VEOF], 4, "public VEOF reads the wire ^D");
+    assert_eq!(termios.c_cc[VMIN], 1, "public VMIN reads the wire VMIN");
+    assert_eq!(termios.c_cc[VTIME], 0, "public VTIME reads the wire VTIME");
+    assert_ne!(termios.c_cc[VINTR], termios.c_cc[VEOF]);
+}
+
+#[test]
+fn every_control_character_round_trips_in_both_directions() {
+    let (platform, fd) = tty_platform();
+    let mut want = default_termios();
+    for (index, byte) in want.c_cc.iter_mut().enumerate() {
+        *byte = (index as u8).wrapping_mul(7).wrapping_add(11);
+    }
+    want.c_line = 0x2a;
+    want.c_iflag = 0x0000_0f0f;
+    want.c_oflag = 0x0000_00f0;
+    want.c_cflag = 0x0000_0303;
+    want.c_lflag = 0x0000_0ff0;
+    want.__c_ispeed = 0o17;
+    want.__c_ospeed = 0o15;
+    tcsetattr(&platform, fd, &want).expect("tcsetattr");
+    let got = tcgetattr(&platform, fd).expect("tcgetattr");
+    assert_eq!(got.c_line, want.c_line);
+    assert_eq!(got.c_iflag, want.c_iflag);
+    assert_eq!(got.c_oflag, want.c_oflag);
+    assert_eq!(got.c_cflag, want.c_cflag);
+    assert_eq!(got.c_lflag, want.c_lflag);
+    assert_eq!(got.__c_ispeed, want.__c_ispeed);
+    assert_eq!(got.__c_ospeed, want.__c_ospeed);
+    assert_eq!(got.c_cc, want.c_cc);
 }
 
 #[test]

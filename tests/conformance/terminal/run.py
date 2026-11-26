@@ -5,9 +5,11 @@
 
 Builds /bin/terminal-conformance into a release initfs with a one-shot service, boots the image,
 and reads the probe rows from the serial console. The four gate rows (termios, pty pair, controlling
-terminal, EIO) must PASS; the three signal rows are PENDING until S44 lands. The service's second
-invocation (`--mutation-termios`) must turn the termios row red. No product code changes and no SSH:
-the probe does not depend on the ssh-hostkeys/tmpfs ordering.
+terminal, EIO) and the three signal rows must PASS. The service's second invocation
+(`--mutation-termios`) must turn the termios row red, and the runner removes the signal rows from a
+copy of the normal text to prove the named rows are required. The public header record and request
+encodings are checked by a host clang oracle with the generated include directory first. No product
+code changes and no SSH: the probe does not depend on the ssh-hostkeys/tmpfs ordering.
 
 Build separately when iterating (each step has its own cap):
   sh tests/conformance/terminal/build.sh
@@ -18,11 +20,17 @@ Build separately when iterating (each step has its own cap):
   cargo xtask image --arch x86_64 --profile release --initfs build/conformance/terminal/initfs.img \
       --cmdline "console=ttyS0 test-exit=1" --output build/qtest/s175-terminal.img
   python3 tests/conformance/terminal/run.py --no-build
+
+The runner selects the guest architecture (`--arch x86_64|aarch64`) and the accelerator
+(`--accel auto|kvm|tcg`): KVM is used only when the host matches the guest and `/dev/kvm` is
+readable, otherwise QEMU runs under TCG. Each architecture builds and reads its own image and
+output directory; aarch64 derives its build, firmware and console from the existing aarch64 qtests.
 """
 
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import signal
 import subprocess
@@ -31,38 +39,128 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-IMAGE = Path(os.environ.get("S175_TERM_IMAGE", ROOT / "build/qtest/s175-terminal.img"))
-OUT = Path(os.environ.get("S175_TERM_OUT", ROOT / "build/conformance/terminal/run"))
-SERIAL = OUT / "serial.log"
-OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
-OVMF_VARS = Path("/usr/share/OVMF/OVMF_VARS_4M.fd")
 SERVICE = ROOT / "tests/conformance/terminal/terminal-conformance.service.toml"
 PROBE = ROOT / "build/conformance/terminal/terminal-conformance"
-GATE_ROWS = ("termios", "pty-both-ways", "ctty", "eio")
-PENDING_ROWS = ("sigwinch", "sighup", "isig")
+GATE_ROWS = ("termios", "pty-both-ways", "ctty", "eio", "target-vintr")
+SIGNAL_ROWS = ("sigwinch", "sighup", "isig")
 MUTATION_MARKER = "S175-TERM-MUTATION-BEGIN"
 
+ARCHES = {
+    "x86_64": {
+        "qemu": "qemu-system-x86_64",
+        "console": "ttyS0",
+        "firmware": ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd"),
+    },
+    "aarch64": {
+        "qemu": "qemu-system-aarch64",
+        "console": "ttyAMA0",
+        "firmware": ("/usr/share/AAVMF/AAVMF_CODE.fd", "/usr/share/AAVMF/AAVMF_VARS.fd"),
+    },
+}
 
-def step(label: str, argv: list[str], timeout: int) -> None:
+HEADER_PROBE = r"""
+#include <stddef.h>
+#include <termios.h>
+#include <sys/ioctl.h>
+
+_Static_assert(sizeof(struct termios) == 60, "native termios size");
+_Static_assert(_Alignof(struct termios) == 4, "native termios alignment");
+_Static_assert(offsetof(struct termios, c_line) == 16, "c_line offset");
+_Static_assert(offsetof(struct termios, c_cc) == 17, "c_cc offset");
+_Static_assert(offsetof(struct termios, __c_ispeed) == 52, "c_ispeed offset");
+_Static_assert(offsetof(struct termios, __c_ospeed) == 56, "c_ospeed offset");
+_Static_assert(NCCS == 32, "NCCS");
+_Static_assert(
+    VEOF == 0 && VINTR == 8 && VMIN == 16 && VTIME == 17,
+    "BSD control-character indexes");
+_Static_assert(TIOCGETA == 0x403c7413UL, "TIOCGETA");
+_Static_assert(TIOCSETA == 0x803c7414UL, "TIOCSETA");
+_Static_assert(TIOCSETAW == 0x803c7415UL, "TIOCSETAW");
+_Static_assert(TIOCSETAF == 0x803c7416UL, "TIOCSETAF");
+_Static_assert(TIOCGWINSZ == 0x40087468UL, "TIOCGWINSZ");
+_Static_assert(TIOCSWINSZ == 0x80087467UL, "TIOCSWINSZ");
+_Static_assert(TIOCGPGRP == 0x40047477UL, "TIOCGPGRP");
+_Static_assert(TIOCSPGRP == 0x80047476UL, "TIOCSPGRP");
+_Static_assert(TIOCSCTTY == 0x20007461UL, "TIOCSCTTY");
+_Static_assert(FIONBIO == 0x8004667eUL, "FIONBIO");
+_Static_assert(FIOCLEX == 0x20006601UL, "FIOCLEX");
+_Static_assert(FIONCLEX == 0x20006602UL, "FIONCLEX");
+
+int main(void) { return 0; }
+"""
+
+
+def step(out: Path, label: str, argv: list[str], timeout: int) -> None:
     print(f"S175-TERM-RUN {label}", flush=True)
     result = subprocess.run(argv, cwd=str(ROOT), capture_output=True, timeout=timeout)
-    (OUT / f"{label}.log").write_bytes(result.stdout + result.stderr)
+    (out / f"{label}.log").write_bytes(result.stdout + result.stderr)
     if result.returncode != 0:
-        raise SystemExit(f"S175-TERM-RUN {label} failed rc={result.returncode}; see {OUT}/{label}.log")
+        raise SystemExit(f"S175-TERM-RUN {label} failed rc={result.returncode}; see {out}/{label}.log")
 
 
-def build_image() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
-    step("fixture-build", ["sh", "tests/conformance/terminal/build.sh"], 240)
-    shutil.rmtree(ROOT / "build/cargo/uutils-x86_64", ignore_errors=True)
-    step("initfs-build",
-         ["cargo", "xtask", "initfs", "--arch", "x86_64", "--profile", "release"], 600)
-    initfs = OUT / "terminal-initfs.img"
+def header_oracle(arch: str, out: Path) -> None:
+    """Compile the FreeBSD terminal ABI expectations against the public headers."""
+    out.mkdir(parents=True, exist_ok=True)
+    header_oracle = out / "header-oracle.c"
+    header_oracle.write_text(HEADER_PROBE, encoding="utf-8")
+    clang = shutil.which("clang")
+    if clang is None:
+        raise SystemExit("S175-TERM-RUN header-oracle failed: clang not found")
+    resource = subprocess.run(
+        [clang, "-print-resource-dir"], capture_output=True, text=True, check=True
+    ).stdout.strip()
     step(
+        out,
+        "header-oracle",
+        [
+            clang,
+            f"--target={arch}-unknown-ravenbsd",
+            "-nostdinc",
+            "-isystem",
+            f"{resource}/include",
+            "-isystem",
+            str(ROOT / "libc/ravenlibc/abi/generated/include"),
+            "-isystem",
+            str(ROOT / f"libc/ravenlibc/arch/{arch}/include"),
+            "-isystem",
+            str(ROOT / "libc/ravenlibc/include"),
+            "-D__BSD_VISIBLE=1",
+            "-std=gnu11",
+            "-c",
+            str(header_oracle),
+            "-o",
+            str(out / "header-oracle.o"),
+        ],
+        60,
+    )
+
+
+def normal_failures(text: str) -> list[str]:
+    found = rows(text)
+    failures: list[str] = []
+    for name in GATE_ROWS + SIGNAL_ROWS:
+        if found.get(name) != "PASS":
+            failures.append(f"normal:{name}={found.get(name)}")
+    if "S175-TERM done failures=" not in text:
+        failures.append("normal:incomplete-output")
+    elif "S175-TERM done failures=0" not in text:
+        failures.append("normal:done-not-zero")
+    return failures
+
+
+def build_image(arch: str, image: Path, out: Path) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    step(out, "fixture-build", ["sh", "tests/conformance/terminal/build.sh", arch], 240)
+    shutil.rmtree(ROOT / f"build/cargo/uutils-{arch}", ignore_errors=True)
+    step(out, "initfs-build",
+         ["cargo", "xtask", "initfs", "--arch", arch, "--profile", "release"], 600)
+    initfs = out / "terminal-initfs.img"
+    step(
+        out,
         "overlay",
         [
             "target/debug/raven-b70-overlay",
-            "build/x86_64/initfs.img",
+            f"build/{arch}/initfs.img",
             str(initfs),
             f"/bin/terminal-conformance={PROBE}:0755",
             f"/etc/services.d/terminal-conformance.toml={SERVICE}:0644",
@@ -70,11 +168,13 @@ def build_image() -> None:
         120,
     )
     step(
+        out,
         "image-build",
         [
-            "cargo", "xtask", "image", "--arch", "x86_64", "--profile", "release",
-            "--initfs", str(initfs), "--cmdline", "console=ttyS0 test-exit=1",
-            "--output", str(IMAGE),
+            "cargo", "xtask", "image", "--arch", arch, "--profile", "release",
+            "--initfs", str(initfs),
+            "--cmdline", f"console={ARCHES[arch]['console']} test-exit=1",
+            "--output", str(image),
         ],
         900,
     )
@@ -92,42 +192,107 @@ def rows(output: str) -> dict[str, str]:
     return found
 
 
-def main() -> int:
-    no_build = "--no-build" in sys.argv[1:]
-    if not no_build or not IMAGE.is_file():
-        build_image()
-    else:
-        print(f"S175-TERM-RUN image reuse {IMAGE}", flush=True)
+def parse_args(argv: list[str]) -> tuple[str, str, bool]:
+    arch = os.environ.get("S175_TERM_ARCH", "x86_64")
+    accel = os.environ.get("S175_TERM_ACCEL", "auto")
+    no_build = False
+    rest = argv[1:]
+    index = 0
+    while index < len(rest):
+        argument = rest[index]
+        if argument == "--no-build":
+            no_build = True
+        elif argument in ("--arch", "--accel"):
+            if index + 1 >= len(rest):
+                raise SystemExit(f"S175-TERM-RUN {argument} needs a value")
+            if argument == "--arch":
+                arch = rest[index + 1]
+            else:
+                accel = rest[index + 1]
+            index += 1
+        else:
+            raise SystemExit(f"S175-TERM-RUN unknown argument {argument}")
+        index += 1
+    if arch not in ARCHES:
+        raise SystemExit(f"S175-TERM-RUN unknown arch {arch}; use {', '.join(ARCHES)}")
+    if accel not in ("auto", "kvm", "tcg"):
+        raise SystemExit(f"S175-TERM-RUN unknown accelerator {accel}")
+    return arch, accel, no_build
 
-    OUT.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(OVMF_VARS, OUT / "vars.fd")
-    SERIAL.write_bytes(b"")
-    argv = [
-        "qemu-system-x86_64", "-machine", "q35", "-m", "512M", "-smp", "4",
-        "-enable-kvm", "-cpu", "host",
-        "-serial", f"file:{SERIAL}", "-display", "none", "-monitor", "none", "-no-reboot",
+
+def accelerator(arch: str, requested: str) -> str:
+    """Pick KVM only when the host can run this guest with it, TCG otherwise."""
+    if requested != "auto":
+        return requested
+    if arch == platform.machine() and Path("/dev/kvm").is_file() and os.access("/dev/kvm", os.R_OK | os.W_OK):
+        return "kvm"
+    return "tcg"
+
+
+def qemu_argv(arch: str, accel: str, image: Path, out: Path, serial: Path) -> list[str]:
+    profile = ARCHES[arch]
+    code = Path(profile["firmware"][0])
+    vars_template = Path(profile["firmware"][1])
+    for firmware in (code, vars_template):
+        if not firmware.is_file():
+            raise SystemExit(f"S175-TERM-RUN firmware missing: {firmware}")
+    vars_path = out / "vars.fd"
+    shutil.copyfile(vars_template, vars_path)
+    argv = [str(profile["qemu"])]
+    if arch == "x86_64":
+        argv += ["-machine", "q35", "-m", "512M", "-smp", "4"]
+    else:
+        argv += ["-M", "virt,gic-version=2", "-m", "512M"]
+    if accel == "kvm":
+        argv += ["-enable-kvm", "-cpu", "host"]
+    elif arch == "x86_64":
+        argv += ["-cpu", "max"]
+    else:
+        argv += ["-cpu", "cortex-a72"]
+    argv += [
+        "-serial", f"file:{serial}", "-display", "none", "-monitor", "none", "-no-reboot",
         "-snapshot",
-        "-drive", f"if=pflash,format=raw,readonly=on,file={OVMF_CODE}",
-        "-drive", f"if=pflash,format=raw,file={OUT / 'vars.fd'}",
-        "-drive", f"format=raw,file={IMAGE}",
-        "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
-        "-nic", "none",
+        "-drive", f"if=pflash,format=raw,readonly=on,file={code}",
+        "-drive", f"if=pflash,format=raw,file={vars_path}",
+        "-drive", f"format=raw,file={image}",
     ]
+    if arch == "x86_64":
+        argv += ["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04"]
+    argv += ["-nic", "none"]
+    return argv
+
+
+def main() -> int:
+    arch, accel, no_build = parse_args(sys.argv)
+    image = Path(os.environ.get("S175_TERM_IMAGE", ROOT / f"build/qtest/s175-terminal-{arch}.img"))
+    out = Path(os.environ.get("S175_TERM_OUT", ROOT / f"build/conformance/terminal/run-{arch}"))
+    serial = out / "serial.log"
+    header_oracle(arch, out)
+    if not no_build or not image.is_file():
+        build_image(arch, image, out)
+    else:
+        print(f"S175-TERM-RUN image reuse {image}", flush=True)
+    chosen = accelerator(arch, accel)
+    print(f"S175-TERM-RUN arch={arch} accel={chosen} image={image}", flush=True)
+
+    out.mkdir(parents=True, exist_ok=True)
+    serial.write_bytes(b"")
+    argv = qemu_argv(arch, chosen, image, out, serial)
     qemu = subprocess.Popen(argv, cwd=str(ROOT), stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL,
-                            stderr=open(OUT / "qemu.stderr", "wb"), start_new_session=True)
+                            stderr=open(out / "qemu.stderr", "wb"), start_new_session=True)
     failures: list[str] = []
     try:
-        deadline = time.monotonic() + 180
+        deadline = time.monotonic() + (300 if arch == "aarch64" else 180)
         text = ""
         while time.monotonic() < deadline:
             if qemu.poll() is not None:
                 break
-            text = SERIAL.read_text(encoding="utf-8", errors="replace")
+            text = serial.read_text(encoding="utf-8", errors="replace")
             if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
                 break
             time.sleep(0.2)
-        (OUT / "serial-copy.log").write_text(text, encoding="utf-8")
+        (out / "serial-copy.log").write_text(text, encoding="utf-8")
 
         if MUTATION_MARKER in text:
             normal, mutation = text.split(MUTATION_MARKER, 1)
@@ -135,24 +300,33 @@ def main() -> int:
             normal, mutation = text, ""
         normal_rows = rows(normal)
         mutation_rows = rows(mutation)
-        for name in GATE_ROWS:
-            if normal_rows.get(name) != "PASS":
-                failures.append(f"normal:{name}={normal_rows.get(name)}")
-        for name in PENDING_ROWS:
-            if normal_rows.get(name) != "PENDING":
-                failures.append(f"normal:{name}={normal_rows.get(name)}")
-        if "S175-TERM done failures=" not in normal:
-            failures.append("normal:incomplete-output")
-        elif "S175-TERM done failures=0" not in normal:
-            failures.append("normal:done-not-zero")
+        failures.extend(normal_failures(normal))
         if mutation_rows.get("termios") != "FAIL":
             failures.append(f"mutation:termios={mutation_rows.get('termios')}")
         if "S175-TERM done failures=" not in mutation:
             failures.append("mutation:incomplete-output")
 
+        # Test-only mutation: remove the signal rows from a copy of the normal output. The
+        # checker must reject it, proving SIGWINCH/SIGHUP/ISIG are named, required rows.
+        mutated = "\n".join(
+            line for line in normal.splitlines()
+            if not any(line.startswith(f"S175-TERM row={name} ") for name in SIGNAL_ROWS)
+        )
+        mutated_failures = normal_failures(mutated)
+        missing = [
+            name for name in SIGNAL_ROWS
+            if not any(f"normal:{name}=" in failure for failure in mutated_failures)
+        ]
+        (out / "signal-mutation.log").write_text(
+            mutated + "\n" + "\n".join(mutated_failures) + "\n", encoding="utf-8"
+        )
+        if missing:
+            failures.append("signal-mutation:harness accepted missing " + ",".join(missing))
+
         print(normal, end="", flush=True)
         print(mutation, end="", flush=True)
-        print(f"S175-TERM-RUN rows_normal={normal_rows} rows_mutation={mutation_rows}", flush=True)
+        print(f"S175-TERM-RUN rows_normal={normal_rows} rows_mutation={mutation_rows} "
+              f"signal_mutation_failures={mutated_failures}", flush=True)
         if failures:
             print(f"S175-TERM-RUN FAIL reasons={';'.join(failures)}", flush=True)
             return 1
