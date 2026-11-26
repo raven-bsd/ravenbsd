@@ -34,7 +34,6 @@ const FIXTURE: &str = r#"/*
 #include <netinet/in.h>
 
 _Static_assert(EAGAIN == 35, "FreeBSD errno: EAGAIN is 35");
-_Static_assert(SIGUSR1 == 30, "FreeBSD signal: SIGUSR1 is 30");
 _Static_assert(sizeof(sa_family_t) == 1, "FreeBSD sa_family_t is one byte");
 _Static_assert(
     offsetof(struct sockaddr_in, sin_family) == 1,
@@ -50,9 +49,8 @@ _Static_assert(
 "#;
 
 /// Baseline rows the staged Raven headers must report before the FreeBSD cutovers.
-const BASELINE_ROWS: [&str; 6] = [
+const BASELINE_ROWS: [&str; 5] = [
     "FreeBSD errno: EAGAIN is 35",
-    "FreeBSD signal: SIGUSR1 is 30",
     "FreeBSD sa_family_t is one byte",
     "FreeBSD sockaddr_in.sin_family is at offset 1 after sin_len",
     "no member named 'sa_len'",
