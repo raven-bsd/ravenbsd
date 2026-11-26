@@ -44,12 +44,8 @@ use crate::arch::aarch64::ipc::{
 };
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::syscall as arch_syscall;
-#[cfg(target_arch = "aarch64")]
-use crate::arch::aarch64::timer;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::syscall as arch_syscall;
-#[cfg(target_arch = "x86_64")]
-use crate::arch::x86_64::tsc;
 use crate::cmdline::CmdLine;
 use crate::initfs;
 #[cfg(target_arch = "x86_64")]
@@ -256,8 +252,9 @@ pub fn leaked_process_stats() -> [u64; 15] {
         .collect();
     stats[10] = processes.len() as u64;
     for (index, process) in processes.iter().enumerate() {
-        if !processes[..index]
+        if !processes
             .iter()
+            .take(index)
             .any(|previous| Arc::ptr_eq(previous, process))
         {
             stats[11] = stats[11].saturating_add(1);
@@ -356,6 +353,12 @@ static S36_TIMEOUT_SLEEPERS: AtomicU64 = AtomicU64::new(0);
 static S36_TIMEOUTCHECK: AtomicBool = AtomicBool::new(false);
 
 /// Record the boot-time S36 gate flags before any process can exit.
+///
+/// Only the x86_64 boot path calls this today; the shared exit path still reads the flags.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(dead_code, reason = "aarch64 boot does not call the S36 gate parser")
+)]
 pub fn configure_gates(cmdline: &CmdLine) {
     S36_TIMEOUTCHECK.store(cmdline.get("s36-timeoutcheck").is_some(), Ordering::Release);
 }
@@ -504,7 +507,7 @@ pub const fn signal_bit(signo: u32) -> u64 {
     if signo == 0 || signo > status::SIG_MAX {
         0
     } else {
-        1u64 << (signo - 1)
+        1u64 << signo.saturating_sub(1)
     }
 }
 
@@ -526,7 +529,10 @@ impl SigActs {
     /// `signal-fault` child teardown.
     pub fn new() -> Self {
         Self {
-            actions: vec![SigAction::default_action(); status::SIG_MAX as usize + 1],
+            actions: vec![
+                SigAction::default_action();
+                (status::SIG_MAX as usize).saturating_add(1)
+            ],
         }
     }
 
@@ -911,26 +917,19 @@ pub fn processes_try() -> Option<alloc::vec::Vec<Arc<Process>>> {
 }
 
 /// Count live processes and their live threads without allocating or taking process locks.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(
+        dead_code,
+        reason = "the K449 metrics sampler is started only on x86_64"
+    )
+)]
 pub fn live_totals() -> (usize, u32) {
     let registry = PID_REGISTRY.lock();
     let mut procs = 0usize;
     let mut threads = 0u32;
     for weak in registry.values() {
         if let Some(process) = weak.upgrade() {
-            procs += 1;
-            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
-        }
-    }
-    (procs, threads)
-}
-
-/// Live sshd/sshd-session processes and their thread count (K449 frame-cliff diagnostic).
-pub fn sshd_totals() -> (usize, u32) {
-    let mut procs = 0usize;
-    let mut threads = 0u32;
-    for process in processes() {
-        let command = process.command.lock().clone();
-        if process.path.contains("sshd") || command.contains("sshd") {
             procs = procs.saturating_add(1);
             threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
         }
@@ -939,6 +938,13 @@ pub fn sshd_totals() -> (usize, u32) {
 }
 
 /// K449 diagnostic: exited processes still retained for `PROC_WAIT`.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(
+        dead_code,
+        reason = "the K449 metrics sampler is started only on x86_64"
+    )
+)]
 pub fn zombie_count() -> usize {
     ZOMBIES.lock().len()
 }
@@ -961,10 +967,10 @@ pub fn dead_live_threads() -> usize {
     for process in processes() {
         let threads = process.threads_live.lock();
         for weak in threads.iter() {
-            if let Some(thread) = weak.upgrade() {
-                if thread.state() == crate::sched::thread::ThreadState::Dead {
-                    total = total.saturating_add(1);
-                }
+            if let Some(thread) = weak.upgrade()
+                && thread.state() == crate::sched::thread::ThreadState::Dead
+            {
+                total = total.saturating_add(1);
             }
         }
     }
@@ -1608,10 +1614,10 @@ impl Process {
             match status::default_action(record.signo) {
                 None | Some(DefaultAction::Ignore) => continue,
                 Some(DefaultAction::Terminate) => {
-                    exit_process(-status::signal_status(record.signo, false))
+                    exit_process(status::signal_status(record.signo, false).wrapping_neg())
                 }
                 Some(DefaultAction::Core) => {
-                    exit_process(-status::signal_status(record.signo, true))
+                    exit_process(status::signal_status(record.signo, true).wrapping_neg())
                 }
                 Some(DefaultAction::Stop) => {
                     self.apply_stop_default(record.signo);
@@ -1660,10 +1666,10 @@ impl Process {
             match status::default_action(record.signo) {
                 None | Some(DefaultAction::Ignore) => {}
                 Some(DefaultAction::Terminate) => {
-                    exit_process(-status::signal_status(record.signo, false))
+                    exit_process(status::signal_status(record.signo, false).wrapping_neg())
                 }
                 Some(DefaultAction::Core) => {
-                    exit_process(-status::signal_status(record.signo, true))
+                    exit_process(status::signal_status(record.signo, true).wrapping_neg())
                 }
                 Some(DefaultAction::Stop) => self.apply_stop_default(record.signo),
                 Some(DefaultAction::Continue) => self.apply_continue_default(),
@@ -1684,10 +1690,10 @@ impl Process {
     /// FreeBSD `sigtd`, NetBSD `sigismasked`). No pop/requeue window exists.
     pub fn pop_signal_where(
         &self,
-        mut predicate: impl FnMut(&PendingSignal) -> bool,
+        predicate: impl FnMut(&PendingSignal) -> bool,
     ) -> Option<PendingSignal> {
         let mut pending = self.pending_signals.lock();
-        let index = pending.iter().position(|signal| predicate(signal))?;
+        let index = pending.iter().position(predicate)?;
         pending.remove(index)
     }
 
@@ -1738,14 +1744,8 @@ impl Process {
     }
 
     /// True when at least one queued signal matches `predicate`.
-    pub fn has_pending_signal_where(
-        &self,
-        mut predicate: impl FnMut(&PendingSignal) -> bool,
-    ) -> bool {
-        self.pending_signals
-            .lock()
-            .iter()
-            .any(|signal| predicate(signal))
+    pub fn has_pending_signal_where(&self, predicate: impl FnMut(&PendingSignal) -> bool) -> bool {
+        self.pending_signals.lock().iter().any(predicate)
     }
 }
 
