@@ -3,22 +3,23 @@
 
 use super::*;
 
+// Values from FreeBSD `sys/sys/errno.h` at the DR-69 pin; the abort path returns them directly.
 #[test]
-fn abort_error_values_match_linux() {
+fn abort_error_values_match_the_abi() {
     assert_eq!(EINVAL.0, 22);
-    assert_eq!(EAGAIN.0, 11);
+    assert_eq!(EAGAIN.0, 35);
     assert_eq!(EBUSY.0, 16);
-    assert_eq!(EDEADLK.0, 35);
+    assert_eq!(EDEADLK.0, 11);
     assert_eq!(EPERM.0, 1);
     assert_eq!(ESRCH.0, 3);
     assert_eq!(EINTR.0, 4);
-    assert_eq!(ETIMEDOUT.0, 110);
-    assert_eq!(ENOTSUP.0, 95);
-    assert_eq!(ENOSYS.0, 38);
-    assert_eq!(EOWNERDEAD.0, 130);
-    assert_eq!(ENOTRECOVERABLE.0, 131);
-    assert_eq!(ECANCELED.0, 125);
-    assert_eq!(EOVERFLOW.0, 75);
+    assert_eq!(ETIMEDOUT.0, 60);
+    assert_eq!(ENOTSUP.0, 45);
+    assert_eq!(ENOSYS.0, 78);
+    assert_eq!(EOWNERDEAD.0, 96);
+    assert_eq!(ENOTRECOVERABLE.0, 95);
+    assert_eq!(ECANCELED.0, 85);
+    assert_eq!(EOVERFLOW.0, 84);
     assert_eq!(ERANGE.0, 34);
     assert_eq!(ENOMEM.0, 12);
     assert_eq!(ENOEXEC.0, 8);
