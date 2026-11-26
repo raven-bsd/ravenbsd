@@ -42,8 +42,7 @@ mod program {
     use raven_proto_fs::{
         ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
         DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
-        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, WIRE_OPEN_EXCL,
-        normalize_request,
+        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
@@ -735,6 +734,7 @@ mod program {
             root: &str,
             response: &mut [u8],
             creds: &Credentials,
+            request_handle: Option<Handle>,
         ) -> Result<usize, Errno> {
             let raw = single_path(&call).ok_or(Errno::EINVAL)?;
             let path = self.call_path(root, base, &bytes_to_string(raw)?)?;
@@ -745,12 +745,16 @@ mod program {
                 .ok_or(Errno::ENOENT)?
                 .scheme
                 .clone();
+            let mut creating = false;
             match call {
                 Call::Mkdir { .. }
                 | Call::Symlink { .. }
                 | Call::Mkfifo { .. }
                 | Call::Mknod { .. } => {
                     self.check_parent(&scheme, suffix, creds)?;
+                    // Creation carries the original caller's credentials and mask to the
+                    // backing filesystem; the request capability is the authority.
+                    creating = true;
                 }
                 Call::Unlink { .. } | Call::Rmdir { .. } => {
                     self.check_parent(&scheme, suffix, creds)?;
@@ -777,6 +781,10 @@ mod program {
             }
             let client = Client::new();
             let root = client.open(&scheme, READ)?;
+            if creating && let Some(handle) = request_handle {
+                // Immediately before the forwarded create, so its packet carries the client.
+                raven_scheme::server::delegate(handle)?;
+            }
             let request = CallRequest::new(rebuild_single(&call, suffix.as_bytes())?);
             let result = proxy_call(&client, root, &request, response);
             let _ = client.close(root);
@@ -1032,57 +1040,6 @@ mod program {
     /// Open `path` for the caller and, when this request creates the inode, give it the caller's
     /// effective uid and gid before the handle is returned.
     ///
-    /// A non-root create is attempted with `O_EXCL` first so ownership is only changed on an inode
-    /// this request actually created; an existing target falls back to the caller's own flags.
-    fn create_with_caller_owner(
-        client: &Client,
-        path: &str,
-        flags: OpenFlags,
-        creds: &Credentials,
-    ) -> Result<Handle, Errno> {
-        if !flags.create() || creds.is_root() {
-            return client.open_flags(path, flags);
-        }
-        let (target, created) = if flags.exclusive() {
-            (client.open_flags(path, flags)?, true)
-        } else {
-            let exclusive = OpenFlags::from_wire(flags.to_wire() | WIRE_OPEN_EXCL)
-                .map_err(|_| Errno::EINVAL)?;
-            match client.open_flags(path, exclusive) {
-                Ok(target) => (target, true),
-                Err(Errno::EEXIST) => (client.open_flags(path, flags)?, false),
-                Err(error) => return Err(error),
-            }
-        };
-        if !created {
-            return Ok(target);
-        }
-        let request = CallRequest::new(Call::Fchown {
-            uid: creds.euid,
-            gid: creds.egid,
-        });
-        let mut response = [0u8; 64];
-        let result = client
-            .call_typed(target, &request, &mut response)
-            .and_then(|written| {
-                let bytes = response.get(..written).ok_or(Errno::EPROTO)?;
-                CallResponse::decode(request.op(), bytes)
-                    .map(|response| response.status())
-                    .map_err(|_| Errno::EPROTO)
-            });
-        match result {
-            Ok(0) => Ok(target),
-            Ok(status) => {
-                let _ = client.close(target);
-                Err(errno_from_status(status))
-            }
-            Err(error) => {
-                let _ = client.close(target);
-                Err(error)
-            }
-        }
-    }
-
     fn errno_from_status(status: i32) -> Errno {
         if (-4095..0).contains(&status) {
             Errno(u16::try_from(-status).unwrap_or(Errno::EIO.0))
@@ -1139,8 +1096,12 @@ mod program {
             let target_path = format!("{scheme}{suffix}");
             self.check_open(&scheme, suffix, &ctx.credentials, target_flags)?;
             let client = Client::new();
-            let target =
-                create_with_caller_owner(&client, &target_path, target_flags, &ctx.credentials)?;
+            if flags.create() {
+                // The backing server applies the original caller's mode and owner at inode
+                // creation; the request handle is the authority the kernel checks.
+                ctx.delegate()?;
+            }
+            let target = client.open_flags(&target_path, target_flags)?;
             if directory || path == "/" {
                 let stat = match client.fstat(target) {
                     Ok(stat) => stat,
@@ -1392,7 +1353,7 @@ mod program {
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
-            self.call_checked(file, request, response, &Credentials::ROOT)
+            self.call_checked(file, request, response, &Credentials::ROOT, None)
         }
 
         fn call_with(
@@ -1414,7 +1375,8 @@ mod program {
             {
                 return self.mmap_call(file, offset, len, shared);
             }
-            let written = self.call_checked(file, request, response, &ctx.credentials)?;
+            let written =
+                self.call_checked(file, request, response, &ctx.credentials, Some(ctx.request))?;
             Ok(CallReply::new(written))
         }
     }
@@ -1444,6 +1406,7 @@ mod program {
             request: &[u8],
             response: &mut [u8],
             creds: &Credentials,
+            request_handle: Option<Handle>,
         ) -> HandlerResult<usize> {
             let (target, base, root) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
@@ -1594,9 +1557,14 @@ mod program {
                 | Call::Mkfifo { .. }
                 | Call::Mknod { .. }
                 | Call::Utimens { .. }
-                | Call::Lstat { .. } => {
-                    Ok(self.forward_one(decoded.call, &base, &root, response, creds)?)
-                }
+                | Call::Lstat { .. } => Ok(self.forward_one(
+                    decoded.call,
+                    &base,
+                    &root,
+                    response,
+                    creds,
+                    request_handle,
+                )?),
                 Call::Mmap { .. } => status(response, Err(Errno::EINVAL)),
             }
         }

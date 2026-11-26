@@ -165,14 +165,27 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         crate::dir::getcwd(&cwd, buf, size)
     }
 
-    /// The process umask.
+    /// The process file-creation mask.
+    ///
+    /// The kernel is authoritative (`PROC_UMASK`); this accessor mirrors the last value set in
+    /// this image for the lexical `umask` consumers that do not create inodes. It is never used
+    /// to mask a create: the kernel stamps the mask onto the request and the filesystem applies
+    /// it at inode creation.
     pub fn umask(&self) -> u32 {
         self.umask.get()
     }
 
-    /// Set the umask and return the previous value.
+    /// Swap the kernel file-creation mask and return the previous value.
+    ///
+    /// The returned value comes from the kernel, so a mask inherited across fork/exec is
+    /// respected. The cell mirror is updated for [`Self::umask`] only.
     pub fn set_umask(&self, mask: u32) -> u32 {
-        self.umask.replace(mask & 0o777)
+        let previous = self
+            .backend
+            .umask(mask)
+            .unwrap_or_else(|_| self.umask.get());
+        self.umask.set(mask & 0o777);
+        previous
     }
 
     /// The rlimit cell.
@@ -781,7 +794,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             crate::intr::run(
                 crate::intr::CallClass::Restartable,
                 crate::intr::restart_wanted(),
-                || self.backend.open(&wire_path, u32::from(wire)),
+                || self.backend.open_mode(&wire_path, u32::from(wire), mode),
             )
         })?;
         let kind = if pty_wire.is_some() || is_tty_path(&resolved.abs) {
@@ -805,14 +818,6 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             && let Ok(reference) = self.get(fd)
         {
             reference.set_pty_master();
-        }
-        if flags & fcntl::O_CREAT as u32 != 0 {
-            // PG-24: protocol v1 has no mode on the wire; apply `mode & ~umask` after the create.
-            let wanted = (mode & 0o777) & !self.umask.get();
-            let _ = self.root_call(Call::Chmod {
-                mode: wanted,
-                path: &resolved.abs,
-            });
         }
         Ok(fd)
     }
@@ -1450,7 +1455,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
-        let mode = (mode & 0o7777) & !self.umask.get();
+        // The server applies the kernel-recorded mask at directory creation.
+        let mode = mode & 0o7777;
         self.root_call(Call::Mkdir {
             mode,
             path: &resolved.abs,

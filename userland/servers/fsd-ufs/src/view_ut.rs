@@ -235,7 +235,7 @@ fn mount_rejects_a_corrupt_superblock() {
 #[test]
 fn hard_links_share_the_inode_and_link_count() {
     let mut view = rw_view();
-    let ino = view.create_file("/a", 0o644, true).expect("create");
+    let ino = view.create_file("/a", 0o644, 0, 0, true).expect("create");
     view.write(ino, 0, b"payload").expect("write");
     view.link("/b", "/a").expect("link");
     assert_eq!(view.resolve("/b"), Ok(ino));
@@ -249,14 +249,27 @@ fn hard_links_share_the_inode_and_link_count() {
 }
 
 #[test]
+fn create_records_the_requested_owner() {
+    let mut view = rw_view();
+    let ino = view
+        .create_file("/owned-file", 0o640, 1000, 100, true)
+        .expect("create");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!((stat.uid, stat.gid), (1000, 100));
+    assert_eq!(stat.mode & 0o7777, 0o640);
+}
+
+#[test]
 fn chown_follows_or_keeps_the_symlink_identity() {
     let mut view = rw_view();
-    let ino = view.create_file("/owned", 0o6755, true).expect("create");
+    let ino = view
+        .create_file("/owned", 0o6755, 0, 0, true)
+        .expect("create");
     view.chown("/owned", 1000, 100, true).expect("chown");
     let stat = view.stat(ino).expect("stat");
     assert_eq!((stat.uid, stat.gid), (1000, 100));
     assert_eq!(stat.mode & 0o7777, 0o755);
-    view.symlink("/link", b"owned").expect("symlink");
+    view.symlink("/link", b"owned", 0, 0).expect("symlink");
     let link = view.resolve_nofollow("/link").expect("link");
     view.chown("/link", 2000, 200, false).expect("lchown");
     assert_eq!(view.stat(link).expect("link stat").uid, 2000);
@@ -268,7 +281,9 @@ fn chown_follows_or_keeps_the_symlink_identity() {
 #[test]
 fn utimens_sets_the_requested_timestamps() {
     let mut view = rw_view();
-    let ino = view.create_file("/times", 0o644, true).expect("create");
+    let ino = view
+        .create_file("/times", 0o644, 0, 0, true)
+        .expect("create");
     view.utimens("/times", Some(111), Some(222), true)
         .expect("utimens");
     let stat = view.stat(ino).expect("stat");
@@ -282,7 +297,9 @@ fn utimens_sets_the_requested_timestamps() {
 #[test]
 fn sparse_extension_keeps_block_accounting_small() {
     let mut view = rw_view();
-    let ino = view.create_file("/sparse", 0o644, true).expect("create");
+    let ino = view
+        .create_file("/sparse", 0o644, 0, 0, true)
+        .expect("create");
     view.truncate(ino, 1024 * 1024).expect("truncate");
     let stat = view.stat(ino).expect("stat");
     assert_eq!(stat.size, 1024 * 1024);
@@ -303,11 +320,11 @@ fn sparse_extension_keeps_block_accounting_small() {
 #[test]
 fn mkfifo_and_mknod_create_special_inodes() {
     let mut view = rw_view();
-    view.mkfifo("/pipe", 0o640).expect("mkfifo");
+    view.mkfifo("/pipe", 0o640, 0, 0).expect("mkfifo");
     let pipe = view.resolve("/pipe").expect("pipe");
     assert_eq!(view.stat(pipe).expect("stat").mode & S_IFMT, S_IFIFO);
-    view.mknod("/null", 0o020600, 0x1234).expect("mknod");
+    view.mknod("/null", 0o020600, 0x1234, 0, 0).expect("mknod");
     let node = view.resolve("/null").expect("node");
     assert_eq!(view.stat(node).expect("stat").mode & S_IFMT, S_IFCHR);
-    assert_eq!(view.mknod("/bad", 0o100644, 0), Err(Errno::EINVAL));
+    assert_eq!(view.mknod("/bad", 0o100644, 0, 0, 0), Err(Errno::EINVAL));
 }

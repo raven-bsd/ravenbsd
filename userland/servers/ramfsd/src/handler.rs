@@ -260,6 +260,7 @@ impl Handler for RamfsHandler {
         if self.opens.len() >= MAX_OPEN_FILES {
             return Err(Errno::EMFILE.into());
         }
+        let mode = raven_abi::types::umask::open_create_mode(mode, ctx.credentials.umask);
         let (ino, created) = self.open_ino(path, flags, mode, &ctx.credentials)?;
         if created && let Ok(parent) = self.parent_ino(ROOT_INO, path) {
             self.bump_dir(parent);
@@ -531,7 +532,7 @@ impl RamfsHandler {
                     .mkdir_at_owned(
                         dir_ino,
                         path,
-                        u16::try_from(mode).map_err(|_| Errno::EINVAL)?,
+                        u16::try_from((mode & 0o7777) & !creds.umask).map_err(|_| Errno::EINVAL)?,
                         creds.euid,
                         creds.egid,
                         now,
@@ -771,7 +772,7 @@ impl RamfsHandler {
                     .mkfifo_at_owned(
                         dir_ino,
                         path,
-                        u16::try_from(mode).map_err(|_| Errno::EINVAL)?,
+                        u16::try_from((mode & 0o7777) & !creds.umask).map_err(|_| Errno::EINVAL)?,
                         creds.euid,
                         creds.egid,
                         now,
@@ -808,7 +809,8 @@ impl RamfsHandler {
                         dir_ino,
                         path,
                         kind,
-                        u16::try_from(mode).map_err(|_| Errno::EINVAL)?,
+                        u16::try_from((mode & (S_IFMT | 0o7777)) & !creds.umask)
+                            .map_err(|_| Errno::EINVAL)?,
                         creds.euid,
                         creds.egid,
                         now,

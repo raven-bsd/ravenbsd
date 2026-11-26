@@ -50,16 +50,23 @@ pub trait FileSystem {
         true
     }
 
-    /// Create a regular file at `path`; when `exclusive` is set an existing
+    /// Create a regular file at `path` owned by `uid`/`gid`; when `exclusive` is set an existing
     /// file is an error.
-    fn create_file(&mut self, path: &str, mode: u16, exclusive: bool) -> Result<u32, Errno> {
-        let _ = (path, mode, exclusive);
+    fn create_file(
+        &mut self,
+        path: &str,
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        exclusive: bool,
+    ) -> Result<u32, Errno> {
+        let _ = (path, mode, uid, gid, exclusive);
         Err(Errno::EROFS)
     }
 
-    /// Create a directory.
-    fn mkdir(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
-        let _ = (path, mode);
+    /// Create a directory owned by `uid`/`gid`.
+    fn mkdir(&mut self, path: &str, mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
+        let _ = (path, mode, uid, gid);
         Err(Errno::EROFS)
     }
 
@@ -81,9 +88,9 @@ pub trait FileSystem {
         Err(Errno::EROFS)
     }
 
-    /// Create a symbolic link.
-    fn symlink(&mut self, path: &str, target: &[u8]) -> Result<(), Errno> {
-        let _ = (path, target);
+    /// Create a symbolic link owned by `uid`/`gid`.
+    fn symlink(&mut self, path: &str, target: &[u8], uid: u32, gid: u32) -> Result<(), Errno> {
+        let _ = (path, target, uid, gid);
         Err(Errno::EROFS)
     }
 
@@ -123,15 +130,15 @@ pub trait FileSystem {
         Err(Errno::EROFS)
     }
 
-    /// Create a FIFO.
-    fn mkfifo(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
-        let _ = (path, mode);
+    /// Create a FIFO owned by `uid`/`gid`.
+    fn mkfifo(&mut self, path: &str, mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
+        let _ = (path, mode, uid, gid);
         Err(Errno::EROFS)
     }
 
-    /// Create a special node; `mode` carries the file type.
-    fn mknod(&mut self, path: &str, mode: u16, dev: u32) -> Result<(), Errno> {
-        let _ = (path, mode, dev);
+    /// Create a special node owned by `uid`/`gid`; `mode` carries the file type.
+    fn mknod(&mut self, path: &str, mode: u16, dev: u32, uid: u32, gid: u32) -> Result<(), Errno> {
+        let _ = (path, mode, dev, uid, gid);
         Err(Errno::EROFS)
     }
 
@@ -286,7 +293,7 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         &mut self,
         path: &str,
         flags: OpenFlags,
-        _mode: u32,
+        mode: u32,
         ctx: &Ctx,
     ) -> HandlerResult<Opened> {
         let Some((file_id, expected)) = self.pending.take() else {
@@ -303,9 +310,15 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             return Err(Errno::EMFILE.into());
         }
         let ino = if flags.create() {
-            let mode = u16::try_from(flags.create_mode().unwrap_or(0o644) & 0o7777)
-                .map_err(|_| Errno::EINVAL)?;
-            self.fs.create_file(path, mode, flags.exclusive())?
+            let mode = raven_abi::types::umask::open_create_mode(mode, ctx.credentials.umask);
+            let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
+            self.fs.create_file(
+                path,
+                mode,
+                ctx.credentials.euid,
+                ctx.credentials.egid,
+                flags.exclusive(),
+            )?
         } else {
             self.check_traverse(path, &ctx.credentials)?;
             self.fs.resolve(path)?
@@ -538,8 +551,11 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             }
             Call::Mkdir { mode, path } => {
                 let path = bytes_to_string(path)?;
-                let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
-                let result = self.fs.mkdir(path, mode);
+                let mode = u16::try_from((mode & 0o7777) & !credentials.umask)
+                    .map_err(|_| Errno::EINVAL)?;
+                let result = self
+                    .fs
+                    .mkdir(path, mode, credentials.euid, credentials.egid);
                 self.result(response, result)
             }
             Call::Unlink { path } => {
@@ -577,7 +593,9 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             }
             Call::Symlink { path, target } => {
                 let path = bytes_to_string(path)?;
-                let result = self.fs.symlink(path, target);
+                let result = self
+                    .fs
+                    .symlink(path, target, credentials.euid, credentials.egid);
                 self.result(response, result)
             }
             Call::Chmod { mode, path } => {
@@ -633,20 +651,26 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             }
             Call::Mkfifo { mode, path } => {
                 let path = bytes_to_string(path)?;
-                let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
+                let mode = u16::try_from((mode & 0o7777) & !credentials.umask)
+                    .map_err(|_| Errno::EINVAL)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
-                let result = self.fs.mkfifo(path, mode);
+                let result = self
+                    .fs
+                    .mkfifo(path, mode, credentials.euid, credentials.egid);
                 self.result(response, result)
             }
             Call::Mknod { mode, dev, path } => {
                 let path = bytes_to_string(path)?;
-                let mode = u16::try_from(mode).map_err(|_| Errno::EINVAL)?;
+                let mode = u16::try_from((mode & (0o170000 | 0o7777)) & !credentials.umask)
+                    .map_err(|_| Errno::EINVAL)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
-                let result = self.fs.mknod(path, mode, dev);
+                let result = self
+                    .fs
+                    .mknod(path, mode, dev, credentials.euid, credentials.egid);
                 self.result(response, result)
             }
             Call::Utimens {

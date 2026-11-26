@@ -21,12 +21,23 @@ const LINK: u32 = 5;
 
 struct FakeFs {
     data: Vec<u8>,
+    created: Option<(u16, u32, u32)>,
+    writable: bool,
 }
 
 impl FakeFs {
     fn new() -> Self {
         Self {
             data: b"hello\n".to_vec(),
+            created: None,
+            writable: false,
+        }
+    }
+
+    fn writable() -> Self {
+        Self {
+            writable: true,
+            ..Self::new()
         }
     }
 
@@ -143,6 +154,25 @@ impl FileSystem for FakeFs {
             free_files: 10,
         }
     }
+
+    fn is_read_only(&self) -> bool {
+        !self.writable
+    }
+
+    fn create_file(
+        &mut self,
+        _path: &str,
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        _exclusive: bool,
+    ) -> Result<u32, Errno> {
+        if !self.writable {
+            return Err(Errno::EROFS);
+        }
+        self.created = Some((mode, uid, gid));
+        Ok(FILE)
+    }
 }
 
 fn ctx() -> Ctx {
@@ -182,6 +212,22 @@ fn opens_the_root_and_files() {
         }
     }
     assert_eq!(handler.opens.len(), 4);
+}
+
+#[test]
+fn create_passes_the_authenticated_mode_and_owner() {
+    let mut handler = FsHandler::new(FakeFs::writable());
+    handler.expect_open(20, "/new");
+    let mut ctx = ctx();
+    ctx.credentials.euid = 1000;
+    ctx.credentials.egid = 100;
+    ctx.credentials.umask = 0o027;
+    let flags = OpenFlags::from_linux(0o100 | 2).expect("create flags");
+    match handler.open_with("/new", flags, 0o666, &ctx) {
+        Ok(Opened::File(20)) => {}
+        other => panic!("unexpected create result: {other:?}"),
+    }
+    assert_eq!(handler.fs.created, Some((0o640, 1000, 100)));
 }
 
 #[test]
