@@ -132,7 +132,7 @@ fn main() {
 
     // Rust's libc crate groups some OS's together which have similar APIs;
     // create similarly-named features to make `cfg` tests more concise.
-    let freebsdlike = os == "freebsd" || os == "dragonfly";
+    let freebsdlike = os == "freebsd" || os == "dragonfly" || os == "ravenbsd";
     if freebsdlike {
         use_feature("freebsdlike");
     }
@@ -157,7 +157,7 @@ fn main() {
     // Add some additional common target combinations.
 
     // Android and "regular" Linux both use the Linux kernel.
-    if os == "android" || os == "linux" || os == "ravenbsd" {
+    if os == "android" || os == "linux" {
         use_feature("linux_kernel");
     }
 
