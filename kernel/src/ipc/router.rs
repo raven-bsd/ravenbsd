@@ -428,7 +428,17 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
         // server CLOSE. Build the CLOSE requests here, in the shallow close-syscall context, so
         // they are queued before the caller's next request.
         let last_arc = Arc::strong_count(&file) == 1;
-        let last_user = last_arc || !other_process_holds(caller, &file);
+        let other = !last_arc && other_process_holds(caller, &file);
+        if !last_arc {
+            crate::kprintln!(
+                "close-debug: pid={} id={} strong={} other_handle={}",
+                caller.id,
+                file.server_id(),
+                Arc::strong_count(&file),
+                other
+            );
+        }
+        let last_user = last_arc || !other;
         if last_user {
             let references = file.server_refs.swap(0, Ordering::AcqRel);
             if references > 0 {
