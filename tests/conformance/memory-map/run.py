@@ -400,8 +400,10 @@ def run_sibling(image: Path, accel: str, smp: int) -> int:
                 failures.append("sibling-exit: user worker never ran")
             if kernel == 0:
                 failures.append("sibling-exit: kernel worker never ran")
-            if f"s194: quiesce waited pid={pid}" not in serial_text:
-                failures.append(f"sibling-exit: no quiesce wait for pid={pid}")
+            if f"s194: quiesce enter pid={pid}" not in serial_text:
+                failures.append(f"sibling-exit: quiesce path not entered for pid={pid}")
+            if f"s194: quiesce clear pid={pid} waited=" not in serial_text:
+                failures.append(f"sibling-exit: quiesce path did not clear for pid={pid}")
             if f"s194: last-exit pid={pid} code=0" not in serial_text:
                 failures.append(f"sibling-exit: no clean terminal exit for pid={pid}")
             if f"process: fault-regs pid={pid}" in serial_text:

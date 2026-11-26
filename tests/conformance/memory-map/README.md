@@ -40,9 +40,11 @@ python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map
 `--sibling-exit` (S715) runs `/bin/mmap-probe --sibling-exit`: one sibling keeps writing a shared
 user page while a second sibling blocks in an interruptible one-millisecond `poll`; the main
 thread calls `_exit(0)`. The runner requires the probe exit status 0 and correlates the pid with
-the kernel's `s194: quiesce waited pid=<pid>` and `s194: last-exit pid=<pid> code=0` lines. A
-missing quiesce wait, a page fault/panic, or a command that does not return inside the bounded
-window fails the row. The image command line enables `s194-trace=1` for that correlation.
+the kernel's `s194: quiesce enter pid=<pid>`, `s194: quiesce clear pid=<pid> waited=<bool>` and
+`s194: last-exit pid=<pid> code=0` lines. A missing quiesce path, a fault for that pid, a
+kernel panic, or a command that does not return inside the bounded window fails the row. The
+image command line enables `s194-trace=1` for that correlation; `waited` records whether the
+scan found a sibling still current or the reschedule IPI had already retired it.
 
 `--smp N` sets the CPU count (default 4). `--smp 1` isolates the kernel heap churn from the
 separate S195 R10 TLB-shootdown timeout, which is quoted as an S195 finding and does not gate the
