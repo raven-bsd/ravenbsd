@@ -62,6 +62,7 @@ PROBE_TIMEOUT = 30
 LISTEN_TIMEOUT = 90
 CLIENT_TIMEOUT = 60
 IMAGE_TIMEOUT = 480
+ADDON_TIMEOUT = 480
 
 EXIT_STAGE = {
     SETUP: 2,
@@ -182,11 +183,27 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", errors="replace")
 
 
-def build_image(arch: str, evidence: Path) -> Path:
-    image = ROOT / "build" / "qtest" / f"s85k-ssh-login-{arch}.img"
-    log(f"building release image {image.relative_to(ROOT)}")
-    log_path = evidence / f"image-build-{arch}.log"
+def build_addon(arch: str, evidence: Path) -> None:
+    log(f"building the OpenSSH add-on for {arch}")
+    log_path = evidence / f"addon-build-{arch}.log"
     result = subprocess.run(
+        ["sh", "addons/ssh/build.sh", "--arch", arch],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=ADDON_TIMEOUT,
+        check=False,
+    )
+    write_text(log_path, result.stdout + result.stderr)
+    if result.returncode != 0:
+        raise GateFailure(
+            IMAGE,
+            f"OpenSSH add-on build failed with exit {result.returncode}; see {log_path}",
+        )
+
+
+def run_image_build(arch: str, image: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         [
             "cargo",
             "xtask",
@@ -204,6 +221,24 @@ def build_image(arch: str, evidence: Path) -> Path:
         timeout=IMAGE_TIMEOUT,
         check=False,
     )
+
+
+def build_image(arch: str, evidence: Path) -> Path:
+    image = ROOT / "build" / "qtest" / f"s85k-ssh-login-{arch}.img"
+    addon = ROOT / "build" / "ssh" / arch / "bin" / "sshd"
+    if not addon.is_file():
+        build_addon(arch, evidence)
+    log(f"building release image {image.relative_to(ROOT)}")
+    log_path = evidence / f"image-build-{arch}.log"
+    result = run_image_build(arch, image)
+    stale = result.returncode != 0 and (
+        "stale addon binary" in result.stdout or "stale addon binary" in result.stderr
+    )
+    if stale:
+        log("staged OpenSSH binaries are stale; rebuilding the add-on once")
+        write_text(log_path, result.stdout + result.stderr)
+        build_addon(arch, evidence)
+        result = run_image_build(arch, image)
     write_text(log_path, result.stdout + result.stderr)
     if result.returncode != 0:
         raise GateFailure(
