@@ -414,6 +414,7 @@ fn pop_request(
 }
 
 /// K449 diagnostic: total request entries in the per-process scheme, active and client queues.
+#[cfg(target_arch = "x86_64")]
 pub fn pending_counts() -> (usize, usize, usize) {
     let mut queued = 0usize;
     let mut active = 0usize;
