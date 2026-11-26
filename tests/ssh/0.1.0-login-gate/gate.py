@@ -192,6 +192,20 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", errors="replace")
 
 
+def write_hashes(evidence: Path, tag: str) -> None:
+    lines = []
+    for name in (
+        f"serial-{tag}.log",
+        f"client-exec-{tag}.log",
+        f"client-pty-{tag}.log",
+        f"summary-{tag}.json",
+    ):
+        path = evidence / name
+        if path.is_file():
+            lines.append(f"{sha256(path)}  {name}\n")
+    write_text(evidence / f"SHA256SUMS-{tag}", "".join(lines))
+
+
 def build_addon(arch: str, evidence: Path) -> None:
     log(f"building the OpenSSH add-on for {arch}")
     log_path = evidence / f"addon-build-{arch}.log"
@@ -590,6 +604,7 @@ def gate(arch: str, accel: str, image: Path, evidence: Path, password: str) -> i
             "client_pty": {"rc": pty_rc, "stdout": pty_stdout, "stderr": pty_stderr},
         }
         write_text(summary, json.dumps(record, indent=2, sort_keys=True) + "\n")
+        write_hashes(evidence, tag)
         log(f"{status} arch={arch} accel={accel} elapsed={elapsed}s")
         log(f"summary: {summary}")
         if stage is not None:
