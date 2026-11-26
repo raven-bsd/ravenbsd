@@ -486,6 +486,7 @@ def run(args: argparse.Namespace) -> int:
     shutil.copyfile(vars_src, vars_path)
 
     started = time.monotonic()
+    started_utc = utc_now()
     failure: GateFailure | None = None
     serial = Serial(serial_path, TOTAL_TIMEOUT)
     image: Path | None = None
@@ -563,7 +564,7 @@ def run(args: argparse.Namespace) -> int:
         "arch": args.arch,
         "accel": args.accel,
         "mutation": args.mutation,
-        "started_utc": utc_now(),
+        "started_utc": started_utc,
         "elapsed_seconds": elapsed,
         "commit": git_head(),
         "image": str(image.relative_to(ROOT)) if image is not None else None,
