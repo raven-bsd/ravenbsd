@@ -13,7 +13,7 @@
 
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd -P)
 cd "$root"
 export PYTHONDONTWRITEBYTECODE=1
 exec python3 "$root/tests/boot/pi4-image/run.py" "$@"

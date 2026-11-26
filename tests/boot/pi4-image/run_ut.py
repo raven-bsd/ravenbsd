@@ -273,6 +273,13 @@ class LoginTests(unittest.TestCase):
             self.run.verify_login(self.payload, self.modes)
 
 
+class RootTests(unittest.TestCase):
+    def test_product_root_is_the_repository(self):
+        run = load_runner()
+        self.assertTrue((run.product_root() / "Makefile").is_file())
+        self.assertTrue((run.product_root() / "tests" / "boot" / "pi4-image").is_dir())
+
+
 class SuperblockTests(unittest.TestCase):
     def setUp(self):
         self.run = load_runner()

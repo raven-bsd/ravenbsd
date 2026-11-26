@@ -144,6 +144,11 @@ class GptSource:
             handle.close()
 
 
+def product_root() -> Path:
+    """The checked-out product repository (tests/boot/pi4-image -> repository)."""
+    return HERE.parents[2]
+
+
 def parse_gpt_bytes(data: bytes) -> list[Partition]:
     return parse_gpt(GptSource.from_bytes(data))
 
@@ -685,7 +690,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args(argv)
 
-    product_root = HERE.parent.parent
+    product_root = HERE.parents[2]
     try:
         if args.arch != "aarch64":
             raise VerifyError("the Pi 4 image requires --arch aarch64")
