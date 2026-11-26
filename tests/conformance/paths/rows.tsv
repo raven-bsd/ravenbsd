@@ -1,5 +1,7 @@
 prepare	S732-R01	1
 long-path	S732-R01	1
+long-path-1000	S732-R01	1
+long-path-max	S732-R01	1
 component-255	S732-R01	1
 symlink-suffix	S732-R01	1
 absolute-symlink	S732-R01	1

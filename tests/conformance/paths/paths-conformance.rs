@@ -284,6 +284,38 @@ fn prepare() -> bool {
     make_dir(&mut root) && make_file(&mut inside) && make_file(&mut outside)
 }
 
+fn make_levels(fill: u8, widths: &[usize]) -> Option<usize> {
+    let mut path = Cs::new();
+    path.base(b"/tmp/paths");
+    for width in widths {
+        if !path.component(fill, *width) || !make_dir(&mut path) {
+            return None;
+        }
+    }
+    Some(path.len)
+}
+
+fn row_levels(state: &mut State, name: &str, fill: u8, widths: &[usize]) {
+    let created = make_levels(fill, widths);
+    let mut path = Cs::new();
+    path.base(b"/tmp/paths");
+    for width in widths {
+        let _ = path.component(fill, *width);
+    }
+    let length = path.len;
+    let directory =
+        lstat_path(&mut path).is_some_and(|stat| stat.st_mode & S_IFMT == S_IFDIR);
+    state.check(
+        name,
+        created == Some(length) && directory,
+        format_args!(
+            "length={length} created={} dir={directory} errno={}",
+            created.is_some(),
+            errno()
+        ),
+    );
+}
+
 fn row_long_path(state: &mut State) {
     let mut path = Cs::new();
     let _ = long_path(&mut path);
@@ -377,6 +409,10 @@ fn run_normal(prepared: bool) -> i32 {
         format_args!("prepare={prepared} errno={}", errno()),
     );
     row_long_path(&mut state);
+    row_levels(&mut state, "long-path-1000", b'p', &[249; 4]);
+    let mut max_widths = [255usize; 16];
+    max_widths[15] = 244;
+    row_levels(&mut state, "long-path-max", b'q', &max_widths);
     row_component_limit(&mut state);
     row_symlink_suffix(&mut state);
     row_absolute_symlink(&mut state);
