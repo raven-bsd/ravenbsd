@@ -12,7 +12,7 @@ use core::fmt;
 use raven_abi::errno::Errno;
 
 /// `ENOTSUP` value used by the audio protocol. `raven-abi` names the same number
-/// `EOPNOTSUPP` (95); both spellings are the Linux `ENOTSUP`.
+/// `EOPNOTSUPP`; the native FreeBSD value is 45.
 pub const ENOTSUP: Errno = Errno::EOPNOTSUPP;
 
 /// Smallest accepted sample rate in Hz.

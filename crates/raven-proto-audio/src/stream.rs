@@ -673,7 +673,7 @@ mod tests {
     fn error_response_golden_bytes() {
         assert_eq!(
             encode_response(StreamResponse::error(crate::ENOTSUP)),
-            [0x01, 0x00, 0x5f, 0x00, 0x04, 0x00]
+            [0x01, 0x00, 0x2d, 0x00, 0x04, 0x00]
         );
     }
 
