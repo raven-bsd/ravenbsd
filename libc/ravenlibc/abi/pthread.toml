@@ -41,22 +41,28 @@ omit = [
   { name = "PTHREAD_NULL", reason = "typed null cast ((pthread_t)0); C37's pthread.h text" },
 ]
 
+# FreeBSD defines the mutex type names as enum pthread_mutextype members and PTHREAD_ONCE_INIT as
+# a brace initialiser, so the oracle's #ifdef constant probe classifies them donor-absent or
+# unevaluated even though the public names and donor values are present in Raven's header.
+# PTHREAD_CANCEL_MASKED (2) is the musl/Raven extension kept under the extension policy.
+donor_absent = "FreeBSD enum/initializer names measured as donor-absent by the #ifdef probe (PTHREAD_MUTEX_ERRORCHECK/RECURSIVE/NORMAL), plus the retained Raven PTHREAD_CANCEL_MASKED extension"
+
 consts = [
   { name = "PTHREAD_CREATE_JOINABLE", value = 0 },
   { name = "PTHREAD_CREATE_DETACHED", value = 1 },
-  { name = "PTHREAD_MUTEX_NORMAL", value = 0 },
-  { name = "PTHREAD_MUTEX_DEFAULT", value = 0 },
-  { name = "PTHREAD_MUTEX_RECURSIVE", value = 1 },
-  { name = "PTHREAD_MUTEX_ERRORCHECK", value = 2 },
+  { name = "PTHREAD_MUTEX_NORMAL", value = 3 },
+  { name = "PTHREAD_MUTEX_DEFAULT", value = 1 },
+  { name = "PTHREAD_MUTEX_RECURSIVE", value = 2 },
+  { name = "PTHREAD_MUTEX_ERRORCHECK", value = 1 },
   { name = "PTHREAD_MUTEX_STALLED", value = 0 },
   { name = "PTHREAD_MUTEX_ROBUST", value = 1 },
   { name = "PTHREAD_PRIO_NONE", value = 0 },
   { name = "PTHREAD_PRIO_INHERIT", value = 1 },
   { name = "PTHREAD_PRIO_PROTECT", value = 2 },
-  { name = "PTHREAD_INHERIT_SCHED", value = 0 },
-  { name = "PTHREAD_EXPLICIT_SCHED", value = 1 },
-  { name = "PTHREAD_SCOPE_SYSTEM", value = 0 },
-  { name = "PTHREAD_SCOPE_PROCESS", value = 1 },
+  { name = "PTHREAD_INHERIT_SCHED", value = 4 },
+  { name = "PTHREAD_EXPLICIT_SCHED", value = 0 },
+  { name = "PTHREAD_SCOPE_SYSTEM", value = 2 },
+  { name = "PTHREAD_SCOPE_PROCESS", value = 0 },
   { name = "PTHREAD_PROCESS_PRIVATE", value = 0 },
   { name = "PTHREAD_PROCESS_SHARED", value = 1 },
   { name = "PTHREAD_ONCE_INIT", value = 0 },
@@ -64,6 +70,6 @@ consts = [
   { name = "PTHREAD_CANCEL_DISABLE", value = 1 },
   { name = "PTHREAD_CANCEL_MASKED", value = 2 },
   { name = "PTHREAD_CANCEL_DEFERRED", value = 0 },
-  { name = "PTHREAD_CANCEL_ASYNCHRONOUS", value = 1 },
+  { name = "PTHREAD_CANCEL_ASYNCHRONOUS", value = 2 },
   { name = "PTHREAD_BARRIER_SERIAL_THREAD", value = -1 },
 ]

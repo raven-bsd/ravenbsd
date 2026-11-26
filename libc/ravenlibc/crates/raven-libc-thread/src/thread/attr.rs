@@ -108,10 +108,13 @@ impl Attr {
         self.words[6] = value as u32;
     }
 
-    /// Whether the attribute was explicitly zeroed (used by `setattr_default_np`).
+    /// Whether the attribute carries only the process default stack and guard size.
     #[must_use]
     pub fn only_defaults(&self) -> bool {
-        self.words[6..].iter().all(|word| *word == 0)
+        self.detach_state() == PTHREAD_CREATE_JOINABLE
+            && self.inheritsched() == PTHREAD_INHERIT_SCHED
+            && self.policy() == SCHED_OTHER
+            && self.priority() == 0
             && self.stackaddr() == 0
             && self.stacksize() != 0
     }
@@ -128,6 +131,7 @@ pub fn init() -> Attr {
     let mut attr = Attr::new();
     attr.set_stacksize_raw(LIBC.default_stack());
     raw::store_usize(&mut attr.words, 2, LIBC.default_guard());
+    attr.words[7] = PTHREAD_INHERIT_SCHED as u32;
     attr
 }
 
