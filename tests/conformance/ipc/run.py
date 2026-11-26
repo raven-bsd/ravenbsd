@@ -84,10 +84,9 @@ def build_image() -> None:
 def run_probe(command: str, timeout: int = 20) -> tuple[int, str, str, bool]:
     """Run one probe and return (rc, stdout, stderr, timed_out).
 
-    Raven's sshd does not close the session channel after the remote command exits (K448): even
-    `ssh true` stays open. The probe's `S180-IPC done failures=` marker is therefore the completion
-    witness; the client is bounded by the timeout and killed after it, and the row evidence is the
-    captured output.
+    A session-close defect (K448) has been observed on this guest. The probe's
+    `S180-IPC done failures=` marker is therefore the completion witness; the client stays bounded
+    by the timeout in case the session does not close, and the row evidence is the captured output.
     """
     ssh = [
         "ssh", "-p", str(PORT),
@@ -200,8 +199,7 @@ def main() -> int:
             failures.append("mutation:incomplete-output")
 
         print(f"S180-IPC-RUN normal_rc={normal_rc} normal_timed={normal_timed} "
-              f"mutation_rc={mutation_rc} mutation_timed={mutation_timed} "
-              f"ssh_session_close=timeout", flush=True)
+              f"mutation_rc={mutation_rc} mutation_timed={mutation_timed}", flush=True)
         if failures:
             print(f"S180-IPC-RUN FAIL reasons={';'.join(failures)}", flush=True)
             return 1
