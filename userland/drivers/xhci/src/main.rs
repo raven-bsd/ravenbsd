@@ -28,6 +28,7 @@ mod program {
     use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec;
+    use core::sync::atomic::{AtomicU32, Ordering};
 
     use raven_abi::types::Handle;
     use raven_driver::{ConfigRegion, DmaRegion, Irq, MmioRegion};
@@ -58,6 +59,10 @@ mod program {
     const PUSH_RETRY_NS: u64 = 10_000_000;
     /// Idle pause between service-loop iterations.
     const SERVE_TICK_NS: u64 = 10_000_000;
+
+    /// Bounded diagnostics: completed EP1 events and timed-out waits.
+    static EVENTS: AtomicU32 = AtomicU32::new(0);
+    static TIMEOUTS: AtomicU32 = AtomicU32::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
@@ -418,7 +423,25 @@ mod program {
         }
 
         fn next_report(&mut self) -> Option<[u8; 8]> {
-            let event = self.controller.wait_interrupt().ok()?;
+            let event = match self.controller.wait_interrupt() {
+                Ok(event) => {
+                    if EVENTS.fetch_add(1, Ordering::Relaxed) < 8 {
+                        println!(
+                            "usb-keyboard: event transfer={} ep={} code={}",
+                            event.kind() == raven_xhci::TrbType::TransferEvent,
+                            event.endpoint(),
+                            event.completion_code()
+                        );
+                    }
+                    event
+                }
+                Err(error) => {
+                    if TIMEOUTS.fetch_add(1, Ordering::Relaxed) < 2 {
+                        println!("usb-keyboard: wait {error}");
+                    }
+                    return None;
+                }
+            };
             if event.completion_code() != 1 && event.completion_code() != 13 {
                 return None;
             }
