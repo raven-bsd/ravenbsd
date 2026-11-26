@@ -309,6 +309,22 @@ class ImageTests(unittest.TestCase):
             with self.assertRaisesRegex(run.VerifyError, "cannot read image"):
                 run.verify_image(Path(temporary) / "absent.img", Path(temporary))
 
+    def test_build_selects_the_pi4_console_and_target_arch(self):
+        run = load_runner()
+        recorded = {}
+
+        def capture(argv, cwd, env, log, label):
+            recorded["argv"] = argv
+            recorded["env"] = env
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with unittest.mock.patch.object(run, "find_firmware", return_value=Path("/firmware")):
+                with unittest.mock.patch.object(run, "run_logged", side_effect=capture):
+                    run.build_image(Path("/product"), Path("/out.img"), Path(temporary))
+        argv = recorded["argv"]
+        self.assertEqual(argv[argv.index("--cmdline") + 1], "console=ttyAMA0 loglevel=info")
+        self.assertEqual(recorded["env"]["RAVEN_QT_ARCH"], "aarch64")
+
 
 class SuperblockTests(unittest.TestCase):
     def setUp(self):

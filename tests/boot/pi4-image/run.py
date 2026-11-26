@@ -627,6 +627,11 @@ def build_image(product_root: Path, image: Path, evidence_dir: Path) -> None:
     firmware = find_firmware(product_root)
     env = os.environ.copy()
     env["RAVEN_RPI_FIRMWARE"] = str(firmware)
+    # The 0.1.0-ufs profile is the QEMU product profile; its console is ttyS0 and its
+    # fixture builds default to the host arch. A Pi 4 image boots the PL011 as
+    # ttyAMA0 and stages the aarch64 fixture output, so select both here exactly as
+    # the Pi 4 profile and qtest harness do.
+    env["RAVEN_QT_ARCH"] = "aarch64"
     env.setdefault("SOURCE_DATE_EPOCH", DEFAULT_EPOCH)
     argv = [
         "cargo",
@@ -638,6 +643,8 @@ def build_image(product_root: Path, image: Path, evidence_dir: Path) -> None:
         "pi4",
         "--profile",
         "0.1.0-ufs",
+        "--cmdline",
+        "console=ttyAMA0 loglevel=info",
         "--output",
         str(image),
     ]
