@@ -393,10 +393,16 @@ fn other_process_holds(caller: &Arc<Process>, file: &Arc<SchemeFile>) -> bool {
         let mut holds = false;
         {
             let handles = process.handles.lock();
-            handles.for_each_live(|_, object, _, _| {
+            handles.for_each_live(|handle, object, _, _| {
                 if let Object::SchemeFile(other) = object
                     && Arc::ptr_eq(other, file)
                 {
+                    crate::kprintln!(
+                        "close-debug holder pid={} handle={} id={}",
+                        process.id,
+                        handle.0,
+                        file.server_id()
+                    );
                     holds = true;
                 }
             });
