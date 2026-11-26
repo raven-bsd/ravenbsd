@@ -12,7 +12,7 @@ use host_mapper::{Event, HostApplier, HostMapper, HostMem};
 use raven_libc_elf::{DigestError, Ehdr, ElfError, MemView, ObjId, Phdr};
 use raven_libc_rtld::dlfcn::{RTLD_GLOBAL, RTLD_NEXT, RTLD_NODELETE, RTLD_NOLOAD};
 use raven_libc_rtld::loadobj::{LoadError, Loader};
-use raven_libc_rtld::main_flow::{StartCtx, rtld_main};
+use raven_libc_rtld::main_flow::{StartCtx, register_premapped, rtld_main};
 use raven_libc_rtld::table::RtldTable;
 
 /// `HostMapper` maps at fixed addresses; serialise the tests so two mappings cannot race.
@@ -729,6 +729,25 @@ fn dl_phdr_info_has_the_c_shape_and_main_first_order() {
     });
     assert_eq!(result, 7);
     assert_eq!(count, 2);
+}
+
+#[test]
+fn a_premapped_library_keeps_its_own_dl_phdr_name() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, dir)) = loader() else {
+        return;
+    };
+    let mapped = load(&mut loader, &dir, "libval.so");
+    let (phdr, phnum) = {
+        let object = loader.object(mapped).expect("mapped");
+        (object.view.phdr.0, object.view.phdr.1)
+    };
+    let id =
+        register_premapped(&mut loader, phdr, phnum, b"libc.so.1").expect("register premapped");
+    let info = loader.dl_phdr_info(id).expect("premapped info");
+    // SAFETY: `dlpi_name` points at the object's stored NUL-terminated name bytes.
+    let name = unsafe { std::ffi::CStr::from_ptr(info.dlpi_name.cast()) };
+    assert_eq!(name.to_bytes(), b"libc.so.1");
 }
 
 #[test]
