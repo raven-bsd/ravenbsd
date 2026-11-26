@@ -53,6 +53,8 @@ mod program {
     const PROMPT: &[u8] = b"raven# ";
     /// Read chunk for one console line.
     const CHUNK: usize = 256;
+    /// Wait between console read attempts while the server reports no input ready.
+    const CONSOLE_POLL_NS: u64 = 10_000_000;
 
     /// How reading a line ended.
     enum Line {
@@ -103,10 +105,23 @@ mod program {
             Ok(())
         }
 
-        /// Read up to `buffer.len()` bytes.
+        /// Read up to `buffer.len()` bytes, waiting while the console has none ready.
+        ///
+        /// The console server is single-threaded and answers an idle read with `EAGAIN` so it
+        /// stays free to dispatch queued writes (K536, K570); a console reader waits and retries
+        /// instead of treating the idle read as a failed session. Other streams return their
+        /// error unchanged.
         fn read(self, tty: Handle, buffer: &mut [u8]) -> Result<usize, Errno> {
             let handle = self.handle(tty)?;
-            Client::new().read(handle, 0, buffer)
+            read_console_waiting(
+                self.is_console(),
+                Errno::EAGAIN,
+                |buffer| Client::new().read(handle, 0, buffer),
+                || {
+                    let _ = raven_rt::nanosleep(CONSOLE_POLL_NS);
+                },
+                buffer,
+            )
         }
     }
 
@@ -1117,3 +1132,33 @@ mod program {
 
 #[cfg(not(target_os = "none"))]
 fn main() {}
+
+/// Read through `read`, waiting while a console stream reports no input ready.
+///
+/// The console server is single-threaded and answers an idle read with `eagain` so it stays
+/// free to dispatch queued writes (K536, K570). A console reader therefore waits and retries
+/// instead of ending the session; other streams and errors are returned unchanged.
+#[cfg(any(target_os = "none", test))]
+fn read_console_waiting<E, R, W>(
+    console: bool,
+    eagain: E,
+    mut read: R,
+    mut wait: W,
+    buffer: &mut [u8],
+) -> Result<usize, E>
+where
+    E: Copy + PartialEq,
+    R: FnMut(&mut [u8]) -> Result<usize, E>,
+    W: FnMut(),
+{
+    loop {
+        match read(buffer) {
+            Err(error) if console && error == eagain => wait(),
+            result => return result,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "main_ut.rs"]
+mod tests;
