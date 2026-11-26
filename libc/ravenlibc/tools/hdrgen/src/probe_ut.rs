@@ -147,3 +147,31 @@ fn tools_probe_finds_clang_and_sed_when_installed() {
         assert_eq!(sed, "sed");
     }
 }
+
+#[test]
+fn a_missing_only_copy_keeps_the_public_header() {
+    let base = std::env::temp_dir().join(format!(
+        "raven-libc-hdrgen-copy-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_nanos())
+    ));
+    let from = base.join("sys/sys");
+    let to = base.join("include");
+    std::fs::create_dir_all(&from).expect("source tree");
+    std::fs::create_dir_all(&to).expect("destination tree");
+    std::fs::write(to.join("time.h"), "public").expect("public header");
+    std::fs::write(from.join("time.h"), "kernel").expect("kernel header");
+    std::fs::write(from.join("param.h"), "kernel-only").expect("kernel-only header");
+    copy_tree_missing(&from, &to).expect("copy");
+    assert_eq!(
+        std::fs::read_to_string(to.join("time.h")).expect("public"),
+        "public"
+    );
+    assert_eq!(
+        std::fs::read_to_string(to.join("param.h")).expect("kernel-only"),
+        "kernel-only"
+    );
+    let _ = std::fs::remove_dir_all(&base);
+}

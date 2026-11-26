@@ -71,16 +71,31 @@ fn verify_prints_the_musl_probe_table() {
 }
 
 #[test]
-fn verify_reports_the_h3_difference_set() {
-    let Some(resources) = require_resources("verify_reports_the_h3_difference_set") else {
+fn verify_checks_fcntl_with_the_freebsd_profile() {
+    let Some(resources) = require_resources("verify_checks_fcntl_with_the_freebsd_profile") else {
         return;
     };
-    let output = verify(&["--target", "all"], &resources);
+    let output = verify(
+        &[
+            "--profile",
+            "freebsd",
+            "--target",
+            "all",
+            "--families",
+            "fcntl",
+        ],
+        &resources,
+    );
     if output.status.code() == Some(77) {
         return;
     }
     assert!(
-        stdout(&output).contains("H3: aarch64 fcntl difference set exactly"),
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout(&output).contains("family fcntl     PASS"),
         "{}",
         stdout(&output)
     );

@@ -178,6 +178,7 @@ fn test_tables() -> Tables {
             base: "dec".to_string(),
             source: vec!["include/errno.h".to_string()],
             donor: None,
+            donor_absent: None,
             prefixes: Vec::new(),
             omit: Vec::new(),
             consts,
@@ -404,4 +405,43 @@ fn comparison_has_no_difference_when_every_measurement_matches() {
         &mut inventory,
     );
     assert!(inventory.diffs.is_empty(), "{:?}", inventory.diffs);
+}
+
+#[test]
+fn the_rust_oracle_reads_the_evaluated_all_table() {
+    let text = "\
+pub const POLLWRNORM: i32 = POLLOUT;
+pub const ALL: &[(&str, i128)] = &[
+    (\"POLLOUT\", 4i128),
+    (\"POLLWRNORM\", 4i128),
+    (\"POLLSTANDARD\", 511i128),
+];
+";
+    let values = parse_rust_constants(text);
+    assert_eq!(values.get("POLLOUT"), Some(&4));
+    assert_eq!(values.get("POLLWRNORM"), Some(&4));
+    assert_eq!(values.get("POLLSTANDARD"), Some(&511));
+}
+
+#[test]
+fn a_declared_donor_absent_policy_approves_an_extension() {
+    let mut tables = test_tables();
+    let diff = Diff {
+        family: "fcntl".to_string(),
+        kind: "donor-absent",
+        name: "O_TMPFILE".to_string(),
+        arch: "x86_64".to_string(),
+        expected: Value::Text("absent".to_string()),
+        actual: Value::Int(0x410000),
+        detail: String::new(),
+        approved: false,
+    };
+    assert!(!approved(&tables, &diff));
+    tables.groups[1].def.donor_absent = Some("Raven extension".to_string());
+    assert!(approved(&tables, &diff));
+    let wrong = Diff {
+        expected: Value::Text("something else".to_string()),
+        ..diff
+    };
+    assert!(!approved(&tables, &wrong));
 }

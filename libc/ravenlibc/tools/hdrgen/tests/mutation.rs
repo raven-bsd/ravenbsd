@@ -114,6 +114,25 @@ fn verify(temp: &Temp, resources: &Path) -> Output {
     ])
 }
 
+fn verify_freebsd(temp: &Temp, resources: &Path, families: &str) -> Output {
+    let root = repo_root();
+    run(&[
+        "verify",
+        "--profile",
+        "freebsd",
+        "--target",
+        "all",
+        "--families",
+        families,
+        "--abi",
+        temp.abi().to_str().unwrap(),
+        "--root",
+        root.to_str().unwrap(),
+        "--resources",
+        resources.to_str().unwrap(),
+    ])
+}
+
 fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
@@ -204,21 +223,17 @@ fn a_flipped_shift_fails_verify_and_names_the_item() {
     };
     temp.mutate(
         "mman.toml",
-        "{ name = \"MAP_HUGE_16KB\", shl = [14, 26] }",
-        "{ name = \"MAP_HUGE_16KB\", shl = [15, 26] }",
+        "{ name = \"MAP_ANON\", value = 0x1000 }",
+        "{ name = \"MAP_ANON\", value = 0x2000 }",
     );
     let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
-    let output = verify(&temp, &resources);
+    let output = verify_freebsd(&temp, &resources, "mman");
     if skip(&output) {
         return;
     }
     assert_eq!(output.status.code(), Some(1));
-    assert!(
-        stderr(&output).contains("MAP_HUGE_16KB"),
-        "{}",
-        stderr(&output)
-    );
+    assert!(stderr(&output).contains("MAP_ANON"), "{}", stderr(&output));
 }
 
 #[test]
@@ -227,9 +242,9 @@ fn a_stale_deviation_row_fails_verify() {
         return;
     };
     temp.mutate(
-        "fcntl.toml",
-        "{ name = \"O_LARGEFILE\", value = 0",
-        "{ name = \"O_LARGEFILE\", value = 4096",
+        "signal.toml",
+        "{ name = \"MINSIGSTKSZ\", value = 6144",
+        "{ name = \"MINSIGSTKSZ\", value = 2048",
     );
     let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
@@ -239,7 +254,7 @@ fn a_stale_deviation_row_fails_verify() {
     }
     assert_eq!(output.status.code(), Some(1));
     assert!(
-        stderr(&output).contains("O_LARGEFILE"),
+        stderr(&output).contains("MINSIGSTKSZ"),
         "{}",
         stderr(&output)
     );

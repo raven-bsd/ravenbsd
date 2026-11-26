@@ -100,7 +100,7 @@ fn musl_group_files_carry_the_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    for name in ["signal.rs", "fcntl.rs", "sysconf.rs"] {
+    for name in ["signal.rs", "limits.rs", "socket.rs"] {
         let text = &files[name];
         assert!(
             text.contains("Copyright © 2005-2020 Rich Felker, et al."),
@@ -218,13 +218,13 @@ fn group_file_has_constants_and_all() {
 }
 
 #[test]
-fn arch_gated_constants_get_a_cfg() {
+fn map_32bit_has_the_freebsd_value() {
     let Some(files) = files() else {
         return;
     };
     let text = &files["mman.rs"];
-    assert!(text.contains("#[cfg(target_arch = \"x86_64\")]"));
-    assert!(text.contains("pub const MAP_32BIT: i32 = 0x40;"));
+    assert!(text.contains("pub const MAP_32BIT: i32 = 0x80000;"));
+    assert!(!text.contains("#[cfg(target_arch = \"x86_64\")]"));
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn visible_constants_get_a_doc_line() {
     };
     let text = &files["fcntl.rs"];
     assert!(text.contains("/// visible: bsd"));
-    assert!(text.contains("pub const O_EXLOCK: i32 = 0x10000000;"));
+    assert!(text.contains("pub const O_EXLOCK: i32 = 0x20;"));
 }
 
 #[test]
