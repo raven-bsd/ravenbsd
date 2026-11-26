@@ -42,7 +42,8 @@ mod program {
     use raven_proto_fs::{
         ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
         DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
-        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, normalize_request,
+        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, WIRE_OPEN_EXCL,
+        normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
@@ -1028,6 +1029,60 @@ mod program {
         })
     }
 
+    /// Open `path` for the caller and, when this request creates the inode, give it the caller's
+    /// effective uid and gid before the handle is returned.
+    ///
+    /// A non-root create is attempted with `O_EXCL` first so ownership is only changed on an inode
+    /// this request actually created; an existing target falls back to the caller's own flags.
+    fn create_with_caller_owner(
+        client: &Client,
+        path: &str,
+        flags: OpenFlags,
+        creds: &Credentials,
+    ) -> Result<Handle, Errno> {
+        if !flags.create() || creds.is_root() {
+            return client.open_flags(path, flags);
+        }
+        let (target, created) = if flags.exclusive() {
+            (client.open_flags(path, flags)?, true)
+        } else {
+            let exclusive = OpenFlags::from_wire(flags.to_wire() | WIRE_OPEN_EXCL)
+                .map_err(|_| Errno::EINVAL)?;
+            match client.open_flags(path, exclusive) {
+                Ok(target) => (target, true),
+                Err(Errno::EEXIST) => (client.open_flags(path, flags)?, false),
+                Err(error) => return Err(error),
+            }
+        };
+        if !created {
+            return Ok(target);
+        }
+        let request = CallRequest::new(Call::Fchown {
+            uid: creds.euid,
+            gid: creds.egid,
+        });
+        let mut response = [0u8; 64];
+        let result = client
+            .call_typed(target, &request, &mut response)
+            .and_then(|written| {
+                let bytes = response.get(..written).ok_or(Errno::EPROTO)?;
+                CallResponse::decode(request.op(), bytes)
+                    .map(|response| response.status())
+                    .map_err(|_| Errno::EPROTO)
+            });
+        match result {
+            Ok(0) => Ok(target),
+            Ok(status) => {
+                let _ = client.close(target);
+                Err(errno_from_status(status))
+            }
+            Err(error) => {
+                let _ = client.close(target);
+                Err(error)
+            }
+        }
+    }
+
     fn errno_from_status(status: i32) -> Errno {
         if (-4095..0).contains(&status) {
             Errno(u16::try_from(-status).unwrap_or(Errno::EIO.0))
@@ -1084,7 +1139,8 @@ mod program {
             let target_path = format!("{scheme}{suffix}");
             self.check_open(&scheme, suffix, &ctx.credentials, target_flags)?;
             let client = Client::new();
-            let target = client.open_flags(&target_path, target_flags)?;
+            let target =
+                create_with_caller_owner(&client, &target_path, target_flags, &ctx.credentials)?;
             if directory || path == "/" {
                 let stat = match client.fstat(target) {
                     Ok(stat) => stat,
