@@ -50,6 +50,17 @@ scan found a sibling still current or the reschedule IPI had already retired it.
 separate S195 R10 TLB-shootdown timeout, which is quoted as an S195 finding and does not gate the
 mapping rows.
 
+### Sibling exit as a one-shot service (S715)
+
+`cargo xtask qtest --case tests/conformance/memory-map/sibling-exit-kvm4.toml --arch x86_64`
+(and the `-kvm1` variant) stages the same probe as the `libc-test` one-shot service. The service
+owns the image lifetime, so `init exited (0)` is the process-termination marker, and the serial
+must carry the sibling user/kernel ready lines, the quiesce enter/clear lines and a clean exit.
+The multi-CPU case records whether the quiesce scan had to wait (`waited=true`); the one-CPU
+variant records the same path through preemption. The blocking-lock mutation (restoring
+`lock_cpu` in `cancel_thread_sleepers_except`) makes the service variant stop at init teardown
+after the probe exits, which is the preserved cross-CPU failure.
+
 `build.sh` uses the release initfs and stages `/bin/mmap-probe`; no product file changes. The
 conformance image also stages three test-only helpers: `/bin/s198-hostkeys` (creates `/tmp/ssh` and
 execs `ssh-keygen`), `/bin/s198-shell` (the `raven` login shell; it passes the probe flags through)
