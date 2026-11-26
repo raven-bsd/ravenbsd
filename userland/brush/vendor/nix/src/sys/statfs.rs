@@ -563,7 +563,13 @@ impl Statfs {
     }
 
     /// Free blocks available to unprivileged user
-    #[cfg(any(apple_targets, linux_android, target_os = "fuchsia"))]
+    // RavenBSD keeps the FreeBSD `statfs` layout (int64_t f_bavail), so it uses the
+    // signed accessor below rather than the unsigned Linux one.
+    #[cfg(any(
+        apple_targets,
+        all(linux_android, not(target_os = "ravenbsd")),
+        target_os = "fuchsia"
+    ))]
     pub fn blocks_available(&self) -> u64 {
         self.0.f_bavail
     }
@@ -575,7 +581,11 @@ impl Statfs {
     }
 
     /// Free blocks available to unprivileged user
-    #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
+    #[cfg(any(
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "ravenbsd"
+    ))]
     pub fn blocks_available(&self) -> i64 {
         self.0.f_bavail
     }
@@ -613,7 +623,7 @@ impl Statfs {
     /// Free file nodes in filesystem
     #[cfg(any(
         apple_targets,
-        linux_android,
+        all(linux_android, not(target_os = "ravenbsd")),
         target_os = "fuchsia",
         target_os = "openbsd",
     ))]
@@ -628,7 +638,7 @@ impl Statfs {
     }
 
     /// Free file nodes in filesystem
-    #[cfg(target_os = "freebsd")]
+    #[cfg(any(target_os = "freebsd", target_os = "ravenbsd"))]
     pub fn files_free(&self) -> i64 {
         self.0.f_ffree
     }
