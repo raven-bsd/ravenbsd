@@ -55,6 +55,7 @@ LISTEN_TIMEOUT = 90
 CLIENT_TIMEOUT = 60
 IMAGE_TIMEOUT = 300
 ADDON_TIMEOUT = 540
+FIXTURE_TIMEOUT = 300
 
 EXIT_STAGE = {
     SETUP: 2,
@@ -243,27 +244,53 @@ def run_image_build(arch: str, image: Path, log_path: Path) -> tuple[int, str]:
     return proc.returncode or 0, output
 
 
-def stage_fixtures(arch: str, evidence: Path) -> None:
-    """Stage the arch-selected virt-dtb profile inputs before the image build.
+def profile_fixtures() -> list[str]:
+    """Arch-selected fixture names staged by the release profile and its shell parent."""
+    names: set[str] = set()
+    candidates = [ROOT / "profiles" / "release.toml", ROOT / "profiles" / "shell.toml"]
+    for directory in (ROOT / "profiles" / "release.d", ROOT / "profiles" / "shell.d"):
+        candidates.extend(sorted(directory.glob("*.toml")))
+    for path in candidates:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        names.update(re.findall(r"build/fixtures/([A-Za-z0-9._-]+)/\{arch\}", text))
+    return sorted(names)
 
-    `tests/fixtures/virt-dtb/build.sh [arch]` is the documented prerequisite for the
-    generated `build/fixtures/virt-dtb/{arch}` inputs. xtask's fixture hook runs the
-    script without the target arch, so the gate invokes it with the requested arch.
+
+def stage_fixtures(arch: str, evidence: Path) -> None:
+    """Stage the arch-selected fixture inputs before the image build.
+
+    The fixture scripts take the target arch, but xtask's fixture hook runs them
+    without it and stages x86_64 files into a cross-arch build. Run each documented
+    `tests/fixtures/<name>/build.sh <arch>` from the resolved profile first.
     """
-    log_path = evidence / f"fixtures-{arch}.log"
-    result = subprocess.run(
-        ["sh", "tests/fixtures/virt-dtb/build.sh", arch],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    write_text(log_path, result.stdout + result.stderr)
-    if result.returncode != 0:
-        raise GateFailure(
-            IMAGE, f"virt-dtb fixture staging failed with exit {result.returncode}; see {log_path}"
+    for name in profile_fixtures():
+        staged = ROOT / "build" / "fixtures" / name / arch
+        if staged.is_dir():
+            continue
+        script = ROOT / "tests" / "fixtures" / name / "build.sh"
+        if not script.is_file():
+            raise GateFailure(
+                IMAGE, f"the release profile stages fixture {name} but {script} is missing"
+            )
+        log(f"staging fixture {name} for {arch}")
+        log_path = evidence / f"fixtures-{arch}-{name}.log"
+        result = subprocess.run(
+            ["sh", str(script), arch],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=FIXTURE_TIMEOUT,
+            check=False,
         )
+        write_text(log_path, result.stdout + result.stderr)
+        if result.returncode != 0:
+            raise GateFailure(
+                IMAGE,
+                f"fixture {name} staging failed with exit {result.returncode}; see {log_path}",
+            )
 
 
 def build_image(arch: str, evidence: Path) -> Path:
