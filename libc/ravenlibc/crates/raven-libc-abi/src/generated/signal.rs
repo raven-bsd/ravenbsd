@@ -32,7 +32,7 @@ pub const ILL_ILLTRP: i32 = 4;
 pub const ILL_PRVOPC: i32 = 5;
 pub const ILL_PRVREG: i32 = 6;
 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-pub const MINSIGSTKSZ: i32 = 2048;
+pub const MINSIGSTKSZ: i32 = 4096;
 #[cfg(target_arch = "x86_64")]
 pub const MINSIGSTKSZ: i32 = 2048;
 pub const NSIG: i32 = 32;
@@ -86,7 +86,7 @@ pub const SIGRTMAX: i32 = 64;
 pub const SIGRTMIN: i32 = 35;
 pub const SIGSEGV: i32 = 11;
 #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-pub const SIGSTKSZ: i32 = 34816;
+pub const SIGSTKSZ: i32 = 36864;
 #[cfg(target_arch = "x86_64")]
 pub const SIGSTKSZ: i32 = 34816;
 pub const SIGSTOP: i32 = 17;
@@ -150,7 +150,7 @@ pub const ALL: &[(&str, i128)] = &[
     ("ILL_PRVOPC", 5i128),
     ("ILL_PRVREG", 6i128),
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-    ("MINSIGSTKSZ", 2048i128),
+    ("MINSIGSTKSZ", 4096i128),
     #[cfg(target_arch = "x86_64")]
     ("MINSIGSTKSZ", 2048i128),
     ("NSIG", 32i128),
@@ -200,7 +200,7 @@ pub const ALL: &[(&str, i128)] = &[
     ("SIGRTMIN", 35i128),
     ("SIGSEGV", 11i128),
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-    ("SIGSTKSZ", 34816i128),
+    ("SIGSTKSZ", 36864i128),
     #[cfg(target_arch = "x86_64")]
     ("SIGSTKSZ", 34816i128),
     ("SIGSTOP", 17i128),

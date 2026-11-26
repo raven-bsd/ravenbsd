@@ -100,7 +100,7 @@ fn musl_group_files_carry_the_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    for name in ["errno.rs", "signal.rs", "fcntl.rs", "sysconf.rs"] {
+    for name in ["errno.rs", "fcntl.rs", "sysconf.rs"] {
         let text = &files[name];
         assert!(
             text.contains("Copyright © 2005-2020 Rich Felker, et al."),
@@ -113,6 +113,26 @@ fn musl_group_files_carry_the_notice_and_revision() {
         );
         assert!(text.contains("Permission is hereby granted"), "{name}");
     }
+}
+
+#[test]
+fn freebsd_signal_group_carries_the_donor_notice_and_revision() {
+    let Some(files) = files() else {
+        return;
+    };
+    let text = &files["signal.rs"];
+    assert!(
+        text.contains("Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors"),
+        "signal.rs"
+    );
+    assert!(
+        text.contains("RavenBSD: derived from freebsd:sys/sys/signal.h"),
+        "signal.rs"
+    );
+    assert!(
+        text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
+        "signal.rs"
+    );
 }
 
 #[test]

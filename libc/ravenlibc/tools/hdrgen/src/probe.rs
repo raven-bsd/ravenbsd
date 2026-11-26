@@ -825,6 +825,16 @@ pub fn verify(
         if group.def.source.is_empty() {
             continue;
         }
+        // A table leased from another donor is measured by that donor's own oracle; the musl
+        // probe must not read a `freebsd:` source as a musl path.
+        if group
+            .def
+            .donor
+            .as_ref()
+            .is_some_and(|donor| donor.name != "musl")
+        {
+            continue;
+        }
         let files = musl_source_files(&musl, &group.def.source);
         let define_set = DefineSet::from_files(&files)?;
         let arches: &[&str] = if group.stem == "fcntl" {

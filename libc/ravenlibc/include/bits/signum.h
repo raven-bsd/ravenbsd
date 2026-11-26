@@ -37,7 +37,7 @@
 #define ILL_PRVOPC 5
 #define ILL_PRVREG 6
 #if defined(__aarch64__) || defined(__riscv)
-#define MINSIGSTKSZ 2048
+#define MINSIGSTKSZ 4096
 #endif
 #if defined(__x86_64__)
 #define MINSIGSTKSZ 2048
@@ -93,7 +93,7 @@
 #define SIGRTMIN 35
 #define SIGSEGV 11
 #if defined(__aarch64__) || defined(__riscv)
-#define SIGSTKSZ 34816
+#define SIGSTKSZ 36864
 #endif
 #if defined(__x86_64__)
 #define SIGSTKSZ 34816
