@@ -39,6 +39,11 @@
 //! delivery (both NMI and fixed IPI), waits out the normal deadline, logs the timeout and
 //! returns `false`.  It exists to test the timeout path under SMP load; it never fires unless
 //! the flag is present.
+//!
+//! The `s209-tlb-ack-order` boot flag arms a one-shot ordering injection: one target delays its
+//! acknowledgement and the shooter is stalled across the diagnostic deadline, reproducing a
+//! descheduling between the acknowledgement test and the deadline check. The same flag is what
+//! proves the post-deadline re-read; it never fires unless the flag is present.
 
 #![allow(clippy::indexing_slicing)]
 
@@ -99,10 +104,19 @@ static FLUSHES: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
 static DROP_NMI: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
 /// Selftest hook: delay one target's acknowledgement inside the NMI handler.
 static ACK_DELAY_NS: [AtomicU64; MAX_CPUS] = [const { AtomicU64::new(0) }; MAX_CPUS];
+/// One-shot ack-order injection (`s209-tlb-ack-order`): stall the shooter across the deadline.
+static INJECT_ACK_ORDER: AtomicBool = AtomicBool::new(false);
+/// Target acknowledgement delay used by the ack-order injection; well inside the deadline.
+const ACK_ORDER_DELAY_NS: u64 = 20_000_000;
+/// Shooter stall used by the ack-order injection; past the 100 ms diagnostic deadline.
+const ACK_ORDER_STALL_NS: u64 = 10_000_000;
 
-/// Arm the one-shot timeout injection used by the `concurrency-stress` test.
+/// Arm the one-shot timeout injection used by the `concurrency-stress` test and read the
+/// ack-order boot flag. Called once from `smp::after_enable_interrupts`.
 pub fn set_failure_injection(enabled: bool) {
     INJECT_FAILURE.store(usize::from(enabled), Ordering::Release);
+    let cmdline = crate::cmdline::CmdLine::parse(crate::memory::paging::cmdline());
+    INJECT_ACK_ORDER.store(cmdline.flag("s209-tlb-ack-order"), Ordering::Release);
 }
 
 /// Selftest hook: drop the NMI delivery to `cpu` once, so only the fixed IPI can complete it.
@@ -127,6 +141,11 @@ pub fn pending_sequence(cpu: usize) -> u64 {
         .unwrap_or(0)
 }
 
+/// Whether `cpu` has completed the requested sequence.
+fn acked(cpu: usize, sequence: u64) -> bool {
+    ACKED[cpu].load(Ordering::SeqCst) == sequence || LAST[cpu].load(Ordering::SeqCst) == sequence
+}
+
 /// Invalidate `addr..addr + len` on every online CPU.
 ///
 /// The local CPU is flushed unconditionally; remote CPUs receive one IPI and acknowledge after
@@ -149,6 +168,7 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
 
     let _guard = ActiveGuard::acquire();
     let inject = INJECT_FAILURE.swap(0, Ordering::AcqRel) != 0;
+    let ack_order = INJECT_ACK_ORDER.swap(false, Ordering::AcqRel);
     let start = time::now_ns();
     let sequence = SEQUENCE.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
     ADDRESS.store(addr, Ordering::SeqCst);
@@ -163,12 +183,18 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
         cpu = cpu.saturating_add(1);
     }
     let mut skipped = false;
+    let mut ack_order_armed = false;
     cpu = 0;
     while cpu < online {
         if cpu != me {
             if inject && !skipped {
                 skipped = true;
             } else {
+                if ack_order && !ack_order_armed {
+                    // One target acks well inside the deadline; the shooter is stalled below.
+                    arm_ack_delay(cpu, ACK_ORDER_DELAY_NS);
+                    ack_order_armed = true;
+                }
                 if !DROP_NMI[cpu].swap(false, Ordering::AcqRel) {
                     ipi::send_tlb(cpu);
                 }
@@ -187,12 +213,25 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
     ap_start::enable_local_interrupts();
     let mut all_acked = true;
     let mut warned = false;
+    let mut ack_order_stalled = false;
     cpu = 0;
     while cpu < online {
         if cpu != me {
-            while ACKED[cpu].load(Ordering::SeqCst) != sequence
-                && LAST[cpu].load(Ordering::SeqCst) != sequence
-            {
+            loop {
+                if acked(cpu, sequence) {
+                    break;
+                }
+                if ack_order && !ack_order_stalled {
+                    // Fault injection only: reproduce a host descheduling between the
+                    // acknowledgement test above and the deadline check below. The bounded
+                    // stall is past the deadline; the target's delayed ack lands during it.
+                    ack_order_stalled = true;
+                    kprintln!("smp: tlb shootdown ack-order stall cpu={cpu} seq={sequence}");
+                    let until = deadline.saturating_add(ACK_ORDER_STALL_NS);
+                    while time::now_ns() < until {
+                        core::hint::spin_loop();
+                    }
+                }
                 if time::now_ns() > deadline {
                     if inject {
                         // Fault injection only: reproduce the historical lost-ack failure.
