@@ -9,7 +9,6 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_libc_abi::poll::{POLLERR, POLLHUP, POLLIN, POLLNVAL, POLLOUT, POLLPRI};
 use raven_libc_abi::structs::Pollfd;
-use raven_libc_abi::time::CLOCK_MONOTONIC;
 use raven_libc_sys::sys::EvqEvent;
 use raven_proto_net::socket::{READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE};
 use raven_proto_net::{Call, Response, SocketRequest};
@@ -302,7 +301,9 @@ fn live_readiness<B: SysBackend>(backend: &B, handle: Handle) -> Option<i32> {
 
 /// Monotonic nanoseconds, used for the remaining poll deadline.
 fn monotonic_ns<B: SysBackend>(backend: &B) -> u64 {
-    let Ok(time) = backend.clock_get(CLOCK_MONOTONIC as u32) else {
+    // The public CLOCK_MONOTONIC is 4; the kernel seam keeps its private 0/1 encoding.
+    const KERNEL_CLOCK_MONOTONIC: u32 = 1;
+    let Ok(time) = backend.clock_get(KERNEL_CLOCK_MONOTONIC) else {
         return 0;
     };
     let sec = u64::try_from(time.tv_sec).unwrap_or(0);

@@ -25,6 +25,7 @@ fn group(source: &[&str], donor: Option<DonorSpec>) -> ConstFile {
         base: "dec".to_string(),
         source: source.iter().map(|value| (*value).to_string()).collect(),
         donor,
+        donor_absent: None,
         prefixes: Vec::new(),
         omit: Vec::new(),
         consts: Vec::new(),

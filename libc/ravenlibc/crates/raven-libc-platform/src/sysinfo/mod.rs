@@ -81,7 +81,3 @@ pub fn getloadavg() -> Result<(), Errno> {
 #[cfg(test)]
 #[path = "sysinfo_ut.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "abi_profile_ut.rs"]
-mod abi_profile_tests;

@@ -82,9 +82,19 @@ fn headers_have_a_notice_and_guard() {
     let Some(files) = files() else {
         return;
     };
+    let freebsd = [
+        "bits/errno.h",
+        "bits/signum.h",
+        "bits/abi_fcntl.h",
+        "bits/abi_mman.h",
+        "bits/abi_poll.h",
+        "bits/abi_time.h",
+        "bits/abi_resource.h",
+        "bits/sysconf.h",
+    ];
     for (name, text) in files {
-        if name == "bits/errno.h" || name == "bits/signum.h" {
-            // The errno and signal tables are FreeBSD-derived, not musl.
+        if freebsd.contains(&name.as_str()) {
+            // The errno, signal and six selector tables are FreeBSD-derived, not musl.
             assert!(
                 text.starts_with("/*\n * SPDX-License-Identifier: BSD-3-Clause"),
                 "{name}"
@@ -93,6 +103,7 @@ fn headers_have_a_notice_and_guard() {
                 text.contains("Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors"),
                 "{name}"
             );
+            assert!(text.contains("derived from freebsd:"), "{name}");
         } else {
             assert!(
                 text.starts_with("/*\n * SPDX-License-Identifier: MIT"),
@@ -128,21 +139,21 @@ fn fcntl_header_keeps_octal_and_expressions() {
         return;
     };
     let text = &files["bits/abi_fcntl.h"];
-    assert!(text.contains("#define O_CREAT 0100\n"));
-    assert!(text.contains("#define O_ACCMODE (03|O_PATH)\n"));
+    assert!(text.contains("#define O_CREAT 0x200\n"));
+    assert!(text.contains("#define O_ACCMODE 03\n"));
     assert!(text.contains("#define O_LARGEFILE 0\n"));
     assert!(text.contains("#define AT_FDCWD (-100)\n"));
-    assert!(text.contains("#define O_SEARCH O_PATH\n"));
+    assert!(text.contains("#define O_SEARCH O_EXEC\n"));
 }
 
 #[test]
-fn arch_entries_are_guarded() {
+fn map_32bit_has_the_freebsd_value() {
     let Some(files) = files() else {
         return;
     };
     let text = &files["bits/abi_mman.h"];
-    assert!(text.contains("#if defined(__x86_64__)\n"));
-    assert!(text.contains("#define MAP_32BIT 0x40\n"));
+    assert!(text.contains("#define MAP_32BIT 0x80000\n"));
+    assert!(!text.contains("#if defined(__x86_64__)\n"));
 }
 
 #[test]
@@ -152,7 +163,7 @@ fn visibility_entries_are_guarded() {
     };
     let text = &files["bits/abi_fcntl.h"];
     assert!(text.contains("#if __BSD_VISIBLE\n"));
-    assert!(text.contains("#define O_EXLOCK 0x10000000\n"));
+    assert!(text.contains("#define O_EXLOCK 0x20\n"));
     assert!(!text.contains("/* visible: bsd */\n/* visible: bsd */"));
 }
 

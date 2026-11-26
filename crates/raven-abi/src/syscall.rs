@@ -146,6 +146,10 @@ syscalls! {
     /// `scheme_register(name: &str, handle: Handle) -> 0`; register a scheme server handle under a name.
     SCHEME_REGISTER = 0x60;
     /// `open(path: &str, flags: u32, mode: u32) -> Handle`; scheme-routed open (file/scheme namespace).
+    ///
+    /// `mode` is the requested creation mode for `O_CREAT`; the kernel records it in the request
+    /// packet and the serving filesystem applies the caller's mask with
+    /// [`crate::types::umask::open_create_mode`] at inode creation.
     OPEN = 0x61;
     /// `read(h: Handle, buf: &mut [u8]) -> usize`.
     READ = 0x62;
@@ -255,6 +259,42 @@ pub const MSYNC: usize = 0x44;
 /// threads yet. A non-`Handle::NONE` handler must be a transferable scheme
 /// file/server and is duplicated into `proc`.
 pub const PROC_SET_PERSONALITY: usize = 0x34;
+
+/// `proc_umask(mask: u32) -> previous` (raw 0x47).
+///
+/// Atomically swaps the calling process's file-creation mask and returns the previous value. The
+/// stored value is the new mask limited to [`crate::types::umask::ALLPERMS`], exactly FreeBSD
+/// `sys_umask` (`sys/kern/vfs_syscalls.c`). `PROC_CREATE` and `PROC_FORK` inherit the mask;
+/// `PROC_EXEC` preserves it. A raw constant, not a [`Syscall`] variant, so existing exhaustive
+/// matches downstream stay intact.
+pub const PROC_UMASK: usize = 0x47;
+
+/// `proc_creation_context(request: Handle, mode: u32, out: *mut Context, len: usize) -> 0` (raw 0x83).
+///
+/// Returns the kernel-authenticated creation context of the scheme request the caller is serving.
+/// `request` is the server-side handle returned by `RECV`; possession of it is the delegation
+/// right, and it is retired with the request. The kernel reads the request's recorded client
+/// credentials and mask (the original caller's, when a broker delegated the request with
+/// [`PROC_DELEGATE`]) and writes a [`crate::types::creation::Context`] with
+/// [`crate::types::umask::open_create_mode`] applied to `mode`. A handle that is not a live
+/// creation or control (`Open`/`Call`) request this process serves is `EINVAL`. Illumos
+/// `door_ucred` is the behaviour donor: the caller of the operation is the immediate request
+/// caller, never a userspace-supplied identity, and a delegated create keeps that caller.
+/// A raw constant, not a [`Syscall`] variant, so existing exhaustive matches downstream stay
+/// intact.
+pub const PROC_CREATION_CONTEXT: usize = 0x83;
+
+/// `proc_delegate(request: Handle) -> 0` (raw 0x8D).
+///
+/// Records the authenticated creation context of the scheme request the calling server is
+/// serving and applies it to the next scheme request this thread submits. A filesystem broker
+/// (`vfsd`) uses it immediately before forwarding a client's create, so the backing server sees
+/// the original caller's credentials and mask instead of the broker's. Possession of the live
+/// server-side request handle is the delegation right: the kernel requires the caller to serve
+/// the request and to hold it with `WRITE`. The stamp is one-shot and per-thread; a request that
+/// does not create uses the credentials only for its own permission checks. A raw constant, not a
+/// [`Syscall`] variant.
+pub const PROC_DELEGATE: usize = 0x8D;
 
 /// `thread_set_tls(thread: Handle, tp: usize) -> 0`.
 ///
