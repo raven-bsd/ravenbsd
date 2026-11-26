@@ -21,8 +21,6 @@ use crate::critical::SigThreadState;
 #[cfg(not(target_os = "none"))]
 use crate::errors::ENOSYS_ERR;
 #[cfg(target_os = "none")]
-use raven_abi::signal::SIG_SETUP;
-#[cfg(target_os = "none")]
 use raven_abi::syscall::{PROC_SIGQUEUE, PROC_SIGRECV_DELIVERABLE, PROC_SIGRECV_EX, THREAD_KICK};
 
 /// Receive one queued process signal, selecting only a deliverable one.
@@ -67,13 +65,6 @@ mod context_riscv64;
 mod context_riscv64_handler;
 #[cfg(target_arch = "x86_64")]
 mod context_x86_64;
-
-#[cfg(target_arch = "aarch64")]
-mod entry_aarch64;
-#[cfg(target_arch = "riscv64")]
-mod entry_riscv64;
-#[cfg(target_arch = "x86_64")]
-mod entry_x86_64;
 
 #[cfg(target_arch = "aarch64")]
 mod setjmp_aarch64;
@@ -373,16 +364,13 @@ pub fn set_ctx_area(tp: usize, address: usize) {
 
 /// Reset the per-thread signal delivery state for a fork child.
 ///
-/// `SIG_SETUP` is per kernel thread. The child's thread is new but inherits the parent's TCB, so
-/// the inherited context registration is stale: clear it (and the thread-directed pending and
-/// deferred records) so the entry can be registered for the child thread. The mask and the
-/// process-wide dispositions are inherited and are not touched. Returns whether the parent had a
-/// registered entry, so the caller can re-register it immediately for the child.
+/// C19 has no user entry to re-register; the child keeps the inherited mask and the process-wide
+/// kernel dispositions, while the thread-directed pending and deferred records are cleared. The
+/// return value stays `false` for the caller that historically re-registered an entry.
 pub fn reset_after_fork(tp: usize) -> bool {
-    let had_entry = with_state(tp, |state| state.ctx_area() != 0);
     with_state(tp, |state| state.reset_for_fork());
     pending_store(tp, 0);
-    had_entry
+    false
 }
 
 /// COPY-IN: copy the kernel area into a `ucontext_t`.
@@ -561,12 +549,8 @@ unsafe extern "C" {
         arg2: usize,
         arg3: usize,
     ) -> usize;
-    fn __rl_sigreturn_stub() -> !;
-    fn __raven_sigentry();
     fn __rl_start_context();
     fn __rl_current_sp() -> usize;
-    /// The function pointer the `__raven_sigentry` stub calls.
-    static __rl_entry_fn: AtomicUsize;
 }
 
 /// Save the callee-saved context into `buffer`.
@@ -642,55 +626,6 @@ pub fn call_handler(stack: usize, handler: usize, arg1: usize, arg2: usize, arg3
     // SAFETY: `stack` is either the application's alternate stack (with room) or the interrupted
     // stack below its live frame; `handler` is the application function address.
     unsafe { __rl_call_handler(stack, handler, arg1, arg2, arg3) }
-}
-
-/// `SIGRETURN` (the ABI signal-return call, PROPOSED PG-7).
-pub fn sigreturn() -> ! {
-    // SAFETY: the kernel contract restores the context area and never returns here.
-    unsafe { __rl_sigreturn_stub() }
-}
-
-/// Set the C-ABI function the `__raven_sigentry` stub calls (the shell's entry body).
-pub fn set_entry_function(function: usize) {
-    // SAFETY: the cell is defined by the linked asm object with the same type.
-    unsafe { __rl_entry_fn.store(function, Ordering::Release) };
-}
-
-/// The registered entry function address (0 until the shell installs it).
-#[must_use]
-pub fn entry_function() -> usize {
-    // SAFETY: as `set_entry_function`; the load is atomic.
-    unsafe { __rl_entry_fn.load(Ordering::Acquire) }
-}
-
-/// The address of the assembly entry stub the kernel resumes at.
-#[must_use]
-pub fn sigentry_address() -> usize {
-    __raven_sigentry as *const () as usize
-}
-
-/// Register the entry and the TLS context offset for the calling thread.
-///
-/// # Errors
-///
-/// The kernel's `EINVAL` (bad offset/flags) or `EFAULT` (entry not executable).
-pub fn sig_setup(entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-    #[cfg(target_os = "none")]
-    {
-        // SAFETY: SIG_SETUP takes three scalar words; the kernel validates the executable entry
-        // and the context window before storing either.
-        let result = unsafe {
-            raven_libc_sys::arch::syscall3(SIG_SETUP, entry, ctx_area_offset, flags as usize)
-        };
-        raven_libc_sys::errno::ret(result)
-            .map(|_| ())
-            .map_err(|error| Errno(error.0))
-    }
-    #[cfg(not(target_os = "none"))]
-    {
-        let _ = (entry, ctx_area_offset, flags);
-        Err(ENOSYS_ERR)
-    }
 }
 
 /// Set the calling thread's sticky kick word and wake an interruptible wait.
