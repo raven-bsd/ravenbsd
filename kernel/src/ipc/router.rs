@@ -276,9 +276,21 @@ fn read_at(
         },
     );
     let trace_new = if trace { crate::time::now_ns() } else { 0 };
-    submit(&request)?;
+    if let Err(error) = submit(&request) {
+        crate::kprintln!("ipc-read: submit {:?}", error);
+        return Err(error);
+    }
     let trace_submit = if trace { crate::time::now_ns() } else { 0 };
-    let (status, result) = wait(caller, &request)?;
+    let (status, result) = match wait(caller, &request) {
+        Ok(reply) => reply,
+        Err(error) => {
+            crate::kprintln!("ipc-read: wait {:?}", error);
+            return Err(error);
+        }
+    };
+    if len <= 64 || status != 0 {
+        crate::kprintln!("ipc-read: reply status={} result={} len={}", status, result, len);
+    }
     let trace_wait = if trace { crate::time::now_ns() } else { 0 };
     if trace {
         crate::kprintln!(

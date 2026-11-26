@@ -144,8 +144,17 @@ fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
             raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
         );
     }
-    let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
-    crate::process::tty::check_access(caller, &file, false)?;
+    let file = match ipc::file_from_handle(caller, handle, Rights::READ) {
+        Ok(file) => file,
+        Err(error) => {
+            crate::kprintln!("ipc-read: file_from_handle {:?}", error);
+            return Err(error);
+        }
+    };
+    if let Err(error) = crate::process::tty::check_access(caller, &file, false) {
+        crate::kprintln!("ipc-read: check_access {:?}", error);
+        return Err(error);
+    }
     fault_in_read_buffer(frame.rsi, frame.rdx);
     router::read(caller, &file, frame.rsi, frame.rdx)
 }
