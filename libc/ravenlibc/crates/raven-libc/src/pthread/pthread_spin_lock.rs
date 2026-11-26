@@ -2,12 +2,15 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //! `pthread_spin_lock(3)`.
 use core::ffi::c_int;
+use raven_libc_abi::errno::EINVAL;
+use raven_libc_abi::types::pthread_spinlock_t;
 use raven_libc_thread::spin as s;
 #[unsafe(no_mangle)]
-pub extern "C" fn pthread_spin_lock(lock: *mut s::SpinLock) -> c_int {
-    if lock.is_null() {
-        return 22;
-    }
-    s::lock(unsafe { &*lock }); // SAFETY: lock is non-NULL after the check and points to a live initialised spinlock.
+pub extern "C" fn pthread_spin_lock(lock: *mut pthread_spinlock_t) -> c_int {
+    let Some(object) = super::common::spin_object(lock) else {
+        return EINVAL;
+    };
+    // SAFETY: spin_object returned the live object for this slot.
+    s::lock(unsafe { &*object });
     0
 }

@@ -42,19 +42,21 @@ fn blob_is_nul_separated_with_exactly_one_nul_per_slot() {
 fn known_texts() {
     assert_eq!(text(0), Some(&b"Success"[..]));
     assert_eq!(text(1), Some(&b"Operation not permitted"[..]));
-    assert_eq!(text(11), Some(&b"Resource temporarily unavailable"[..]));
+    // FreeBSD errno.h: 11 is EDEADLK and 35 is EAGAIN (DR-69).
+    assert_eq!(text(11), Some(&b"Resource deadlock avoided"[..]));
+    assert_eq!(text(35), Some(&b"Resource temporarily unavailable"[..]));
     assert_eq!(text(22), Some(&b"Invalid argument"[..]));
-    assert_eq!(text(41), Some(&b"No error information"[..]));
-    assert_eq!(text(58), Some(&b"No error information"[..]));
-    assert_eq!(text(95), Some(&b"Not supported"[..]));
-    assert_eq!(text(133), Some(&b"Memory page has hardware error"[..]));
+    assert_eq!(text(41), Some(&b"Protocol wrong type for socket"[..]));
+    assert_eq!(text(58), Some(&b"Can't send after socket shutdown"[..]));
+    assert_eq!(text(86), Some(&b"Illegal byte sequence"[..]));
+    assert_eq!(text(95), Some(&b"State not recoverable"[..]));
 }
 
 #[test]
 fn every_abi_errno_has_a_message() {
     let mut seen: Vec<(i32, &[u8])> = Vec::new();
     for &(name, value) in raven_libc_abi::errno::ALL {
-        if !(0..=133).contains(&value) {
+        if !(0..=97).contains(&value) {
             continue;
         }
         let value = value as i32;
@@ -73,16 +75,14 @@ fn every_abi_errno_has_a_message() {
             seen.push((value, message));
         }
     }
-    assert!(seen.len() >= 131, "only {} distinct numbers", seen.len());
+    // The FreeBSD native domain has 97 distinct numbers below `sys_nerr` (98).
+    assert!(seen.len() >= 97, "only {} distinct numbers", seen.len());
 }
 
 #[test]
 fn no_duplicate_text_between_distinct_numbers() {
     for left in 0usize..ERRMSG_COUNT {
         for right in left + 1..ERRMSG_COUNT {
-            if left == 41 || left == 58 || right == 41 || right == 58 {
-                continue; // the catch-all is deliberately shared
-            }
             assert_ne!(text(left), text(right), "slots {left} and {right}");
         }
     }

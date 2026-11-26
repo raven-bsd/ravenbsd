@@ -390,7 +390,7 @@ fn byte_order_and_socket_types_are_the_frozen_table() {
     assert_eq!(raven_libc_abi::time::CLOCKS_PER_SEC, 128);
     assert_eq!(raven_libc_abi::misc::FD_SETSIZE, 1024);
     assert_eq!(raven_libc_abi::misc::EAI_OVERFLOW, -12);
-    assert_eq!(raven_libc_abi::pthread::PTHREAD_MUTEX_RECURSIVE, 1);
+    assert_eq!(raven_libc_abi::pthread::PTHREAD_MUTEX_RECURSIVE, 2);
 }
 
 #[test]
@@ -437,8 +437,9 @@ fn every_record_runtime_layout_matches_the_constant_table() {
     );
     assert_eq!(
         core::mem::size_of::<raven_libc_abi::structs::Utsname>(),
-        390
+        1280
     );
+    assert_eq!(core::mem::size_of::<raven_libc_abi::structs::Passwd>(), 80);
     assert_eq!(
         core::mem::size_of::<raven_libc_abi::structs::Sigaction>(),
         152
@@ -488,8 +489,8 @@ typedef struct { __ab_timeval ru_utime; __ab_timeval ru_stime;
   long ru_maxrss, ru_ixrss, ru_idrss, ru_isrss, ru_minflt, ru_majflt, ru_nswap, ru_inblock,
   ru_oublock, ru_msgsnd, ru_msgrcv, ru_nsignals, ru_nvcsw, ru_nivcsw;
   long __reserved[16]; } __ab_rusage;
-typedef struct { char sysname[65]; char nodename[65]; char release[65]; char version[65];
-  char machine[65]; char domainname[65]; } __ab_utsname;
+typedef struct { char sysname[256]; char nodename[256]; char release[256]; char version[256];
+  char machine[256]; } __ab_utsname;
 typedef union { unsigned long __u; unsigned char __b[128]; } __ab_sigset_t;
 typedef struct { void *sa_handler; __ab_sigset_t sa_mask; int sa_flags; void *sa_restorer; } __ab_sigaction;
 typedef struct { void *ss_sp; int ss_flags; unsigned long ss_size; } __ab_stack_t;
@@ -500,7 +501,8 @@ typedef struct { unsigned int c_iflag; unsigned int c_oflag; unsigned int c_cfla
 typedef struct { unsigned long f_bavail, f_bfree, f_blocks, f_favail, f_ffree, f_files,
   f_bsize, f_flag, f_frsize, f_fsid, f_namemax; } __ab_statvfs;
 typedef struct { void *pw_name; void *pw_passwd; unsigned int pw_uid; unsigned int pw_gid;
-  void *pw_gecos; void *pw_dir; void *pw_shell; } __ab_passwd;
+  long pw_change; void *pw_class; void *pw_gecos; void *pw_dir; void *pw_shell;
+  long pw_expire; int pw_fields; } __ab_passwd;
 typedef struct { void *gr_name; void *gr_passwd; unsigned int gr_gid; void *gr_mem; } __ab_group;
 typedef struct { short l_type; short l_whence; long l_start; long l_len; int l_pid; } __ab_flock;
 

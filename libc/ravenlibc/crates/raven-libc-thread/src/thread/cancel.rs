@@ -166,7 +166,11 @@ pub fn setcanceltype<K: ThreadKernel>(kernel: &K, new: i32) -> Result<i32, Errno
     }
     let pthread = crate::thread::current_pthread(kernel);
     let word = pthread.cancel.load(Ordering::Acquire);
-    let old = i32::from(word & CANCEL_ASYNC != 0);
+    let old = if word & CANCEL_ASYNC != 0 {
+        PTHREAD_CANCEL_ASYNCHRONOUS
+    } else {
+        PTHREAD_CANCEL_DEFERRED
+    };
     if new == PTHREAD_CANCEL_ASYNCHRONOUS {
         pthread.cancel.fetch_or(CANCEL_ASYNC, Ordering::AcqRel);
     } else {

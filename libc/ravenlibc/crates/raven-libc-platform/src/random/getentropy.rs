@@ -74,8 +74,17 @@ pub fn getentropy<B: SysBackend, L: Lock>(
     if buf.is_empty() {
         return Ok(());
     }
-    // PG-52 will replace the whole body with one `S:GETRANDOM*` call; until then the cached
-    // `rand:` handle is the only source, and it is not cryptographic (A-sys-14).
+    // PG-52: the kernel CSPRNG is available (`GETRANDOM` 0x08). Rust std seeds its RNG before
+    // the `rand:` scheme server is ready, so try the syscall first and keep the cached `rand:`
+    // handle only as the fallback.
+    if let Ok(count) = raven_libc_sys::sys::getrandom(buf, 0)
+        && count == buf.len()
+    {
+        mark_strong();
+        return Ok(());
+    }
+    // The kernel pool may be unseeded (`EAGAIN`); until then the cached `rand:` handle is the
+    // only source, and it is not cryptographic (A-sys-14).
     let _ = platform.backend().pending(PendingCall::Getrandom);
     let handle = platform.random_handle()?;
     let mut collected = 0usize;
