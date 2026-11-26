@@ -227,10 +227,10 @@ fn termios_ioctl_values_are_the_pinned_freebsd_encodings() {
     // `_IOR('t', 19, struct termios)` / `_IOW('t', 20..22, struct termios)`.
     let toolchain = evaluate(TOOLCHAIN_LIBC);
     for (name, value) in [
-        ("TIOCGETA", 0x402c_7413_u64),
-        ("TIOCSETA", 0x802c_7414_u64),
-        ("TIOCSETAW", 0x802c_7415_u64),
-        ("TIOCSETAF", 0x802c_7416_u64),
+        ("TIOCGETA", 0x402c_7413_i128),
+        ("TIOCSETA", 0x802c_7414_i128),
+        ("TIOCSETAW", 0x802c_7415_i128),
+        ("TIOCSETAF", 0x802c_7416_i128),
     ] {
         assert_eq!(toolchain.get(name).copied(), Some(value), "{name}");
     }
