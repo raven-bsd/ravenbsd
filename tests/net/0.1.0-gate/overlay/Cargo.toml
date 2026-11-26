@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone qtest package: the initfs overlay tool is a test fixture, not a
+# product workspace member (see tests/fixtures/aarch64 for the same pattern).
+[workspace]
+
+[package]
+name = "raven-net-gate-overlay"
+version = "0.1.0"
+description = "S85n fixture: rebuild an initfs with test-only file replacements."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[[bin]]
+name = "raven-net-gate-overlay"
+path = "src/main.rs"
+
+[dependencies]
+raven-initfs = { path = "../../../../crates/raven-initfs", features = ["std"] }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
