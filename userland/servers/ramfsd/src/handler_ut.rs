@@ -118,6 +118,55 @@ fn create_write_read_round_trip() {
 }
 
 #[test]
+fn create_applies_the_requested_mode() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler.expect_open(10, "m");
+    let opened = handler
+        .open_with("m", flags(O_RDWR | O_CREAT), 0o600, &ctx())
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    assert_eq!(handler.fstat(file).expect("stat").mode & 0o7777, 0o600);
+}
+
+#[test]
+fn create_applies_the_caller_umask() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler.expect_open(10, "umasked");
+    let mut ctx = ctx();
+    ctx.credentials.umask = 0o027;
+    let opened = handler
+        .open_with("umasked", flags(O_RDWR | O_CREAT), 0o666, &ctx)
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    assert_eq!(handler.fstat(file).expect("stat").mode & 0o7777, 0o640);
+}
+
+#[test]
+fn create_uses_the_authenticated_owner() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler
+        .fs
+        .mkdir_at_owned(ROOT_INO, "home", 0o755, 1000, 1000, 0)
+        .expect("home");
+    handler.expect_open(10, "home/owned");
+    let mut ctx = ctx();
+    ctx.credentials.euid = 1000;
+    ctx.credentials.egid = 1000;
+    let opened = handler
+        .open_with("home/owned", flags(O_RDWR | O_CREAT), 0o644, &ctx)
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    let stat = handler.fstat(file).expect("stat");
+    assert_eq!((stat.uid, stat.gid), (1000, 1000));
+}
+
+#[test]
 fn exclusive_create_fails_the_second_time() {
     let mut handler = RamfsHandler::new(|| 1000);
     let flags = flags(O_RDWR | O_CREAT | O_EXCL);

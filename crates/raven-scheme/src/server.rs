@@ -140,6 +140,35 @@ pub struct Ctx {
     pub trace_id: u64,
 }
 
+impl Ctx {
+    /// Apply this served request's authenticated caller context to the next scheme request this
+    /// thread submits.
+    ///
+    /// A namespace broker (`vfsd`) calls this immediately before forwarding a create to the
+    /// backing filesystem, so the backing server authenticates the original caller rather than
+    /// the broker. Possession of the live request handle is the delegation right; the kernel
+    /// refuses a handle the caller does not serve or does not hold with `WRITE`.
+    pub fn delegate(&self) -> Result<(), Errno> {
+        delegate(self.request)
+    }
+}
+
+/// Apply the served request's authenticated caller context to the next scheme request this
+/// thread submits. This is the broker API used by [`Ctx::delegate`] and by call paths that keep
+/// only the request handle.
+pub fn delegate(request: Handle) -> Result<(), Errno> {
+    let value = crate::sys::syscall6(
+        raven_abi::syscall::PROC_DELEGATE,
+        request.0 as usize,
+        0,
+        0,
+        0,
+        0,
+        0,
+    );
+    Errno::from_ret(value).map(|_| ())
+}
+
 /// A scheme server handler.
 ///
 /// Every method defaults to `-ENOSYS`. Return `Err(HandlerError::Defer(token))` from any method to
@@ -159,10 +188,9 @@ pub trait Handler {
 
     /// Open `path` with validated K66 open flags and the create mode.
     ///
-    /// `mode` is the create mode (`0o644` for protocol version 1) when
-    /// `flags.create()` is set; it is zero otherwise.  A server that does not
-    /// need the typed interface may leave the default, which forwards the raw
-    /// wire bits to [`Handler::open`].
+    /// `mode` is the requested creation mode from the `Open` packet when
+    /// `flags.create()` is set; it is zero otherwise. A server must not apply
+    /// its own fixed mode: the authenticated mask is applied at inode creation.
     fn open_with(
         &mut self,
         path: &str,
@@ -472,6 +500,7 @@ impl<K: Kernel> Server<K> {
                 packet.packet.egid,
                 packet.packet.groups,
                 packet.packet.group_count,
+                packet.packet.umask,
             ),
             root_len: packet.packet.root_len,
             trace_id: packet.packet.trace_id,
@@ -504,7 +533,7 @@ impl<K: Kernel> Server<K> {
                     .map_err(|_| HandlerError::from(Errno::EINVAL))?;
                 let flags = OpenFlags::from_wire(request.flags)
                     .map_err(|_| HandlerError::from(Errno::EINVAL))?;
-                let mode = flags.create_mode().unwrap_or(0);
+                let mode = request.mode;
                 match handler.open_with(path, flags, mode, ctx)? {
                     Opened::File(id) => self
                         .send_response(ctx.request, request, Reply::ok().cookie(id))

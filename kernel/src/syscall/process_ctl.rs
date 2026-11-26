@@ -106,6 +106,7 @@ pub fn chroot(frame: &SyscallFrame) -> Result<usize, Errno> {
         &target,
         context,
         WIRE_OPEN_READ | WIRE_OPEN_DIRECTORY,
+        0,
     )?;
     router::close(&caller, handle)?;
     *caller.root.lock() = target;
@@ -576,29 +577,27 @@ pub fn creation_context(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EPERM);
     }
     if request.opcode != crate::ipc::protocol::Opcode::Open
+        && request.opcode != crate::ipc::protocol::Opcode::Call
         || request.done.load(Ordering::Acquire)
         || request.cancelled.load(Ordering::Acquire)
     {
         return Err(Errno::EINVAL);
     }
-    let ids = *request.client.ids.lock();
-    let mask = request.client.umask();
+    let stamp = *request.stamp.lock();
     let context = raven_abi::types::creation::Context {
         version: raven_abi::types::creation::VERSION,
         size: raven_abi::types::creation::SIZE as u32,
         request_id: request.id,
         pid: request.client.id,
-        uid: ids.uid,
-        euid: ids.euid,
-        gid: ids.gid,
-        egid: ids.egid,
-        umask: mask,
-        mode: raven_abi::types::umask::open_create_mode(requested, mask),
-        group_count: ids
-            .group_count
-            .min(raven_abi::types::creation::MAX_GROUPS as u32),
+        uid: stamp.uid,
+        euid: stamp.euid,
+        gid: stamp.gid,
+        egid: stamp.egid,
+        umask: stamp.umask,
+        mode: raven_abi::types::umask::open_create_mode(requested, stamp.umask),
+        group_count: stamp.group_count,
         reserved: 0,
-        groups: ids.groups,
+        groups: stamp.groups,
     };
     // Encode in the record's declared little-endian field order; the layout asserts in
     // `raven-abi` keep the offsets and `SIZE` fixed.
@@ -631,7 +630,43 @@ pub fn creation_context(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
-/// `proc_getgroups(out: *mut u32, size: usize) -> count`.
+/// `proc_delegate(request: Handle) -> 0` (raw 0x8D).
+///
+/// Records the authenticated context of the live creation request the caller serves and applies
+/// it to the next scheme request this thread submits. The caller must hold the server-side request
+/// handle with `WRITE` and be the request's serving process, exactly like
+/// [`creation_context`]. This is the broker hop: `vfsd` delegates the client's `Open`/`Call`
+/// immediately before forwarding the create, so the backing filesystem applies the original
+/// caller's uid/gid and mask instead of the broker's. A request capability that another process
+/// holds is refused; delegation cannot be borrowed.
+pub fn delegate(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let object = caller
+        .handles
+        .lock()
+        .get(handle, Rights::NONE)
+        .map(|object| object.clone())?;
+    let Object::SchemeRequest(request) = object else {
+        return Err(Errno::EINVAL);
+    };
+    if caller.handles.lock().get(handle, Rights::WRITE).is_err() {
+        return Err(Errno::EPERM);
+    }
+    if request.server.id != caller.id {
+        return Err(Errno::EPERM);
+    }
+    if request.opcode != crate::ipc::protocol::Opcode::Open
+        && request.opcode != crate::ipc::protocol::Opcode::Call
+        || request.done.load(Ordering::Acquire)
+        || request.cancelled.load(Ordering::Acquire)
+    {
+        return Err(Errno::EINVAL);
+    }
+    let stamp = *request.stamp.lock();
+    router::set_delegation(stamp)?;
+    Ok(0)
+}
 ///
 /// `size == 0` returns the count without touching user memory. A smaller buffer is `EINVAL`;
 /// a larger buffer receives exactly `count` entries in kernel storage order.

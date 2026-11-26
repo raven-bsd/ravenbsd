@@ -549,16 +549,26 @@ pub fn pipe2(flags: u32) -> Result<(Handle, Handle), Errno> {
 }
 
 /// Open `path` (bytes, no NUL, no UTF-8 requirement at this layer).
-pub fn open(path: &[u8], flags: u32) -> Result<Handle, Errno> {
+pub fn open(path: &[u8], flags: u32, mode: u32) -> Result<Handle, Errno> {
     // SAFETY: OPEN reads `path.len()` bytes from the valid slice.
     handle_from_ret(unsafe {
-        arch::syscall3(
+        arch::syscall4(
             Syscall::OPEN as usize,
             path.as_ptr() as usize,
             path.len(),
             flags as usize,
+            mode as usize,
         )
     })
+}
+
+/// Swap the process file-creation mask; returns the previous value.
+pub fn umask(mask: u32) -> Result<u32, Errno> {
+    // SAFETY: PROC_UMASK takes one scalar argument and has no pointer.
+    let previous = crate::errno::ret(unsafe {
+        arch::syscall1(raven_abi::syscall::PROC_UMASK, mask as usize)
+    })?;
+    u32::try_from(previous).map_err(|_| Errno::EOVERFLOW)
 }
 
 /// Read from a handle.

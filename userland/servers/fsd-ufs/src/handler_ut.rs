@@ -24,6 +24,7 @@ struct FakeFs {
     data: Vec<u8>,
     writable: bool,
     created: Vec<Vec<u8>>,
+    created_file: Option<(u16, u32, u32)>,
 }
 
 impl FakeFs {
@@ -32,6 +33,7 @@ impl FakeFs {
             data: b"hello\n".to_vec(),
             writable: false,
             created: Vec::new(),
+            created_file: None,
         }
     }
 
@@ -160,7 +162,22 @@ impl FileSystem for FakeFs {
         !self.writable
     }
 
-    fn mkdir(&mut self, path: &[u8], _mode: u16) -> Result<(), Errno> {
+    fn create_file(
+        &mut self,
+        _path: &[u8],
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        _exclusive: bool,
+    ) -> Result<u32, Errno> {
+        if !self.writable {
+            return Err(Errno::EROFS);
+        }
+        self.created_file = Some((mode, uid, gid));
+        Ok(FILE)
+    }
+
+    fn mkdir(&mut self, path: &[u8], _mode: u16, _uid: u32, _gid: u32) -> Result<(), Errno> {
         if !self.writable {
             return Err(Errno::EROFS);
         }
@@ -206,6 +223,22 @@ fn opens_the_root_and_files() {
         }
     }
     assert_eq!(handler.opens.len(), 4);
+}
+
+#[test]
+fn create_passes_the_authenticated_mode_and_owner() {
+    let mut handler = FsHandler::new(FakeFs::writable());
+    handler.expect_open(20, b"/new");
+    let mut ctx = ctx();
+    ctx.credentials.euid = 1000;
+    ctx.credentials.egid = 100;
+    ctx.credentials.umask = 0o027;
+    let flags = OpenFlags::from_linux(0o100 | 2).expect("create flags");
+    match handler.open_with("/new", flags, 0o666, &ctx) {
+        Ok(Opened::File(20)) => {}
+        other => panic!("unexpected create result: {other:?}"),
+    }
+    assert_eq!(handler.fs.created_file, Some((0o640, 1000, 100)));
 }
 
 #[test]

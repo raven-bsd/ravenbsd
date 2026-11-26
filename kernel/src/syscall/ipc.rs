@@ -75,6 +75,7 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
     let (scheme, suffix) = model::split_path(&path).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    let mode = u32::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
     // A per-process root only affects the file namespace. Lexical `.`/`..` resolution clamps at
     // the root before the request leaves the process boundary; symlink resolution remains a
     // vfsd responsibility (K224).
@@ -91,7 +92,7 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
         String::from(suffix)
     };
     let server = registry::lookup(caller, scheme)?;
-    let handle = router::open(caller, server, &effective, root.as_deref(), flags)?;
+    let handle = router::open(caller, server, &effective, root.as_deref(), flags, mode)?;
     Ok(handle.0 as usize)
 }
 

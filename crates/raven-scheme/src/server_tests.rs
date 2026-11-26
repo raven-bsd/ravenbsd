@@ -788,6 +788,7 @@ fn open_with_receives_typed_flags_and_create_mode() {
     packet.flags = raven_proto_fs::WIRE_OPEN_READ
         | raven_proto_fs::WIRE_OPEN_CREATE
         | raven_proto_fs::WIRE_OPEN_EXCL;
+    packet.mode = 0o640;
     let expected = packet.flags;
     server
         .dispatch(
@@ -798,7 +799,7 @@ fn open_with_receives_typed_flags_and_create_mode() {
             &mut handler,
         )
         .unwrap();
-    assert_eq!(handler.seen, Some((expected, 0o644)));
+    assert_eq!(handler.seen, Some((expected, 0o640)));
 }
 
 #[test]
