@@ -3,7 +3,7 @@
 
 //! Thread objects and kernel-stack allocation.
 //!
-//! A thread owns a 28 KiB kernel stack with an unmapped guard page below it. Exiting threads
+//! A thread owns a 32 KiB kernel stack with an unmapped guard page below it. Exiting threads
 //! return their stacks to a cache bounded by the live-thread admission bound; reuse zeroes the
 //! mapped frames and leaves the guard unmapped. The heap block is never returned because its
 //! guard page mapping cannot be restored from the general heap.
@@ -39,13 +39,16 @@ pub const PRIORITY_DEFAULT: u8 = 16;
 /// Priority of the per-CPU idle thread.
 pub const PRIORITY_IDLE: u8 = PRIORITY_MAX;
 
-/// Number of pages in one kernel stack (28 KiB).
+/// Number of pages in one kernel stack (32 KiB).
 ///
 /// P2g measured the aarch64 `PROC_FORK`/`PROC_SIGNAL` chain at 24,816 bytes including the 288-byte
-/// exception frame: the fork/COW frames are deeper than the five-page stack left for them. Seven
-/// mapped pages restore about 3.9 KiB of headroom on both architectures; the same latent depth
-/// exists on x86_64 even though its current test path is shallower.
-const KERNEL_STACK_PAGES: u64 = 7;
+/// exception frame: the fork/COW frames are deeper than the five-page stack left for them. S217
+/// then measured the aarch64 `exec` VMA-insertion chain (`Vmas::insert` -> heap grow -> raven_kmem
+/// -> raven_vmem carve) filling all seven mapped pages, so the exception entry wrote into the guard
+/// page. NetBSD aarch64 reserves one 32 KiB `USPACE` for the uarea and trap frame
+/// (`sys/arch/aarch64/include/vmparam.h`); eight mapped pages restore one page of headroom on both
+/// architectures, where the same latent depth exists even though the x86_64 test path is shallower.
+const KERNEL_STACK_PAGES: u64 = 8;
 /// Page size.
 const PAGE: u64 = 4096;
 /// Total reserved pages, including the guard.

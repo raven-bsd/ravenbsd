@@ -23,6 +23,8 @@ pub mod futex;
 pub mod handle_xfer;
 /// Scheme IPC (`0x60..0x69`) is shared by x86-64 and aarch64.
 pub mod ipc;
+/// Kernel log ring reader (`KLOG_READ`, S51b).
+pub mod klog;
 /// Linux-personality trap routing to the per-process userspace handler (S41).
 pub mod linux;
 pub mod memory_ctl;
@@ -313,6 +315,10 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     // P5c: RECORD_LOCK (reviewer-assigned raw number 0x0C; not a Syscall variant).
     if number == raven_abi::syscall::RECORD_LOCK {
         return record_lock::record_lock(frame);
+    }
+    // S51b: KLOG_READ (raw number 0x0E; not a Syscall variant).
+    if number == raven_abi::syscall::KLOG_READ {
+        return klog::read(frame);
     }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.
