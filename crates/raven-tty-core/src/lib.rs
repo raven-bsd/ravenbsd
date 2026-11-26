@@ -134,8 +134,8 @@ pub const VEOL: usize = 11;
 /// Index of `VWERASE` in `c_cc`.
 pub const VWERASE: usize = 14;
 
-/// The disabled special-character value (`_POSIX_VDISABLE` in Raven libc is 0).
-pub const VDISABLE: u8 = 0;
+/// The disabled special-character value (`_POSIX_VDISABLE`, DR-71/C20 is `0xff`).
+pub const VDISABLE: u8 = 0xff;
 
 /// The complete `struct termios` attribute record.
 ///
@@ -167,7 +167,8 @@ impl Termios {
     /// `ICRNL`, `IXON`, `ISIG`, `IEXTEN`, `OPOST` and `ONLCR`.
     #[must_use]
     pub const fn sane() -> Self {
-        let mut cc = [0u8; 32];
+        // `_POSIX_VDISABLE` is 0xff, so every slot without a default is explicitly disabled.
+        let mut cc = [VDISABLE; 32];
         cc[VINTR] = CTRL_C;
         cc[VQUIT] = 0x1c;
         cc[VERASE] = DEL;

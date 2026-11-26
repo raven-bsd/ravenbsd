@@ -21,84 +21,24 @@ use crate::fd::ofd::OfdKind;
 use crate::lock::Lock;
 use crate::platform::Platform;
 
-/// `ICANON` from `<bits/termios.h>`.
-pub const ICANON: u32 = 0o0002;
-/// `ECHO` from `<bits/termios.h>`.
-pub const ECHO: u32 = 0o0010;
-/// `CS8` from `<bits/termios.h>`.
-pub const CS8: u32 = 0o0060;
-/// `CREAD` from `<bits/termios.h>`.
-pub const CREAD: u32 = 0o0200;
-/// Index of `VMIN` in the public `c_cc` (BSD order).
+/// `ICANON` from the public FreeBSD `<bits/termios.h>`.
+pub const ICANON: u32 = 0x0000_0100;
+/// `ECHO` from the public FreeBSD `<bits/termios.h>`.
+pub const ECHO: u32 = 0x0000_0008;
+/// `CS8` from the public FreeBSD `<bits/termios.h>`.
+pub const CS8: u32 = 0x0000_0300;
+/// `CREAD` from the public FreeBSD `<bits/termios.h>`.
+pub const CREAD: u32 = 0x0000_0800;
+/// Index of `VMIN` in the public `c_cc`.
 pub const VMIN: usize = 16;
-/// Index of `VTIME` in the public `c_cc` (BSD order).
+/// Index of `VTIME` in the public `c_cc`.
 pub const VTIME: usize = 17;
-/// Index of `VINTR` in the public `c_cc` (BSD order).
+/// Index of `VINTR` in the public `c_cc`.
 pub const VINTR: usize = 8;
-/// Index of `VEOF` in the public `c_cc` (BSD order).
+/// Index of `VEOF` in the public `c_cc`.
 pub const VEOF: usize = 0;
-
-/// Public `c_cc` index -> internal `raven-proto-tty` index.
-///
-/// The public ABI is the pinned BSD order; the wire record keeps the order the pty server
-/// already carries. Every named byte maps to its wire slot and the unnamed spare bytes keep
-/// their own position, so the conversion is a bijection over all 32 slots.
-const CC_PUBLIC_TO_WIRE: [(usize, usize); 20] = [
-    (0, 4),   // VEOF
-    (1, 11),  // VEOL
-    (2, 16),  // VEOL2
-    (3, 2),   // VERASE
-    (4, 14),  // VWERASE
-    (5, 3),   // VKILL
-    (6, 12),  // VREPRINT
-    (7, 7),   // VERASE2 / VSWTC
-    (8, 0),   // VINTR
-    (9, 1),   // VQUIT
-    (10, 10), // VSUSP
-    (11, 17), // VDSUSP (wire has no slot; keep the spare)
-    (12, 8),  // VSTART
-    (13, 9),  // VSTOP
-    (14, 15), // VLNEXT
-    (15, 13), // VDISCARD
-    (16, 6),  // VMIN
-    (17, 5),  // VTIME
-    (18, 18), // VSTATUS
-    (19, 19), // spare 2
-];
-
-fn cc_from_wire(wire: &[u8; 32]) -> [u8; 32] {
-    let mut cc = [0u8; 32];
-    let mut public = 20;
-    while public < cc.len() {
-        cc[public] = wire[public];
-        public += 1;
-    }
-    let mut index = 0;
-    while index < CC_PUBLIC_TO_WIRE.len() {
-        let (public, wire_index) = CC_PUBLIC_TO_WIRE[index];
-        cc[public] = wire[wire_index];
-        index += 1;
-    }
-    cc
-}
-
-fn cc_to_wire(cc: &[u8; 32]) -> [u8; 32] {
-    let mut wire = [0u8; 32];
-    let mut public = 20;
-    while public < wire.len() {
-        wire[public] = cc[public];
-        public += 1;
-    }
-    let mut index = 0;
-    while index < CC_PUBLIC_TO_WIRE.len() {
-        let (public, wire_index) = CC_PUBLIC_TO_WIRE[index];
-        wire[wire_index] = cc[public];
-        index += 1;
-    }
-    wire
-}
-/// The only line speed the current console reports.
-pub const B38400: u32 = 0o17;
+/// `B38400`, the speed the current console reports.
+pub const B38400: u32 = 38_400;
 
 /// `pty` server custom `SET_FG` op: store the foreground process group
 /// (`userland/servers/ptyd/src/main.rs:35`).
@@ -294,23 +234,68 @@ pub fn cfmakeraw(termios: &mut Termios) {
 
 /// `cfgetispeed`.
 pub const fn cfgetispeed(termios: &Termios) -> u32 {
-    termios.__c_ispeed
+    termios.c_ispeed
 }
 
 /// `cfgetospeed`.
 pub const fn cfgetospeed(termios: &Termios) -> u32 {
-    termios.__c_ospeed
+    termios.c_ospeed
+}
+
+/// Whether `speed` is one of the FreeBSD numeric `B*` values.
+pub const fn is_supported_speed(speed: u32) -> bool {
+    matches!(
+        speed,
+        0 | 50
+            | 75
+            | 110
+            | 134
+            | 150
+            | 200
+            | 300
+            | 600
+            | 1200
+            | 1800
+            | 2400
+            | 4800
+            | 7200
+            | 9600
+            | 14_400
+            | 19_200
+            | 28_800
+            | 38_400
+            | 57_600
+            | 76_800
+            | 115_200
+            | 230_400
+            | 460_800
+            | 500_000
+            | 921_600
+            | 1_000_000
+            | 1_500_000
+            | 2_000_000
+            | 2_500_000
+            | 3_000_000
+            | 3_500_000
+            | 4_000_000
+    )
 }
 
 /// `cfsetispeed`.
 pub fn cfsetispeed(termios: &mut Termios, speed: u32) -> i32 {
-    termios.__c_ispeed = speed;
+    if !is_supported_speed(speed) {
+        return -1;
+    }
+    termios.c_ispeed = speed;
     0
 }
 
 /// `cfsetospeed`.
 pub fn cfsetospeed(termios: &mut Termios, speed: u32) -> i32 {
-    termios.__c_ospeed = speed;
+    if !is_supported_speed(speed) {
+        return -1;
+    }
+    termios.c_ospeed = speed;
     0
 }
 
@@ -487,29 +472,230 @@ fn settings_from(termios: &Termios) -> Settings {
     }
 }
 
+/// Public `(FreeBSD) -> private (tty wire)` input-flag bits.
+const IFLAG_MAP: &[(u32, u32)] = &[
+    (0x0001, 0o000001),
+    (0x0002, 0o000002),
+    (0x0004, 0o000004),
+    (0x0008, 0o000010),
+    (0x0010, 0o000020),
+    (0x0020, 0o000040),
+    (0x0040, 0o000100),
+    (0x0080, 0o000200),
+    (0x0100, 0o000400),
+    (0x0200, 0o002000),
+    (0x0400, 0o010000),
+    (0x0800, 0o004000),
+    (0x2000, 0o020000),
+    (0x4000, 0o040000),
+];
+
+/// Public `(FreeBSD) -> private (tty wire)` output-flag bits.
+const OFLAG_MAP: &[(u32, u32)] = &[
+    (0x0001, 0o000001),
+    (0x0002, 0o000004),
+    (0x0004, 0o0014000),
+    (0x0010, 0o000010),
+    (0x0020, 0o000020),
+    (0x0040, 0o000040),
+];
+
+/// Public `(FreeBSD) -> private (tty wire)` local-flag bits.
+const LFLAG_MAP: &[(u32, u32)] = &[
+    (0x0000_0001, 0o004000),
+    (0x0000_0002, 0o000020),
+    (0x0000_0004, 0o000040),
+    (0x0000_0008, 0o000010),
+    (0x0000_0010, 0o000100),
+    (0x0000_0020, 0o002000),
+    (0x0000_0040, 0o001000),
+    (0x0000_0080, 0o000001),
+    (0x0000_0100, 0o000002),
+    (0x0000_0400, 0o100000),
+    (0x0000_0800, 0o200000),
+    (0x0040_0000, 0o000400),
+    (0x0080_0000, 0o010000),
+    (0x2000_0000, 0o040000),
+    (0x8000_0000, 0o000200),
+];
+
+/// Public `c_cc` index -> private tty-wire `c_cc` index, for all 20 public slots.
+///
+/// `VERASE2` (7), `VDSUSP` (11), `VSTATUS` (18) and the spare (19) have no tty-core consumer;
+/// they are stored in a dedicated wire slot and returned unchanged, with no behavioural effect.
+const CC_MAP: &[(usize, usize)] = &[
+    (0, 4),   // VEOF
+    (1, 11),  // VEOL
+    (2, 16),  // VEOL2
+    (3, 2),   // VERASE
+    (4, 14),  // VWERASE
+    (5, 3),   // VKILL
+    (6, 12),  // VREPRINT
+    (7, 7),   // VERASE2 (wire VSWTC slot, unused)
+    (8, 0),   // VINTR
+    (9, 1),   // VQUIT
+    (10, 10), // VSUSP
+    (11, 17), // VDSUSP (wire spare, unused)
+    (12, 8),  // VSTART
+    (13, 9),  // VSTOP
+    (14, 15), // VLNEXT
+    (15, 13), // VDISCARD
+    (16, 6),  // VMIN
+    (17, 5),  // VTIME
+    (18, 18), // VSTATUS (wire spare, unused)
+    (19, 19), // spare 19
+];
+
+/// FreeBSD numeric speed -> private tty-wire speed encoding.
+const SPEED_MAP: &[(u32, u32)] = &[
+    (0, 0o000000),
+    (50, 0o000001),
+    (75, 0o000002),
+    (110, 0o000003),
+    (134, 0o000004),
+    (150, 0o000005),
+    (200, 0o000006),
+    (300, 0o000007),
+    (600, 0o000010),
+    (1200, 0o000011),
+    (1800, 0o000012),
+    (2400, 0o000013),
+    (4800, 0o000014),
+    (9600, 0o000015),
+    (19_200, 0o000016),
+    (38_400, 0o000017),
+    (57_600, 0o010001),
+    (115_200, 0o010002),
+    (230_400, 0o010003),
+    (460_800, 0o010004),
+    (500_000, 0o010005),
+    (576_000, 0o010006),
+    (921_600, 0o010007),
+    (1_000_000, 0o010010),
+    (1_500_000, 0o010011),
+    (2_000_000, 0o010012),
+    (2_500_000, 0o010013),
+    (3_000_000, 0o010014),
+    (3_500_000, 0o010015),
+    (4_000_000, 0o010016),
+];
+
+fn map_flags(flags: u32, map: &[(u32, u32)]) -> u32 {
+    let mut out = 0;
+    for &(public, private) in map {
+        if flags & public != 0 {
+            out |= private;
+        }
+    }
+    out
+}
+
+fn unmap_flags(flags: u32, map: &[(u32, u32)]) -> u32 {
+    let mut out = 0;
+    for &(public, private) in map {
+        if flags & private != 0 {
+            out |= public;
+        }
+    }
+    out
+}
+
+fn speed_to_wire(speed: u32) -> u32 {
+    SPEED_MAP
+        .iter()
+        .find(|(public, _)| *public == speed)
+        .map_or(0, |(_, private)| *private)
+}
+
+fn speed_from_wire(speed: u32) -> u32 {
+    SPEED_MAP
+        .iter()
+        .find(|(_, private)| *private == speed)
+        .map_or(0, |(public, _)| *public)
+}
+
+fn cflag_to_wire(flags: u32) -> u32 {
+    let mut out = match flags & 0x0300 {
+        0x0100 => 0o000020,
+        0x0200 => 0o000040,
+        0x0300 => 0o000060,
+        _ => 0,
+    };
+    for &(public, private) in &[
+        (0x0400, 0o000100),
+        (0x0800, 0o000200),
+        (0x1000, 0o000400),
+        (0x2000, 0o001000),
+        (0x4000, 0o002000),
+        (0x8000, 0o004000),
+    ] {
+        if flags & public != 0 {
+            out |= private;
+        }
+    }
+    out
+}
+
+fn cflag_from_wire(flags: u32) -> u32 {
+    let mut out = match flags & 0o000060 {
+        0o000020 => 0x0100,
+        0o000040 => 0x0200,
+        0o000060 => 0x0300,
+        _ => 0,
+    };
+    for &(public, private) in &[
+        (0x0400, 0o000100),
+        (0x0800, 0o000200),
+        (0x1000, 0o000400),
+        (0x2000, 0o001000),
+        (0x4000, 0o002000),
+        (0x8000, 0o004000),
+    ] {
+        if flags & private != 0 {
+            out |= public;
+        }
+    }
+    out
+}
+
+fn cc_to_wire(cc: &[u8; 20]) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    for &(public, private) in CC_MAP {
+        out[private] = cc[public];
+    }
+    out
+}
+
+fn cc_from_wire(cc: &[u8; 32]) -> [u8; 20] {
+    let mut out = [0u8; 20];
+    for &(public, private) in CC_MAP {
+        out[public] = cc[private];
+    }
+    out
+}
+
 fn termios_from_wire(wire: WireTermios) -> Termios {
     let mut termios = Termios::ZERO;
-    termios.c_iflag = wire.iflag;
-    termios.c_oflag = wire.oflag;
-    termios.c_cflag = wire.cflag;
-    termios.c_lflag = wire.lflag;
-    termios.c_line = wire.line;
+    termios.c_iflag = unmap_flags(wire.iflag, IFLAG_MAP);
+    termios.c_oflag = unmap_flags(wire.oflag, OFLAG_MAP);
+    termios.c_cflag = cflag_from_wire(wire.cflag);
+    termios.c_lflag = unmap_flags(wire.lflag, LFLAG_MAP);
     termios.c_cc = cc_from_wire(&wire.cc);
-    termios.__c_ispeed = wire.ispeed;
-    termios.__c_ospeed = wire.ospeed;
+    termios.c_ispeed = speed_from_wire(wire.ispeed);
+    termios.c_ospeed = speed_from_wire(wire.ospeed);
     termios
 }
 
 fn wire_from_termios(termios: &Termios) -> WireTermios {
     WireTermios {
-        iflag: termios.c_iflag,
-        oflag: termios.c_oflag,
-        cflag: termios.c_cflag,
-        lflag: termios.c_lflag,
-        line: termios.c_line,
+        iflag: map_flags(termios.c_iflag, IFLAG_MAP),
+        oflag: map_flags(termios.c_oflag, OFLAG_MAP),
+        cflag: cflag_to_wire(termios.c_cflag) | (speed_to_wire(termios.c_ispeed) & 0o010017),
+        lflag: map_flags(termios.c_lflag, LFLAG_MAP),
+        line: 0,
         cc: cc_to_wire(&termios.c_cc),
-        ispeed: termios.__c_ispeed,
-        ospeed: termios.__c_ospeed,
+        ispeed: speed_to_wire(termios.c_ispeed),
+        ospeed: speed_to_wire(termios.c_ospeed),
     }
 }
 

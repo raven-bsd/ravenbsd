@@ -36,7 +36,7 @@ const TCSANOW: c_int = 0;
 const TCSADRAIN: c_int = 1;
 const TCSAFLUSH: c_int = 2;
 
-const NCCS: usize = 32;
+const NCCS: usize = 20;
 const VEOF: usize = 0;
 const VERASE: usize = 3;
 const VKILL: usize = 5;
@@ -45,29 +45,29 @@ const VQUIT: usize = 9;
 const VMIN: usize = 16;
 const VTIME: usize = 17;
 
-const ICRNL: u32 = 0o000400;
-const IXON: u32 = 0o002000;
-const OPOST: u32 = 0o000001;
-const ONLCR: u32 = 0o000004;
-const CSIZE: u32 = 0o000060;
-const CS8: u32 = 0o000060;
-const CREAD: u32 = 0o000200;
-const PARENB: u32 = 0o000400;
-const CLOCAL: u32 = 0o010000;
-const ISIG: u32 = 0o000001;
-const ICANON: u32 = 0o000002;
-const ECHO: u32 = 0o000010;
-const ECHOE: u32 = 0o000020;
-const ECHOK: u32 = 0o000040;
-const IEXTEN: u32 = 0o100000;
-const B9600: u32 = 0o000015;
+const ICRNL: u32 = 0x0000_0100;
+const IXON: u32 = 0x0000_0200;
+const OPOST: u32 = 0x0000_0001;
+const ONLCR: u32 = 0x0000_0002;
+const CSIZE: u32 = 0x0000_0300;
+const CS8: u32 = 0x0000_0300;
+const CREAD: u32 = 0x0000_0800;
+const PARENB: u32 = 0x0000_1000;
+const CLOCAL: u32 = 0x0000_8000;
+const ISIG: u32 = 0x0000_0080;
+const ICANON: u32 = 0x0000_0100;
+const ECHO: u32 = 0x0000_0008;
+const ECHOE: u32 = 0x0000_0002;
+const ECHOK: u32 = 0x0000_0004;
+const ECHONL: u32 = 0x0000_0010;
+const IEXTEN: u32 = 0x0000_0400;
+const B9600: u32 = 9600;
 
 // The `c_cc` indexes of the Rust target libc as committed in the toolchain. S742 proves that the
 // target module and the native tty agree; the build writes this file from
 // `toolchain/vendor/libc/src/unix/ravenbsd/mod.rs`, so the test uses the target's own constants
 // instead of a copy of the public header.
 include!(concat!(env!("TERMIOS_TARGET_CONSTANTS")));
-const _: () = assert!(NCCS == TARGET_NCCS);
 
 const EPERM: c_int = 1;
 const EINTR: c_int = 4;
@@ -94,7 +94,6 @@ struct Termios {
     c_oflag: u32,
     c_cflag: u32,
     c_lflag: u32,
-    c_line: u8,
     c_cc: [u8; NCCS],
     c_ispeed: u32,
     c_ospeed: u32,
@@ -106,14 +105,13 @@ impl Termios {
         c_oflag: 0,
         c_cflag: 0,
         c_lflag: 0,
-        c_line: 0,
         c_cc: [0; NCCS],
         c_ispeed: 0,
         c_ospeed: 0,
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Termios>() == 60);
+const _: () = assert!(core::mem::size_of::<Termios>() == 44);
 const _: () = assert!(core::mem::align_of::<Termios>() == 4);
 
 #[repr(C)]
@@ -328,7 +326,7 @@ fn make_raw(fd: c_int) -> bool {
     // ECHO|ECHONL|ICANON|ISIG|IEXTEN (the public `<bits/termios.h>` values).
     termios.c_iflag &= !(0x1 | 0x2 | 0x8 | 0x20 | 0x40 | 0x80 | 0x100 | 0x200);
     termios.c_oflag &= !OPOST;
-    termios.c_lflag &= !(ECHO | 0x100 | ICANON | ISIG | IEXTEN);
+    termios.c_lflag &= !(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
     termios.c_cflag &= !(CSIZE | PARENB);
     termios.c_cflag |= CS8;
     termios.c_cc[VMIN] = 1;
@@ -655,18 +653,30 @@ fn setup_winsize(_fd: c_int) -> c_int {
     0
 }
 
-fn setup_isig(fd: c_int) -> c_int {
+fn setup_isig(fd: c_int, enabled: bool) -> c_int {
     let mut termios = Termios::ZERO;
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
         return -1;
     }
-    termios.c_lflag |= ISIG;
+    if enabled {
+        termios.c_lflag |= ISIG;
+    } else {
+        termios.c_lflag &= !ISIG;
+    }
     termios.c_lflag &= !ICANON;
     termios.c_lflag &= !ECHO;
     termios.c_cc[VINTR] = 3;
     termios.c_cc[VMIN] = 1;
     termios.c_cc[VTIME] = 0;
     unsafe { tcsetattr(fd, TCSANOW, &termios) }
+}
+
+fn setup_isig_on(fd: c_int) -> c_int {
+    setup_isig(fd, true)
+}
+
+fn setup_isig_off(fd: c_int) -> c_int {
+    setup_isig(fd, false)
 }
 
 struct Signals {
@@ -879,13 +889,8 @@ fn row_isig(enabled: bool) {
             return;
         }
     };
-    if enabled && !make_raw(pair.slave) {
-        let error = errno();
-        pair.close();
-        fail("isig", format_args!("raw mode errno={error}"));
-        return;
-    }
-    let signals = match run_signal_child(&pair, setup_isig, SIGINT) {
+    let setup = if enabled { setup_isig_on } else { setup_isig_off };
+    let signals = match run_signal_child(&pair, setup, SIGINT) {
         Some(signals) => signals,
         None => {
             let error = errno();

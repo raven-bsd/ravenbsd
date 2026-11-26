@@ -6,6 +6,7 @@
 use raven_abi::errno::Errno;
 use raven_libc_abi::fcntl;
 
+use super::{CC_MAP, cc_from_wire, cc_to_wire};
 use crate::backend::FakeSys;
 use crate::ioctl::tty::{
     B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VEOF, VINTR, VMIN, VTIME, Winsize, cfgetispeed,
@@ -210,23 +211,52 @@ fn every_control_character_round_trips_in_both_directions() {
     for (index, byte) in want.c_cc.iter_mut().enumerate() {
         *byte = (index as u8).wrapping_mul(7).wrapping_add(11);
     }
-    want.c_line = 0x2a;
-    want.c_iflag = 0x0000_0f0f;
-    want.c_oflag = 0x0000_00f0;
-    want.c_cflag = 0x0000_0303;
-    want.c_lflag = 0x0000_0ff0;
-    want.__c_ispeed = 0o17;
-    want.__c_ospeed = 0o15;
+    want.c_iflag = 0x100 | 0x200; // ICRNL | IXON
+    want.c_oflag = 0x1 | 0x2; // OPOST | ONLCR
+    want.c_cflag = 0x300 | 0x800 | 0x8000; // CS8 | CREAD | CLOCAL
+    want.c_lflag = 0x8 | 0x80 | 0x100 | 0x400; // ECHO | ISIG | ICANON | IEXTEN
+    want.c_ispeed = 9600;
+    want.c_ospeed = 19_200;
     tcsetattr(&platform, fd, &want).expect("tcsetattr");
     let got = tcgetattr(&platform, fd).expect("tcgetattr");
-    assert_eq!(got.c_line, want.c_line);
     assert_eq!(got.c_iflag, want.c_iflag);
     assert_eq!(got.c_oflag, want.c_oflag);
     assert_eq!(got.c_cflag, want.c_cflag);
     assert_eq!(got.c_lflag, want.c_lflag);
-    assert_eq!(got.__c_ispeed, want.__c_ispeed);
-    assert_eq!(got.__c_ospeed, want.__c_ospeed);
+    assert_eq!(got.c_ispeed, want.c_ispeed);
+    assert_eq!(got.c_ospeed, want.c_ospeed);
     assert_eq!(got.c_cc, want.c_cc);
+}
+
+#[test]
+fn every_public_slot_maps_to_its_exact_wire_slot() {
+    let mut public = [0u8; 20];
+    for (index, byte) in public.iter_mut().enumerate() {
+        *byte = 0x10 + index as u8;
+    }
+    let wire = cc_to_wire(&public);
+    for &(public_index, wire_index) in CC_MAP {
+        assert_eq!(
+            wire[wire_index], public[public_index],
+            "public slot {public_index} must land in wire slot {wire_index}"
+        );
+    }
+    assert_eq!(wire[0], public[8], "VINTR");
+    assert_eq!(wire[4], public[0], "VEOF");
+    assert_eq!(wire[6], public[16], "VMIN");
+    assert_eq!(wire[5], public[17], "VTIME");
+    assert_eq!(wire[19], public[19], "spare 19");
+    assert_eq!(cc_from_wire(&wire), public);
+}
+
+#[test]
+fn posix_vdisable_is_ff_on_both_sides() {
+    let public = [0xff; 20];
+    let wire = cc_to_wire(&public);
+    for &(_, wire_index) in CC_MAP {
+        assert_eq!(wire[wire_index], 0xff, "disabled slot keeps 0xff");
+    }
+    assert_eq!(cc_from_wire(&wire), public);
 }
 
 #[test]
@@ -253,29 +283,25 @@ fn default_termios_has_cread_and_cs8() {
 /// field; K444 is red when any one of them is dropped.
 #[test]
 fn tcsetattr_round_trips_every_termios_field() {
-    const IGNBRK: u32 = 0o0000001;
-    const ICRNL: u32 = 0o0000400;
-    const IXON: u32 = 0o0002000;
-    const OPOST: u32 = 0o0000001;
-    const ONLCR: u32 = 0o0000004;
-    const ISIG: u32 = 0o0000001;
-    const IEXTEN: u32 = 0o100000;
-    const VINTR: usize = 0;
-    const VERASE: usize = 2;
-    const VKILL: usize = 3;
-    const VEOF: usize = 4;
-    const VSTART: usize = 8;
-    const VSTOP: usize = 9;
-    const B9600: u32 = 0o15;
-    const B19200: u32 = 0o16;
+    const IGNBRK: u32 = 0x1;
+    const ICRNL: u32 = 0x100;
+    const IXON: u32 = 0x200;
+    const OPOST: u32 = 0x1;
+    const ONLCR: u32 = 0x2;
+    const ISIG: u32 = 0x80;
+    const IEXTEN: u32 = 0x400;
+    const CLOCAL: u32 = 0x8000;
+    const VERASE: usize = 3;
+    const VKILL: usize = 5;
+    const VSTART: usize = 12;
+    const VSTOP: usize = 13;
 
     let (platform, fd) = tty_platform();
     let mut want = default_termios();
     want.c_iflag = IGNBRK | ICRNL | IXON;
     want.c_oflag = OPOST | ONLCR;
-    want.c_cflag = crate::ioctl::tty::CS8 | crate::ioctl::tty::CREAD | B38400;
+    want.c_cflag = crate::ioctl::tty::CS8 | crate::ioctl::tty::CREAD | CLOCAL;
     want.c_lflag = ISIG | ICANON | ECHO | IEXTEN;
-    want.c_line = 0;
     want.c_cc[VINTR] = 3;
     want.c_cc[VERASE] = 0x7f;
     want.c_cc[VKILL] = 0x15;
@@ -284,8 +310,8 @@ fn tcsetattr_round_trips_every_termios_field() {
     want.c_cc[VSTOP] = 0x13;
     want.c_cc[VMIN] = 7;
     want.c_cc[VTIME] = 3;
-    want.__c_ispeed = B9600;
-    want.__c_ospeed = B19200;
+    want.c_ispeed = 9600;
+    want.c_ospeed = 19_200;
 
     tcsetattr(&platform, fd, &want).expect("tcsetattr");
     let got = tcgetattr(&platform, fd).expect("tcgetattr");
