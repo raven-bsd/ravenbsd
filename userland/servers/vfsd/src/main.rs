@@ -43,9 +43,10 @@ mod program {
     use raven_abi::types::{Handle, Rights, prot};
     use raven_pager::{PAGE_IN, PAGE_OUT, PagerPacket};
     use raven_proto_fs::{
-        ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
-        DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
-        OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs, WIRE_OPEN_DIRECTORY, WIRE_OPEN_EXCL,
+        ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, CALL_HEADER_LEN, Call, CallRequest, CallResponse,
+        Credentials, DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader,
+        DirEntryIter, MAX_PATH, OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs,
+        WIRE_OPEN_DIRECTORY, WIRE_OPEN_EXCL,
     };
     use raven_rt::entry;
     use raven_rt::println;
@@ -67,6 +68,9 @@ mod program {
     /// the 4 KiB nested-call storm for large file reads without a 64 KiB stack array.
     const PROXY_CHUNK: usize = 64 * 1024;
     const PAGE: usize = 4096;
+    /// Request staging for one control message: the header, two `u16` path lengths and two
+    /// maximum-length paths.
+    const CALL_BUFFER: usize = CALL_HEADER_LEN + 4 + 2 * MAX_PATH;
     /// Budget for proxy open-file descriptions.
     ///
     /// The caller's `RLIMIT_NOFILE` soft limit is the per-process bound; this aggregate budget must
@@ -697,7 +701,7 @@ mod program {
         } else {
             let request = CallRequest::new(Call::Lstat { path: suffix });
             let mut response = [0u8; 128];
-            match client.call_typed(root, &request, &mut response) {
+            match call_typed_big(&client, root, &request, &mut response) {
                 Ok(length) => match CallResponse::decode(request.op(), &response[..length]) {
                     Ok(CallResponse::Stat { status: 0, stat }) => Ok(stat),
                     Ok(CallResponse::Stat { status, .. })
@@ -721,7 +725,7 @@ mod program {
         let root = client.open(&scheme, READ)?;
         let request = CallRequest::new(Call::Readlink { path: suffix });
         let mut response = [0u8; MAX_PATH + 8];
-        let result = client.call_typed(root, &request, &mut response);
+        let result = call_typed_big(&client, root, &request, &mut response);
         let _ = client.close(root);
         let length = result?;
         match CallResponse::decode(request.op(), &response[..length]) {
@@ -882,12 +886,27 @@ mod program {
     ) -> Result<usize, Errno> {
         let mut scratch = [0u8; MAX_PATH + 64];
         let capacity = response.len().min(scratch.len());
-        let written = client.call_typed(target, request, &mut scratch[..capacity])?;
+        let written = call_typed_big(client, target, request, &mut scratch[..capacity])?;
         if written > response.len() {
             return Err(Errno::E2BIG);
         }
         response[..written].copy_from_slice(&scratch[..written]);
         Ok(written)
+    }
+
+    /// Encode and send a control request that may carry two full-length paths.
+    ///
+    /// `raven_scheme::Client::call_typed` stages every request in a 640-byte buffer, which cannot
+    /// hold a path anywhere near `PATH_MAX`. Encode into a buffer sized for the protocol instead.
+    fn call_typed_big(
+        client: &Client,
+        target: Handle,
+        request: &CallRequest<'_>,
+        response: &mut [u8],
+    ) -> Result<usize, Errno> {
+        let mut bytes = vec![0u8; CALL_BUFFER];
+        let length = request.encode(&mut bytes).map_err(|_| Errno::EINVAL)?;
+        client.call(target, &bytes[..length], response)
     }
 
     fn rebuild_single<'a>(call: &Call<'a>, path: &'a [u8]) -> Result<Call<'a>, Errno> {
@@ -963,14 +982,12 @@ mod program {
             gid: creds.egid,
         });
         let mut response = [0u8; 64];
-        let result = client
-            .call_typed(target, &request, &mut response)
-            .and_then(|written| {
-                let bytes = response.get(..written).ok_or(Errno::EPROTO)?;
-                CallResponse::decode(request.op(), bytes)
-                    .map(|response| response.status())
-                    .map_err(|_| Errno::EPROTO)
-            });
+        let result = call_typed_big(&client, target, &request, &mut response).and_then(|written| {
+            let bytes = response.get(..written).ok_or(Errno::EPROTO)?;
+            CallResponse::decode(request.op(), bytes)
+                .map(|response| response.status())
+                .map_err(|_| Errno::EPROTO)
+        });
         match result {
             Ok(0) => Ok(target),
             Ok(status) => {
@@ -1422,7 +1439,8 @@ mod program {
                     for mount in self.table.mounts() {
                         if let Ok(root) = client.open(&mount.scheme, READ) {
                             let mut scratch = [0u8; 64];
-                            match client.call_typed(
+                            match call_typed_big(
+                                &client,
                                 root,
                                 &CallRequest::new(Call::Sync),
                                 &mut scratch,

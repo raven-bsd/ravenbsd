@@ -45,10 +45,7 @@ fn the_longest_mount_prefix_wins() {
 #[test]
 fn a_component_prefix_of_a_mount_name_is_not_a_mount() {
     let table = table();
-    assert_eq!(
-        mount_suffix(&table, b"/tmpx"),
-        Ok((1, b"tmpx".to_vec()))
-    );
+    assert_eq!(mount_suffix(&table, b"/tmpx"), Ok((1, b"tmpx".to_vec())));
 }
 
 #[test]

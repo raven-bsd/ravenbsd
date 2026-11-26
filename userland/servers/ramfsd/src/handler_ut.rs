@@ -756,6 +756,58 @@ fn utimens_sets_and_omits_times() {
 }
 
 #[test]
+fn a_multi_component_path_longer_than_the_old_field_is_carried() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let root = root(&mut handler);
+    let a = [b'a'; 100];
+    let b = [b'b'; 100];
+    let c = [b'c'; 100];
+    let mut path = Vec::new();
+    path.extend_from_slice(&a);
+    path.push(b'/');
+    path.extend_from_slice(&b);
+    path.push(b'/');
+    path.extend_from_slice(&c);
+    assert!(path.len() > 255);
+    let mut parent = Vec::new();
+    parent.extend_from_slice(&a);
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkdir {
+            mode: 0o755,
+            path: &parent,
+        },
+    )
+    .expect("mkdir a");
+    parent.push(b'/');
+    parent.extend_from_slice(&b);
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkdir {
+            mode: 0o755,
+            path: &parent,
+        },
+    )
+    .expect("mkdir a/b");
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkdir {
+            mode: 0o755,
+            path: &path,
+        },
+    )
+    .expect("mkdir");
+    let (op, response) = call(&mut handler, root, Call::Lstat { path: &path }).expect("lstat");
+    match CallResponse::decode(op, &response).expect("decode") {
+        CallResponse::Stat { status: 0, stat } => assert_eq!(stat.mode & S_IFMT, S_IFDIR),
+        other => panic!("unexpected response: {other:?}"),
+    }
+}
+
+#[test]
 fn statvfs_reports_capacity_and_fragment_size() {
     let mut handler = RamfsHandler::new(|| 1000);
     let root = root(&mut handler);
