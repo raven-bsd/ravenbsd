@@ -118,6 +118,19 @@ fn create_write_read_round_trip() {
 }
 
 #[test]
+fn create_applies_the_requested_mode() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    handler.expect_open(10, "m");
+    let opened = handler
+        .open_with("m", flags(O_RDWR | O_CREAT), 0o600, &ctx())
+        .expect("create");
+    let Opened::File(file) = opened else {
+        panic!("create must open a file");
+    };
+    assert_eq!(handler.fstat(file).expect("stat").mode & 0o7777, 0o600);
+}
+
+#[test]
 fn exclusive_create_fails_the_second_time() {
     let mut handler = RamfsHandler::new(|| 1000);
     let flags = flags(O_RDWR | O_CREAT | O_EXCL);

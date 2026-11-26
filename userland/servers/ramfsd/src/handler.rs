@@ -153,6 +153,7 @@ impl RamfsHandler {
         &mut self,
         path: &str,
         flags: OpenFlags,
+        mode: u32,
         creds: &Credentials,
     ) -> Result<(u64, bool), Errno> {
         let now = self.clock();
@@ -181,8 +182,7 @@ impl RamfsHandler {
                 ) {
                     return Err(Errno::EACCES);
                 }
-                let mode = u16::try_from(flags.create_mode().unwrap_or(0o644))
-                    .map_err(|_| Errno::EINVAL)?;
+                let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
                 (
                     self.fs
                         .create_file_at_owned(ROOT_INO, path, mode, creds.euid, creds.egid, now)?,
@@ -248,7 +248,7 @@ impl Handler for RamfsHandler {
         &mut self,
         path: &str,
         flags: OpenFlags,
-        _mode: u32,
+        mode: u32,
         ctx: &Ctx,
     ) -> HandlerResult<Opened> {
         let Some((file_id, expected)) = self.pending.take() else {
@@ -260,7 +260,7 @@ impl Handler for RamfsHandler {
         if self.opens.len() >= MAX_OPEN_FILES {
             return Err(Errno::EMFILE.into());
         }
-        let (ino, created) = self.open_ino(path, flags, &ctx.credentials)?;
+        let (ino, created) = self.open_ino(path, flags, mode, &ctx.credentials)?;
         if created && let Ok(parent) = self.parent_ino(ROOT_INO, path) {
             self.bump_dir(parent);
         }
