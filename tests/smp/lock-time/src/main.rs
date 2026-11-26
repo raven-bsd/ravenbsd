@@ -163,7 +163,14 @@ fn leak_marker(initfs: &Initfs<'_>, code: i32) -> Result<i32, Errno> {
         args: &args,
         env: &[],
     };
-    let child = spawn(initfs, "/init", &options).map_err(|_| Errno::EINVAL)?;
+    // The isolated case installs the fixture as `/init`; the boot-service case installs the same
+    // binary as `/bin/smp-lock-time` and leaves `/init` to the system init.
+    let path = if initfs.get("/bin/smp-lock-time").is_some() {
+        "/bin/smp-lock-time"
+    } else {
+        "/init"
+    };
+    let child = spawn(initfs, path, &options).map_err(|_| Errno::EINVAL)?;
     let status = proc_wait(child)?;
     let _ = sys::handle_close(child);
     Ok(status)
@@ -238,8 +245,8 @@ fn leak_mode() -> i32 {
     if leak_marker(&initfs, LEAK_BASE_EXIT) != Ok(LEAK_BASE_EXIT) {
         return fail_code("leak base marker");
     }
-    if leak_churn().is_err() {
-        return fail_code("leak churn");
+    if let Err(message) = leak_churn() {
+        return fail_code(message);
     }
     println!(
         "lock-time: leak churn wake={} timeout={}",
@@ -486,6 +493,15 @@ fn marker_exit_code(args: &raven_rt::Args) -> Option<i32> {
 fn main(args: raven_rt::Args) -> i32 {
     if let Some(code) = marker_exit_code(&args) {
         sys::exit(code);
+    }
+    // Boot-service mode: svcd starts the fixture with `leak` as the first argument, so the frame
+    // churn runs without a console step. `noop` parks a base-image service that would otherwise
+    // run a CPU-heavy thread suite inside the measurement window.
+    if args.get(1) == Some("leak") {
+        return leak_mode();
+    }
+    if args.get(1) == Some("noop") {
+        return 0;
     }
     println!("lock-time: ready");
     let (iterations, cpus, on, mem_period, timers, leak) = read_config();

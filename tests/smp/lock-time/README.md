@@ -46,6 +46,21 @@ The qtest harness defaults to `-smp 4` for x86_64. The KVM cases append `-accel 
 runner exits non-zero and the serial log is kept under `build/smp/lock-time/logs/`. A flake or a
 lost wake is a blocker, not a retry.
 
+## Frame-window case
+
+`leak.toml` runs the same futex wake/timeout churn as the S36 lifecycle fixture, but as a boot
+service. The fixture starts after `vfsd` and `resolvd` are ready, then emits exit-90 and exit-91
+marker children; the kernel's `s36-lockcheck` diagnostic samples `frame::stats().allocated_bytes`
+between them. Because the late services are settled before the baseline, the delta covers only
+the lock/time churn.
+
+`leak-early.toml` is the negative control: the same service without the `resolvd` dependency.
+It starts before the resolver, so resolvd's resident frames land inside the window and the
+forbidden `s36: lockcheck leak` row appears. It is expected to fail; `leak.toml` is the gate.
+
+Both cases build `build/smp/lock-time/leak*-initfs.img` from the core base image and overlay the
+fixture, a core-built `resolvd`, their service manifests and a one-shot `svcd.conf`.
+
 ## TLB narrowing variants
 
 `lock-time-tcg-nomem.toml` disables the TLB pressure (`mem_period=0`) and keeps the timers and

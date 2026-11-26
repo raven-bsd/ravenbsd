@@ -1,23 +1,19 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+# S85a frame-window case: run the lock/time churn as a boot service after the late services
+# that allocate resident frames (resolvd, vfsd) are ready. The kernel's `s36-lockcheck`
+# diagnostic samples `frame::stats().allocated_bytes` when a process exits 90 (baseline) and
+# 91 (sample); both markers are children of this fixture, so the delta covers only the churn.
 name = "smp-lock-time-leak"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 120
-pre = ["sh tests/smp/lock-time/build.sh"]
-initfs = "build/smp/lock-time/initfs.img"
+pre = ["sh tests/smp/lock-time/build.sh leak"]
+initfs = "build/smp/lock-time/leak-initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on s36-lockcheck=1"
 qemu_extra = []
 expect_exit = "success"
-
-# The kernel's `s36-lockcheck` diagnostic samples `frame::stats().allocated_bytes` when a process
-# exits 90 (baseline) and 91 (sample). The fixture spawns two marker children around the lock/time
-# churn, so the delta covers only this suite's work.
-[[step]]
-wait = '^lock-time: ready$'
-send = "leak\n"
-delay_ms = 50
 
 [[expect]]
 regex = '^s36: lockcheck base allocated=[0-9]+$'

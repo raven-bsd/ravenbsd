@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The core base image runs a libc thread stress service. Replace it with the fixture's no-op
+# mode so it exits before the frame-window measurement starts.
+
+name = "libc-test"
+exec = "/bin/smp-lock-time"
+args = ["/bin/smp-lock-time", "noop"]
+needs = []
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
