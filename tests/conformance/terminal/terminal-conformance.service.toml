@@ -7,9 +7,9 @@
 # row from stopping the boot; the runner reads the rows from the serial log.
 
 name = "terminal-conformance"
-exec = "/bin/rsh"
-args = ["/bin/rsh", "-c", "/bin/terminal-conformance --signals; echo S175-TERM-MUTATION-BEGIN; /bin/terminal-conformance --mutation-termios --signals"]
-needs = ["vfsd", "tmpfs", "ptyd", "devd", "consd"]
+exec = "/bin/terminal-conformance"
+args = ["/bin/terminal-conformance", "--signals", "--both"]
+needs = ["vfsd", "ptyd", "consd"]
 readiness = "exit"
 restart = "never"
 max_restarts = 0

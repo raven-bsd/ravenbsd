@@ -151,8 +151,10 @@ def build_image(arch: str, image: Path, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     step(out, "fixture-build", ["sh", "tests/conformance/terminal/build.sh", arch], 240)
     shutil.rmtree(ROOT / f"build/cargo/uutils-{arch}", ignore_errors=True)
+    # The terminal probe needs the initfs services, not brush. The libc-test profile stages the
+    # same pty/vfs/console servers without the shell and keeps the terminal image ABI-consistent.
     step(out, "initfs-build",
-         ["cargo", "xtask", "initfs", "--arch", arch, "--profile", "release"], 600)
+         ["cargo", "xtask", "initfs", "--arch", arch, "--profile", "libc-test"], 600)
     initfs = out / "terminal-initfs.img"
     step(
         out,
@@ -170,7 +172,7 @@ def build_image(arch: str, image: Path, out: Path) -> None:
         out,
         "image-build",
         [
-            "cargo", "xtask", "image", "--arch", arch, "--profile", "release",
+            "cargo", "xtask", "image", "--arch", arch, "--profile", "libc-test",
             "--initfs", str(initfs),
             "--cmdline", f"console={ARCHES[arch]['console']} test-exit=1",
             "--output", str(image),

@@ -1124,17 +1124,7 @@ fn slice_bytes<T>(pointer: *const T, count: usize) -> &'static [T] {
     unsafe { &*slice_from_raw_parts(pointer, count) }
 }
 
-extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
-    let args = slice_bytes(argv, argc as usize);
-    let mut run_signals = false;
-    let mut mutation_termios = false;
-    for argument in &args[1..] {
-        if c_str_eq(*argument, b"--signals") {
-            run_signals = true;
-        } else if c_str_eq(*argument, b"--mutation-termios") {
-            mutation_termios = true;
-        }
-    }
+fn run_pass(run_signals: bool, mutation_termios: bool) {
     conformance::emit(format_args!(
         "S175-TERM start uid={} signals={} mutation={}\n",
         unsafe { getuid() },
@@ -1159,6 +1149,32 @@ extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
     }
     let failures = FAILURES.load(Ordering::SeqCst);
     conformance::emit(format_args!("S175-TERM done failures={failures}\n"));
+}
+
+extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
+    let args = slice_bytes(argv, argc as usize);
+    let mut run_signals = false;
+    let mut mutation_termios = false;
+    let mut both = false;
+    for argument in &args[1..] {
+        if c_str_eq(*argument, b"--signals") {
+            run_signals = true;
+        } else if c_str_eq(*argument, b"--mutation-termios") {
+            mutation_termios = true;
+        } else if c_str_eq(*argument, b"--both") {
+            both = true;
+        }
+    }
+    if both {
+        run_pass(run_signals, false);
+        conformance::emit(format_args!("S175-TERM-MUTATION-BEGIN\n"));
+        FAILURES.store(0, Ordering::SeqCst);
+        run_pass(run_signals, true);
+        let failures = FAILURES.load(Ordering::SeqCst);
+        return if failures == 0 { 0 } else { 1 };
+    }
+    run_pass(run_signals, mutation_termios);
+    let failures = FAILURES.load(Ordering::SeqCst);
     if failures == 0 { 0 } else { 1 }
 }
 
