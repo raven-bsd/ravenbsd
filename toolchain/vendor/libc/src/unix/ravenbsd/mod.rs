@@ -101,6 +101,16 @@ s! {
         pub _pad: u64,
     }
 
+    pub struct kevent {
+        pub ident: crate::uintptr_t,
+        pub filter: c_short,
+        pub flags: c_ushort,
+        pub fflags: c_uint,
+        pub data: crate::intptr_t,
+        pub udata: *mut c_void,
+        pub ext: [u64; 4],
+    }
+
     pub struct fd_set {
         fds_bits: [c_ulong; crate::FD_SETSIZE as usize / ULONG_SIZE],
     }
@@ -448,6 +458,67 @@ impl siginfo_t {
 }
 
 pub const UTSLENGTH: usize = 65;
+
+// sys/event.h (S743 declared kqueue subset: READ, WRITE, TIMER, USER, PROC with NOTE_EXIT).
+pub const EVFILT_READ: c_short = -1;
+pub const EVFILT_WRITE: c_short = -2;
+pub const EVFILT_AIO: c_short = -3;
+pub const EVFILT_VNODE: c_short = -4;
+pub const EVFILT_PROC: c_short = -5;
+pub const EVFILT_SIGNAL: c_short = -6;
+pub const EVFILT_TIMER: c_short = -7;
+pub const EVFILT_PROCDESC: c_short = -8;
+pub const EVFILT_FS: c_short = -9;
+pub const EVFILT_LIO: c_short = -10;
+pub const EVFILT_USER: c_short = -11;
+pub const EVFILT_SENDFILE: c_short = -12;
+pub const EVFILT_EMPTY: c_short = -13;
+pub const EVFILT_JAIL: c_short = -14;
+pub const EVFILT_JAILDESC: c_short = -15;
+pub const EVFILT_SYSCOUNT: c_short = 15;
+
+pub const EV_ADD: c_ushort = 0x0001;
+pub const EV_DELETE: c_ushort = 0x0002;
+pub const EV_ENABLE: c_ushort = 0x0004;
+pub const EV_DISABLE: c_ushort = 0x0008;
+pub const EV_ONESHOT: c_ushort = 0x0010;
+pub const EV_CLEAR: c_ushort = 0x0020;
+pub const EV_RECEIPT: c_ushort = 0x0040;
+pub const EV_DISPATCH: c_ushort = 0x0080;
+pub const EV_FORCEONESHOT: c_ushort = 0x0100;
+pub const EV_KEEPUDATA: c_ushort = 0x0200;
+pub const EV_SYSFLAGS: c_ushort = 0xf000;
+pub const EV_FLAG1: c_ushort = 0x2000;
+pub const EV_FLAG2: c_ushort = 0x4000;
+pub const EV_EOF: c_ushort = 0x8000;
+pub const EV_ERROR: c_ushort = 0x4000;
+
+pub const NOTE_FFNOP: c_uint = 0x0000_0000;
+pub const NOTE_FFAND: c_uint = 0x4000_0000;
+pub const NOTE_FFOR: c_uint = 0x8000_0000;
+pub const NOTE_FFCOPY: c_uint = 0xc000_0000;
+pub const NOTE_FFCTRLMASK: c_uint = 0xc000_0000;
+pub const NOTE_FFLAGSMASK: c_uint = 0x00ff_ffff;
+pub const NOTE_TRIGGER: c_uint = 0x0100_0000;
+
+pub const NOTE_LOWAT: c_uint = 0x0001;
+pub const NOTE_FILE_POLL: c_uint = 0x0002;
+
+pub const NOTE_EXIT: c_uint = 0x8000_0000;
+pub const NOTE_FORK: c_uint = 0x4000_0000;
+pub const NOTE_EXEC: c_uint = 0x2000_0000;
+pub const NOTE_TRACK: c_uint = 0x0000_0001;
+pub const NOTE_TRACKERR: c_uint = 0x0000_0002;
+pub const NOTE_CHILD: c_uint = 0x0000_0004;
+
+pub const NOTE_SECONDS: c_uint = 0x0000_0001;
+pub const NOTE_MSECONDS: c_uint = 0x0000_0002;
+pub const NOTE_USECONDS: c_uint = 0x0000_0004;
+pub const NOTE_NSECONDS: c_uint = 0x0000_0008;
+pub const NOTE_ABSTIME: c_uint = 0x0000_0010;
+
+pub const KQUEUE_CLOEXEC: c_uint = 0x0000_0001;
+pub const KQUEUE_CPONFORK: c_uint = 0x0000_0002;
 
 // intentionally not public, only used for fd_set
 cfg_if! {
@@ -1798,6 +1869,18 @@ extern "C" {
         timeout: c_int,
     ) -> c_int;
     pub fn epoll_ctl(epfd: c_int, op: c_int, fd: c_int, event: *mut crate::epoll_event) -> c_int;
+
+    // sys/event.h
+    pub fn kqueue() -> c_int;
+    pub fn kqueue1(flags: c_int) -> c_int;
+    pub fn kevent(
+        kq: c_int,
+        changelist: *const crate::kevent,
+        nchanges: c_int,
+        eventlist: *mut crate::kevent,
+        nevents: c_int,
+        timeout: *const crate::timespec,
+    ) -> c_int;
 
     // sys/ioctl.h
     pub fn ioctl(fd: c_int, request: c_ulong, ...) -> c_int;

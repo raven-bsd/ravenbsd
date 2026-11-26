@@ -848,6 +848,7 @@ impl raven_libc_personality_bsd::seams::SrcOps for RealSrc {
         &mut self,
         handle: raven_libc_personality_bsd::seams::Handle,
     ) -> Result<(), raven_libc_personality_bsd::seams::Errno> {
+        use raven_libc_platform::SysBackend;
         platform().backend().handle_close(handle).map_err(sys_error)
     }
 }

@@ -105,7 +105,6 @@ struct kevent {
 #define EV_DISPATCH 0x0080
 
 #define EV_SYSFLAGS 0xF000
-#define EV_DROP 0x1000
 #define EV_FLAG1 0x2000
 #define EV_FLAG2 0x4000
 
@@ -169,7 +168,6 @@ struct timespec;
 __BEGIN_DECLS
 #if __BSD_VISIBLE
 int kqueue(void);
-int kqueuex(unsigned int);
 int kqueue1(int);
 int kevent(int, const struct kevent *, int, struct kevent *, int,
     const struct timespec *);

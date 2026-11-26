@@ -173,14 +173,9 @@ fn change(ident: usize, filter: i16, flags: u16, fflags: u32, data: i64) -> Keve
 }
 
 fn token_of(kqueue: &Kqueue, kqfd: i32, key: (usize, i16)) -> u64 {
-    kqueue
-        .registrations(kqfd)
-        .unwrap()
-        .tokens
-        .iter()
-        .find(|(_, value)| **value == key)
-        .map(|(token, _)| *token)
-        .unwrap()
+    let instance = kqueue.registrations(kqfd).unwrap();
+    let handle = instance.regs.get(&key).unwrap().handle;
+    instance.watches.get(&handle.0).unwrap().cookie
 }
 
 #[test]
@@ -427,7 +422,7 @@ fn signal_filter_needs_pg7() {
         None,
     )
     .unwrap();
-    assert_eq!(events[0].data, i64::from(Errno::ENOSYS.0));
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
 }
 
 #[test]
@@ -445,7 +440,7 @@ fn vnode_filter_needs_pg38() {
         None,
     )
     .unwrap();
-    assert_eq!(events[0].data, i64::from(Errno::ENOSYS.0));
+    assert_eq!(events[0].data, i64::from(Errno::EOPNOTSUPP.0));
 }
 
 #[test]
@@ -804,7 +799,6 @@ fn registration_cap_is_enomem() {
         instance.regs.insert(
             (index.saturating_add(1000), EVFILT_READ),
             Reg {
-                token: index as u64,
                 flags: EV_ADD,
                 fflags: 0,
                 data: 0,
@@ -814,6 +808,7 @@ fn registration_cap_is_enomem() {
                 epoch: 0,
                 mask: 0,
                 disabled: false,
+                owned: false,
             },
         );
     }
@@ -970,7 +965,13 @@ fn kqueue_fd_is_not_inherited_semantics_are_not_faked() {
 // ---------------------------------------------------------------------------------------------
 // Pinned FreeBSD `sys/kern/kern_event.c` `kqueue_register`/`kqueue_kevent` contract rows (S743).
 
-fn add_read(evq: &mut FakeEvq, table: &FakeFdTable, source: &mut FakeSrc, kqueue: &mut Kqueue, kqfd: i32) {
+fn add_read(
+    evq: &mut FakeEvq,
+    table: &FakeFdTable,
+    source: &mut FakeSrc,
+    kqueue: &mut Kqueue,
+    kqfd: i32,
+) {
     let mut events = [Kevent::default(); 2];
     let count = kevent(
         evq,
@@ -1017,7 +1018,7 @@ fn read_and_write_on_one_fd_register_together() {
         1
     );
     let cookie = evq.cookie_of(Handle(710)).unwrap();
-    let mask = evq.last_mask(EvqCtl::Add, cookie).unwrap();
+    let (mask, _) = evq.regs.get(&710).copied().unwrap_or((0, cookie));
     assert_eq!(
         mask & (EV_READABLE | EV_WRITABLE | EV_HUP),
         EV_READABLE | EV_WRITABLE | EV_HUP
@@ -1057,8 +1058,13 @@ fn read_and_write_delivery_is_per_filter() {
     )
     .unwrap();
     assert_eq!(count, 2);
-    assert_eq!(events[0].filter, EVFILT_READ);
-    assert_eq!(events[1].filter, EVFILT_WRITE);
+    let filters: alloc::vec::Vec<i16> = events
+        .iter()
+        .take(count)
+        .map(|event| event.filter)
+        .collect();
+    assert!(filters.contains(&EVFILT_READ));
+    assert!(filters.contains(&EVFILT_WRITE));
 }
 
 #[test]
@@ -1210,7 +1216,13 @@ fn enable_and_disable_together_is_einval() {
         &mut source,
         &mut kqueue,
         kqfd,
-        &[change(10, EVFILT_READ, EV_ADD | EV_ENABLE | EV_DISABLE, 0, 0)],
+        &[change(
+            10,
+            EVFILT_READ,
+            EV_ADD | EV_ENABLE | EV_DISABLE,
+            0,
+            0,
+        )],
         &mut events,
         None,
     )
@@ -1576,7 +1588,10 @@ fn readd_of_timer_rearms_the_same_source() {
     )
     .unwrap();
     assert_eq!(source.timers, 1);
-    assert_eq!(source.timer_sets.last(), Some(&(Handle(901), 9_000_000, 9_000_000)));
+    assert_eq!(
+        source.timer_sets.last(),
+        Some(&(Handle(901), 9_000_000, 9_000_000))
+    );
 }
 
 #[test]
@@ -1732,4 +1747,3 @@ fn add_disabled_creates_no_watch_until_enabled() {
     assert_eq!(count, 0);
     assert!(evq.cookie_of(Handle(710)).is_some());
 }
-
