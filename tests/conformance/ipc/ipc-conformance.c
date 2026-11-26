@@ -595,8 +595,14 @@ static void test_collector_bounded(void) {
 static void test_collector_concurrent(void) {
     enum { CHURN = 64 };
     char detail[256];
+    int sync[2];
+    if (pipe(sync) != 0) {
+        fail_row("collector-concurrent", "pipe failed", errno);
+        return;
+    }
     pid_t child = fork();
     if (child == 0) {
+        close(sync[0]);
         for (int index = 0; index < CHURN; index++) {
             uint32_t pair[2];
             uint32_t handle = 0;
@@ -616,13 +622,26 @@ static void test_collector_concurrent(void) {
             raw_close(handle);
             raw_close(pair[0]);
             raw_close(pair[1]);
+            if (index == 0) {
+                char ready = 'R';
+                if (write(sync[1], &ready, 1) != 1) {
+                    _exit(5);
+                }
+            }
         }
+        close(sync[1]);
         _exit(0);
     }
     if (child < 0) {
         fail_row("collector-concurrent", "fork failed", errno);
+        close(sync[0]);
+        close(sync[1]);
         return;
     }
+    close(sync[1]);
+    char ready = 0;
+    int started = read(sync[0], &ready, 1) == 1 && ready == 'R';
+    close(sync[0]);
     int calls = 0;
     int denied = 0;
     int call_errno = 0;
@@ -670,12 +689,12 @@ static void test_collector_concurrent(void) {
     int received_bytes = raw_recv_handle(pair[1], &received, &handle, &got_handle);
     int retained = received_bytes == 1 && received == 'S' && got_handle;
     int child_ok = reaped && WIFEXITED(status) && WEXITSTATUS(status) == 0;
-    int ok = child_ok && retained;
+    int ok = child_ok && retained && started && (denied || calls > 0);
     snprintf(detail, sizeof detail,
-             "child=%d collect_calls=%d denied=%d errno=%d collect_denied=%d collect_errno=%d "
-             "recv=%d retained=%d",
-             status, calls, denied, call_errno, collect_denied, collect_errno, received_bytes,
-             retained);
+             "child=%d started=%d collect_calls=%d denied=%d errno=%d collect_denied=%d "
+             "collect_errno=%d recv=%d retained=%d",
+             status, started, calls, denied, call_errno, collect_denied, collect_errno,
+             received_bytes, retained);
     row("collector-concurrent", ok, detail);
     if (got_handle) {
         raw_close(handle);
