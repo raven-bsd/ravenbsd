@@ -1084,23 +1084,23 @@ pub const SOL_SOCKET: c_int = 1;
 pub const SOMAXCONN: c_int = 4096;
 
 // sys/termios.h
-pub const VEOF: usize = 4;
-pub const VEOL: usize = 11;
-pub const VEOL2: usize = 16;
-pub const VERASE: usize = 2;
-pub const VWERASE: usize = 14;
-pub const VKILL: usize = 3;
-pub const VREPRINT: usize = 12;
+pub const VEOF: usize = 0;
+pub const VEOL: usize = 1;
+pub const VEOL2: usize = 2;
+pub const VERASE: usize = 3;
+pub const VWERASE: usize = 4;
+pub const VKILL: usize = 5;
+pub const VREPRINT: usize = 6;
 pub const VSWTC: usize = 7;
-pub const VINTR: usize = 0;
-pub const VQUIT: usize = 1;
+pub const VINTR: usize = 8;
+pub const VQUIT: usize = 9;
 pub const VSUSP: usize = 10;
-pub const VSTART: usize = 8;
-pub const VSTOP: usize = 9;
-pub const VLNEXT: usize = 15;
-pub const VDISCARD: usize = 13;
-pub const VMIN: usize = 6;
-pub const VTIME: usize = 5;
+pub const VSTART: usize = 12;
+pub const VSTOP: usize = 13;
+pub const VLNEXT: usize = 14;
+pub const VDISCARD: usize = 15;
+pub const VMIN: usize = 16;
+pub const VTIME: usize = 17;
 pub const NCCS: usize = 32;
 
 pub const IGNBRK: crate::tcflag_t = 0o000_001;
@@ -1720,7 +1720,9 @@ extern "C" {
     pub fn daemon(nochdir: c_int, noclose: c_int) -> c_int;
 
     // grp.h
-    pub fn setgroups(size: size_t, ptr: *const crate::gid_t) -> c_int;
+    pub fn setgroups(ngroups: c_int, ptr: *const crate::gid_t) -> c_int;
+    pub fn eaccess(path: *const c_char, mode: c_int) -> c_int;
+    pub fn chflags(path: *const c_char, flags: c_ulong) -> c_int;
     pub fn initgroups(user: *const c_char, group: crate::gid_t) -> c_int;
 
     // sys/stat.h
