@@ -2278,9 +2278,12 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 };
                 (ofd.kind, ofd.handle.get())
             };
-            if !matches!(kind, OfdKind::Socket | OfdKind::Tty | OfdKind::Pipe)
-                || handle == Handle::NONE
-            {
+            // A pty master/slave keeps the kernel's single server reference across fork. Dupping
+            // it gave the child a second server reference that only its process exit released,
+            // so the server saw the master CLOSE after the foreground process was gone. The
+            // kernel `SchemeFile` Arc already tracks both handles and sends the CLOSE at the
+            // last one; FreeBSD `tty_pty.c` `ptyclose` hangs up on that last master close.
+            if !matches!(kind, OfdKind::Socket | OfdKind::Pipe) || handle == Handle::NONE {
                 continue;
             }
             if let Ok(duplicate) = self
