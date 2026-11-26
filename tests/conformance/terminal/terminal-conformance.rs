@@ -991,12 +991,19 @@ fn row_target_vintr() {
     };
     let raw = target_raw_mode(pair.slave);
     let target = signal_exchange(&pair, target_intr);
+    pair.close();
     let old = if TARGET_VINTR == VINTR {
         None
     } else {
-        signal_exchange(&pair, old_default_intr)
+        match Pair::open() {
+            Some(old_pair) => {
+                let signal = signal_exchange(&old_pair, old_default_intr);
+                old_pair.close();
+                signal
+            }
+            None => None,
+        }
     };
-    pair.close();
     let Some(target_signal) = target else {
         fail("target-vintr", format_args!("target write errno={}", errno()));
         return;
