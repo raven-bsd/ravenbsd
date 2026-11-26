@@ -170,8 +170,13 @@ stage_sysroot() {
 configure() {
     find_lld
     # Git checkout mtimes are not ordered; the generated configure must not look older than
-    # configure.ac/aclocal.m4 or OpenSSH refuses with `run autoreconf`. Touch the generated
-    # file, do not regenerate or modify the vendored source.
+    # configure.ac/m4/*.m4 or OpenSSH refuses with `run autoreconf`. Touch the generated file for
+    # the configure run, do not regenerate or modify the vendored source. Restore its mtime
+    # afterwards so building one arch does not leave the other arch's staged binaries older than
+    # a shared add-on input.
+    stamp=$root/build/ssh/$arch/configure.stamp
+    mkdir -p "$(dirname "$stamp")"
+    touch -r "$source/configure" "$stamp" || die "cannot stamp $source/configure"
     touch "$source/configure"
     rm -rf "$build" "$t1_stage"
     mkdir -p "$build" "$t1_stage"
@@ -191,6 +196,8 @@ configure() {
             --with-ssl-dir="$t1_stage" --without-openssl-header-check \
             --without-zlib --without-pam --without-selinux --without-audit --without-kerberos5 --without-libedit
     )
+    touch -r "$stamp" "$source/configure" || die "cannot restore $source/configure mtime"
+    rm -f "$stamp"
 }
 
 build() {
