@@ -1969,6 +1969,7 @@ extern "C" {
     pub fn fdatasync(fd: c_int) -> c_int;
     pub fn posix_fadvise(fd: c_int, offset: off_t, len: off_t, advice: c_int) -> c_int;
     pub fn posix_fallocate(fd: c_int, offset: off_t, len: off_t) -> c_int;
+    #[allow(dead_code)] // std does not call flock yet; the public ABI keeps it declared.
     pub fn flock(fd: c_int, operation: c_int) -> c_int;
     pub fn sync();
     pub fn sethostname(name: *const c_char, len: size_t) -> c_int;

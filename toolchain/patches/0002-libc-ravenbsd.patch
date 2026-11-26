@@ -120397,9 +120397,9 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..a052c3f1aa9084d889ccbd0dc7ed433f25d1ebe3
+index 0000000..eb0e879f0e4d6e84ecb73ffb427cc96cf052711e
 --- /dev/null
-@@ -0,0 +1,2482 @@
+@@ -0,0 +1,2483 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -122360,6 +122360,7 @@ index 0000000..a052c3f1aa9084d889ccbd0dc7ed433f25d1ebe3
 +    pub fn fdatasync(fd: c_int) -> c_int;
 +    pub fn posix_fadvise(fd: c_int, offset: off_t, len: off_t, advice: c_int) -> c_int;
 +    pub fn posix_fallocate(fd: c_int, offset: off_t, len: off_t) -> c_int;
++    #[allow(dead_code)] // std does not call flock yet; the public ABI keeps it declared.
 +    pub fn flock(fd: c_int, operation: c_int) -> c_int;
 +    pub fn sync();
 +    pub fn sethostname(name: *const c_char, len: size_t) -> c_int;
