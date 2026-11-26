@@ -711,7 +711,8 @@ def main(argv: list[str] | None = None) -> int:
         image = args.image or repo / "build" / "aarch64" / IMAGE_NAME
         if args.mutation:
             return mutate_missing_boot_file(image, evidence_dir)
-        build_image(repo, image, evidence_dir)
+        if args.image is None:
+            build_image(repo, image, evidence_dir)
         manifest = verify_image(image, evidence_dir)
     except VerifyError as error:
         print(f"pi4-image: FAIL {error}", file=sys.stderr)
