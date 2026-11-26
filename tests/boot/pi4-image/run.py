@@ -529,7 +529,10 @@ def probe_read_write(image: Path, ufs_part: Partition, work: Path) -> None:
 
 
 def verify_image(image: Path, evidence_dir: Path) -> dict:
-    source = GptSource.from_path(image)
+    try:
+        source = GptSource.from_path(image)
+    except OSError as error:
+        raise VerifyError(f"cannot read image: {image}: {error.strerror}") from error
     try:
         parts = parse_gpt(source)
         check_ufs2_superblock(source.read(parts[1].offset + SBLOCK_PROBE, 8192))

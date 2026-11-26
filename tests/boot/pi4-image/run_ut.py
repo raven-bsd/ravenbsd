@@ -302,6 +302,14 @@ class RootTests(unittest.TestCase):
                 run.find_management_root(Path(temporary), "")
 
 
+class ImageTests(unittest.TestCase):
+    def test_missing_image_is_reported_not_raised(self):
+        run = load_runner()
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(run.VerifyError, "cannot read image"):
+                run.verify_image(Path(temporary) / "absent.img", Path(temporary))
+
+
 class SuperblockTests(unittest.TestCase):
     def setUp(self):
         self.run = load_runner()
