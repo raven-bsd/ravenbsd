@@ -156,6 +156,50 @@ pub mod bringup {
     }
 }
 
+/// Accept IRQ delivery inside a polling wait.
+///
+/// The aarch64 TLB shootdown acknowledgement is a maskable IRQ SGI, while x86-64 delivers its
+/// invalidation as an NMI that the target cannot mask. A CPU that waits for another CPU's thread
+/// to leave (process quiesce) therefore must accept IRQ delivery even though the caller's
+/// critical section keeps the preemption count raised; otherwise the target CPU's shootdown can
+/// never be acknowledged and both CPUs spin forever (S755 cross-CPU teardown stall).
+pub mod irq_window {
+    /// Saved DAIF, restored when the window closes.
+    pub struct Guard {
+        flags: u64,
+    }
+
+    impl Guard {
+        /// Unmask IRQ delivery on this CPU.
+        pub fn new() -> Self {
+            let flags: u64;
+            // SAFETY: DAIF is an EL1 system register; the paired restore writes the saved value.
+            unsafe {
+                core::arch::asm!(
+                    "mrs {flags}, daif",
+                    "msr daifclr, #2",
+                    flags = out(reg) flags,
+                    options(nomem, nostack, preserves_flags),
+                );
+            }
+            Self { flags }
+        }
+    }
+
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            // SAFETY: the value was captured by `new` on this CPU.
+            unsafe {
+                core::arch::asm!(
+                    "msr daif, {flags}",
+                    flags = in(reg) self.flags,
+                    options(nomem, nostack, preserves_flags)
+                );
+            }
+        }
+    }
+}
+
 /// Cross-CPU TLB shootdown.
 ///
 /// A CPU that changes a user mapping publishes the page-aligned range, sends [`super::SGI_TLB`]
@@ -362,9 +406,29 @@ pub mod shootdown {
                 while acked.load(Ordering::SeqCst) != sequence {
                     if time::now_ns() > deadline && !warned {
                         // The target is late, not lost. Keep the request published and wait for
-                        // the acknowledgement; the SGI remains pending in the GIC.
+                        // the acknowledgement; the SGI remains pending in the GIC. The one-shot
+                        // line names the target's state so a masked-interrupt stall points at
+                        // its exact path instead of reporting only the CPU index.
                         warned = true;
-                        kprintln!("aarch64-smp: tlb shootdown ack delay on cpu {cpu}");
+                        let raw = crate::arch::percpu::block(cpu)
+                            .current_thread
+                            .load(Ordering::Acquire);
+                        if raw == 0 {
+                            kprintln!("aarch64-smp: tlb shootdown ack delay on cpu {cpu} idle");
+                        } else {
+                            // SAFETY: the per-CPU block publishes the running thread, which the
+                            // scheduler keeps alive until it is switched out; the fields read
+                            // here are atomics.
+                            let thread = unsafe { &*(raw as *const crate::sched::thread::Thread) };
+                            kprintln!(
+                                "aarch64-smp: tlb shootdown ack delay on cpu {cpu} tid={} state={:?} user={} syscall={} pc={:#x}",
+                                thread.tid,
+                                thread.state(),
+                                thread.user,
+                                thread.process.last_syscall.load(Ordering::Relaxed),
+                                thread.process.last_pc.load(Ordering::Relaxed)
+                            );
+                        }
                     }
                     core::hint::spin_loop();
                 }

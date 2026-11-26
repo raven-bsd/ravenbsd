@@ -123,6 +123,7 @@ unsafe impl Sync for GlobalCell {}
 static GLOBAL: GlobalCell = GlobalCell(UnsafeCell::new(None));
 static CPUS: [SpinMutex<Option<CpuSched>>; MAX_CPUS] = [const { SpinMutex::new(None) }; MAX_CPUS];
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
+
 /// User threads are scheduled on application processors by default. `smp_user=off` is the
 /// emergency disable (bringing a machine up while a default-on failure is being fixed);
 /// `smp_user=on` remains accepted as an explicit default.
@@ -190,7 +191,14 @@ pub fn quiesce_process(process: &Arc<Process>) {
     if crate::process::s194_trace() {
         kprintln!("s194: quiesce enter pid={} cpu={}", process.id, this_cpu());
     }
+    // The wait polls other CPUs and can only end after a sibling's address-space release, whose
+    // TLB shootdown acknowledgement is an IRQ on aarch64. Keep IRQ delivery open for the wait so
+    // this CPU can acknowledge it; the preemption count stays raised, so no thread is switched in.
+    #[cfg(target_arch = "aarch64")]
+    let _irq_window = smp::irq_window::Guard::new();
     let mut waited = false;
+    #[cfg(target_arch = "aarch64")]
+    let mut dump_at = 0u64;
     loop {
         let mut running = false;
         for cpu in 0..online {
@@ -220,7 +228,46 @@ pub fn quiesce_process(process: &Arc<Process>) {
             return;
         }
         waited = true;
+        #[cfg(target_arch = "aarch64")]
+        if crate::process::s194_trace() {
+            let now = time::now_ns();
+            if dump_at == 0 {
+                dump_at = now.saturating_add(1_000_000_000);
+            } else if now >= dump_at {
+                dump_at = now.saturating_add(1_000_000_000);
+                dump_quiesce_cpus(process, online);
+            }
+        }
         core::hint::spin_loop();
+    }
+}
+
+/// One `s194-trace` line per waiting second: the thread each CPU runs.
+///
+/// The quiesce loop can only end when a sibling leaves its CPU, so a stall names every CPU's
+/// current process/thread, state and last syscall instead of only the waited-for process.
+#[cfg(target_arch = "aarch64")]
+fn dump_quiesce_cpus(process: &Arc<Process>, online: usize) {
+    for cpu in 0..online {
+        let raw = crate::arch::percpu::block(cpu)
+            .current_thread
+            .load(Ordering::Acquire);
+        if raw == 0 {
+            kprintln!("s194: wait pid={} cpu={cpu} idle", process.id);
+            continue;
+        }
+        // SAFETY: the per-CPU block publishes the running thread, which the scheduler keeps
+        // alive until it is switched out; the fields read here are atomics.
+        let thread = unsafe { &*(raw as *const Thread) };
+        kprintln!(
+            "s194: wait pid={} cpu={cpu} target={} tid={} state={:?} user={} syscall={}",
+            process.id,
+            thread.process.id,
+            thread.tid,
+            thread.state(),
+            thread.user,
+            thread.process.last_syscall.load(Ordering::Relaxed)
+        );
     }
 }
 

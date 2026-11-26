@@ -478,6 +478,48 @@ pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::T
     crate::sched::syscall_return();
 }
 
+/// Enable kernel-mode IRQ delivery for the syscalls whose kernel path can wait on another CPU.
+///
+/// aarch64 masks DAIF on exception entry, so unlike x86-64 (whose syscall entry opens IF for the
+/// same set in `sched_syscall_enter`) a target CPU that is inside one of these syscalls cannot
+/// take the cross-CPU TLB invalidation IRQ, and the shooter spins forever. `PROC_TERMINATE` is
+/// included because its teardown quiesce waits for a sibling that may itself be releasing the
+/// address space's TLB. A kernel-mode IRQ does not switch threads: `irq_return(false)` keeps
+/// kernel threads cooperative, and the vector masks DAIF again before `eret`.
+#[cfg(target_arch = "aarch64")]
+fn enable_kernel_interrupts(number: usize) {
+    let interruptible = matches!(
+        raven_abi::syscall::Syscall::from_usize(number),
+        Some(
+            raven_abi::syscall::Syscall::MAP
+                | raven_abi::syscall::Syscall::UNMAP
+                | raven_abi::syscall::Syscall::PROTECT
+                | raven_abi::syscall::Syscall::THREAD_CREATE
+                | raven_abi::syscall::Syscall::THREAD_EXIT
+                | raven_abi::syscall::Syscall::EXIT
+                | raven_abi::syscall::Syscall::PROC_TERMINATE
+                | raven_abi::syscall::Syscall::FUTEX
+                | raven_abi::syscall::Syscall::SCHEME_REGISTER
+                | raven_abi::syscall::Syscall::OPEN
+                | raven_abi::syscall::Syscall::READ
+                | raven_abi::syscall::Syscall::WRITE
+                | raven_abi::syscall::Syscall::CLOSE
+                | raven_abi::syscall::Syscall::DUP
+                | raven_abi::syscall::Syscall::FSTAT
+                | raven_abi::syscall::Syscall::CALL
+                | raven_abi::syscall::Syscall::RECV
+                | raven_abi::syscall::Syscall::SEND
+        )
+    ) || matches!(number, ipc::PREAD | ipc::PWRITE | ipc::SEEK);
+    if interruptible {
+        // SAFETY: the vectors and GIC are installed before a user thread can reach `svc`; the
+        // return path masks DAIF before `eret`.
+        unsafe {
+            crate::sync::enable_interrupts();
+        }
+    }
+}
+
 /// Dispatch an aarch64 `svc #0` (ESR `EC=0x15`) and publish the result in `x0`.
 ///
 /// For an SVC, `ELR_EL1` already holds the address of the instruction after the `svc`, so the
@@ -505,6 +547,13 @@ pub fn svc_dispatch(frame: &mut crate::arch::aarch64::vectors::TrapFrame) {
             }
         }
     } else {
+        enable_kernel_interrupts(usize::try_from(registers.rax).unwrap_or(usize::MAX));
+        // Parity with the x86-64 syscall entry: record the number and the user return PC so a
+        // cross-CPU stall can name the exact syscall the target was executing.
+        if let Some(caller) = process::current() {
+            caller.last_syscall.store(registers.rax, Ordering::Relaxed);
+            caller.last_pc.store(frame.elr, Ordering::Relaxed);
+        }
         let value = result_value(dispatch(&registers));
         if let Some(slot) = frame.x.get_mut(0) {
             *slot = value;
