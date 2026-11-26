@@ -567,7 +567,9 @@ extern "C" fn robust_owner(_arg: *mut c_void) -> *mut c_void {
     core::mem::swap(&mut state.node, &mut node_value);
     // SAFETY: `head` is a live 24-byte user `robust_list_head`.
     let registered = unsafe { syscall2(SYS_ROBUST_LIST_SET, head as usize, 24) };
-    ROBUST_OWNER_ARMED.store(registered as u32, Ordering::SeqCst);
+    // 1 = registered; 2 = the kernel rejected the list.  Main waits for 1, never for a raw
+    // return value (0 is success).
+    ROBUST_OWNER_ARMED.store(if registered == 0 { 1 } else { 2 }, Ordering::SeqCst);
     if registered != 0 {
         // SAFETY: THREAD_EXIT never returns.
         unsafe {
