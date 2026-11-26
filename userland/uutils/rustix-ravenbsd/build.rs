@@ -132,7 +132,9 @@ fn main() {
 
     // Rust's libc crate groups some OS's together which have similar APIs;
     // create similarly-named features to make `cfg` tests more concise.
-    let freebsdlike = os == "freebsd" || os == "dragonfly";
+    // RavenBSD's target libc is the FreeBSD ABI (DR-71), so it belongs to the
+    // freebsdlike/bsd groups, not to linux_like.
+    let freebsdlike = os == "freebsd" || os == "dragonfly" || os == "ravenbsd";
     if freebsdlike {
         use_feature("freebsdlike");
     }
@@ -148,7 +150,6 @@ fn main() {
         || os == "l4re"
         || os == "android"
         || os == "emscripten"
-        || os == "ravenbsd"
     {
         use_feature("linux_like");
     }

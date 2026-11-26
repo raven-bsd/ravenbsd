@@ -20,6 +20,7 @@ pub use self::consts::*;
 
 cfg_if! {
     if #[cfg(any(target_os = "freebsd",
+                 target_os = "ravenbsd",
                  apple_targets,))] {
         unsafe fn errno_location() -> *mut c_int {
             unsafe { libc::__error() }
@@ -29,7 +30,6 @@ cfg_if! {
             unsafe { libc::__errno() }
         }
     } else if #[cfg(any(target_os = "linux",
-                        target_os = "ravenbsd",
                         target_os = "redox",
                         target_os = "dragonfly",
                         target_os = "fuchsia",
@@ -1091,12 +1091,7 @@ fn desc(errno: Errno) -> &'static str {
     }
 }
 
-#[cfg(any(
-    linux_android,
-    target_os = "fuchsia",
-    target_os = "emscripten",
-    target_os = "ravenbsd"
-))]
+#[cfg(any(linux_android, target_os = "fuchsia", target_os = "emscripten"))]
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
@@ -1630,7 +1625,7 @@ mod consts {
     }
 }
 
-#[cfg(target_os = "freebsd")]
+#[cfg(any(target_os = "freebsd", target_os = "ravenbsd"))]
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
