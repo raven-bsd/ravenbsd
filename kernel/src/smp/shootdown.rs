@@ -233,6 +233,11 @@ pub fn flush_range(addr: u64, len: u64) -> bool {
                     }
                 }
                 if time::now_ns() > deadline {
+                    // The target may have acknowledged between the loop condition and this
+                    // clock read; re-read before reporting a delay or a timeout.
+                    if acked(cpu, sequence) {
+                        break;
+                    }
                     if inject {
                         // Fault injection only: reproduce the historical lost-ack failure.
                         // The mailbox is cleared so a late IPI is ignored; production never
