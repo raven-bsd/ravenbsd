@@ -75,6 +75,15 @@ fn component_prefixes_walk_from_the_top() {
 }
 
 #[test]
+fn relative_to_root_strips_the_open_prefix() {
+    assert_eq!(relative_to_root("/", "/a/b"), Ok("/a/b"));
+    assert_eq!(relative_to_root("/chroot", "/chroot"), Ok(""));
+    assert_eq!(relative_to_root("/chroot", "/chroot/etc"), Ok("/etc"));
+    assert_eq!(relative_to_root("/chroot", "/chrootx"), Err(Errno::ENOENT));
+    assert_eq!(relative_to_root("/chroot", "/etc"), Err(Errno::ENOENT));
+}
+
+#[test]
 fn component_prefixes_keep_non_utf8_bytes() {
     assert_eq!(
         component_prefixes(b"\xff/b"),

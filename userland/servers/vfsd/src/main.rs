@@ -55,7 +55,7 @@ mod program {
     };
     use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
 
-    use crate::route::{component_prefixes, mount_suffix, parent_bytes};
+    use crate::route::{component_prefixes, mount_suffix, parent_bytes, relative_to_root};
 
     entry!(main);
 
@@ -1043,6 +1043,7 @@ mod program {
             {
                 root = path.get(..root_len).ok_or(Errno::EINVAL)?.to_string();
             }
+            let open_path = relative_to_root(&root, &path)?;
             let resolved = {
                 let mut resolver = RootResolver {
                     table: &self.table,
@@ -1052,7 +1053,7 @@ mod program {
                     &mut resolver,
                     root.as_bytes(),
                     root.as_bytes(),
-                    path.as_bytes(),
+                    open_path.as_bytes(),
                     !target_flags.nofollow(),
                     MAX_PATH,
                 )?

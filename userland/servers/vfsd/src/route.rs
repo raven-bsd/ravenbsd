@@ -63,6 +63,24 @@ pub(crate) fn component_prefixes(suffix: &[u8]) -> Vec<&[u8]> {
     prefixes
 }
 
+/// The path below `root` for an OPEN path that already carries the root prefix.
+///
+/// The kernel passes the per-process root as a prefix of the open path and its byte length in
+/// `Ctx::root_len`. The walker resolves absolute payloads from the root, so the prefix is removed
+/// first; a path outside the root cannot be opened.
+pub(crate) fn relative_to_root<'a>(root: &str, path: &'a str) -> Result<&'a str, Errno> {
+    if root == "/" {
+        return Ok(path);
+    }
+    if path == root {
+        return Ok("");
+    }
+    match path.strip_prefix(root) {
+        Some(rest) if rest.starts_with('/') => Ok(rest),
+        _ => Err(Errno::ENOENT),
+    }
+}
+
 #[cfg(test)]
 #[path = "route_ut.rs"]
 mod tests;

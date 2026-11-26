@@ -111,6 +111,21 @@ fn dotdot_after_a_symlink_pops_the_link_target() {
 }
 
 #[test]
+fn a_chrooted_open_path_keeps_the_process_root() {
+    let mut fs = Fake::new();
+    fs.dir(b"/")
+        .dir(b"/chroot")
+        .dir(b"/chroot/etc")
+        .file(b"/chroot/x");
+    fs.link(b"/chroot/etc/l", b"/x");
+    let rest = crate::route::relative_to_root("/chroot", "/chroot/etc/l").expect("prefix");
+    assert_eq!(
+        fs.walk(b"/chroot", b"/chroot", rest.as_bytes()).unwrap(),
+        b"/chroot/x"
+    );
+}
+
+#[test]
 fn relative_path_starts_at_the_base() {
     let mut fs = Fake::new();
     fs.dir(b"/").dir(b"/a").dir(b"/a/b").file(b"/a/b/f");
