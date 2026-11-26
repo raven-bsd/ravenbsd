@@ -26,10 +26,12 @@ Usage:
   python3 tests/conformance/credentials/run.py --image ... --limits
   python3 tests/conformance/credentials/run.py --selftest
 
-`--service` reads the umask rows from a staged one-shot svcd service image
-(`build-service.sh`) instead of the SSH path; it is the S189 path while the brush
-external-command route is unavailable. `--limits` reads the S190 libc rlimit/rusage
-rows from the `build-limits.sh` service image.
+`--service` reads the whole gate table from a staged one-shot svcd service image
+(`build-service.sh`): the probe drops to `raven` with the account's groups and prints
+the `/etc/passwd` and `/etc/group` values it checks the ids and groups rows against.
+It is the release-image path while the brush external-command route is unavailable;
+`build-service.sh --mutation` stages the negative-check marker for `--mutation`.
+`--limits` reads the S190 libc rlimit/rusage rows from the `build-limits.sh` image.
 
 Exit: 0 all rows green, 1 a row/style check failed, 2 setup error.
 """
@@ -140,6 +142,151 @@ def _octal(row: dict[str, str] | None, key: str, failures: list[str], name: str)
         return None
 
 
+def _check_ids(
+    rows: dict[str, dict[str, str]], uid: int, gid: int, failures: list[str]
+) -> None:
+    """The real and effective ids must equal the `raven` account entry."""
+    ids = rows.get("ids")
+    for key, want in (("uid", uid), ("euid", uid), ("gid", gid), ("egid", gid)):
+        got = _int(ids, key, failures, "ids")
+        if got is not None and got != want:
+            failures.append(f"ids: {key}={got}, `/etc/passwd` wants {want}")
+
+
+def _check_groups(
+    rows: dict[str, dict[str, str]], expected: list[int], failures: list[str]
+) -> None:
+    """`getgroups` must return exactly the account's group memberships."""
+    group_row = rows.get("groups")
+    count = _int(group_row, "count", failures, "groups")
+    got_count = _int(group_row, "got", failures, "groups")
+    listed: list[int] = []
+    if group_row is not None and "list" in group_row:
+        try:
+            listed = sorted(int(value) for value in group_row["list"].split(",") if value)
+        except ValueError:
+            failures.append(f"groups: list={group_row['list']!r} is not a gid list")
+    if count is not None and count != len(expected):
+        failures.append(f"groups: count={count}, `/etc/group` wants {len(expected)}")
+    if got_count is not None and got_count != len(expected):
+        failures.append(f"groups: got={got_count}, `/etc/group` wants {len(expected)}")
+    if listed != expected:
+        failures.append(f"groups: list={listed}, `/etc/group` wants {expected}")
+
+
+def _check_setid(rows: dict[str, dict[str, str]], failures: list[str]) -> None:
+    """An unprivileged `setuid`/`setgid` of a non-permitted id must be `EPERM`."""
+    for name in ("setuid-nonpermitted", "setgid-nonpermitted"):
+        row = rows.get(name)
+        if _int(row, "ret", failures, name) != -1:
+            failures.append(f"{name}: must fail")
+        if _int(row, "errno", failures, name) != 1:
+            failures.append(f"{name}: expected EPERM (1)")
+
+
+def _check_umask_create(rows: dict[str, dict[str, str]], failures: list[str]) -> None:
+    """`umask(027)` makes a 0666 create 0640 and `umask(077)` makes it 0600."""
+    old = _octal(rows.get("umask-old"), "mask", failures, "umask-old")
+    if old is not None and old != 0o022:
+        failures.append(f"umask-old: {old:04o}, expected 0022")
+    mode = _octal(rows.get("umask-file"), "mode", failures, "umask-file")
+    if mode is not None and mode != 0o640:
+        failures.append(f"umask-file: {mode:04o}, expected 0640")
+    returned = _octal(rows.get("umask-return"), "mask", failures, "umask-return")
+    if returned is not None and returned != 0o027:
+        failures.append(f"umask-return: {returned:04o}, expected 0027")
+    mode = _octal(rows.get("umask-file-077"), "mode", failures, "umask-file-077")
+    if mode is not None and mode != 0o600:
+        failures.append(f"umask-file-077: {mode:04o}, expected 0600")
+
+
+def _check_kernel_rlimit(rows: dict[str, dict[str, str]], failures: list[str]) -> None:
+    """Kernel `PROC_*RLIMIT`: round-trip, soft raise, hard raise `EPERM`, unchanged state."""
+    kernel_limit = rows.get("kernel-rlimit-nofile")
+    cur = _int(kernel_limit, "cur", failures, "kernel-rlimit-nofile")
+    hard = _int(kernel_limit, "max", failures, "kernel-rlimit-nofile")
+    if cur is not None and hard is not None and cur > hard:
+        failures.append(f"kernel-rlimit-nofile: cur={cur} > max={hard}")
+    for name in ("kernel-rlimit-roundtrip", "kernel-rlimit-soft-raise", "kernel-rlimit-restore"):
+        if _int(rows.get(name), "errno", failures, name) != 0:
+            failures.append(f"{name}: expected 0")
+    if _int(rows.get("kernel-rlimit-hard-raise"), "errno", failures,
+            "kernel-rlimit-hard-raise") != 1:
+        failures.append("kernel-rlimit-hard-raise: expected EPERM (1)")
+    raised_state = rows.get("kernel-rlimit-hard-raise-state")
+    if _int(raised_state, "errno", failures, "kernel-rlimit-hard-raise-state") != 0:
+        failures.append("kernel-rlimit-hard-raise-state: getrlimit failed")
+    raised_cur = _int(raised_state, "cur", failures, "kernel-rlimit-hard-raise-state")
+    raised_max = _int(raised_state, "max", failures, "kernel-rlimit-hard-raise-state")
+    if cur is not None and raised_cur is not None and raised_cur != cur:
+        failures.append(
+            f"kernel-rlimit-hard-raise: soft changed {cur} -> {raised_cur} after EPERM"
+        )
+    if hard is not None and raised_max is not None and raised_max != hard:
+        failures.append(
+            f"kernel-rlimit-hard-raise: hard changed {hard} -> {raised_max} after EPERM"
+        )
+
+
+def _check_libc_rlimit(rows: dict[str, dict[str, str]], failures: list[str]) -> None:
+    """The libc C-API rlimit calls must round-trip and refuse an unprivileged hard raise."""
+    if _int(rows.get("libc-getrlimit"), "ret", failures, "libc-getrlimit") != 0:
+        failures.append("libc-getrlimit: expected 0")
+    if _int(rows.get("libc-setrlimit"), "ret", failures, "libc-setrlimit") != 0:
+        failures.append("libc-setrlimit: expected 0")
+    if _int(rows.get("libc-hard-raise"), "ret", failures, "libc-hard-raise") != -1:
+        failures.append("libc-hard-raise: must fail")
+    if _int(rows.get("libc-hard-raise"), "errno", failures, "libc-hard-raise") != 1:
+        failures.append("libc-hard-raise: expected EPERM (1)")
+
+
+def _check_nofile(rows: dict[str, dict[str, str]], failures: list[str]) -> None:
+    """`RLIMIT_NOFILE` is enforced on open: every open below the soft limit must succeed."""
+    nofile = rows.get("nofile")
+    soft = _int(nofile, "soft", failures, "nofile")
+    base = _int(nofile, "base", failures, "nofile")
+    opened = _int(nofile, "open-ok", failures, "nofile")
+    if soft is not None and base is not None and opened is not None:
+        if opened != soft - base:
+            failures.append(f"nofile: open-ok={opened}, expected soft-base={soft - base}")
+    if _int(nofile, "errno", failures, "nofile") != 0:
+        failures.append("nofile: a valid open failed below the kernel soft limit")
+
+
+def _check_rusage(
+    rows: dict[str, dict[str, str]], prefix: str, failures: list[str]
+) -> None:
+    """Three samples must only grow, with `maxrss` at least the mapped size."""
+    samples: list[tuple[int, int, int]] = []
+    for index in range(3):
+        name = f"{prefix}{index}"
+        row = rows.get(name)
+        if row is None:
+            failures.append(f"{name}: missing")
+            continue
+        if _int(row, "errno", failures, name) != 0:
+            failures.append(f"{name}: syscall failed")
+        if prefix == "libc-rusage" and _int(row, "ret", failures, name) != 0:
+            failures.append(f"{name}: getrusage failed")
+        user = _int(row, "user", failures, name)
+        system = _int(row, "sys", failures, name)
+        maxrss = _int(row, "maxrss", failures, name)
+        if user is not None and system is not None and maxrss is not None:
+            samples.append((user, system, maxrss))
+    for index in range(1, len(samples)):
+        before = samples[index - 1][0] + samples[index - 1][1]
+        after = samples[index][0] + samples[index][1]
+        if after < before:
+            failures.append(f"{prefix}{index}: user+sys went backwards ({before} -> {after})")
+    if samples and samples[-1][2] < MAP_BYTES:
+        failures.append(f"{prefix}: maxrss={samples[-1][2]} < mapped {MAP_BYTES}")
+
+
+def _check_fail_row(rows: dict[str, dict[str, str]], failures: list[str]) -> None:
+    if "FAIL" in rows:
+        failures.append(f"probe: FAIL row={rows['FAIL']}")
+
+
 def check_rows(
     probe_text: str,
     passwd_text: str,
@@ -166,121 +313,15 @@ def check_rows(
         }
     )
 
-    ids = rows.get("ids")
-    for key, want in (
-        ("uid", int(raven["uid"])),
-        ("euid", int(raven["uid"])),
-        ("gid", int(raven["gid"])),
-        ("egid", int(raven["gid"])),
-    ):
-        got = _int(ids, key, failures, "ids")
-        if got is not None and got != want:
-            failures.append(f"ids: {key}={got}, passwd wants {want}")
-
-    group_row = rows.get("groups")
-    count = _int(group_row, "count", failures, "groups")
-    got_count = _int(group_row, "got", failures, "groups")
-    listed: list[int] = []
-    if group_row is not None and "list" in group_row:
-        try:
-            listed = sorted(int(value) for value in group_row["list"].split(",") if value)
-        except ValueError:
-            failures.append(f"groups: list={group_row['list']!r} is not a gid list")
-    if count is not None and count != len(expected_groups):
-        failures.append(f"groups: count={count}, `/etc/group` wants {len(expected_groups)}")
-    if got_count is not None and got_count != len(expected_groups):
-        failures.append(f"groups: got={got_count}, `/etc/group` wants {len(expected_groups)}")
-    if listed != expected_groups:
-        failures.append(f"groups: list={listed}, `/etc/group` wants {expected_groups}")
-
-    for name in ("setuid-nonpermitted", "setgid-nonpermitted"):
-        row = rows.get(name)
-        if _int(row, "ret", failures, name) != -1:
-            failures.append(f"{name}: must fail")
-        if _int(row, "errno", failures, name) != 1:
-            failures.append(f"{name}: expected EPERM (1)")
-
-    old = _octal(rows.get("umask-old"), "mask", failures, "umask-old")
-    if old is not None and old != 0o022:
-        failures.append(f"umask-old: {old:04o}, expected 0022")
-    mode = _octal(rows.get("umask-file"), "mode", failures, "umask-file")
-    if mode is not None and mode != 0o640:
-        failures.append(f"umask-file: {mode:04o}, expected 0640")
-    returned = _octal(rows.get("umask-return"), "mask", failures, "umask-return")
-    if returned is not None and returned != 0o027:
-        failures.append(f"umask-return: {returned:04o}, expected 0027")
-    mode = _octal(rows.get("umask-file-077"), "mode", failures, "umask-file-077")
-    if mode is not None and mode != 0o600:
-        failures.append(f"umask-file-077: {mode:04o}, expected 0600")
-
-    kernel_limit = rows.get("kernel-rlimit-nofile")
-    cur = _int(kernel_limit, "cur", failures, "kernel-rlimit-nofile")
-    hard = _int(kernel_limit, "max", failures, "kernel-rlimit-nofile")
-    if cur is not None and hard is not None and cur > hard:
-        failures.append(f"kernel-rlimit-nofile: cur={cur} > max={hard}")
-    for name in ("kernel-rlimit-roundtrip", "kernel-rlimit-soft-raise", "kernel-rlimit-restore"):
-        if _int(rows.get(name), "errno", failures, name) != 0:
-            failures.append(f"{name}: expected 0")
-    if _int(rows.get("kernel-rlimit-hard-raise"), "errno", failures,
-            "kernel-rlimit-hard-raise") != 1:
-        failures.append("kernel-rlimit-hard-raise: expected EPERM (1)")
-    raised_state = rows.get("kernel-rlimit-hard-raise-state")
-    if _int(raised_state, "errno", failures, "kernel-rlimit-hard-raise-state") != 0:
-        failures.append("kernel-rlimit-hard-raise-state: getrlimit failed")
-    raised_cur = _int(raised_state, "cur", failures, "kernel-rlimit-hard-raise-state")
-    raised_max = _int(raised_state, "max", failures, "kernel-rlimit-hard-raise-state")
-    if cur is not None and raised_cur is not None and raised_cur != cur:
-        failures.append(
-            f"kernel-rlimit-hard-raise: soft changed {cur} -> {raised_cur} after EPERM"
-        )
-    if hard is not None and raised_max is not None and raised_max != hard:
-        failures.append(
-            f"kernel-rlimit-hard-raise: hard changed {hard} -> {raised_max} after EPERM"
-        )
-
-    if _int(rows.get("libc-getrlimit"), "ret", failures, "libc-getrlimit") != 0:
-        failures.append("libc-getrlimit: expected 0")
-    if _int(rows.get("libc-setrlimit"), "ret", failures, "libc-setrlimit") != 0:
-        failures.append("libc-setrlimit: expected 0")
-    if _int(rows.get("libc-hard-raise"), "ret", failures, "libc-hard-raise") != -1:
-        failures.append("libc-hard-raise: must fail")
-    if _int(rows.get("libc-hard-raise"), "errno", failures, "libc-hard-raise") != 1:
-        failures.append("libc-hard-raise: expected EPERM (1)")
-
-    nofile = rows.get("nofile")
-    soft = _int(nofile, "soft", failures, "nofile")
-    base = _int(nofile, "base", failures, "nofile")
-    opened = _int(nofile, "open-ok", failures, "nofile")
-    if soft is not None and base is not None and opened is not None:
-        if opened != soft - base:
-            failures.append(
-                f"nofile: open-ok={opened}, expected soft-base={soft - base}"
-            )
-    if _int(nofile, "errno", failures, "nofile") != 0:
-        failures.append("nofile: a valid open failed below the kernel soft limit")
-
+    _check_ids(rows, int(raven["uid"]), int(raven["gid"]), failures)
+    _check_groups(rows, expected_groups, failures)
+    _check_setid(rows, failures)
+    _check_umask_create(rows, failures)
+    _check_kernel_rlimit(rows, failures)
+    _check_libc_rlimit(rows, failures)
+    _check_nofile(rows, failures)
     for prefix in ("kernel-rusage", "libc-rusage"):
-        samples: list[tuple[int, int, int]] = []
-        for index in range(3):
-            name = f"{prefix}{index}"
-            row = rows.get(name)
-            if row is None:
-                failures.append(f"{name}: missing")
-                continue
-            if _int(row, "errno", failures, name) != 0:
-                failures.append(f"{name}: syscall failed")
-            user = _int(row, "user", failures, name)
-            system = _int(row, "sys", failures, name)
-            maxrss = _int(row, "maxrss", failures, name)
-            if user is not None and system is not None and maxrss is not None:
-                samples.append((user, system, maxrss))
-        for index in range(1, len(samples)):
-            before = samples[index - 1][0] + samples[index - 1][1]
-            after = samples[index][0] + samples[index][1]
-            if after < before:
-                failures.append(f"{prefix}{index}: user+sys went backwards ({before} -> {after})")
-        if samples and samples[-1][2] < MAP_BYTES:
-            failures.append(f"{prefix}: maxrss={samples[-1][2]} < mapped {MAP_BYTES}")
+        _check_rusage(rows, prefix, failures)
 
     if "umask-child" not in parse_rows(umask_exec_text):
         failures.append("umask-exec: no child row")
@@ -290,25 +331,13 @@ def check_rows(
         if mask is not None and mask != 0o027:
             failures.append(f"umask-exec: child mask={mask:04o}, expected 0027")
 
-    if "FAIL" in rows:
-        failures.append(f"probe: FAIL row={rows['FAIL']}")
+    _check_fail_row(rows, failures)
     return failures
 
 def check_umask_rows(rows: dict[str, dict[str, str]]) -> list[str]:
     """The S189 rows only: the created mode and the mask across exec."""
     failures: list[str] = []
-    old = _octal(rows.get("umask-old"), "mask", failures, "umask-old")
-    if old is not None and old != 0o022:
-        failures.append(f"umask-old: {old:04o}, expected 0022")
-    mode = _octal(rows.get("umask-file"), "mode", failures, "umask-file")
-    if mode is not None and mode != 0o640:
-        failures.append(f"umask-file: {mode:04o}, expected 0640")
-    returned = _octal(rows.get("umask-return"), "mask", failures, "umask-return")
-    if returned is not None and returned != 0o027:
-        failures.append(f"umask-return: {returned:04o}, expected 0027")
-    mode = _octal(rows.get("umask-file-077"), "mode", failures, "umask-file-077")
-    if mode is not None and mode != 0o600:
-        failures.append(f"umask-file-077: {mode:04o}, expected 0600")
+    _check_umask_create(rows, failures)
     parent = _octal(rows.get("umask-exec-parent"), "mask", failures, "umask-exec-parent")
     if parent is not None and parent != 0o027:
         failures.append(f"umask-exec-parent: {parent:04o}, expected 0027")
@@ -319,8 +348,7 @@ def check_umask_rows(rows: dict[str, dict[str, str]]) -> list[str]:
         mask = _octal(child_row, "mask", failures, "umask-child")
         if mask is not None and mask != 0o027:
             failures.append(f"umask-exec: child mask={mask:04o}, expected 0027")
-    if "FAIL" in rows:
-        failures.append(f"probe: FAIL row={rows['FAIL']}")
+    _check_fail_row(rows, failures)
     return failures
 
 
@@ -350,32 +378,46 @@ def check_limits_rows(rows: dict[str, dict[str, str]]) -> list[str]:
         failures.append("libc-hard-raise: expected EPERM (1)")
 
     for prefix in ("libc-rusage", "kernel-rusage"):
-        samples: list[tuple[int, int, int]] = []
-        for index in range(3):
-            name = f"{prefix}{index}"
-            row = rows.get(name)
-            if row is None:
-                failures.append(f"{name}: missing")
-                continue
-            if _int(row, "errno", failures, name) != 0:
-                failures.append(f"{name}: syscall failed")
-            if prefix == "libc-rusage" and _int(row, "ret", failures, name) != 0:
-                failures.append(f"{name}: getrusage failed")
-            user = _int(row, "user", failures, name)
-            system = _int(row, "sys", failures, name)
-            maxrss = _int(row, "maxrss", failures, name)
-            if user is not None and system is not None and maxrss is not None:
-                samples.append((user, system, maxrss))
-        for index in range(1, len(samples)):
-            before = samples[index - 1][0] + samples[index - 1][1]
-            after = samples[index][0] + samples[index][1]
-            if after < before:
-                failures.append(f"{prefix}{index}: user+sys went backwards ({before} -> {after})")
-        if samples and samples[-1][2] < MAP_BYTES:
-            failures.append(f"{prefix}: maxrss={samples[-1][2]} < mapped {MAP_BYTES}")
+        _check_rusage(rows, prefix, failures)
 
-    if "FAIL" in rows:
-        failures.append(f"probe: FAIL row={rows['FAIL']}")
+    _check_fail_row(rows, failures)
+    return failures
+
+
+def check_table_rows(rows: dict[str, dict[str, str]]) -> list[str]:
+    """The whole gate table from the one-shot service serial.
+
+    The probe prints the `/etc/passwd` (`passwd`) and `/etc/group` (`group-expected`) values it
+    read at run time, so the ids and groups rows are checked against the account files exactly as
+    the SSH path checks them against `/bin/cat` output.
+    """
+    failures: list[str] = []
+    passwd = rows.get("passwd")
+    uid = _int(passwd, "uid", failures, "passwd")
+    gid = _int(passwd, "gid", failures, "passwd")
+
+    accounted = rows.get("group-expected")
+    count = _int(accounted, "count", failures, "group-expected")
+    expected: list[int] = []
+    if accounted is not None and "list" in accounted:
+        try:
+            expected = sorted(int(value) for value in accounted["list"].split(",") if value)
+        except ValueError:
+            failures.append(f"group-expected: list={accounted['list']!r} is not a gid list")
+    if count is not None and count != len(expected):
+        failures.append(f"group-expected: count={count}, list has {len(expected)}")
+
+    if uid is not None and gid is not None:
+        _check_ids(rows, uid, gid, failures)
+    _check_groups(rows, expected, failures)
+    _check_setid(rows, failures)
+    failures.extend(check_umask_rows(rows))
+    _check_kernel_rlimit(rows, failures)
+    _check_libc_rlimit(rows, failures)
+    _check_nofile(rows, failures)
+    for prefix in ("kernel-rusage", "libc-rusage"):
+        _check_rusage(rows, prefix, failures)
+    _check_fail_row(rows, failures)
     return failures
 
 
@@ -389,6 +431,8 @@ def selftest() -> int:
     groups = "root:x:0:root\nraven:x:1000:raven\n"
     clean = "\n".join(
         [
+            "cred: passwd uid=1000 gid=1000",
+            "cred: group-expected count=1 list=1000",
             "cred: ids uid=1000 euid=1000 gid=1000 egid=1000",
             "cred: groups count=1 got=1 list=1000",
             "cred: setuid-nonpermitted ret=-1 errno=1",
@@ -498,6 +542,22 @@ def selftest() -> int:
             for failure in check_limits_rows(parse_rows(dirty_rusage))),
         True,
     )
+    table = clean + "\n" + umask_exec
+    check("table-clean", check_table_rows(parse_rows(table)), [])
+    dirty_ids = clean.replace("cred: ids uid=1000 euid=1000",
+                              "cred: ids uid=1001 euid=1001")
+    for name, dirty_text in (
+        ("table-dirty-ids", dirty_ids),
+        ("table-dirty-hard-raise", dirty),
+        ("table-dirty-groups", dirty_groups),
+        ("table-dirty-nofile", dirty_nofile),
+        ("table-dirty-umask", dirty_service),
+    ):
+        check(
+            name,
+            bool(check_table_rows(parse_rows(dirty_text + "\n" + umask_exec))),
+            True,
+        )
     if failures:
         for failure in failures:
             print(f"cred-conformance: selftest FAIL: {failure}", file=sys.stderr)
@@ -634,8 +694,8 @@ def boot_service(run: Path, image: Path, accel: str) -> tuple[subprocess.Popen, 
     return child, serial
 
 
-def run_service(image: Path, accel: str, keep: bool) -> int:
-    """Run the staged one-shot probe service and check the S189 rows from the serial."""
+def run_service(image: Path, accel: str, mutation: bool, keep: bool) -> int:
+    """Run the staged one-shot probe service and check the whole gate table from the serial."""
     if not image.is_file():
         print(f"cred-conformance: image {image} is missing", file=sys.stderr)
         return 2
@@ -656,7 +716,32 @@ def run_service(image: Path, accel: str, keep: bool) -> int:
         serial_text = serial.read_text(encoding="utf-8", errors="replace")
         (run_dir / "serial.out").write_text(serial_text, encoding="utf-8")
         rows = parse_rows(serial_text)
-        failures = check_umask_rows(rows)
+        if mutation:
+            marker = "cred: mutation=ignore-hard-limit"
+            if marker not in serial_text:
+                print(
+                    "cred-conformance: MUTATION IMAGE DID NOT REPORT "
+                    f"{marker!r} (marker not staged)",
+                    file=sys.stderr,
+                )
+                print(f"cred-conformance: run={run_dir}")
+                return 2
+            target = "kernel-rlimit-hard-raise: expected EPERM (1)"
+            failures = check_table_rows(rows)
+            if any(target in failure for failure in failures):
+                print(
+                    "cred-conformance: MUTATION RED: kernel-rlimit-hard-raise errno=0 "
+                    "(expected 1)"
+                )
+                print(f"cred-conformance: run={run_dir}")
+                return 1
+            print(
+                "cred-conformance: MUTATION DID NOT TURN THE KERNEL HARD-RAISE ROW RED",
+                file=sys.stderr,
+            )
+            print(f"cred-conformance: run={run_dir}")
+            return 1
+        failures = check_table_rows(rows)
         for line in (
             "KERNEL PANIC",
             "EXCEPTION",
@@ -674,8 +759,7 @@ def run_service(image: Path, accel: str, keep: bool) -> int:
                 print(f"cred-conformance: FAIL: {failure}")
             print(f"cred-conformance: run={run_dir}")
             return 1
-        print("cred-conformance: PASS umask-old umask-file umask-return umask-file-077 "
-              "umask-exec")
+        print("cred-conformance: PASS ids groups setid umask rlimit nofile rusage")
         print(f"cred-conformance: run={run_dir}")
         return 0
     finally:
@@ -825,7 +909,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--accel", choices=("tcg", "kvm"), default="tcg")
     parser.add_argument("--mutation", action="store_true")
     parser.add_argument("--service", action="store_true",
-                        help="read the umask rows from a staged one-shot svcd service")
+                        help="read the whole gate table from a staged one-shot svcd service")
     parser.add_argument("--limits", action="store_true",
                         help="read the S190 rlimit/rusage rows from a staged one-shot svcd service")
     parser.add_argument("--keep", action="store_true")
@@ -840,7 +924,7 @@ def main(argv: list[str]) -> int:
     if options.limits:
         return run_limits(image, options.accel, options.keep)
     if options.service:
-        return run_service(image, options.accel, options.keep)
+        return run_service(image, options.accel, options.mutation, options.keep)
     return run(image, options.accel, options.mutation, options.keep)
 
 

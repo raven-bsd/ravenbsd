@@ -8,6 +8,12 @@
 // that only grow with a maximum RSS at least the mapped size. The kernel rlimit/rusage rows use
 // the PROC_* ABI directly so the kernel contract is tested, not the libc cache.
 //
+// The `cred-service` mode runs the same table from the svcd one-shot service: svcd starts the
+// probe as root, so it first drops to `raven` with the account's own supplementary groups (the
+// login `initgroups` step). The `passwd` and `group-expected` rows carry the `/etc/passwd` and
+// `/etc/group` values the ids/groups rows are checked against, because the service path has no
+// shell to read those files separately. The exec row is last because execv replaces this image.
+//
 // The only output the harness reads is `cred:` lines. Exit 0 only when every row passed.
 
 #include <errno.h>
@@ -358,32 +364,157 @@ static int umask_exec(void) {
     return 1;
 }
 
-// Run the two S189 rows from an svcd one-shot service. svcd starts the service as root; the SSH
-// harness runs the probe as the `raven` account, so switch to that account first and keep the row
-// context identical (the create/chmod path is ownership-sensitive). The exec row is last because
-// execv replaces this image.
-static int umask_service(void) {
-    if (geteuid() == 0) {
-        struct passwd *raven = getpwnam("raven");
-        if (raven == NULL) {
-            failed("umask-service", "getpwnam raven");
-            return 1;
-        }
-        if (initgroups("raven", raven->pw_gid) != 0) {
-            failed("umask-service", "initgroups");
-            return 1;
-        }
-        if (setgid(raven->pw_gid) != 0 || setuid(raven->pw_uid) != 0) {
-            failed("umask-service", "drop to raven");
-            return 1;
+static int compare_gid(const void *left, const void *right) {
+    unsigned int a = *(const unsigned int *)left;
+    unsigned int b = *(const unsigned int *)right;
+    return (a > b) - (a < b);
+}
+
+static void remember_gid(unsigned int **gids, size_t *count, size_t *capacity, unsigned int gid) {
+    for (size_t index = 0; index < *count; index++) {
+        if ((*gids)[index] == gid) {
+            return;
         }
     }
-    int before = failures;
-    row_umask();
-    if (failures != before) {
+    if (*count == *capacity) {
+        size_t grown = *capacity == 0 ? 8 : *capacity * 2;
+        unsigned int *next = realloc(*gids, grown * sizeof(unsigned int));
+        if (next == NULL) {
+            return;
+        }
+        *gids = next;
+        *capacity = grown;
+    }
+    (*gids)[(*count)++] = gid;
+}
+
+// The `/etc/passwd` and `/etc/group` values the ids and groups rows must match. The service path
+// does not use a shell, so the account file is read here and the two rows are compared by the
+// harness. Membership is the group line naming `raven`, exactly what `initgroups` derives.
+static void row_account(void) {
+    struct passwd *raven = getpwnam("raven");
+    if (raven == NULL) {
+        failed("passwd", "getpwnam raven");
+        return;
+    }
+    printf("cred: passwd uid=%u gid=%u\n", raven->pw_uid, raven->pw_gid);
+
+    FILE *file = fopen("/etc/group", "r");
+    if (file == NULL) {
+        failed("group-expected", "open /etc/group");
+        return;
+    }
+    unsigned int *gids = NULL;
+    size_t count = 0;
+    size_t capacity = 0;
+    remember_gid(&gids, &count, &capacity, raven->pw_gid);
+    char line[512];
+    while (fgets(line, sizeof(line), file) != NULL) {
+        char *save = NULL;
+        char *name = strtok_r(line, ":", &save);
+        char *password = strtok_r(NULL, ":", &save);
+        char *gid_text = strtok_r(NULL, ":", &save);
+        char *members = strtok_r(NULL, ":\n", &save);
+        (void)name;
+        (void)password;
+        if (gid_text == NULL || members == NULL) {
+            continue;
+        }
+        int member = 0;
+        char *cursor = members;
+        while (cursor != NULL && *cursor != '\0') {
+            char *comma = strchr(cursor, ',');
+            size_t length = comma != NULL ? (size_t)(comma - cursor) : strlen(cursor);
+            if (length == 5 && strncmp(cursor, "raven", 5) == 0) {
+                member = 1;
+                break;
+            }
+            cursor = comma != NULL ? comma + 1 : NULL;
+        }
+        if (!member) {
+            continue;
+        }
+        char *end = NULL;
+        unsigned long gid = strtoul(gid_text, &end, 10);
+        if (end == gid_text || *end != '\0') {
+            continue;
+        }
+        remember_gid(&gids, &count, &capacity, (unsigned int)gid);
+    }
+    fclose(file);
+
+    qsort(gids, count, sizeof(unsigned int), compare_gid);
+    printf("cred: group-expected count=%zu list=", count);
+    for (size_t index = 0; index < count; index++) {
+        printf("%s%u", index == 0 ? "" : ",", gids[index]);
+    }
+    printf("\n");
+    free(gids);
+}
+
+// svcd starts the one-shot service as root; the login path runs the probe as `raven`, so switch
+// to that account first and keep the row context identical (the create/chmod path is
+// ownership-sensitive). `initgroups` is the same call the login makes.
+static int drop_to_raven(void) {
+    if (geteuid() != 0) {
+        return 0;
+    }
+    struct passwd *raven = getpwnam("raven");
+    if (raven == NULL) {
+        failed("cred-service", "getpwnam raven");
         return 1;
     }
+    if (initgroups("raven", raven->pw_gid) != 0) {
+        failed("cred-service", "initgroups");
+        return 1;
+    }
+    if (setgid(raven->pw_gid) != 0 || setuid(raven->pw_uid) != 0) {
+        failed("cred-service", "drop to raven");
+        return 1;
+    }
+    return 0;
+}
+
+// The whole gate table from an svcd one-shot service. The exec row is last because execv replaces
+// this image; every earlier row has already printed its verdict by then.
+static int cred_service(int mutation_ignore_hard_limit) {
+    if (drop_to_raven() != 0) {
+        return 1;
+    }
+    row_account();
+    row_ids();
+    row_groups();
+
+    errno = 0;
+    int result = setuid(0);
+    row_setid("setuid-nonpermitted", result, errno);
+
+    errno = 0;
+    result = setgid(0);
+    row_setid("setgid-nonpermitted", result, errno);
+
+    row_umask();
+    row_kernel_rlimit(mutation_ignore_hard_limit);
+    row_libc_rlimit();
+    row_nofile();
+    row_libc_rusage();
+    row_kernel_rusage();
+    printf("cred: done failures=%d\n", failures);
+    if (mutation_ignore_hard_limit) {
+        return 0;
+    }
     return umask_exec();
+}
+
+// Presence of the staged marker makes the probe report the hard-limit raise as accepted. It is a
+// test-only negative check (`build-service.sh --mutation`); the product tree is untouched.
+static int mutation_requested(void) {
+    int fd = open("/etc/cred-mutation", O_RDONLY);
+    if (fd < 0) {
+        return 0;
+    }
+    close(fd);
+    return 1;
 }
 
 int main(int argc, char **argv) {
@@ -395,8 +526,8 @@ int main(int argc, char **argv) {
     if (argc > 1 && strcmp(argv[1], "umask-exec") == 0) {
         return umask_exec();
     }
-    if (argc > 1 && strcmp(argv[1], "umask-service") == 0) {
-        return umask_service();
+    if (argc > 1 && strcmp(argv[1], "cred-service") == 0) {
+        return cred_service(mutation_requested());
     }
 
     int mutation_ignore_hard_limit =
