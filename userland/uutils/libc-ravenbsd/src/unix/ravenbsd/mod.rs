@@ -3,6 +3,8 @@
 
 use crate::prelude::*;
 
+mod abi_probe;
+
 pub type wchar_t = i32;
 
 pub type blkcnt_t = c_longlong;
