@@ -11,6 +11,7 @@
 //! never claimed.
 
 use raven_abi::PAGE_SIZE;
+use raven_abi::errno::Errno;
 use raven_libc_abi::structs::{Stat, Statvfs, Timespec};
 use raven_proto_fs::{Stat as WireStat, StatFs};
 
@@ -48,7 +49,13 @@ impl StatSource {
 }
 
 /// Convert the 64-byte wire record to the libc `struct stat`.
-pub fn from_wire(wire: &WireStat, source: StatSource) -> Stat {
+///
+/// # Errors
+///
+/// `EOVERFLOW` when a wire `u64` size or block count does not fit the donor `off_t`/`blkcnt_t`
+/// (`i64`); the donor `struct stat` cannot represent it, and a wrapped or clamped value would be
+/// fake metadata.
+pub fn from_wire(wire: &WireStat, source: StatSource) -> Result<Stat, Errno> {
     let mut mode = wire.mode;
     if mode & raven_libc_abi::stat::S_IFMT == 0 {
         mode |= match source {
@@ -59,7 +66,9 @@ pub fn from_wire(wire: &WireStat, source: StatSource) -> Stat {
             StatSource::File | StatSource::Unknown => raven_libc_abi::stat::S_IFREG,
         };
     }
-    Stat {
+    let size = i64::try_from(wire.size).map_err(|_| Errno::EOVERFLOW)?;
+    let blocks = i64::try_from(wire.blocks).map_err(|_| Errno::EOVERFLOW)?;
+    Ok(Stat {
         st_dev: 0,
         st_ino: wire.ino,
         st_nlink: u64::from(wire.nlink),
@@ -87,14 +96,14 @@ pub fn from_wire(wire: &WireStat, source: StatSource) -> Stat {
             tv_sec: 0,
             tv_nsec: 0,
         },
-        st_size: wire.size as i64,
-        st_blocks: wire.blocks as i64,
+        st_size: size,
+        st_blocks: blocks,
         st_blksize: PAGE_SIZE as i32,
         st_flags: 0,
         st_gen: 0,
         st_filerev: 0,
         st_spare: [0; 9],
-    }
+    })
 }
 
 /// Convert `StatFs` to the FreeBSD-profile `struct statvfs`; unknown fields keep the documented

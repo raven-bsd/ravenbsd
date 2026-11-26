@@ -1103,10 +1103,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let mut record = [0u8; raven_proto_fs::STAT_LEN];
         self.backend.fstat(reference.handle(), &mut record)?;
         let wire = WireStat::decode(&record).map_err(|error| error.errno())?;
-        Ok(crate::stat::from_wire(
-            &wire,
-            StatSource::from_kind(reference.kind()),
-        ))
+        crate::stat::from_wire(&wire, StatSource::from_kind(reference.kind()))
     }
 
     /// `stat`: interim `open + FSTAT + close` (3.14 sequence 7); one `OP_STAT` after PG-31.
@@ -1144,7 +1141,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .map_err(|error| error.errno())?
         {
             CallResponse::Stat { status: 0, stat } => {
-                Ok(crate::stat::from_wire(&stat, StatSource::Unknown))
+                crate::stat::from_wire(&stat, StatSource::Unknown)
             }
             CallResponse::Stat { status, .. } => match xlat::call_status(status) {
                 Err(error) => Err(error),
@@ -1185,7 +1182,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             let execute = raven_libc_abi::stat::S_IXUSR
                 | raven_libc_abi::stat::S_IXGRP
                 | raven_libc_abi::stat::S_IXOTH;
-            if stat.st_mode & execute == 0 {
+            if u32::from(stat.st_mode) & execute == 0 {
                 return Err(Errno::EACCES);
             }
         }
@@ -1516,7 +1513,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .map_err(crate::path::path_errno)?;
         if source.must_be_dir {
             let stat = self.stat(&source.abs)?;
-            if stat.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFDIR {
+            if u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT
+                != raven_libc_abi::stat::S_IFDIR
+            {
                 return Err(Errno::ENOTDIR);
             }
         }
@@ -1624,7 +1623,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
         if reference.kind() == OfdKind::File || reference.kind() == OfdKind::Unknown {
             let stat = self.fstat(fd)?;
-            return Ok(stat.st_mode & raven_libc_abi::stat::S_IFMT == raven_libc_abi::stat::S_IFDIR);
+            return Ok(u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT
+                == raven_libc_abi::stat::S_IFDIR);
         }
         Ok(false)
     }

@@ -56,10 +56,13 @@ s! {
     }
 
     pub struct dirent {
-        pub d_ino: crate::ino_t,
+        pub d_fileno: crate::ino_t,
         pub d_off: off_t,
-        pub d_reclen: c_ushort,
-        pub d_type: c_uchar,
+        pub d_reclen: u16,
+        pub d_type: u8,
+        d_pad0: Padding<u8>,
+        pub d_namlen: u16,
+        d_pad1: Padding<u16>,
         pub d_name: [c_char; 256],
     }
 
@@ -195,42 +198,48 @@ s! {
         pub sin6_scope_id: u32,
     }
 
+    // RavenBSD: the public record is the FreeBSD 133344405 layout (DR-69). `mode_t` and
+    // `nlink_t` keep their historical ravenlibc widths, so the donor-width members are
+    // spelled explicitly; the atime/mtime/ctime/birthtime pairs occupy the donor timespecs.
     pub struct stat {
         pub st_dev: crate::dev_t,
         pub st_ino: crate::ino_t,
-        pub st_mode: mode_t,
-        pub st_nlink: crate::nlink_t,
+        pub st_nlink: u64,
+        pub st_mode: u16,
+        st_padding0: Padding<i16>,
         pub st_uid: crate::uid_t,
         pub st_gid: crate::gid_t,
+        st_padding1: Padding<i32>,
         pub st_rdev: crate::dev_t,
-        pub __pad1: u64,
-        pub st_size: off_t,
-        pub st_blksize: crate::blksize_t,
-        pub __pad2: i32,
-        pub st_blocks: crate::blkcnt_t,
         pub st_atime: crate::time_t,
         pub st_atime_nsec: c_long,
         pub st_mtime: crate::time_t,
         pub st_mtime_nsec: c_long,
         pub st_ctime: crate::time_t,
         pub st_ctime_nsec: c_long,
-        pub __unused: [u32; 2],
+        pub st_birthtime: crate::time_t,
+        pub st_birthtime_nsec: c_long,
+        pub st_size: off_t,
+        pub st_blocks: crate::blkcnt_t,
+        pub st_blksize: crate::blksize_t,
+        pub st_flags: u32,
+        pub st_gen: u64,
+        pub st_filerev: u64,
+        pub st_spare: [u64; 9],
     }
 
     pub struct statvfs {
-        pub f_bsize: c_ulong,
-        pub f_frsize: c_ulong,
-        pub f_blocks: crate::fsblkcnt_t,
-        pub f_bfree: crate::fsblkcnt_t,
         pub f_bavail: crate::fsblkcnt_t,
-        pub f_files: crate::fsfilcnt_t,
-        pub f_ffree: crate::fsfilcnt_t,
+        pub f_bfree: crate::fsblkcnt_t,
+        pub f_blocks: crate::fsblkcnt_t,
         pub f_favail: crate::fsfilcnt_t,
-        pub f_fsid: c_ulong,
+        pub f_ffree: crate::fsfilcnt_t,
+        pub f_files: crate::fsfilcnt_t,
+        pub f_bsize: c_ulong,
         pub f_flag: c_ulong,
+        pub f_frsize: c_ulong,
+        pub f_fsid: c_ulong,
         pub f_namemax: c_ulong,
-        pub f_type: u32,
-        pub __reserved: [i32; 5],
     }
 
     pub struct termios {
@@ -343,18 +352,28 @@ s! {
     }
 
     pub struct statfs {
-        pub f_type: c_ulong,
-        pub f_bsize: c_ulong,
-        pub f_blocks: crate::fsblkcnt_t,
-        pub f_bfree: crate::fsblkcnt_t,
-        pub f_bavail: crate::fsblkcnt_t,
-        pub f_files: crate::fsfilcnt_t,
-        pub f_ffree: crate::fsfilcnt_t,
+        pub f_version: u32,
+        pub f_type: u32,
+        pub f_flags: u64,
+        pub f_bsize: u64,
+        pub f_iosize: u64,
+        pub f_blocks: u64,
+        pub f_bfree: u64,
+        pub f_bavail: i64,
+        pub f_files: u64,
+        pub f_ffree: i64,
+        pub f_syncwrites: u64,
+        pub f_asyncwrites: u64,
+        pub f_syncreads: u64,
+        pub f_asyncreads: u64,
+        f_spare: [u64; 10],
+        pub f_namemax: u32,
+        pub f_owner: crate::uid_t,
         pub f_fsid: crate::fsid_t,
-        pub f_namelen: c_ulong,
-        pub f_frsize: c_ulong,
-        pub f_flags: c_ulong,
-        pub f_spare: [c_ulong; 4],
+        f_charspare: [c_char; 80],
+        pub f_fstypename: [c_char; 16],
+        pub f_mntfromname: [c_char; 1024],
+        pub f_mntonname: [c_char; 1024],
     }
 
     pub struct sigevent {

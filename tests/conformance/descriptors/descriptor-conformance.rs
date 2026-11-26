@@ -85,20 +85,24 @@ struct Timespec {
 struct Stat {
     st_dev: u64,
     st_ino: u64,
-    st_mode: u32,
-    st_nlink: u32,
+    st_nlink: u64,
+    st_mode: u16,
+    st_bsdflags: i16,
     st_uid: u32,
     st_gid: u32,
+    st_padding1: i32,
     st_rdev: u64,
-    _pad: u64,
-    st_size: i64,
-    st_blksize: i32,
-    _pad2: i32,
-    st_blocks: i64,
     st_atim: Timespec,
     st_mtim: Timespec,
     st_ctim: Timespec,
-    _unused: [u32; 2],
+    st_birthtim: Timespec,
+    st_size: i64,
+    st_blocks: i64,
+    st_blksize: i32,
+    st_flags: u32,
+    st_gen: u64,
+    st_filerev: u64,
+    st_spare: [u64; 9],
 }
 
 impl Stat {
@@ -106,16 +110,13 @@ impl Stat {
         Self {
             st_dev: 0,
             st_ino: 0,
-            st_mode: 0,
             st_nlink: 0,
+            st_mode: 0,
+            st_bsdflags: 0,
             st_uid: 0,
             st_gid: 0,
+            st_padding1: 0,
             st_rdev: 0,
-            _pad: 0,
-            st_size: 0,
-            st_blksize: 0,
-            _pad2: 0,
-            st_blocks: 0,
             st_atim: Timespec {
                 tv_sec: 0,
                 tv_nsec: 0,
@@ -128,12 +129,22 @@ impl Stat {
                 tv_sec: 0,
                 tv_nsec: 0,
             },
-            _unused: [0; 2],
+            st_birthtim: Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+            st_size: 0,
+            st_blocks: 0,
+            st_blksize: 0,
+            st_flags: 0,
+            st_gen: 0,
+            st_filerev: 0,
+            st_spare: [0; 9],
         }
     }
 }
 
-const _: () = assert!(core::mem::size_of::<Stat>() == 128);
+const _: () = assert!(core::mem::size_of::<Stat>() == 224);
 
 /// The public 128-byte `sigset_t`.
 #[repr(C)]
@@ -453,7 +464,7 @@ fn row_dup_offset(state: &mut State, mutation: bool) {
         && a.st_dev == b.st_dev
         && a.st_ino == b.st_ino
         && a.st_size == b.st_size
-        && a.st_mode & S_IFMT == S_IFREG
+        && u32::from(a.st_mode) & S_IFMT == S_IFREG
         && (unsafe { fcntl(fd, F_GETFL, 0) } & !O_APPEND)
             == (unsafe { fcntl(dupfd, F_GETFL, 0) } & !O_APPEND);
 
@@ -1242,7 +1253,7 @@ fn row_fstat_identity(state: &mut State) {
         && first.st_dev == second.st_dev
         && first.st_ino == second.st_ino
         && first.st_size == 10
-        && first.st_mode & S_IFMT == S_IFREG
+        && u32::from(first.st_mode) & S_IFMT == S_IFREG
         && grown.st_size == 11
         && grown.st_ino == first.st_ino;
 
@@ -1257,7 +1268,7 @@ fn row_fstat_identity(state: &mut State) {
             second.st_ino,
             first.st_size,
             grown.st_size,
-            flag(first.st_mode & S_IFMT == S_IFREG)
+            flag(u32::from(first.st_mode) & S_IFMT == S_IFREG)
         ),
     );
     if dupfd >= 0 {

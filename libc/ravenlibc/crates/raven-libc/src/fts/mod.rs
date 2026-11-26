@@ -418,9 +418,7 @@ pub(crate) fn fill_dirent(entry: &DirEntry, out: &mut Dirent) {
     let count = entry.name.len().min(capacity);
     out.d_fileno = entry.ino;
     out.d_off = entry.off;
-    // The stream record length is an internal encoding; the public `struct dirent` carries the
-    // FreeBSD `_GENERIC_DIRLEN` of the name it returns.
-    out.d_reclen = raven_libc_platform::dir::dirent_reclen(count) as u16;
+    out.d_reclen = entry.reclen;
     out.d_type = entry.typ;
     out.d_pad0 = 0;
     out.d_namlen = count as u16;

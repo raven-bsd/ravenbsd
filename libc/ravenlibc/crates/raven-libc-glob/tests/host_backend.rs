@@ -45,16 +45,13 @@ impl HostFs {
         Stat {
             st_dev: meta.dev(),
             st_ino: meta.ino(),
-            st_mode: meta.mode(),
-            st_nlink: meta.nlink() as u32,
+            st_nlink: meta.nlink(),
+            st_mode: meta.mode() as u16,
+            st_bsdflags: 0,
             st_uid: meta.uid(),
             st_gid: meta.gid(),
+            st_padding1: 0,
             st_rdev: meta.rdev(),
-            __pad1: 0,
-            st_size: meta.size() as i64,
-            st_blksize: meta.blksize() as i32,
-            __pad2: 0,
-            st_blocks: meta.blocks() as i64,
             st_atim: raven_libc_abi::generated::structs::Timespec {
                 tv_sec: meta.atime(),
                 tv_nsec: meta.atime_nsec(),
@@ -67,7 +64,17 @@ impl HostFs {
                 tv_sec: meta.ctime(),
                 tv_nsec: meta.ctime_nsec(),
             },
-            __unused: [0; 2],
+            st_birthtim: raven_libc_abi::generated::structs::Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+            st_size: meta.size() as i64,
+            st_blocks: meta.blocks() as i64,
+            st_blksize: meta.blksize() as i32,
+            st_flags: 0,
+            st_gen: 0,
+            st_filerev: 0,
+            st_spare: [0; 9],
         }
     }
 }
@@ -268,10 +275,9 @@ fn broken_symlink_is_returned_not_dereferenced() {
 }
 
 #[test]
-fn eacces_and_eloop_values_are_what_the_backend_reports() {
-    // The fake reports the same errno values the host backend maps.
+fn errno_values_are_the_native_freebsd_table() {
     assert_eq!(EACCES, 13);
-    assert_eq!(ELOOP, 40);
+    assert_eq!(ELOOP, 62);
     assert_eq!(ENOENT, 2);
     assert_eq!(ENOTDIR, 20);
 }

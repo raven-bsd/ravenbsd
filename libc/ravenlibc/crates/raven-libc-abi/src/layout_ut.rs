@@ -24,12 +24,12 @@ fn find_returns_none_for_unknown() {
 }
 
 #[test]
-fn stat_has_the_frozen_shape() {
+fn stat_has_the_freebsd_shape() {
     let stat = find("stat").expect("stat");
     assert_eq!(stat.c_name, "struct stat");
-    assert_eq!(stat.size, 128);
+    assert_eq!(stat.size, 224);
     assert_eq!(stat.align, 8);
-    assert_eq!(stat.fields.len(), 16);
+    assert_eq!(stat.fields.len(), 20);
 }
 
 #[test]
@@ -43,13 +43,24 @@ fn stat_field_offsets() {
     };
     assert_eq!(offset("st_dev"), Some(0));
     assert_eq!(offset("st_ino"), Some(8));
-    assert_eq!(offset("st_mode"), Some(16));
-    assert_eq!(offset("st_nlink"), Some(20));
-    assert_eq!(offset("st_size"), Some(48));
-    assert_eq!(offset("st_blksize"), Some(56));
-    assert_eq!(offset("st_blocks"), Some(64));
-    assert_eq!(offset("st_atim"), Some(72));
-    assert_eq!(offset("__unused"), Some(120));
+    assert_eq!(offset("st_nlink"), Some(16));
+    assert_eq!(offset("st_mode"), Some(24));
+    assert_eq!(offset("st_bsdflags"), Some(26));
+    assert_eq!(offset("st_uid"), Some(28));
+    assert_eq!(offset("st_gid"), Some(32));
+    assert_eq!(offset("st_padding1"), Some(36));
+    assert_eq!(offset("st_rdev"), Some(40));
+    assert_eq!(offset("st_atim"), Some(48));
+    assert_eq!(offset("st_mtim"), Some(64));
+    assert_eq!(offset("st_ctim"), Some(80));
+    assert_eq!(offset("st_birthtim"), Some(96));
+    assert_eq!(offset("st_size"), Some(112));
+    assert_eq!(offset("st_blocks"), Some(120));
+    assert_eq!(offset("st_blksize"), Some(128));
+    assert_eq!(offset("st_flags"), Some(132));
+    assert_eq!(offset("st_gen"), Some(136));
+    assert_eq!(offset("st_filerev"), Some(144));
+    assert_eq!(offset("st_spare"), Some(152));
 }
 
 #[test]
@@ -57,9 +68,11 @@ fn dirent_is_280_bytes() {
     let dirent = find("dirent").expect("dirent");
     assert_eq!(dirent.size, 280);
     assert_eq!(dirent.align, 8);
-    assert_eq!(dirent.fields.len(), 5);
-    assert_eq!(dirent.fields[4].offset, 19);
-    assert_eq!(dirent.fields[4].size, 256);
+    assert_eq!(dirent.fields.len(), 8);
+    assert_eq!(dirent.fields[0].name, "d_fileno");
+    assert_eq!(dirent.fields[5].name, "d_namlen");
+    assert_eq!(dirent.fields[7].offset, 24);
+    assert_eq!(dirent.fields[7].size, 256);
 }
 
 #[test]

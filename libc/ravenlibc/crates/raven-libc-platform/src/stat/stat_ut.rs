@@ -5,7 +5,14 @@
 
 use raven_proto_fs::{Stat as WireStat, StatFs};
 
-use crate::stat::{STATX_BASIC_MASK, StatSource, from_wire, statvfs_from_wire};
+use crate::stat::{
+    STATX_BASIC_MASK, StatSource, from_wire as from_wire_checked, statvfs_from_wire,
+};
+
+/// The infallible view the tests use; overflow is asserted separately.
+fn from_wire(wire: &WireStat, source: StatSource) -> raven_libc_abi::structs::Stat {
+    from_wire_checked(wire, source).expect("wire record fits the public stat")
+}
 
 fn record() -> WireStat {
     WireStat {
@@ -166,6 +173,24 @@ fn statvfs_maps_the_wire_record() {
     assert_eq!(statvfs.f_namemax, 255);
     assert_eq!(statvfs.f_fsid, 0);
     assert_eq!(statvfs.f_flag, 0);
+}
+
+#[test]
+fn a_wire_size_or_block_count_above_i64_is_eoverflow() {
+    use raven_abi::errno::Errno;
+
+    let mut wire = record();
+    wire.size = u64::MAX;
+    assert_eq!(
+        from_wire_checked(&wire, StatSource::File),
+        Err(Errno::EOVERFLOW)
+    );
+    let mut wire = record();
+    wire.blocks = u64::MAX;
+    assert_eq!(
+        from_wire_checked(&wire, StatSource::File),
+        Err(Errno::EOVERFLOW)
+    );
 }
 
 #[test]
