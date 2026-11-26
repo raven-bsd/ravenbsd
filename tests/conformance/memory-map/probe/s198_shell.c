@@ -34,13 +34,17 @@ int main(int argc, char **argv) {
     }
     char iteration_arg[32];
     (void)snprintf(iteration_arg, sizeof iteration_arg, "--iterations=%d", iterations);
-    char *args[] = {
-        "/bin/mmap-probe",
-        iteration_arg,
-        mutation ? "--mutation=private-shared" : (char *)0,
-        sibling_exit ? "--sibling-exit" : (char *)0,
-        (char *)0,
-    };
+    char *args[5];
+    int count = 0;
+    args[count++] = "/bin/mmap-probe";
+    args[count++] = iteration_arg;
+    if (mutation) {
+        args[count++] = "--mutation=private-shared";
+    }
+    if (sibling_exit) {
+        args[count++] = "--sibling-exit";
+    }
+    args[count] = (char *)0;
     execv(args[0], args);
     _exit(127);
 }
