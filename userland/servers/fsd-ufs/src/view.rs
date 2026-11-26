@@ -6,15 +6,13 @@
 //! Paths are lexically normalised, symbolic links are followed with a fixed
 //! depth bound, and every on-disk failure is mapped to a stable errno.
 
-use alloc::format;
-use alloc::string::{String, ToString};
 use alloc::vec;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_proto_fs::{
     DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_BLK, DT_CHR, DT_DIR, DT_FIFO, DT_LNK, DT_REG, DT_SOCK,
-    DirEntry as ProtoDirEntry, DirEntryHeader as ProtoDirEntryHeader, MAX_PATH, PathError, Stat,
-    StatFs, normalize_absolute,
+    DirEntry as ProtoDirEntry, DirEntryHeader as ProtoDirEntryHeader, MAX_PATH, Stat, StatFs,
 };
 use ufs_core::{Attr, BlockIo, FileType, Ino, MountOptions, SetAttr, Timespec, Ufs, UfsError};
 
@@ -45,15 +43,14 @@ impl<D: BlockIo> UfsView<D> {
         self.ufs.is_journaled()
     }
 
-    /// Read the target of `ino` as UTF-8.
-    fn readlink_string(&mut self, ino: Ino) -> Result<String, UfsError> {
-        let mut buffer = vec![0u8; MAX_SYMLINK_BYTES];
+    /// Read the target bytes of `ino`.
+    fn readlink_bytes(&mut self, ino: Ino) -> Result<Vec<u8>, UfsError> {
+        let mut buffer = vec![0u8; MAX_SYMLINK_BYTES + 1];
         let length = self.ufs.readlink(ino, &mut buffer)?;
-        if length == 0 || length == buffer.len() {
+        if length == 0 || length > MAX_SYMLINK_BYTES {
             return Err(UfsError::NameTooLong);
         }
-        let target = core::str::from_utf8(&buffer[..length]).map_err(|_| UfsError::Invalid)?;
-        Ok(target.to_string())
+        Ok(buffer[..length].to_vec())
     }
 
     fn ensure_writable(&self) -> Result<(), Errno> {
@@ -93,29 +90,35 @@ impl<D: BlockIo> UfsView<D> {
     }
 
     /// Split a path into its resolved parent directory and final name.
-    fn parent_and_name(&mut self, path: &str) -> Result<(Ino, String), Errno> {
-        let normalized = normalize_path(path)?;
-        if normalized == "/" {
+    fn parent_and_name(&mut self, path: &[u8]) -> Result<(Ino, Vec<u8>), Errno> {
+        let trimmed = path.strip_suffix(b"/").unwrap_or(path);
+        if trimmed.is_empty() {
             return Err(Errno::EINVAL);
         }
-        let (parent, name) = normalized.rsplit_once('/').ok_or(Errno::EINVAL)?;
-        if name.is_empty() || name == "." || name == ".." {
+        let (parent, name) = match trimmed.iter().rposition(|byte| *byte == b'/') {
+            Some(0) => (&trimmed[..1], &trimmed[1..]),
+            Some(index) => (&trimmed[..index], &trimmed[index + 1..]),
+            None => (b"/".as_slice(), trimmed),
+        };
+        if name.is_empty() || name == b"." || name == b".." {
             return Err(Errno::EINVAL);
         }
         if name.len() > 255 {
             return Err(Errno::ENAMETOOLONG);
         }
-        let parent = if parent.is_empty() { "/" } else { parent };
         let dir = self.resolve_inner(parent, true)?;
         let attr = self.ufs.getattr(dir).map_err(errno)?;
         if attr.kind != FileType::Directory {
             return Err(Errno::ENOTDIR);
         }
-        Ok((dir, name.to_string()))
+        Ok((dir, name.to_vec()))
     }
 
-    fn resolve_inner(&mut self, path: &str, follow_last: bool) -> Result<Ino, Errno> {
-        let mut current = normalize_path(path)?;
+    fn resolve_inner(&mut self, path: &[u8], follow_last: bool) -> Result<Ino, Errno> {
+        if path.len() > MAX_PATH {
+            return Err(Errno::ENAMETOOLONG);
+        }
+        let mut current = path.to_vec();
         for _ in 0..=MAX_SYMLINKS {
             match self.walk(&current, follow_last) {
                 Ok(ino) => return Ok(ino),
@@ -130,40 +133,37 @@ impl<D: BlockIo> UfsView<D> {
         Err(Errno::ELOOP)
     }
 
-    fn walk(&mut self, path: &str, follow_last: bool) -> Result<Ino, WalkError> {
+    fn walk(&mut self, path: &[u8], follow_last: bool) -> Result<Ino, WalkError> {
         let mut ino = self.ufs.root();
-        let mut parent = String::from("/");
-        let mut rest = path.trim_start_matches('/');
+        let mut parent = b"/".to_vec();
+        let mut rest = path.strip_prefix(b"/").unwrap_or(path);
         loop {
+            rest = rest.strip_prefix(b"/").unwrap_or(rest);
             if rest.is_empty() {
                 return Ok(ino);
             }
-            let (name, tail) = match rest.split_once('/') {
-                Some((name, tail)) => (name, tail.trim_start_matches('/')),
-                None => (rest, ""),
+            let (name, tail) = match rest.iter().position(|byte| *byte == b'/') {
+                Some(index) => (&rest[..index], &rest[index + 1..]),
+                None => (rest, &b""[..]),
             };
-            let child = self
-                .ufs
-                .lookup(ino, name.as_bytes())
-                .map_err(WalkError::Ufs)?;
+            let child = self.ufs.lookup(ino, name).map_err(WalkError::Ufs)?;
             let attr = self.ufs.getattr(child).map_err(WalkError::Ufs)?;
             let last = tail.is_empty();
             if attr.kind == FileType::Symlink && (follow_last || !last) {
-                let target = self.readlink_string(child).map_err(WalkError::Ufs)?;
+                let target = self.readlink_bytes(child).map_err(WalkError::Ufs)?;
                 return Err(WalkError::Expand {
                     parent,
                     target,
-                    rest: tail.to_string(),
+                    rest: tail.to_vec(),
                 });
             }
             if !last && attr.kind != FileType::Directory {
                 return Err(WalkError::Ufs(UfsError::NotDir));
             }
-            parent = if parent == "/" {
-                format!("/{name}")
-            } else {
-                format!("{parent}/{name}")
-            };
+            if parent != b"/" {
+                parent.push(b'/');
+            }
+            parent.extend_from_slice(name);
             ino = child;
             rest = tail;
         }
@@ -173,50 +173,33 @@ impl<D: BlockIo> UfsView<D> {
 enum WalkError {
     Ufs(UfsError),
     Expand {
-        parent: String,
-        target: String,
-        rest: String,
+        parent: Vec<u8>,
+        target: Vec<u8>,
+        rest: Vec<u8>,
     },
 }
 
-fn normalize_path(path: &str) -> Result<String, Errno> {
-    // `vfsd` passes the suffix inside a mount without its leading slash; the
-    // server root is also opened as an empty path.
-    let path = if path.is_empty() {
-        "/".to_string()
-    } else if path.starts_with('/') {
-        path.to_string()
+fn rebuild_path(parent: &[u8], target: &[u8], rest: &[u8]) -> Result<Vec<u8>, Errno> {
+    let mut combined = Vec::new();
+    if target.first() == Some(&b'/') {
+        combined.extend_from_slice(target);
     } else {
-        format!("/{path}")
-    };
-    let mut out = [0u8; MAX_PATH];
-    let normalized = normalize_absolute(&path, &mut out).map_err(path_errno)?;
-    Ok(normalized.to_string())
-}
-
-fn rebuild_path(parent: &str, target: &str, rest: &str) -> Result<String, Errno> {
-    let combined = if target.starts_with('/') {
-        if rest.is_empty() {
-            target.to_string()
-        } else {
-            format!("{target}/{rest}")
+        combined.extend_from_slice(parent);
+        if combined.last() != Some(&b'/') {
+            combined.push(b'/');
         }
-    } else if parent == "/" {
-        if rest.is_empty() {
-            format!("/{target}")
-        } else {
-            format!("/{target}/{rest}")
+        combined.extend_from_slice(target);
+    }
+    if !rest.is_empty() {
+        if combined.last() != Some(&b'/') {
+            combined.push(b'/');
         }
-    } else if rest.is_empty() {
-        format!("{parent}/{target}")
-    } else {
-        format!("{parent}/{target}/{rest}")
-    };
-    normalize_path(&combined)
-}
-
-fn path_errno(error: PathError) -> Errno {
-    error.errno()
+        combined.extend_from_slice(rest);
+    }
+    if combined.len() > MAX_PATH {
+        return Err(Errno::ENAMETOOLONG);
+    }
+    Ok(combined)
 }
 
 /// Map a core error to the protocol errno.
@@ -279,11 +262,11 @@ fn wire_stat(attr: Attr) -> Stat {
 }
 
 impl<D: BlockIo> FileSystem for UfsView<D> {
-    fn resolve(&mut self, path: &str) -> Result<u32, Errno> {
+    fn resolve(&mut self, path: &[u8]) -> Result<u32, Errno> {
         self.resolve_inner(path, true)
     }
 
-    fn resolve_nofollow(&mut self, path: &str) -> Result<u32, Errno> {
+    fn resolve_nofollow(&mut self, path: &[u8]) -> Result<u32, Errno> {
         self.resolve_inner(path, false)
     }
 
@@ -365,60 +348,60 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
         self.read_only
     }
 
-    fn create_file(&mut self, path: &str, mode: u16, exclusive: bool) -> Result<u32, Errno> {
+    fn create_file(&mut self, path: &[u8], mode: u16, exclusive: bool) -> Result<u32, Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
-        match self.ufs.create(parent, name.as_bytes(), mode, 0, 0) {
+        match self.ufs.create(parent, &name, mode, 0, 0) {
             Ok(ino) => Ok(ino),
             Err(UfsError::Exists) if !exclusive => self.resolve(path),
             Err(error) => Err(self.note_error(error)),
         }
     }
 
-    fn mkdir(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+    fn mkdir(&mut self, path: &[u8], mode: u16) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mkdir(parent, name.as_bytes(), mode, 0, 0)
+            .mkdir(parent, &name, mode, 0, 0)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
 
-    fn unlink(&mut self, path: &str) -> Result<(), Errno> {
+    fn unlink(&mut self, path: &[u8]) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .unlink(parent, name.as_bytes())
+            .unlink(parent, &name)
             .map_err(|error| self.note_error(error))
     }
 
-    fn rmdir(&mut self, path: &str) -> Result<(), Errno> {
+    fn rmdir(&mut self, path: &[u8]) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .rmdir(parent, name.as_bytes())
+            .rmdir(parent, &name)
             .map_err(|error| self.note_error(error))
     }
 
-    fn rename(&mut self, from: &str, to: &str) -> Result<(), Errno> {
+    fn rename(&mut self, from: &[u8], to: &[u8]) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (old_dir, old_name) = self.parent_and_name(from)?;
         let (new_dir, new_name) = self.parent_and_name(to)?;
         self.ufs
-            .rename(old_dir, old_name.as_bytes(), new_dir, new_name.as_bytes())
+            .rename(old_dir, &old_name, new_dir, &new_name)
             .map_err(|error| self.note_error(error))
     }
 
-    fn symlink(&mut self, path: &str, target: &[u8]) -> Result<(), Errno> {
+    fn symlink(&mut self, path: &[u8], target: &[u8]) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .symlink(parent, name.as_bytes(), target, 0, 0)
+            .symlink(parent, &name, target, 0, 0)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
 
-    fn link(&mut self, path: &str, target: &str) -> Result<(), Errno> {
+    fn link(&mut self, path: &[u8], target: &[u8]) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         let target = self.resolve_inner(target, false)?;
@@ -426,11 +409,11 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
             return Err(Errno::EPERM);
         }
         self.ufs
-            .link(parent, name.as_bytes(), target)
+            .link(parent, &name, target)
             .map_err(|error| self.note_error(error))
     }
 
-    fn chmod(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+    fn chmod(&mut self, path: &[u8], mode: u16) -> Result<(), Errno> {
         self.ensure_writable()?;
         let ino = self.resolve(path)?;
         self.ufs
@@ -444,7 +427,7 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
             .map_err(|error| self.note_error(error))
     }
 
-    fn chown(&mut self, path: &str, uid: u32, gid: u32, follow: bool) -> Result<(), Errno> {
+    fn chown(&mut self, path: &[u8], uid: u32, gid: u32, follow: bool) -> Result<(), Errno> {
         self.ensure_writable()?;
         let ino = self.resolve_inner(path, follow)?;
         self.set_owner(ino, uid, gid)
@@ -457,7 +440,7 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
 
     fn utimens(
         &mut self,
-        path: &str,
+        path: &[u8],
         atime: Option<i64>,
         mtime: Option<i64>,
         follow: bool,
@@ -476,16 +459,16 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
             .map_err(|error| self.note_error(error))
     }
 
-    fn mkfifo(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+    fn mkfifo(&mut self, path: &[u8], mode: u16) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mknod(parent, name.as_bytes(), 0o010000 | (mode & 0o7777), 0, 0, 0)
+            .mknod(parent, &name, 0o010000 | (mode & 0o7777), 0, 0, 0)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
 
-    fn mknod(&mut self, path: &str, mode: u16, dev: u32) -> Result<(), Errno> {
+    fn mknod(&mut self, path: &[u8], mode: u16, dev: u32) -> Result<(), Errno> {
         self.ensure_writable()?;
         let kind = mode & 0o170000;
         if !matches!(kind, 0o010000 | 0o020000 | 0o060000 | 0o140000) {
@@ -493,7 +476,7 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
         }
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mknod(parent, name.as_bytes(), mode, u64::from(dev), 0, 0)
+            .mknod(parent, &name, mode, u64::from(dev), 0, 0)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }

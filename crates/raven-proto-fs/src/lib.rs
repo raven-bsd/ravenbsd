@@ -93,8 +93,6 @@ pub enum ProtoError {
     LengthOutOfRange,
     /// A field is well formed but violates an invariant.
     Malformed,
-    /// A name or path is not valid UTF-8.
-    InvalidUtf8,
     /// A directory entry name is empty or contains `/` or NUL.
     InvalidName,
     /// A response status is outside the documented errno range.
@@ -114,10 +112,7 @@ impl ProtoError {
             Self::Truncated | Self::TrailingBytes | Self::Malformed | Self::BadStatus => {
                 Errno::EPROTO
             }
-            Self::LengthOutOfRange
-            | Self::InvalidUtf8
-            | Self::InvalidName
-            | Self::InvalidOpenFlags => Errno::EINVAL,
+            Self::LengthOutOfRange | Self::InvalidName | Self::InvalidOpenFlags => Errno::EINVAL,
         }
     }
 }
@@ -141,7 +136,6 @@ impl fmt::Display for ProtoError {
             Self::UnknownOp(op) => write!(formatter, "unknown operation {op}"),
             Self::LengthOutOfRange => formatter.write_str("length or count out of range"),
             Self::Malformed => formatter.write_str("malformed field"),
-            Self::InvalidUtf8 => formatter.write_str("name or path is not UTF-8"),
             Self::InvalidName => formatter.write_str("invalid directory entry name"),
             Self::BadStatus => formatter.write_str("status outside the errno range"),
             Self::InvalidOpenFlags => formatter.write_str("invalid open flags"),
