@@ -465,6 +465,7 @@ cfg_if! {
 
 // limits.h
 pub const PATH_MAX: c_int = 4096;
+pub const IOV_MAX: c_int = 1024;
 
 // fcntl.h
 
