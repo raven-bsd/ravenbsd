@@ -5,9 +5,10 @@
 # S85p 0.1.0 USB keyboard console login gate.
 #
 # Builds the release profile image, boots it under QEMU with `qemu-xhci` and
-# `usb-kbd`, and types the brush login dialogue only through the QMP monitor.
-# The serial console is output-only, so a pass cannot come from serial input.
-# Every serial, summary and hash is written under
+# `usb-kbd`, and types the brush login dialogue as QMP input events routed to
+# the USB keyboard display. The routed display excludes the PS/2 keyboard and
+# the serial console is output-only, so a pass cannot come from PS/2 or serial
+# input. Every serial, summary and hash is written under
 # tickets/evidence/artifacts/S85p/ in ravenbsd-prjmgmt.
 #
 # Usage:

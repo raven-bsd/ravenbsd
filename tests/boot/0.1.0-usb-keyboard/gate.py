@@ -6,12 +6,11 @@
 
 Boot the release profile image under QEMU with `qemu-xhci` and `usb-kbd`, wait
 for the brush login prompt on the serial console, and type the login dialogue
-only through the QMP monitor (`sendkey`). The gate then asserts the password
-prompt, the root shell prompt and a marker command echoed by the guest.
-
-The serial console is output-only here (`-serial file:`), so a pass cannot come
-from serial input. A missing prompt, rejected input, failed login or panic names
-the exact stage and preserves the serial.
+only as QMP input events routed to the USB keyboard (`display=video0`). The
+routed display excludes the unrouted PS/2 keyboard, and the serial console is
+output-only here (`-serial file:`), so a pass cannot come from PS/2 or serial
+input. The gate then asserts the password prompt, the root shell prompt and a
+marker command echoed by the guest.
 
 Usage:
   sh tests/boot/0.1.0-usb-keyboard/run.sh --arch x86_64 --accel kvm
@@ -69,7 +68,7 @@ MARKER_COMMAND = "echo " + MARKER_TEXT
 MARKER_LINE = r"(?m)^" + re.escape(MARKER_TEXT) + r"$"
 REJECTED = r"(?i)login incorrect"
 
-PANIC_PATTERN = r"(?i)kernel panic|\bpanic:|EXCEPTION"
+PANIC_PATTERN = r"(?i)kernel panic|panicked at|\bpanic:|EXCEPTION"
 
 IMAGE_TIMEOUT = 300
 TOTAL_TIMEOUT = 240
@@ -110,7 +109,7 @@ KEY_NAMES = {
 
 
 def key_name(character: str) -> str:
-    """Return the QEMU `sendkey` name for one ASCII character."""
+    """Return the QEMU `QKeyCode` name for one ASCII character."""
     if len(character) != 1:
         raise ValueError(f"expected one character, got {character!r}")
     if "a" <= character <= "z" or "0" <= character <= "9":
@@ -128,11 +127,22 @@ def key_sequence(text: str) -> list[str]:
     return [key_name(character) for character in text] + ["ret"]
 
 
-def sendkey_command(key: str) -> dict:
-    """Return the QMP request that injects one key into the guest keyboard."""
+def input_event_command(key: str, down: bool) -> dict:
+    """Return the QMP request that routes one key event to the USB keyboard."""
     return {
-        "execute": "human-monitor-command",
-        "arguments": {"command-line": f"sendkey {key}"},
+        "execute": "input-send-event",
+        "arguments": {
+            "device": "video0",
+            "events": [
+                {
+                    "type": "key",
+                    "data": {
+                        "key": {"type": "qcode", "data": key},
+                        "down": down,
+                    },
+                }
+            ],
+        },
     }
 
 
@@ -180,13 +190,17 @@ def qemu_argv(
         f"if=pflash,format=raw,file={vars_path}",
         "-drive",
         f"format=raw,file={image}",
+        "-vga",
+        "none",
+        "-device",
+        "VGA,id=video0",
         "-device",
         "qemu-xhci",
         "-qmp",
         f"unix:{qmp_path},server=on,wait=off",
     ]
     if mutation != "no-keyboard":
-        argv.extend(["-device", "usb-kbd"])
+        argv.extend(["-device", "usb-kbd,display=video0"])
     if accel == "kvm":
         argv.extend(["-enable-kvm", "-cpu", "host"])
     else:
@@ -278,7 +292,7 @@ class Serial:
 
 
 class Qmp:
-    """QMP client that injects keys through QEMU's monitor."""
+    """QMP client that injects keys into the routed USB keyboard."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -321,7 +335,14 @@ class Qmp:
 
     def type_text(self, text: str) -> None:
         for key in key_sequence(text):
-            self.command(sendkey_command(key))
+            if key.startswith("shift-"):
+                self.command(input_event_command("shift", True))
+                self.command(input_event_command(key[6:], True))
+                self.command(input_event_command(key[6:], False))
+                self.command(input_event_command("shift", False))
+            else:
+                self.command(input_event_command(key, True))
+                self.command(input_event_command(key, False))
             time.sleep(KEY_DELAY)
 
     def close(self) -> None:

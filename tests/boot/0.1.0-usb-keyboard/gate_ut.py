@@ -46,14 +46,29 @@ class KeyNameTests(unittest.TestCase):
 
 
 class QmpCommandTests(unittest.TestCase):
-    def test_sendkey_is_a_human_monitor_command(self):
+    def test_input_event_is_routed_to_the_usb_display(self):
         self.assertEqual(
-            gate.sendkey_command("ret"),
+            gate.input_event_command("ret", True),
             {
-                "execute": "human-monitor-command",
-                "arguments": {"command-line": "sendkey ret"},
+                "execute": "input-send-event",
+                "arguments": {
+                    "device": "video0",
+                    "events": [
+                        {
+                            "type": "key",
+                            "data": {
+                                "key": {"type": "qcode", "data": "ret"},
+                                "down": True,
+                            },
+                        }
+                    ],
+                },
             },
         )
+
+    def test_input_event_carries_the_release(self):
+        command = gate.input_event_command("r", False)
+        self.assertFalse(command["arguments"]["events"][0]["data"]["down"])
 
 
 class StageTests(unittest.TestCase):
@@ -85,6 +100,14 @@ class StageTests(unittest.TestCase):
             gate.console_stage("login: \npanic: page fault\n"), gate.PANIC
         )
 
+    def test_rust_panic_is_a_panic(self):
+        self.assertEqual(
+            gate.console_stage(
+                "login: \nthread 'main' (1) panicked at src/main.rs:1:1:\n"
+            ),
+            gate.PANIC,
+        )
+
     def test_exit_code_names_the_failed_stage(self):
         self.assertEqual(gate.EXIT_STAGE[gate.PANIC], 14)
         self.assertEqual(gate.EXIT_STAGE[gate.INPUT], 11)
@@ -113,15 +136,16 @@ class MutationTests(unittest.TestCase):
             "no-keyboard",
         )
         self.assertIn("qemu-xhci", argv)
-        self.assertNotIn("usb-kbd", argv)
+        self.assertFalse(any(arg.startswith("usb-kbd") for arg in argv))
 
-    def test_normal_cell_attaches_the_usb_keyboard(self):
+    def test_normal_cell_routes_the_usb_keyboard(self):
         argv = gate.qemu_argv(
             "x86_64", "tcg", gate.Path("image.img"), gate.Path("vars.fd"),
             gate.Path("code.fd"), gate.Path("serial.log"), gate.Path("qmp.sock"),
             "none",
         )
-        self.assertIn("usb-kbd", argv)
+        self.assertIn("usb-kbd,display=video0", argv)
+        self.assertIn("VGA,id=video0", argv)
         self.assertIn("qemu-xhci", argv)
 
 
