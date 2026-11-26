@@ -65,8 +65,9 @@ const LIMIT_TIMEOUT_NS: u64 = 400_000_000;
 const ROBUST_TIMEOUT_NS: u64 = 2_000_000_000;
 /// Upper bound on a scheduling settle: enough for a waiter on another CPU to enqueue.
 const SETTLE_NS: u64 = 100_000_000;
-/// Bound on a yield loop waiting for a worker to arm.
-const SPIN_LIMIT: usize = 5_000_000;
+/// Wall-clock and iteration bounds on a yield loop waiting for a worker to arm.
+const SPIN_DEADLINE_NS: u64 = 3_000_000_000;
+const SPIN_LIMIT: usize = 200_000;
 const TLS_ROUNDS: usize = 1000;
 
 const CLOCK_MONOTONIC: c_int = 1;
@@ -278,19 +279,31 @@ fn thread_pointer() -> usize {
 }
 
 fn spin_until(condition: impl Fn() -> bool) -> bool {
-    for _ in 0..SPIN_LIMIT {
+    let start = now_ns();
+    let mut iterations = 0usize;
+    while iterations < SPIN_LIMIT {
         if condition() {
             return true;
         }
+        // Check the clock every 64 yields; the iteration cap still bounds a failing clock.
+        if iterations & 0x3f == 0 && now_ns().saturating_sub(start) >= SPIN_DEADLINE_NS {
+            return false;
+        }
         yield_now();
+        iterations = iterations.saturating_add(1);
     }
-    false
+    condition()
 }
 
 fn settle() {
     let start = now_ns();
-    while now_ns().saturating_sub(start) < SETTLE_NS {
+    let mut iterations = 0usize;
+    while iterations < SPIN_LIMIT {
+        if now_ns().saturating_sub(start) >= SETTLE_NS {
+            return;
+        }
         yield_now();
+        iterations = iterations.saturating_add(1);
     }
 }
 
