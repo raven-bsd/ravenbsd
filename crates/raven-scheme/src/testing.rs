@@ -107,6 +107,16 @@ impl FakeKernel {
             .collect()
     }
 
+    /// Request handles recorded by `SEND`, in send order.
+    pub fn sent_handles(&self) -> Vec<Handle> {
+        self.state
+            .lock()
+            .sent
+            .iter()
+            .map(|(handle, _)| *handle)
+            .collect()
+    }
+
     /// Request handles closed through `CLOSE`.
     pub fn closed(&self) -> Vec<Handle> {
         self.state.lock().closed.clone()

@@ -860,6 +860,56 @@ fn server_completer_has_a_fresh_token_per_request() {
 }
 
 #[test]
+fn deferred_replies_follow_their_own_requests() {
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut first = TestHandler {
+        defer: true,
+        ..TestHandler::default()
+    };
+    let mut second = TestHandler {
+        defer: true,
+        ..TestHandler::default()
+    };
+    let mut first_packet = open_packet("a");
+    first_packet.request_id = 41;
+    let mut second_packet = open_packet("b");
+    second_packet.request_id = 42;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet: first_packet,
+            },
+            &mut first,
+        )
+        .unwrap();
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(10),
+                packet: second_packet,
+            },
+            &mut second,
+        )
+        .unwrap();
+    let completer = server.completer();
+    // Complete out of order and with different results: the second request finishes first.
+    completer
+        .complete(second.token.unwrap(), Err(Errno::EIO))
+        .unwrap();
+    completer.complete(first.token.unwrap(), Ok(3)).unwrap();
+    assert_eq!(kernel.sent_handles(), vec![Handle(10), Handle(9)]);
+    let replies = decode_sent(&kernel);
+    assert_eq!(replies.len(), 2);
+    assert_eq!(replies[0].request_id, 42);
+    assert_eq!(replies[0].status, i32::from(Errno::EIO.0));
+    assert_eq!(replies[1].request_id, 41);
+    assert_eq!(replies[1].status, 0);
+    assert_eq!(replies[1].buffer_len, 3);
+}
+
+#[test]
 fn positional_flag_dispatches_pread_and_pwrite() {
     let kernel = FakeKernel::new();
     let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
