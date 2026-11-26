@@ -20,7 +20,8 @@
 //! before use. See `README.md` for the byte tables that match the golden tests.
 //!
 //! `OPEN`, `READ`, `WRITE`, `CLOSE`, `DUP` and `FSTAT` keep the S11 opcodes. `OPEN` carries a path
-//! relative to the server root (at most 255 bytes) and the validated [`OpenFlags`] wire bit set.
+//! relative to the server root (at most [`MAX_PATH`] bytes, `PATH_MAX` minus the terminating NUL)
+//! and the validated [`OpenFlags`] wire bit set.
 //! `READ` and `WRITE` are sequential per open-file description; a nonzero wire offset is invalid.
 //! `READ` on a directory returns [`DirEntry`] records. `FSTAT` returns a [`Stat`] record. All path
 //! control operations use [`CallRequest`]. The authoritative contract is
@@ -64,8 +65,8 @@ pub use open::{
     WIRE_OPEN_TRUNC, WIRE_OPEN_WRITE,
 };
 pub use path::{
-    MAX_COMPONENT, MAX_PATH, NormalizedPath, PathError, normalize_absolute, normalize_request,
-    split_first_component,
+    MAX_COMPONENT, MAX_PATH, NormalizedPath, PATH_MAX, PathError, normalize_absolute,
+    normalize_request, split_first_component,
 };
 pub use raven_abi::errno::Errno;
 pub use stat::{STAT_LEN, Stat};
