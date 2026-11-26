@@ -48,7 +48,7 @@ fn the_committed_tables_validate() {
     assert_eq!(tables.structs.record.len(), 26);
     assert_eq!(tables.structs.opaque.len(), 32);
     assert_eq!(tables.types.types.len(), 46);
-    assert_eq!(tables.deviations.deviation.len(), 101);
+    assert_eq!(tables.deviations.deviation.len(), 103);
 }
 
 #[test]

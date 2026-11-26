@@ -148,8 +148,8 @@ fn a_flipped_offset_fails_generate_and_names_the_field() {
     };
     temp.mutate(
         "structs.toml",
-        "{ name = \"st_size\", ty = \"i64\", off = 48 }",
-        "{ name = \"st_size\", ty = \"i64\", off = 56 }",
+        "{ name = \"st_size\", ty = \"i64\", off = 112 }",
+        "{ name = \"st_size\", ty = \"i64\", off = 120 }",
     );
     let output = generate(&temp, &resources);
     assert_eq!(output.status.code(), Some(1));

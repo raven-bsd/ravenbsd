@@ -180,8 +180,8 @@ fn structs_contains_records_zeros_and_assertions() {
     assert!(text.contains("pub struct Stat {"));
     assert!(text.contains("impl Stat {"));
     assert!(text.contains("pub const ZERO: Self"));
-    assert!(text.contains("core::mem::size_of::<Stat>() == 128"));
-    assert!(text.contains("core::mem::offset_of!(Stat, st_size) == 48"));
+    assert!(text.contains("core::mem::size_of::<Stat>() == 224"));
+    assert!(text.contains("core::mem::offset_of!(Stat, st_size) == 112"));
     assert!(text.contains("pub struct UcontextT"));
     assert!(text.contains("#[repr(C, align(16))]"));
 }

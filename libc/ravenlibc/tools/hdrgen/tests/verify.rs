@@ -66,7 +66,7 @@ fn verify_prints_the_musl_probe_table() {
     assert!(text.contains("jmp_buf"), "{text}");
     assert!(text.contains("200/8"), "{text}");
     assert!(text.contains("392/8"), "{text}");
-    assert!(text.contains("144/8"), "{text}");
+    assert!(text.contains("168/8"), "{text}");
     assert!(text.contains("differs"), "{text}");
 }
 
