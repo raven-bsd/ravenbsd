@@ -1060,7 +1060,13 @@ fn row_exec_image(state: &mut State) {
         }
     }
     // SAFETY: the path is NUL-terminated.
-    let cloexec_fd = unsafe { open(cloexec_path.as_ptr(), O_RDWR | O_CLOEXEC) };
+    let cloexec_fd = unsafe {
+        open(
+            cloexec_path.as_ptr(),
+            O_RDWR | O_CREAT | O_CLOEXEC,
+            0o600 as c_int,
+        )
+    };
     let cloexec_errno = errno();
     created = created && cloexec_fd >= 0;
     conformance::note(
