@@ -805,6 +805,26 @@
       "ty": "i32",
       "value": 33
     },
+    "F_DUP2FD": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 10
+    },
+    "F_DUP2FD_CLOEXEC": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 18
+    },
+    "F_DUP3FD": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 24
+    },
+    "F_DUP3FD_SHIFT": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 16
+    },
     "F_DUPFD": {
       "group": "fcntl",
       "ty": "i32",
@@ -814,6 +834,11 @@
       "group": "fcntl",
       "ty": "i32",
       "value": 17
+    },
+    "F_DUPFD_CLOFORK": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 23
     },
     "F_GETFD": {
       "group": "fcntl",
@@ -875,6 +900,16 @@
       "ty": "i32",
       "value": 20
     },
+    "F_ISUNIONSTACK": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 21
+    },
+    "F_KINFO": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 22
+    },
     "F_LOCK": {
       "group": "fcntl",
       "ty": "i32",
@@ -900,10 +935,25 @@
       "ty": "i32",
       "value": 32
     },
+    "F_OGETLK": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 7
+    },
     "F_OK": {
       "group": "fcntl",
       "ty": "i32",
       "value": 0
+    },
+    "F_OSETLK": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 8
+    },
+    "F_OSETLKW": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 9
     },
     "F_OWNER_GID": {
       "group": "fcntl",
@@ -925,10 +975,20 @@
       "ty": "i32",
       "value": 0
     },
+    "F_RDAHEAD": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 16
+    },
     "F_RDLCK": {
       "group": "fcntl",
       "ty": "i32",
       "value": 1
+    },
+    "F_READAHEAD": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 15
     },
     "F_SEAL_FUTURE_WRITE": {
       "group": "fcntl",
@@ -979,6 +1039,11 @@
       "group": "fcntl",
       "ty": "i32",
       "value": 13
+    },
+    "F_SETLK_REMOTE": {
+      "group": "fcntl",
+      "ty": "i32",
+      "value": 14
     },
     "F_SETOWN": {
       "group": "fcntl",
