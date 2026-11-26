@@ -224,11 +224,18 @@ mod program {
     /// keyboard.
     fn serve_console(service: &mut KeyboardService<HidTransport>) -> Result<(), String> {
         println!("usb-keyboard: serving");
+        let mut pushed = 0usize;
         loop {
             service.poll().map_err(hid_text)?;
             let mut console = [0u8; 8];
             let count = service.read_console(&mut console);
-            push_console(&console[..count]);
+            if count > 0 {
+                if pushed == 0 {
+                    println!("usb-keyboard: first console bytes len={count}");
+                }
+                pushed = pushed.saturating_add(1);
+                push_console(&console[..count]);
+            }
             let _ = raven_rt::nanosleep(SERVE_TICK_NS);
         }
     }
