@@ -109,6 +109,7 @@ unsafe extern "C" {
     fn close(fd: c_int) -> c_int;
     fn mkdir(path: *const c_char, mode: u32) -> c_int;
     fn lstat(path: *const c_char, buffer: *mut Stat) -> c_int;
+    fn rename(from: *const c_char, to: *const c_char) -> c_int;
     fn symlink(target: *const c_char, path: *const c_char) -> c_int;
     fn chroot(path: *const c_char) -> c_int;
     fn __errno_location() -> *mut c_int;
@@ -329,6 +330,36 @@ fn row_long_path(state: &mut State) {
     );
 }
 
+fn row_rename_max(state: &mut State) {
+    let mut source = Cs::new();
+    source.base(b"/tmp/paths");
+    for _ in 0..15 {
+        let _ = source.component(b'q', 255);
+    }
+    let _ = source.component(b'q', 244);
+    let mut destination = Cs::new();
+    destination.base(b"/tmp/paths");
+    for _ in 0..15 {
+        let _ = destination.component(b'q', 255);
+    }
+    let _ = destination.component(b'z', 244);
+    let source_len = source.len;
+    let destination_len = destination.len;
+    // SAFETY: both pointers are NUL-terminated arrays owned by the two builders.
+    let renamed = unsafe { rename(source.ptr(), destination.ptr()) } == 0;
+    let error = errno();
+    let moved = lstat_path(&mut destination)
+        .is_some_and(|stat| stat.st_mode & S_IFMT == S_IFDIR);
+    let gone = lstat_path(&mut source).is_none();
+    state.check(
+        "rename-max",
+        renamed && moved && gone,
+        format_args!(
+            "renamed={renamed} from={source_len} to={destination_len} moved={moved} gone={gone} errno={error}"
+        ),
+    );
+}
+
 fn row_component_limit(state: &mut State) {
     let mut max = Cs::new();
     max.base(b"/tmp/paths");
@@ -413,6 +444,7 @@ fn run_normal(prepared: bool) -> i32 {
     let mut max_widths = [255usize; 16];
     max_widths[15] = 244;
     row_levels(&mut state, "long-path-max", b'q', &max_widths);
+    row_rename_max(&mut state);
     row_component_limit(&mut state);
     row_symlink_suffix(&mut state);
     row_absolute_symlink(&mut state);

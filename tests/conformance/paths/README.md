@@ -12,6 +12,8 @@ path travels in the request buffer and the filesystem wire carries up to 4095 by
 * `long-path-1000` - a 1010-byte path, same checks.
 * `long-path-max` - a maximum 4095-byte path (sixteen components), same checks. The resulting
   4113-byte control request is captured and served, so the whole public path boundary is proven.
+* `rename-max` - a `rename` whose source and destination are both 4095 bytes; the 8210-byte
+  two-path request is captured, the destination stats and the source is gone.
 * `component-255` - a 255-byte component is a directory; a 256-byte component returns
   `ENAMETOOLONG`.
 * `symlink-suffix` - opening `link/<remaining>` reaches the link target plus the unprocessed
