@@ -174,7 +174,7 @@ def build_image(arch: str, image: Path, out: Path) -> None:
         [
             "cargo", "xtask", "image", "--arch", arch, "--profile", "libc-test",
             "--initfs", str(initfs),
-            "--cmdline", f"console={ARCHES[arch]['console']} test-exit=1 k495-debug=1",
+            "--cmdline", f"console={ARCHES[arch]['console']} test-exit=1",
             "--output", str(image),
         ],
         900,
