@@ -63,20 +63,19 @@ HEADER_PROBE = r"""
 #include <termios.h>
 #include <sys/ioctl.h>
 
-_Static_assert(sizeof(struct termios) == 60, "native termios size");
-_Static_assert(_Alignof(struct termios) == 4, "native termios alignment");
-_Static_assert(offsetof(struct termios, c_line) == 16, "c_line offset");
-_Static_assert(offsetof(struct termios, c_cc) == 17, "c_cc offset");
-_Static_assert(offsetof(struct termios, __c_ispeed) == 52, "c_ispeed offset");
-_Static_assert(offsetof(struct termios, __c_ospeed) == 56, "c_ospeed offset");
-_Static_assert(NCCS == 32, "NCCS");
+_Static_assert(sizeof(struct termios) == 44, "pinned FreeBSD termios size");
+_Static_assert(_Alignof(struct termios) == 4, "pinned FreeBSD termios alignment");
+_Static_assert(offsetof(struct termios, c_cc) == 16, "c_cc offset");
+_Static_assert(offsetof(struct termios, c_ispeed) == 36, "c_ispeed offset");
+_Static_assert(offsetof(struct termios, c_ospeed) == 40, "c_ospeed offset");
+_Static_assert(NCCS == 20, "NCCS");
 _Static_assert(
-    VEOF == 0 && VINTR == 8 && VMIN == 16 && VTIME == 17,
+    VEOF == 0 && VINTR == 8 && VMIN == 16 && VTIME == 17 && VERASE2 == 7,
     "BSD control-character indexes");
-_Static_assert(TIOCGETA == 0x403c7413UL, "TIOCGETA");
-_Static_assert(TIOCSETA == 0x803c7414UL, "TIOCSETA");
-_Static_assert(TIOCSETAW == 0x803c7415UL, "TIOCSETAW");
-_Static_assert(TIOCSETAF == 0x803c7416UL, "TIOCSETAF");
+_Static_assert(TIOCGETA == 0x402c7413UL, "TIOCGETA");
+_Static_assert(TIOCSETA == 0x802c7414UL, "TIOCSETA");
+_Static_assert(TIOCSETAW == 0x802c7415UL, "TIOCSETAW");
+_Static_assert(TIOCSETAF == 0x802c7416UL, "TIOCSETAF");
 _Static_assert(TIOCGWINSZ == 0x40087468UL, "TIOCGWINSZ");
 _Static_assert(TIOCSWINSZ == 0x80087467UL, "TIOCSWINSZ");
 _Static_assert(TIOCGPGRP == 0x40047477UL, "TIOCGPGRP");
@@ -152,8 +151,10 @@ def build_image(arch: str, image: Path, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     step(out, "fixture-build", ["sh", "tests/conformance/terminal/build.sh", arch], 240)
     shutil.rmtree(ROOT / f"build/cargo/uutils-{arch}", ignore_errors=True)
+    # The terminal probe needs the initfs services, not brush. The libc-test profile stages the
+    # same pty/vfs/console servers without the shell and keeps the terminal image ABI-consistent.
     step(out, "initfs-build",
-         ["cargo", "xtask", "initfs", "--arch", arch, "--profile", "release"], 600)
+         ["cargo", "xtask", "initfs", "--arch", arch, "--profile", "libc-test"], 600)
     initfs = out / "terminal-initfs.img"
     step(
         out,
@@ -171,7 +172,7 @@ def build_image(arch: str, image: Path, out: Path) -> None:
         out,
         "image-build",
         [
-            "cargo", "xtask", "image", "--arch", arch, "--profile", "release",
+            "cargo", "xtask", "image", "--arch", arch, "--profile", "libc-test",
             "--initfs", str(initfs),
             "--cmdline", f"console={ARCHES[arch]['console']} test-exit=1",
             "--output", str(image),

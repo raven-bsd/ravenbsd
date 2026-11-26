@@ -36,7 +36,7 @@ const TCSANOW: c_int = 0;
 const TCSADRAIN: c_int = 1;
 const TCSAFLUSH: c_int = 2;
 
-const NCCS: usize = 32;
+const NCCS: usize = 20;
 const VEOF: usize = 0;
 const VERASE: usize = 3;
 const VKILL: usize = 5;
@@ -45,29 +45,29 @@ const VQUIT: usize = 9;
 const VMIN: usize = 16;
 const VTIME: usize = 17;
 
-const ICRNL: u32 = 0o000400;
-const IXON: u32 = 0o002000;
-const OPOST: u32 = 0o000001;
-const ONLCR: u32 = 0o000004;
-const CSIZE: u32 = 0o000060;
-const CS8: u32 = 0o000060;
-const CREAD: u32 = 0o000200;
-const PARENB: u32 = 0o000400;
-const CLOCAL: u32 = 0o010000;
-const ISIG: u32 = 0o000001;
-const ICANON: u32 = 0o000002;
-const ECHO: u32 = 0o000010;
-const ECHOE: u32 = 0o000020;
-const ECHOK: u32 = 0o000040;
-const IEXTEN: u32 = 0o100000;
-const B9600: u32 = 0o000015;
+const ICRNL: u32 = 0x0000_0100;
+const IXON: u32 = 0x0000_0200;
+const OPOST: u32 = 0x0000_0001;
+const ONLCR: u32 = 0x0000_0002;
+const CSIZE: u32 = 0x0000_0300;
+const CS8: u32 = 0x0000_0300;
+const CREAD: u32 = 0x0000_0800;
+const PARENB: u32 = 0x0000_1000;
+const CLOCAL: u32 = 0x0000_8000;
+const ISIG: u32 = 0x0000_0080;
+const ICANON: u32 = 0x0000_0100;
+const ECHO: u32 = 0x0000_0008;
+const ECHOE: u32 = 0x0000_0002;
+const ECHOK: u32 = 0x0000_0004;
+const ECHONL: u32 = 0x0000_0010;
+const IEXTEN: u32 = 0x0000_0400;
+const B9600: u32 = 9600;
 
 // The `c_cc` indexes of the Rust target libc as committed in the toolchain. S742 proves that the
 // target module and the native tty agree; the build writes this file from
 // `toolchain/vendor/libc/src/unix/ravenbsd/mod.rs`, so the test uses the target's own constants
 // instead of a copy of the public header.
 include!(concat!(env!("TERMIOS_TARGET_CONSTANTS")));
-const _: () = assert!(NCCS == TARGET_NCCS);
 
 const EPERM: c_int = 1;
 const EINTR: c_int = 4;
@@ -84,6 +84,13 @@ const TIOCSWINSZ: c_ulong = 0x8008_7467;
 
 const IO_TIMEOUT_MS: c_int = 2000;
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Timeval {
+    tv_sec: i64,
+    tv_usec: i64,
+}
+
 static FAILURES: AtomicU32 = AtomicU32::new(0);
 static SIGNAL_SEEN: AtomicI32 = AtomicI32::new(0);
 
@@ -94,7 +101,6 @@ struct Termios {
     c_oflag: u32,
     c_cflag: u32,
     c_lflag: u32,
-    c_line: u8,
     c_cc: [u8; NCCS],
     c_ispeed: u32,
     c_ospeed: u32,
@@ -106,14 +112,13 @@ impl Termios {
         c_oflag: 0,
         c_cflag: 0,
         c_lflag: 0,
-        c_line: 0,
         c_cc: [0; NCCS],
         c_ispeed: 0,
         c_ospeed: 0,
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Termios>() == 60);
+const _: () = assert!(core::mem::size_of::<Termios>() == 44);
 const _: () = assert!(core::mem::align_of::<Termios>() == 4);
 
 #[repr(C)]
@@ -182,6 +187,7 @@ unsafe extern "C" {
     fn pipe(fds: *mut c_int) -> c_int;
     fn sigaction(signal: c_int, action: *const Sigaction, old: *mut Sigaction) -> c_int;
     fn usleep(microseconds: c_uint) -> c_int;
+    fn gettimeofday(value: *mut Timeval, zone: *mut c_void) -> c_int;
     fn __errno_location() -> *mut c_int;
     fn _exit(status: c_int) -> !;
 }
@@ -328,7 +334,7 @@ fn make_raw(fd: c_int) -> bool {
     // ECHO|ECHONL|ICANON|ISIG|IEXTEN (the public `<bits/termios.h>` values).
     termios.c_iflag &= !(0x1 | 0x2 | 0x8 | 0x20 | 0x40 | 0x80 | 0x100 | 0x200);
     termios.c_oflag &= !OPOST;
-    termios.c_lflag &= !(ECHO | 0x100 | ICANON | ISIG | IEXTEN);
+    termios.c_lflag &= !(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
     termios.c_cflag &= !(CSIZE | PARENB);
     termios.c_cflag |= CS8;
     termios.c_cc[VMIN] = 1;
@@ -655,18 +661,30 @@ fn setup_winsize(_fd: c_int) -> c_int {
     0
 }
 
-fn setup_isig(fd: c_int) -> c_int {
+fn setup_isig(fd: c_int, enabled: bool) -> c_int {
     let mut termios = Termios::ZERO;
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
         return -1;
     }
-    termios.c_lflag |= ISIG;
+    if enabled {
+        termios.c_lflag |= ISIG;
+    } else {
+        termios.c_lflag &= !ISIG;
+    }
     termios.c_lflag &= !ICANON;
     termios.c_lflag &= !ECHO;
     termios.c_cc[VINTR] = 3;
     termios.c_cc[VMIN] = 1;
     termios.c_cc[VTIME] = 0;
     unsafe { tcsetattr(fd, TCSANOW, &termios) }
+}
+
+fn setup_isig_on(fd: c_int) -> c_int {
+    setup_isig(fd, true)
+}
+
+fn setup_isig_off(fd: c_int) -> c_int {
+    setup_isig(fd, false)
 }
 
 struct Signals {
@@ -879,13 +897,8 @@ fn row_isig(enabled: bool) {
             return;
         }
     };
-    if enabled && !make_raw(pair.slave) {
-        let error = errno();
-        pair.close();
-        fail("isig", format_args!("raw mode errno={error}"));
-        return;
-    }
-    let signals = match run_signal_child(&pair, setup_isig, SIGINT) {
+    let setup = if enabled { setup_isig_on } else { setup_isig_off };
+    let signals = match run_signal_child(&pair, setup, SIGINT) {
         Some(signals) => signals,
         None => {
             let error = errno();
@@ -920,9 +933,12 @@ fn row_isig(enabled: bool) {
     }
 }
 
-/// `tcsetattr` with every control character cleared, `index` set to `^C`, and the raw-mode
-/// `VMIN`/`VTIME` indexes from the Rust target libc set to 1/0.
-fn setup_target_intr(fd: c_int, index: usize) -> c_int {
+const DISTINCTIVE_INTR: u8 = 0x07;
+const DEFAULT_INTR: u8 = 0x03;
+
+/// Configure `VINTR` at the target libc index to a distinctive byte, with the target
+/// `VMIN`/`VTIME` indexes in raw mode.
+fn setup_target_vintr(fd: c_int) -> c_int {
     let mut termios = Termios::ZERO;
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
         return -1;
@@ -930,47 +946,48 @@ fn setup_target_intr(fd: c_int, index: usize) -> c_int {
     termios.c_lflag |= ISIG;
     termios.c_lflag &= !ICANON;
     termios.c_lflag &= !ECHO;
-    termios.c_cc = [0; NCCS];
-    termios.c_cc[index] = 3;
+    termios.c_cc[TARGET_VINTR] = DISTINCTIVE_INTR;
     termios.c_cc[TARGET_VMIN] = 1;
     termios.c_cc[TARGET_VTIME] = 0;
     unsafe { tcsetattr(fd, TCSANOW, &termios) }
 }
 
-fn target_intr(fd: c_int) -> c_int {
-    setup_target_intr(fd, TARGET_VINTR)
-}
-
-fn old_default_intr(fd: c_int) -> c_int {
-    setup_target_intr(fd, VINTR)
-}
-
-/// The exact raw-mode assertion for the target-libc `VMIN`/`VTIME` indexes.
-fn target_raw_mode(fd: c_int) -> bool {
+fn configure_raw(fd: c_int, vmin: u8, vtime: u8) -> Option<(u8, u8)> {
     let mut termios = Termios::ZERO;
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
-        return false;
+        return None;
     }
     termios.c_lflag &= !ICANON;
     termios.c_lflag &= !ECHO;
-    termios.c_cc = [0; NCCS];
-    termios.c_cc[TARGET_VMIN] = 1;
-    termios.c_cc[TARGET_VTIME] = 0;
+    termios.c_cc[TARGET_VMIN] = vmin;
+    termios.c_cc[TARGET_VTIME] = vtime;
     if unsafe { tcsetattr(fd, TCSANOW, &termios) } != 0 {
+        return None;
+    }
+    let mut back = Termios::ZERO;
+    if unsafe { tcgetattr(fd, &mut back) } != 0 {
+        return None;
+    }
+    Some((back.c_cc[TARGET_VMIN], back.c_cc[TARGET_VTIME]))
+}
+
+fn target_raw_mode(fd: c_int) -> bool {
+    if setup_target_vintr(fd) != 0 {
         return false;
     }
     let mut back = Termios::ZERO;
     if unsafe { tcgetattr(fd, &mut back) } != 0 {
         return false;
     }
-    back.c_cc[TARGET_VMIN] == 1 && back.c_cc[TARGET_VTIME] == 0
+    back.c_cc[TARGET_VINTR] == DISTINCTIVE_INTR
+        && back.c_cc[TARGET_VMIN] == 1
+        && back.c_cc[TARGET_VTIME] == 0
 }
 
-fn signal_exchange(pair: &Pair, setup: fn(c_int) -> c_int) -> Option<c_int> {
-    let signals = run_signal_child(pair, setup, SIGINT)?;
+fn signal_exchange(pair: &Pair, byte: u8) -> Option<c_int> {
+    let signals = run_signal_child(pair, setup_target_vintr, SIGINT)?;
     wait_ready(signals.ready);
-    let intr = 3u8;
-    let written = unsafe { write(pair.master, (&intr as *const u8).cast::<c_void>(), 1) };
+    let written = unsafe { write(pair.master, (&byte as *const u8).cast::<c_void>(), 1) };
     let received = collect_signal(signals.result);
     let mut status = 0;
     unsafe {
@@ -981,14 +998,29 @@ fn signal_exchange(pair: &Pair, setup: fn(c_int) -> c_int) -> Option<c_int> {
     if written == 1 { Some(received) } else { None }
 }
 
+fn now_ms() -> i64 {
+    let mut value = Timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    // SAFETY: `value` is a valid writable timeval and the zone pointer is null.
+    unsafe {
+        gettimeofday(&mut value, null_mut());
+    }
+    value.tv_sec.saturating_mul(1000) + value.tv_usec / 1000
+}
+
 /// Real-pty regression for the Rust target libc `c_cc` indexes.
 ///
-/// The public tty interprets `c_cc[VINTR]`; a program built against the target libc writes the
-/// byte at `TARGET_VINTR`. The two indexes must be the same, and the raw-mode `VMIN`/`VTIME`
-/// indexes must agree too. The default `^C` at the public index must not stand in for the
-/// target's byte: index `VINTR` is cleared before the target index is set, so a mismatch is a
-/// real failure rather than the inherited default.
+/// The tty interrupts on its private `VINTR` byte. A program built against the target libc
+/// writes `0x07` at `TARGET_VINTR`; the TTY must deliver SIGINT for that byte and must not
+/// deliver it for the inherited `^C` after `VINTR` is `0x07`. The target `VMIN`/`VTIME`
+/// indexes must also implement the POSIX timing: `VMIN=1/VTIME=0` returns one byte at once,
+/// `VMIN=0/VTIME=1` returns 0 after about 100 ms.
 fn row_target_vintr() {
+    let mut detail = "ok";
+    let mut ok = true;
+
     let pair = match Pair::open() {
         Some(pair) => pair,
         None => {
@@ -997,40 +1029,98 @@ fn row_target_vintr() {
         }
     };
     let raw = target_raw_mode(pair.slave);
-    let target = signal_exchange(&pair, target_intr);
+    let target = signal_exchange(&pair, DISTINCTIVE_INTR);
     pair.close();
-    let old = if TARGET_VINTR == VINTR {
-        None
-    } else {
-        match Pair::open() {
-            Some(old_pair) => {
-                let signal = signal_exchange(&old_pair, old_default_intr);
-                old_pair.close();
-                signal
-            }
-            None => None,
+    if !raw {
+        ok = false;
+        detail = "read-back";
+    }
+    if target != Some(SIGINT) {
+        ok = false;
+        detail = "distinctive byte did not deliver SIGINT";
+    }
+
+    let old_pair = match Pair::open() {
+        Some(pair) => pair,
+        None => {
+            fail("target-vintr", format_args!("old pair errno={}", errno()));
+            return;
         }
     };
-    let Some(target_signal) = target else {
-        fail("target-vintr", format_args!("target write errno={}", errno()));
-        return;
+    let old = signal_exchange(&old_pair, DEFAULT_INTR);
+    old_pair.close();
+    if old != Some(0) {
+        ok = false;
+        detail = "inherited ^C still delivered SIGINT";
+    }
+
+    let immediate_pair = match Pair::open() {
+        Some(pair) => pair,
+        None => {
+            fail("target-vintr", format_args!("vmin pair errno={}", errno()));
+            return;
+        }
     };
-    let old_ok = match old {
-        None => true,
-        Some(signal) => signal == 0,
+    let immediate = configure_raw(immediate_pair.slave, 1, 0);
+    let sent = unsafe {
+        write(
+            immediate_pair.master,
+            (&b'x' as *const u8).cast::<c_void>(),
+            1,
+        )
     };
-    if raw && target_signal == SIGINT && old_ok {
+    let start = now_ms();
+    let mut buffer = [0u8; 4];
+    let count = unsafe {
+        read(
+            immediate_pair.slave,
+            buffer.as_mut_ptr().cast::<c_void>(),
+            buffer.len(),
+        )
+    };
+    let elapsed = now_ms().saturating_sub(start);
+    immediate_pair.close();
+    if immediate != Some((1, 0)) || sent != 1 || count != 1 || elapsed >= 100 {
+        ok = false;
+        detail = "VMIN=1/VTIME=0 did not return one byte immediately";
+    }
+
+    let timed_pair = match Pair::open() {
+        Some(pair) => pair,
+        None => {
+            fail("target-vintr", format_args!("vtime pair errno={}", errno()));
+            return;
+        }
+    };
+    let timed = configure_raw(timed_pair.slave, 0, 1);
+    let start = now_ms();
+    let count = unsafe {
+        read(
+            timed_pair.slave,
+            buffer.as_mut_ptr().cast::<c_void>(),
+            buffer.len(),
+        )
+    };
+    let elapsed = now_ms().saturating_sub(start);
+    let timed_errno = errno();
+    timed_pair.close();
+    if timed != Some((0, 1)) || count != 0 || elapsed < 50 || elapsed > 500 {
+        ok = false;
+        detail = "VMIN=0/VTIME=1 did not return 0 after about 100 ms";
+    }
+
+    if ok {
         pass(
             "target-vintr",
             format_args!(
-                "target VINTR={TARGET_VINTR} delivered SIGINT; public VINTR={VINTR} did not; target VMIN={TARGET_VMIN} VTIME={TARGET_VTIME} raw"
+                "target VINTR={TARGET_VINTR} byte 0x07 delivered SIGINT; inherited ^C did not; VMIN={TARGET_VMIN}/VTIME={TARGET_VTIME} timing ok"
             ),
         );
     } else {
         fail(
             "target-vintr",
             format_args!(
-                "raw={raw} target VINTR={TARGET_VINTR} signal={target_signal} public VINTR={VINTR} old_signal={old:?} (want SIGINT at the target index only)"
+                "{detail} (target VINTR={TARGET_VINTR} raw={raw} distinctive={target:?} old={old:?} back_vmin_vtime={timed:?} vtime_count={count} vtime_ms={elapsed} vtime_errno={timed_errno})"
             ),
         );
     }
@@ -1041,17 +1131,7 @@ fn slice_bytes<T>(pointer: *const T, count: usize) -> &'static [T] {
     unsafe { &*slice_from_raw_parts(pointer, count) }
 }
 
-extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
-    let args = slice_bytes(argv, argc as usize);
-    let mut run_signals = false;
-    let mut mutation_termios = false;
-    for argument in &args[1..] {
-        if c_str_eq(*argument, b"--signals") {
-            run_signals = true;
-        } else if c_str_eq(*argument, b"--mutation-termios") {
-            mutation_termios = true;
-        }
-    }
+fn run_pass(run_signals: bool, mutation_termios: bool) {
     conformance::emit(format_args!(
         "S175-TERM start uid={} signals={} mutation={}\n",
         unsafe { getuid() },
@@ -1076,6 +1156,32 @@ extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
     }
     let failures = FAILURES.load(Ordering::SeqCst);
     conformance::emit(format_args!("S175-TERM done failures={failures}\n"));
+}
+
+extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
+    let args = slice_bytes(argv, argc as usize);
+    let mut run_signals = false;
+    let mut mutation_termios = false;
+    let mut both = false;
+    for argument in &args[1..] {
+        if c_str_eq(*argument, b"--signals") {
+            run_signals = true;
+        } else if c_str_eq(*argument, b"--mutation-termios") {
+            mutation_termios = true;
+        } else if c_str_eq(*argument, b"--both") {
+            both = true;
+        }
+    }
+    if both {
+        run_pass(run_signals, false);
+        conformance::emit(format_args!("S175-TERM-MUTATION-BEGIN\n"));
+        FAILURES.store(0, Ordering::SeqCst);
+        run_pass(run_signals, true);
+        let failures = FAILURES.load(Ordering::SeqCst);
+        return if failures == 0 { 0 } else { 1 };
+    }
+    run_pass(run_signals, mutation_termios);
+    let failures = FAILURES.load(Ordering::SeqCst);
     if failures == 0 { 0 } else { 1 }
 }
 

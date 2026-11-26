@@ -48,66 +48,66 @@ const DEL: u8 = 0x7f;
 const BACKSPACE: u8 = 0x08;
 
 /// `IGNBRK`: ignore break.
-pub const IGNBRK: u32 = 0o0000001;
+pub const IGNBRK: u32 = 0x0000_0001;
 /// `BRKINT`: break raises `SIGINT`.
-pub const BRKINT: u32 = 0o0000002;
+pub const BRKINT: u32 = 0x0000_0002;
 /// `IGNPAR`: ignore parity errors.
-pub const IGNPAR: u32 = 0o0000004;
+pub const IGNPAR: u32 = 0x0000_0004;
 /// `PARMRK`: mark parity errors.
-pub const PARMRK: u32 = 0o0000010;
+pub const PARMRK: u32 = 0x0000_0008;
 /// `INPCK`: enable input parity checking.
-pub const INPCK: u32 = 0o0000020;
+pub const INPCK: u32 = 0x0000_0010;
 /// `ISTRIP`: strip the eighth input bit.
-pub const ISTRIP: u32 = 0o0000040;
+pub const ISTRIP: u32 = 0x0000_0020;
 /// `INLCR`: translate input `\n` to `\r`.
-pub const INLCR: u32 = 0o0000100;
+pub const INLCR: u32 = 0x0000_0040;
 /// `IGNCR`: ignore input `\r`.
-pub const IGNCR: u32 = 0o0000200;
+pub const IGNCR: u32 = 0x0000_0080;
 /// `ICRNL`: translate input `\r` to `\n`.
-pub const ICRNL: u32 = 0o0000400;
+pub const ICRNL: u32 = 0x0000_0100;
 /// `IXON`: enable start/stop output flow control.
-pub const IXON: u32 = 0o0002000;
+pub const IXON: u32 = 0x0000_0200;
 /// `IXANY`: any character restarts output.
-pub const IXANY: u32 = 0o0004000;
+pub const IXANY: u32 = 0x0000_0800;
 /// `IXOFF`: enable start/stop input flow control.
-pub const IXOFF: u32 = 0o0010000;
+pub const IXOFF: u32 = 0x0000_0400;
 /// `IMAXBEL`: ring the bell on input overflow.
-pub const IMAXBEL: u32 = 0o0020000;
+pub const IMAXBEL: u32 = 0x0000_2000;
 /// `IUTF8`: input is UTF-8.
-pub const IUTF8: u32 = 0o0040000;
+pub const IUTF8: u32 = 0x0000_4000;
 
 /// `OPOST`: enable output processing.
-pub const OPOST: u32 = 0o0000001;
+pub const OPOST: u32 = 0x0000_0001;
 /// `ONLCR`: map output `\n` to `\r\n`.
-pub const ONLCR: u32 = 0o0000004;
+pub const ONLCR: u32 = 0x0000_0002;
 /// `OCRNL`: map output `\r` to `\n`.
-pub const OCRNL: u32 = 0o0000010;
+pub const OCRNL: u32 = 0x0000_0010;
 /// `ONOCR`: do not output `\r` at column zero.
-pub const ONOCR: u32 = 0o0000020;
+pub const ONOCR: u32 = 0x0000_0020;
 /// `ONLRET`: output `\n` also returns the carriage.
-pub const ONLRET: u32 = 0o0000040;
+pub const ONLRET: u32 = 0x0000_0040;
 
 /// `CS8`: eight-bit characters.
-pub const CS8: u32 = 0o0000060;
+pub const CS8: u32 = 0x0000_0300;
 /// `CREAD`: enable the receiver.
-pub const CREAD: u32 = 0o0000200;
-/// `B38400`, the pty default line speed.
-pub const B38400: u32 = 0o0000017;
+pub const CREAD: u32 = 0x0000_0800;
+/// `B38400`, the pty default line speed (numeric donor value).
+pub const B38400: u32 = 38_400;
 
 /// `ISIG`: enable `VINTR`/`VQUIT`/`VSUSP` signals.
-pub const ISIG: u32 = 0o0000001;
+pub const ISIG: u32 = 0x0000_0080;
 /// `ICANON`: enable canonical input processing.
-pub const ICANON: u32 = 0o0000002;
+pub const ICANON: u32 = 0x0000_0100;
 /// `ECHO`: echo input characters.
-pub const ECHO: u32 = 0o0000010;
+pub const ECHO: u32 = 0x0000_0008;
 /// `ECHOE`: echo erase as `"\b \b"`.
-pub const ECHOE: u32 = 0o0000020;
+pub const ECHOE: u32 = 0x0000_0002;
 /// `ECHOK`: echo `VKILL` as a newline.
-pub const ECHOK: u32 = 0o0000040;
+pub const ECHOK: u32 = 0x0000_0004;
 /// `ECHONL`: echo `\n` even when `ECHO` is off.
-pub const ECHONL: u32 = 0o0000100;
+pub const ECHONL: u32 = 0x0000_0010;
 /// `IEXTEN`: enable implementation-defined input processing.
-pub const IEXTEN: u32 = 0o100000;
+pub const IEXTEN: u32 = 0x0000_0400;
 
 /// Index of `VINTR` in `c_cc`.
 pub const VINTR: usize = 0;
@@ -134,8 +134,8 @@ pub const VEOL: usize = 11;
 /// Index of `VWERASE` in `c_cc`.
 pub const VWERASE: usize = 14;
 
-/// The disabled special-character value (`_POSIX_VDISABLE` in Raven libc is 0).
-pub const VDISABLE: u8 = 0;
+/// The disabled special-character value (`_POSIX_VDISABLE`, DR-71/C20 is `0xff`).
+pub const VDISABLE: u8 = 0xff;
 
 /// The complete `struct termios` attribute record.
 ///
@@ -167,7 +167,8 @@ impl Termios {
     /// `ICRNL`, `IXON`, `ISIG`, `IEXTEN`, `OPOST` and `ONLCR`.
     #[must_use]
     pub const fn sane() -> Self {
-        let mut cc = [0u8; 32];
+        // `_POSIX_VDISABLE` is 0xff, so every slot without a default is explicitly disabled.
+        let mut cc = [VDISABLE; 32];
         cc[VINTR] = CTRL_C;
         cc[VQUIT] = 0x1c;
         cc[VERASE] = DEL;

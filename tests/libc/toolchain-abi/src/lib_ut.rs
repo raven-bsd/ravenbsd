@@ -116,13 +116,15 @@ fn termios_constants_match_the_header() {
         "VEOF",
         "VTIME",
         "VMIN",
-        "VSWTC",
+        "VERASE2",
         "VSTART",
         "VSTOP",
         "VSUSP",
         "VEOL",
         "VREPRINT",
         "VDISCARD",
+        "VDSUSP",
+        "VSTATUS",
         "VWERASE",
         "VLNEXT",
         "VEOL2",
@@ -218,8 +220,26 @@ fn statvfs_layout_matches_the_abi() {
 
 #[test]
 fn termios_layout_matches_the_abi() {
-    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "u8", "[u8; 32]", "u32", "u32"];
+    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "[u8; 20]", "u32", "u32"];
     assert_clean(compare_struct("termios", FIELDS), "termios");
+}
+
+#[test]
+fn termios_public_header_is_the_pinned_freebsd_record() {
+    let header = strip_comments(TERMIOS_HEADER);
+    assert!(header.contains("struct termios"), "termios record");
+    assert!(header.contains("#define NCCS 20"), "NCCS=20");
+    assert!(header.contains("c_cc[NCCS]"), "c_cc[NCCS]");
+    assert!(header.contains("c_ispeed"), "c_ispeed");
+    assert!(header.contains("c_ospeed"), "c_ospeed");
+    assert!(!header.contains("c_line"), "no c_line in the public record");
+    assert!(header.contains("VERASE2"), "FreeBSD VERASE2");
+    assert!(
+        !header.contains("VSWTC"),
+        "VSWTC is not a FreeBSD public name"
+    );
+    assert!(header.contains("VDSUSP") && header.contains("VSTATUS"));
+    assert!(header.contains("_POSIX_VDISABLE 0xff"));
 }
 
 #[test]
