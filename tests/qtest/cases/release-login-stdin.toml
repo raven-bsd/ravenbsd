@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S211: the release login shell's stdin is a blocking console session. After the `raven# `
+# prompt the first read must wait for input, not return EAGAIN; a command then runs and
+# `cd && pwd` prints `/root` before `exit 0` ends the session.
+#
+# The case is red on unmodified master: brush aborts with `I/O error: Resource temporarily
+# unavailable` after the prompt. The mutation that restores the non-blocking console stdin
+# reproduces the same abort.
+
+name = "release-login-stdin"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+pre = ["cargo xtask build brush --arch x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+[[expect]]
+regex = '(?i)^password: ?'
+
+[[expect]]
+regex = '^raven# '
+
+[[expect]]
+regex = '^/root$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|AccessError'
+
+[[forbid]]
+regex = '(?i)resource temporarily unavailable|EAGAIN'
+
+[[forbid]]
+regex = '(?i)login: .*incorrect|login: .*failed|getty failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "cd && pwd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/root$'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
