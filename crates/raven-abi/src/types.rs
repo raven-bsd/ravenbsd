@@ -178,6 +178,54 @@ pub mod clock {
     pub const MONOTONIC: u32 = 1;
 }
 
+/// Kernel log ring record layout and `KLOG_READ` result flags.
+pub mod klog {
+    /// `KlogInfo.version` written by this kernel.
+    pub const VERSION: u32 = 1;
+    /// The reader cursor was older than the first retained record and was clamped.
+    pub const LOST: u32 = 1;
+    /// The next record did not fit in the supplied buffer; the cursor was not advanced past it.
+    pub const MORE: u32 = 2;
+    /// Fixed record header: `mono_ns: u64`, `level: u8`, `flags: u8`, `len: u16`,
+    /// `reserved: u32`.
+    pub const HEADER_LEN: usize = 16;
+    /// Maximum record body in bytes.
+    pub const MAX_BODY: usize = 1024;
+    /// Record flag bit 0: written from the panic path.
+    pub const RECORD_PANIC: u8 = 1;
+
+    /// Result record for [`crate::syscall::KLOG_READ`].
+    ///
+    /// `next_cursor` is the absolute byte cursor the caller must pass on its next read.
+    /// `first_cursor` and `last_cursor` bound the retained records; `last_cursor` is also the
+    /// position where a caught-up reader stops.
+    #[repr(C)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+    pub struct KlogInfo {
+        /// Record layout version; [`VERSION`].
+        pub version: u32,
+        /// [`LOST`] and/or [`MORE`].
+        pub flags: u32,
+        /// Cursor after the last complete record copied.
+        pub next_cursor: u64,
+        /// Cumulative count of records lost to overwrite or an oversized body.
+        pub dropped: u64,
+        /// Absolute cursor of the oldest retained record.
+        pub first_cursor: u64,
+        /// Absolute cursor of the next write / caught-up position.
+        pub last_cursor: u64,
+    }
+
+    const _: () = assert!(core::mem::size_of::<KlogInfo>() == 40);
+    const _: () = assert!(core::mem::align_of::<KlogInfo>() == 8);
+    const _: () = assert!(core::mem::offset_of!(KlogInfo, version) == 0);
+    const _: () = assert!(core::mem::offset_of!(KlogInfo, flags) == 4);
+    const _: () = assert!(core::mem::offset_of!(KlogInfo, next_cursor) == 8);
+    const _: () = assert!(core::mem::offset_of!(KlogInfo, dropped) == 16);
+    const _: () = assert!(core::mem::offset_of!(KlogInfo, first_cursor) == 24);
+    const _: () = assert!(core::mem::offset_of!(KlogInfo, last_cursor) == 32);
+}
+
 /// Namespace prefix operations for `PROC_NAMESPACE`.
 pub mod namespace {
     /// Grant every scheme name starting with the prefix.
