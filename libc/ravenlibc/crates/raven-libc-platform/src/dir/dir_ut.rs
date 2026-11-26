@@ -63,10 +63,14 @@ fn k60(name: &[u8], ino: u64, kind: u8) -> alloc::vec::Vec<u8> {
 fn encode_dirents_writes_the_public_record() {
     use crate::dir::{DIRENT_NAME_OFFSET, encode_dirents};
 
-    let raw = k60(b"a", 42, raven_proto_fs::flags::DT_REG);
+    let raw = k60(b"a", 0x0102_0304_0506_0708, raven_proto_fs::flags::DT_REG);
     let mut out = [0u8; 32];
     assert_eq!(encode_dirents(&raw, &mut out), Ok(32));
-    assert_eq!(u64::from_le_bytes(out[0..8].try_into().unwrap()), 42);
+    assert_eq!(
+        u64::from_le_bytes(out[0..8].try_into().unwrap()),
+        0x0102_0304_0506_0708,
+        "d_fileno keeps all 64 bits"
+    );
     assert_eq!(i64::from_le_bytes(out[8..16].try_into().unwrap()), 0);
     assert_eq!(u16::from_le_bytes(out[16..18].try_into().unwrap()), 32);
     assert_eq!(out[18], raven_proto_fs::flags::DT_REG);
