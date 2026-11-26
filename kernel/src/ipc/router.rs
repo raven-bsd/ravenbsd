@@ -1216,8 +1216,10 @@ pub(crate) fn withdraw_undelivered_dup(request: &Arc<PendingRequest>) -> bool {
         queue.retain(|queued| !Arc::ptr_eq(queued, request));
         queue.len() != before
     };
-    if removed && let Some(file) = request.file.as_ref() {
-        file.server_refs.fetch_sub(1, Ordering::AcqRel);
+    if removed {
+        if let Some(file) = request.file.as_ref() {
+            file.server_refs.fetch_sub(1, Ordering::AcqRel);
+        }
     }
     removed
 }
@@ -1261,7 +1263,6 @@ pub(crate) fn on_process_exit(process: &Arc<Process>) {
 }
 
 /// K449 diagnostic: deferred last-close notices still queued.
-#[cfg(target_arch = "x86_64")]
 pub(crate) fn close_notice_count() -> usize {
     CLOSE_NOTICES.lock().len()
 }

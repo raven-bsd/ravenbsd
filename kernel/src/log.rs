@@ -668,15 +668,15 @@ fn panic(info: &PanicInfo<'_>) -> ! {
             "K434 alloc-bt 0x{:x} 0x{:x} 0x{:x} 0x{:x} 0x{:x} 0x{:x}",
             bt[0], bt[1], bt[2], bt[3], bt[4], bt[5]
         );
-        if let Some(index) = raven_kmem::class_for(fail_size)
-            && let Some(stats) = crate::memory::heap::class_stats(index)
-        {
-            let class = raven_kmem::SIZE_CLASSES.get(index).copied().unwrap_or(0);
-            let _ = writeln!(
-                serial,
-                "K434 class size={fail_size} index={index} class={class} slabs={} used={} free={} waste={} fail={}",
-                stats.slabs, stats.in_use, stats.free, stats.waste_bytes, stats.alloc_fail
-            );
+        if let Some(index) = raven_kmem::class_for(fail_size) {
+            if let Some(stats) = crate::memory::heap::class_stats(index) {
+                let class = raven_kmem::SIZE_CLASSES.get(index).copied().unwrap_or(0);
+                let _ = writeln!(
+                    serial,
+                    "K434 class size={fail_size} index={index} class={class} slabs={} used={} free={} waste={} fail={}",
+                    stats.slabs, stats.in_use, stats.free, stats.waste_bytes, stats.alloc_fail
+                );
+            }
         }
         let grow = crate::memory::heap::grow_fail();
         if let Some((spans, free, largest, fail, used)) = crate::memory::heap::arena_stats() {

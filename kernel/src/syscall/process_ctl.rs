@@ -558,7 +558,11 @@ pub fn creation_context(frame: &SyscallFrame) -> Result<usize, Errno> {
         frame.rdx,
         u64::try_from(raven_abi::types::creation::SIZE).map_err(|_| Errno::EINVAL)?,
     )?;
-    let object = caller.handles.lock().get(handle, Rights::NONE).cloned()?;
+    let object = caller
+        .handles
+        .lock()
+        .get(handle, Rights::NONE)
+        .map(|object| object.clone())?;
     let Object::SchemeRequest(request) = object else {
         return Err(Errno::EINVAL);
     };
@@ -638,7 +642,11 @@ pub fn creation_context(frame: &SyscallFrame) -> Result<usize, Errno> {
 pub fn delegate(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
-    let object = caller.handles.lock().get(handle, Rights::NONE).cloned()?;
+    let object = caller
+        .handles
+        .lock()
+        .get(handle, Rights::NONE)
+        .map(|object| object.clone())?;
     let Object::SchemeRequest(request) = object else {
         return Err(Errno::EINVAL);
     };
@@ -1456,7 +1464,7 @@ fn terminate_by_signal(
     core: bool,
 ) -> Result<(), Errno> {
     let raw = (signo & 0x7f) | if core { 0x80 } else { 0 };
-    let code = (raw as i32).checked_neg().ok_or(Errno::EINVAL)?;
+    let code = -(raw as i32);
     if Arc::ptr_eq(caller, target) {
         process::exit_process(code);
     }
@@ -1765,8 +1773,7 @@ fn signal_bit(signo: u32) -> u64 {
 /// Shared receive path for the legacy three-word and the extended six-word call.
 fn receive(frame: &SyscallFrame, words: usize, extended: bool) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
-    let byte_len = words.saturating_mul(8);
-    let destination = UserSlice::new(frame.rdi, byte_len as u64)?;
+    let destination = UserSlice::new(frame.rdi, (words * 8) as u64)?;
     let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let allowed = if extended {
         WNOHANG | SIGRECV_DELIVERABLE
@@ -1801,8 +1808,7 @@ fn receive(frame: &SyscallFrame, words: usize, extended: bool) -> Result<usize, 
             for (chunk, value) in bytes.chunks_exact_mut(8).zip(values).take(words) {
                 chunk.copy_from_slice(&value.to_le_bytes());
             }
-            let output = bytes.get(..byte_len).ok_or(Errno::EFAULT)?;
-            copy_to_user(destination, output)?;
+            copy_to_user(destination, &bytes[..words * 8])?;
             return Ok(signal.signo as usize);
         }
         if flags & WNOHANG != 0 {
