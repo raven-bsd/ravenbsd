@@ -698,19 +698,8 @@ impl raven_libc_signal::kernel::SigKernel for SignalKernel {
     fn now_ns(&self) -> u64 {
         0
     }
-    fn sig_setup(
-        &self,
-        _entry: usize,
-        _ctx_area_offset: usize,
-        _flags: u32,
-    ) -> Result<(), AbiErrno> {
-        Err(abi(raven_libc_abi::errno::ENOSYS))
-    }
     fn kick(&self, _handle: u32, _bits: u32) -> Result<(), AbiErrno> {
         Ok(())
-    }
-    fn sigreturn(&self) -> ! {
-        std::process::abort()
     }
     fn resend(
         &self,
