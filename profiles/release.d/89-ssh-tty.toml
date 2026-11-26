@@ -6,7 +6,7 @@
 # It is test tooling; the product tty utility is the uutils `tty` staged by shell.d/72-uutils.toml.
 
 [[initfs.files]]
-src = "build/fixtures/pty-path/pty-path"
+src = "build/fixtures/pty-path/{arch}/pty-path"
 path = "/bin/pty-path"
 mode = 0o755
 generated = true

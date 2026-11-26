@@ -2,20 +2,44 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K495 rev174 test-only pty path fixture. Build the /bin/pty-path probe used by the test-only
-# pty-path image overlay. No product source is changed.
+# K570 test-only pty path fixture. Build the /bin/pty-path probe used by the test-only pty-path
+# image overlay for the architecture selected by RAVEN_QT_ARCH. No product source is changed.
 #
-# Usage: sh tests/fixtures/pty-path/build.sh
-# Output: build/fixtures/pty-path/pty-path
+# Usage: sh tests/fixtures/pty-path/build.sh [x86_64|aarch64]
+# Output: build/fixtures/pty-path/<arch>/pty-path
 
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
 cd "$root"
 
-out=build/fixtures/pty-path
+arch=${RAVEN_QT_ARCH:-${1:-x86_64}}
+case "$arch" in
+    x86_64)
+        target=x86_64-unknown-ravenbsd
+        link_script=$root/tests/libc/target/x86_64.ld
+        fp_flags="-mno-sse -mno-mmx -msoft-float"
+        linker_flavor=
+        builtins_path=
+        ;;
+    aarch64)
+        target=aarch64-unknown-ravenbsd
+        link_script=$root/userland/linker/aarch64.ld
+        fp_flags=-mgeneral-regs-only
+        linker_flavor=-Wl,-m,aarch64linux
+        builtins_path=/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a
+        ;;
+    *)
+        echo "pty-path fixture: unsupported arch $arch" >&2
+        exit 2
+        ;;
+esac
+out=build/fixtures/pty-path/$arch
 mkdir -p "$out"
-arch=x86_64
+
 sysroot=$root/build/$arch/sysroot
+if [ ! -f "$sysroot/usr/lib/libc.a" ] || [ ! -f "$sysroot/usr/lib/crt1.o" ]; then
+    cargo xtask libc-pack --arch "$arch"
+fi
 for file in crt1.o crti.o crtn.o libc.a; do
     [ -f "$sysroot/usr/lib/$file" ] || {
         echo "pty-path fixture: missing $sysroot/usr/lib/$file; run cargo xtask libc-pack --arch $arch" >&2
@@ -38,17 +62,42 @@ if ! command -v ld.lld >/dev/null 2>&1; then
         fi
     fi
 fi
+if ! command -v ld.lld >/dev/null 2>&1; then
+    echo "pty-path fixture: ld.lld not found" >&2
+    exit 77
+fi
 
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+builtins_arg=
+if [ -n "$builtins_path" ]; then
+    builtins_arg=$builtins_path
+elif [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
+    builtins_arg=-lclang_rt.builtins
+fi
+"$CC" --target="$target" --sysroot="$sysroot" \
     -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-    -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+    -D__ravenbsd__=1 -D__unix__=1 $fp_flags \
     -c "$root/tests/fixtures/pty-path/pty-path.c" -o "$out/pty-path.o"
 
-"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
-    -nostdlib -nostartfiles -static -T"$root/tests/libc/target/x86_64.ld" \
-    -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
-    "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/pty-path.o" \
-    -L"$sysroot/usr/lib" -lc \
-    "$sysroot/usr/lib/crtn.o" -o "$out/pty-path"
+if [ -n "$builtins_arg" ]; then
+    "$CC" --target="$target" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
+        -nostdlib -nostartfiles -static -T"$link_script" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/pty-path.o" \
+        -L"$sysroot/usr/lib" -lc "$builtins_arg" \
+        "$sysroot/usr/lib/crtn.o" -o "$out/pty-path"
+else
+    "$CC" --target="$target" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
+        -nostdlib -nostartfiles -static -T"$link_script" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/pty-path.o" \
+        -L"$sysroot/usr/lib" -lc \
+        "$sysroot/usr/lib/crtn.o" -o "$out/pty-path"
+fi
+
+# The K434 matrix runner overlays the unqualified fixture path; keep the x86_64 alias it stages
+# without widening that test's paths. The arch-specific output above is the profile source.
+if [ "$arch" = x86_64 ]; then
+    ln -sf "x86_64/pty-path" build/fixtures/pty-path/pty-path
+fi
 
 echo "pty-path fixture: staged $out/pty-path"
