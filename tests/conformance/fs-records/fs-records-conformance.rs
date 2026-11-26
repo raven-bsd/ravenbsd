@@ -418,10 +418,10 @@ fn row_lstat_symlink(state: &mut State) {
     let _ = dir;
 }
 
-fn long_name() -> ([u8; 230], usize) {
-    let mut name = [b'n'; 230];
+fn long_name() -> ([u8; 255], usize) {
+    let mut name = [b'n'; 255];
     name[0] = b'L';
-    let length = 230;
+    let length = 255;
     (name, length)
 }
 
@@ -484,9 +484,8 @@ fn scan_getdents(
 }
 
 fn row_dirent_bytes(state: &mut State, mutation: bool) {
-    // The private path wire caps a whole path at 255 bytes, so the longest addressable name under
-    // `/tmp/fsrec-<pid>/d/` is 230 bytes; the 255-byte maximum record is covered by the host
-    // `dirent_reclen`/parser tests, which do not need a live path.
+    // The public path limit is PATH_MAX (4096), so the 255-byte donor maximum name is
+    // addressable and the feed emits the maximum 280-byte record.
     let dir_name = child(b"d");
     // SAFETY: the path is NUL-terminated.
     unsafe {
@@ -494,14 +493,16 @@ fn row_dirent_bytes(state: &mut State, mutation: bool) {
     }
     let long = long_name();
     let short = child(b"d/short");
-    let mut long_relative = [0u8; 2 + 230];
+    let mut long_relative = [0u8; 2 + 255];
     long_relative[..2].copy_from_slice(b"d/");
     long_relative[2..].copy_from_slice(&long.0[..long.1]);
     let long_path = child(&long_relative[..]);
     let short_rc = create(&short, O_WRONLY);
     close_quiet(short_rc);
-    let long_rc = create(&long_path, O_WRONLY);
-    close_quiet(long_rc);
+    // The S11 Open packet carries 256 path bytes, so a 255-byte name is created through the
+    // control-call path (mkdir), which carries PATH_MAX bytes and yields the maximum record.
+    let long_rc = unsafe { mkdir(long_path.as_ptr(), 0o755) };
+    let long_errno = errno();
 
     let fd = unsafe { open(dir_name.as_ptr(), O_RDONLY) };
     let mut buffer = [0u8; 1024];
@@ -521,7 +522,7 @@ fn row_dirent_bytes(state: &mut State, mutation: bool) {
         }
         if same_name(&names[index][..lengths[index]], &long.0[..long.1]) {
             has_long = true;
-            if reclens[index] != 256 {
+            if reclens[index] != 280 {
                 has_long = false;
             }
         }
@@ -563,14 +564,14 @@ fn row_dirent_bytes(state: &mut State, mutation: bool) {
         "dirent-bytes",
         ok,
         format_args!(
-            "records={} seen={} short={} long={} invariant={} short_rc={} long_rc={}",
-            total, seen, has_short, has_long, invariant, short_rc, long_rc
+            "records={} seen={} short={} long={} invariant={} short_rc={} long_rc={} long_errno={}",
+            total, seen, has_short, has_long, invariant, short_rc, long_rc, long_errno
         ),
     );
     // SAFETY: the probe owns the tree.
     unsafe {
         unlink(short.as_ptr());
-        unlink(long_path.as_ptr());
+        rmdir(long_path.as_ptr());
         rmdir(dir_name.as_ptr());
     }
 }
