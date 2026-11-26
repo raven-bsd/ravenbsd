@@ -62,9 +62,9 @@ impl PathOps for Fake {
         if self.dirs.contains(path) || self.files.contains(path) {
             let mut stat = Stat::ZERO;
             stat.st_mode = if self.dirs.contains(path) {
-                S_IFDIR
+                S_IFDIR as u16
             } else {
-                S_IFREG
+                S_IFREG as u16
             };
             return Ok(stat);
         }

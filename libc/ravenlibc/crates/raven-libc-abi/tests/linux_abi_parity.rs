@@ -421,7 +421,8 @@ fn stat_layout_and_zero() {
     assert_eq!(zero.st_ino, 0);
     assert_eq!(zero.st_nlink, 0);
     assert_eq!(zero.st_blocks, 0);
-    assert_eq!(zero.__unused, [0; 2]);
+    assert_eq!(zero.st_spare, [0; 9]);
+    assert_eq!(zero.st_birthtim, raven_libc_abi::structs::Timespec::ZERO);
     assert_eq!(zero.st_atim, raven_libc_abi::structs::Timespec::ZERO);
     assert_eq!(zero.st_mtim.tv_nsec, 0);
 }
@@ -459,12 +460,15 @@ typedef struct { long tv_sec; long tv_nsec; } __ab_timespec;
 typedef struct { long tv_sec; long tv_usec; } __ab_timeval;
 typedef struct { __ab_timespec it_interval; __ab_timespec it_value; } __ab_itimerspec;
 typedef struct { void *iov_base; unsigned long iov_len; } __ab_iovec;
-typedef struct { unsigned long st_dev; unsigned long st_ino; unsigned int st_mode;
-  unsigned int st_nlink; unsigned int st_uid; unsigned int st_gid; unsigned long st_rdev;
-  unsigned long __pad1; long st_size; int st_blksize; int __pad2; long st_blocks;
-  __ab_timespec st_atim; __ab_timespec st_mtim; __ab_timespec st_ctim; unsigned int __unused[2]; } __ab_stat;
-typedef struct { unsigned long d_ino; long d_off; unsigned short d_reclen;
-  unsigned char d_type; char d_name[256]; } __ab_dirent;
+typedef struct { unsigned long st_dev; unsigned long st_ino; unsigned long st_nlink;
+  unsigned short st_mode; short st_bsdflags; unsigned int st_uid; unsigned int st_gid;
+  int st_padding1; unsigned long st_rdev; __ab_timespec st_atim; __ab_timespec st_mtim;
+  __ab_timespec st_ctim; __ab_timespec st_birthtim; long st_size; long st_blocks;
+  int st_blksize; unsigned int st_flags; unsigned long st_gen; unsigned long st_filerev;
+  unsigned long st_spare[9]; } __ab_stat;
+typedef struct { unsigned long d_fileno; long d_off; unsigned short d_reclen;
+  unsigned char d_type; unsigned char d_pad0; unsigned short d_namlen;
+  unsigned short d_pad1; char d_name[256]; } __ab_dirent;
 typedef struct { unsigned short sa_family; char sa_data[14]; } __ab_sockaddr;
 typedef struct { unsigned short sin_family; unsigned short sin_port; unsigned int sin_addr;
   unsigned char sin_zero[8]; } __ab_sockaddr_in;
@@ -493,8 +497,8 @@ typedef struct { int si_signo; int si_errno; int si_code; int __pad; unsigned lo
 typedef struct { unsigned int c_iflag; unsigned int c_oflag; unsigned int c_cflag;
   unsigned int c_lflag; unsigned char c_line; unsigned char c_cc[32];
   unsigned int __c_ispeed; unsigned int __c_ospeed; } __ab_termios;
-typedef struct { unsigned long f_bsize, f_frsize, f_blocks, f_bfree, f_bavail, f_files,
-  f_ffree, f_favail, f_fsid, f_flag, f_namemax; unsigned int f_type; int __reserved[5]; } __ab_statvfs;
+typedef struct { unsigned long f_bavail, f_bfree, f_blocks, f_favail, f_ffree, f_files,
+  f_bsize, f_flag, f_frsize, f_fsid, f_namemax; } __ab_statvfs;
 typedef struct { void *pw_name; void *pw_passwd; unsigned int pw_uid; unsigned int pw_gid;
   void *pw_gecos; void *pw_dir; void *pw_shell; } __ab_passwd;
 typedef struct { void *gr_name; void *gr_passwd; unsigned int gr_gid; void *gr_mem; } __ab_group;
@@ -510,11 +514,16 @@ REC(utsname) REC(sigaction) REC(stack_t) REC(siginfo_t) REC(termios)
 REC(statvfs) REC(passwd) REC(group) REC(flock)
 
 #define OFF(rec, field) const int off_##rec##_##field = offsetof(__ab_##rec, field);
-OFF(stat, st_dev) OFF(stat, st_ino) OFF(stat, st_mode) OFF(stat, st_nlink) OFF(stat, st_uid)
-OFF(stat, st_gid) OFF(stat, st_rdev) OFF(stat, __pad1) OFF(stat, st_size) OFF(stat, st_blksize)
-OFF(stat, __pad2) OFF(stat, st_blocks) OFF(stat, st_atim) OFF(stat, st_mtim) OFF(stat, st_ctim)
-OFF(stat, __unused)
-OFF(dirent, d_ino) OFF(dirent, d_off) OFF(dirent, d_reclen) OFF(dirent, d_type) OFF(dirent, d_name)
+OFF(stat, st_dev) OFF(stat, st_ino) OFF(stat, st_nlink) OFF(stat, st_mode)
+OFF(stat, st_bsdflags) OFF(stat, st_uid) OFF(stat, st_gid) OFF(stat, st_padding1)
+OFF(stat, st_rdev) OFF(stat, st_atim) OFF(stat, st_mtim) OFF(stat, st_ctim)
+OFF(stat, st_birthtim) OFF(stat, st_size) OFF(stat, st_blocks) OFF(stat, st_blksize)
+OFF(stat, st_flags) OFF(stat, st_gen) OFF(stat, st_filerev) OFF(stat, st_spare)
+OFF(dirent, d_fileno) OFF(dirent, d_off) OFF(dirent, d_reclen) OFF(dirent, d_type)
+OFF(dirent, d_pad0) OFF(dirent, d_namlen) OFF(dirent, d_pad1) OFF(dirent, d_name)
+OFF(statvfs, f_bavail) OFF(statvfs, f_bfree) OFF(statvfs, f_blocks) OFF(statvfs, f_favail)
+OFF(statvfs, f_ffree) OFF(statvfs, f_files) OFF(statvfs, f_bsize) OFF(statvfs, f_flag)
+OFF(statvfs, f_frsize) OFF(statvfs, f_fsid) OFF(statvfs, f_namemax)
 OFF(msghdr, msg_name) OFF(msghdr, msg_namelen) OFF(msghdr, msg_iov) OFF(msghdr, msg_iovlen)
 OFF(msghdr, msg_control) OFF(msghdr, msg_controllen) OFF(msghdr, msg_flags)
 OFF(sigaction, sa_handler) OFF(sigaction, sa_mask) OFF(sigaction, sa_flags) OFF(sigaction, sa_restorer)

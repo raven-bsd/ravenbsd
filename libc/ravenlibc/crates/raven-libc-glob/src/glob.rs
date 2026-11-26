@@ -551,9 +551,9 @@ impl Ctx<'_> {
                 }
                 let last = end.checked_sub(1).and_then(|i| pathbuf.get(i).copied());
                 if self.out.flags & GLOB_MARK != 0 && last.is_some_and(|c| unprot(c) != SEP) {
-                    let mark = is_dir(sb.st_mode)
-                        || (is_link(sb.st_mode)
-                            && matches!(self.sys.stat(&path), Ok(s) if is_dir(s.st_mode)));
+                    let mark = is_dir(u32::from(sb.st_mode))
+                        || (is_link(u32::from(sb.st_mode))
+                            && matches!(self.sys.stat(&path), Ok(s) if is_dir(u32::from(s.st_mode))));
                     if mark {
                         if end.wrapping_add(1) > MAXPATHLEN.wrapping_sub(1) {
                             return self.too_big();

@@ -414,12 +414,15 @@ impl ShellDir {
 
 /// Copy one parsed entry into a C `struct dirent`.
 pub(crate) fn fill_dirent(entry: &DirEntry, out: &mut Dirent) {
-    out.d_ino = entry.ino;
+    let capacity = out.d_name.len().saturating_sub(1);
+    let count = entry.name.len().min(capacity);
+    out.d_fileno = entry.ino;
     out.d_off = entry.off;
     out.d_reclen = entry.reclen;
     out.d_type = entry.typ;
-    let capacity = out.d_name.len().saturating_sub(1);
-    let count = entry.name.len().min(capacity);
+    out.d_pad0 = 0;
+    out.d_namlen = count as u16;
+    out.d_pad1 = 0;
     let mut index = 0usize;
     while index < count {
         if let (Some(byte), Some(slot)) = (entry.name.get(index), out.d_name.get_mut(index)) {
@@ -445,7 +448,7 @@ pub(crate) unsafe fn dirent_entry(pointer: *const Dirent) -> Option<DirEntry> {
     // SAFETY: `d_name` is a NUL-terminated array inside the struct.
     let name = unsafe { crate::ffi::cstr::slice(dirent.d_name.as_ptr()) }.to_vec();
     Some(DirEntry {
-        ino: dirent.d_ino,
+        ino: dirent.d_fileno,
         off: dirent.d_off,
         typ: dirent.d_type,
         name,

@@ -284,20 +284,13 @@ impl Fake {
         Stat {
             st_dev: node.dev,
             st_ino: node.ino,
-            st_mode: node.mode,
-            st_nlink: node.nlink,
+            st_nlink: u64::from(node.nlink),
+            st_mode: node.mode as u16,
+            st_bsdflags: 0,
             st_uid: 0,
             st_gid: 0,
+            st_padding1: 0,
             st_rdev: 0,
-            __pad1: 0,
-            st_size: if node.kind == Kind::File {
-                node.size
-            } else {
-                0
-            },
-            st_blksize: 4096,
-            __pad2: 0,
-            st_blocks: (node.size + 511) / 512,
             st_atim: Timespec {
                 tv_sec: node.mtime,
                 tv_nsec: 0,
@@ -310,7 +303,21 @@ impl Fake {
                 tv_sec: node.mtime,
                 tv_nsec: 0,
             },
-            __unused: [0; 2],
+            st_birthtim: Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+            st_size: if node.kind == Kind::File {
+                node.size
+            } else {
+                0
+            },
+            st_blocks: (node.size + 511) / 512,
+            st_blksize: 4096,
+            st_flags: 0,
+            st_gen: 0,
+            st_filerev: 0,
+            st_spare: [0; 9],
         }
     }
 

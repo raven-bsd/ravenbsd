@@ -488,7 +488,7 @@ pub fn pty_pair<B: SysBackend, L: Lock>(platform: &Platform<B, L>, fd: i32) -> O
         return None;
     }
     let stat = platform.fstat(fd).ok()?;
-    if stat.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFCHR {
+    if u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFCHR {
         return None;
     }
     let ino = stat.st_ino;
@@ -675,45 +675,18 @@ pub fn getdents<B: SysBackend, L: Lock>(
     fd: i32,
     buf: &mut [u8],
 ) -> Result<usize, Errno> {
-    // The file servers return the packed K60 entry format. `readdir` expects the Linux
-    // `struct dirent` records (20-byte header, NUL-terminated name, 8-byte reclen), so decode the
-    // server page and re-encode it into the caller's buffer. Read only what the caller buffer can
-    // represent: a K60 record is 16+name (8-aligned) and a Linux record is 20+name (8-aligned),
-    // so the worst expansion is 4/3 (names 7-8 bytes). Reading 3/4 of the caller buffer keeps the
-    // converted records inside it; the old 4 KiB read advanced the server cursor past records
-    // that did not fit and silently dropped them.
-    if buf.len() < 280 {
+    // The file servers return the packed K60 entry format; `getdents` returns the public FreeBSD
+    // `struct dirent` records of `include/dirent.h`. A K60 record (16+name, 8-aligned) expands to
+    // the donor 24-byte header plus name and NUL, at most 5/3 (272 -> 280), so reading 3/5 of the
+    // caller buffer keeps every encoded record inside it and never advances the server cursor
+    // past an entry that was not returned.
+    if buf.len() < crate::dir::DIRENT_MIN_BUFFER {
         return Err(Errno::EINVAL);
     }
-    let raw_len = (buf.len().saturating_mul(3) / 4).clamp(272, 4096);
+    let raw_len = (buf.len().saturating_mul(3) / 5).min(4096);
     let mut raw = [0u8; 4096];
     let length = platform.read(fd, &mut raw[..raw_len])?;
-    let mut written = 0usize;
-    for item in raven_proto_fs::DirEntryIter::new(&raw[..length]) {
-        let entry = item.map_err(|_| Errno::EPROTO)?;
-        let name = entry.name;
-        let record_len = (19usize
-            .saturating_add(name.len())
-            .saturating_add(1)
-            .saturating_add(7))
-            & !7;
-        let Some(end) = written.checked_add(record_len) else {
-            return Err(Errno::EIO);
-        };
-        if end > buf.len() {
-            break;
-        }
-        let record = &mut buf[written..end];
-        record.fill(0);
-        record[0..8].copy_from_slice(&entry.header.ino.to_le_bytes());
-        // The K60 stream has no seek cookie; sequential `readdir` does not need one.
-        record[8..16].copy_from_slice(&0i64.to_le_bytes());
-        record[16..18].copy_from_slice(&(record_len as u16).to_le_bytes());
-        record[18] = entry.header.kind;
-        record[19..19 + name.len()].copy_from_slice(name);
-        written = end;
-    }
-    Ok(written)
+    crate::dir::encode_dirents(&raw[..length], buf)
 }
 
 /// `getdirentries` (BSD spelling of `getdents`).
