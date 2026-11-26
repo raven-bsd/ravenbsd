@@ -19,16 +19,23 @@ extern crate alloc;
 mod program {
     use alloc::string::String;
 
-    use login::tty::Console;
+    use login::tty::{Console, PtyPair, forward_console_to_pty};
     use login::{
         Autologin, PasswdEntry, Profile, parse_autologin, parse_passwd, parse_profile,
         parse_root_passwd,
     };
+    use raven_abi::types::Handle;
     use raven_getty::{Account, Session, SessionError, run_session};
     use raven_initfs::Initfs;
     use raven_rt::entry;
     use raven_rt::fs;
-    use raven_rt::spawn::{RtSys, SpawnOptions};
+    use raven_rt::spawn::{
+        RtSys, SpawnAttributes, SpawnError, SpawnOptions, spawn_image_with_fdmap,
+        spawn_with_attributes,
+    };
+
+    /// Stack for the console-to-pty forwarder thread.
+    const RELAY_STACK: usize = 16 * 1024;
 
     entry!(main);
 
@@ -65,7 +72,22 @@ mod program {
             env: &[&str],
         ) -> Result<i32, SessionError> {
             let options = SpawnOptions { args, env };
-            spawn_wait(&self.initfs, shell, &options)
+            // The console scheme reports an idle read as EAGAIN; give the shell a pty slave
+            // whose read waits for the writer and forward console input into the master.
+            let pair = PtyPair::open().map_err(|_| SessionError)?;
+            let _relay = raven_rt::thread::spawn(
+                forward_console_to_pty,
+                pair.master().0 as usize,
+                RELAY_STACK,
+            )
+            .map_err(|_| SessionError)?;
+            let process = spawn_shell(&self.initfs, shell, &options, pair.slave())
+                .map_err(|_| SessionError)?;
+            let mut code = 0i32;
+            let waited = RtSys.proc_wait(process, &mut code);
+            let _ = raven_rt::handle_close(process);
+            // `pair` and `_relay` stay alive until the shell has exited.
+            waited.map(|()| code).map_err(|_| SessionError)
         }
 
         fn account(&mut self, username: &str) -> Option<Account> {
@@ -134,6 +156,34 @@ mod program {
             .ok()
             .and_then(|bytes| core::str::from_utf8(&bytes).ok().map(parse_profile))
             .unwrap_or_default()
+    }
+
+    /// Spawn the session shell with `stdin` installed as child fd 0.
+    ///
+    /// The initfs carries the shell in a boot image; after a root pivot it lives on the
+    /// mounted root, so the K176 file-server fallback reads the image and keeps the fd map.
+    fn spawn_shell(
+        initfs: &Initfs<'_>,
+        path: &str,
+        options: &SpawnOptions<'_>,
+        stdin: Handle,
+    ) -> Result<Handle, SpawnError> {
+        let fdmap = [(0i32, stdin.0)];
+        let zero = [0u8; 128];
+        let attributes = SpawnAttributes {
+            fdmap: &fdmap,
+            sigmask: &zero,
+            sigdefault: &zero,
+            ignored: &zero,
+        };
+        match spawn_with_attributes(initfs, path, options, &attributes) {
+            Ok(child) => Ok(child),
+            Err(SpawnError::NotFound) => {
+                let image = raven_rt::spawn::read_file_image(path)?;
+                spawn_image_with_fdmap(&image, path, options, &fdmap, &mut RtSys)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     fn spawn_wait(
