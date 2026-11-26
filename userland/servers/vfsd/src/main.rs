@@ -26,6 +26,8 @@ mod trace;
 
 mod chunk;
 mod pivot;
+#[cfg_attr(not(target_os = "none"), allow(dead_code))]
+// caller is target-only; host tests the routing helpers
 mod route;
 #[cfg_attr(not(target_os = "none"), allow(dead_code))]
 // caller is target-only; host tests the walker
