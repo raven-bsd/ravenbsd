@@ -74,20 +74,25 @@ mod program {
             let options = SpawnOptions { args, env };
             // The console scheme reports an idle read as EAGAIN; give the shell a pty slave
             // whose read waits for the writer and forward console input into the master.
-            let pair = PtyPair::open().map_err(|_| SessionError)?;
-            let _relay = raven_rt::thread::spawn(
-                forward_console_to_pty,
-                pair.master().0 as usize,
-                RELAY_STACK,
-            )
-            .map_err(|_| SessionError)?;
-            let process = spawn_shell(&self.initfs, shell, &options, pair.slave())
-                .map_err(|_| SessionError)?;
-            let mut code = 0i32;
-            let waited = RtSys.proc_wait(process, &mut code);
-            let _ = raven_rt::handle_close(process);
-            // `pair` and `_relay` stay alive until the shell has exited.
-            waited.map(|()| code).map_err(|_| SessionError)
+            if let Ok(pair) = PtyPair::open()
+                && let Ok(_relay) = raven_rt::thread::spawn(
+                    forward_console_to_pty,
+                    pair.master().0 as usize,
+                    RELAY_STACK,
+                )
+            {
+                let process = spawn_shell(&self.initfs, shell, &options, pair.slave())
+                    .map_err(|_| SessionError)?;
+                let mut code = 0i32;
+                let waited = RtSys.proc_wait(process, &mut code);
+                let _ = raven_rt::handle_close(process);
+                // `pair` and `_relay` stay alive until the shell has exited.
+                return waited.map(|()| code).map_err(|_| SessionError);
+            }
+            // A profile without the pty service keeps the pre-S211 direct console session
+            // instead of failing to start the shell; say so on the console.
+            let _ = raven_rt::eprintln!("getty: pty unavailable; console stdin is the session");
+            spawn_wait(&self.initfs, shell, &options)
         }
 
         fn account(&mut self, username: &str) -> Option<Account> {
