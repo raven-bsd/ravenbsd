@@ -120400,7 +120400,7 @@ new file mode 100644
 index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 --- /dev/null
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
-@@ -0,0 +1,1568 @@
+@@ -0,0 +1,1569 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -121925,6 +121925,7 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const EV_FORCEONESHOT: c_ushort = 0x0100;
 +pub const EV_KEEPUDATA: c_ushort = 0x0200;
 +pub const EV_SYSFLAGS: c_ushort = 0xf000;
++pub const EV_DROP: c_ushort = 0x1000;
 +pub const EV_FLAG1: c_ushort = 0x2000;
 +pub const EV_FLAG2: c_ushort = 0x4000;
 +pub const EV_EOF: c_ushort = 0x8000;

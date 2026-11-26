@@ -488,6 +488,7 @@ pub const EV_DISPATCH: c_ushort = 0x0080;
 pub const EV_FORCEONESHOT: c_ushort = 0x0100;
 pub const EV_KEEPUDATA: c_ushort = 0x0200;
 pub const EV_SYSFLAGS: c_ushort = 0xf000;
+pub const EV_DROP: c_ushort = 0x1000;
 pub const EV_FLAG1: c_ushort = 0x2000;
 pub const EV_FLAG2: c_ushort = 0x4000;
 pub const EV_EOF: c_ushort = 0x8000;

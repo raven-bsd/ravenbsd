@@ -105,6 +105,7 @@ struct kevent {
 #define EV_DISPATCH 0x0080
 
 #define EV_SYSFLAGS 0xF000
+#define EV_DROP 0x1000
 #define EV_FLAG1 0x2000
 #define EV_FLAG2 0x4000
 
