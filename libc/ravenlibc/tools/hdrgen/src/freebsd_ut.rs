@@ -96,10 +96,40 @@ pub const CHAR_IS_SIGNED: bool = true;
 pub const NEGATIVE: i64 = -7;
 ";
     let values = parse_rust_constants(text);
-    assert_eq!(values.get("EAGAIN"), Some(&11));
-    assert_eq!(values.get("O_CREAT"), Some(&512));
-    assert_eq!(values.get("NEGATIVE"), Some(&-7));
+    assert_eq!(
+        values
+            .get("EAGAIN")
+            .and_then(|by_arch| by_arch.get("x86_64")),
+        Some(&11)
+    );
+    assert_eq!(
+        values
+            .get("O_CREAT")
+            .and_then(|by_arch| by_arch.get("aarch64")),
+        Some(&512)
+    );
+    assert_eq!(
+        values
+            .get("NEGATIVE")
+            .and_then(|by_arch| by_arch.get("riscv64")),
+        Some(&-7)
+    );
     assert!(!values.contains_key("CHAR_IS_SIGNED"));
+}
+
+#[test]
+fn rust_constant_parser_keeps_per_architecture_cfg_values() {
+    let text = "\
+#[cfg(any(target_arch = \"aarch64\", target_arch = \"riscv64\"))]
+pub const MINSIGSTKSZ: i32 = 4096;
+#[cfg(target_arch = \"x86_64\")]
+pub const MINSIGSTKSZ: i32 = 2048;
+";
+    let values = parse_rust_constants(text);
+    let by_arch = values.get("MINSIGSTKSZ").expect("MINSIGSTKSZ");
+    assert_eq!(by_arch.get("x86_64"), Some(&2048));
+    assert_eq!(by_arch.get("aarch64"), Some(&4096));
+    assert_eq!(by_arch.get("riscv64"), Some(&4096));
 }
 
 #[test]
@@ -309,8 +339,14 @@ fn comparison_reports_every_required_negative_class() {
         },
     );
     let mut rust = BTreeMap::new();
-    rust.insert("EAGAIN".to_string(), 12);
-    rust.insert("O_SYNC".to_string(), 129);
+    rust.insert(
+        "EAGAIN".to_string(),
+        BTreeMap::from([("x86_64".to_string(), 12)]),
+    );
+    rust.insert(
+        "O_SYNC".to_string(),
+        BTreeMap::from([("x86_64".to_string(), 129)]),
+    );
     let mut inventory = Inventory::default();
     compare(
         &tables,
@@ -389,7 +425,10 @@ fn comparison_has_no_difference_when_every_measurement_matches() {
     );
     let mut rust = BTreeMap::new();
     for (name, value) in &donor.constants {
-        rust.insert(name.clone(), *value);
+        rust.insert(
+            name.clone(),
+            BTreeMap::from([("x86_64".to_string(), *value)]),
+        );
     }
     donor.runtime.insert("CLK_TCK".to_string(), Ok(()));
     raven.runtime.insert("CLK_TCK".to_string(), Ok(()));

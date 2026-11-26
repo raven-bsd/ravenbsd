@@ -34,7 +34,6 @@ const FIXTURE: &str = r#"/*
 #include <netinet/in.h>
 
 _Static_assert(EAGAIN == 35, "FreeBSD errno: EAGAIN is 35");
-_Static_assert(SIGUSR1 == 30, "FreeBSD signal: SIGUSR1 is 30");
 _Static_assert(sizeof(sa_family_t) == 1, "FreeBSD sa_family_t is one byte");
 _Static_assert(
     offsetof(struct sockaddr_in, sin_family) == 1,
@@ -51,9 +50,9 @@ _Static_assert(
 
 /// Baseline rows the staged Raven headers still report as red after the FreeBSD cutovers.
 ///
-/// The errno row (`EAGAIN` 35) is satisfied by S722 and is asserted separately as green.
-const BASELINE_ROWS: [&str; 5] = [
-    "FreeBSD signal: SIGUSR1 is 30",
+/// The errno row (`EAGAIN` 35) is satisfied by S722 and the signal row (`SIGUSR1` 30) by S713;
+/// both are asserted separately as green.
+const BASELINE_ROWS: [&str; 4] = [
     "FreeBSD sa_family_t is one byte",
     "FreeBSD sockaddr_in.sin_family is at offset 1 after sin_len",
     "no member named 'sa_len'",
@@ -62,6 +61,9 @@ const BASELINE_ROWS: [&str; 5] = [
 
 /// The row S722 makes true in the staged Raven headers.
 const SATISFIED_ERRNO_ROW: &str = "FreeBSD errno: EAGAIN is 35";
+
+/// The row S713 makes true in the staged Raven headers.
+const SATISFIED_SIGNAL_ROW: &str = "FreeBSD signal: SIGUSR1 is 30";
 
 const SYNTHETIC_ERRNO: &str = "#define EAGAIN 35\n";
 const SYNTHETIC_SIGNAL: &str = "#define SIGUSR1 30\n";
@@ -237,6 +239,10 @@ fn the_generated_probe_compiles_and_names_every_baseline_row() {
         assert!(
             !text.contains(SATISFIED_ERRNO_ROW),
             "{arch} Raven headers still reject the satisfied errno row {SATISFIED_ERRNO_ROW:?}:\n{text}"
+        );
+        assert!(
+            !text.contains(SATISFIED_SIGNAL_ROW),
+            "{arch} Raven headers still reject the satisfied signal row {SATISFIED_SIGNAL_ROW:?}:\n{text}"
         );
     }
 }

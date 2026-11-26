@@ -48,7 +48,7 @@ fn the_committed_tables_validate() {
     assert_eq!(tables.structs.record.len(), 26);
     assert_eq!(tables.structs.opaque.len(), 32);
     assert_eq!(tables.types.types.len(), 46);
-    assert_eq!(tables.deviations.deviation.len(), 24);
+    assert_eq!(tables.deviations.deviation.len(), 27);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn the_constant_count_is_frozen() {
         .iter()
         .map(|group| group.def.consts.len())
         .sum();
-    assert_eq!(total, 1291);
+    assert_eq!(total, 1281);
     let counts: Vec<(&str, usize)> = tables
         .groups
         .iter()
@@ -69,7 +69,7 @@ fn the_constant_count_is_frozen() {
         counts,
         vec![
             ("errno", 99),
-            ("signal", 116),
+            ("signal", 106),
             ("fcntl", 111),
             ("mman", 86),
             ("stat", 38),
@@ -90,7 +90,7 @@ fn the_constant_count_is_frozen() {
 fn values_resolve_for_every_group() {
     let tables = real();
     let values = validate(&tables).expect("values");
-    assert_eq!(values.by_name.len(), 1291);
+    assert_eq!(values.by_name.len(), 1279);
     assert_eq!(values.by_name["EPERM"].value, 1);
     assert_eq!(values.by_name["O_ACCMODE"].value, 0o10000003);
     assert_eq!(values.by_name["RLIM_INFINITY"].value, i128::from(u64::MAX));

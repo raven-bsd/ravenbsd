@@ -525,14 +525,14 @@ notes = "Generated from abi/errno.toml, whose native error values are transcribe
 
 [[import]]
 path = "libc/ravenlibc/abi/generated/include/bits/signum.h"
-upstream = "musl"
-upstream_path = "include/signal.h, arch/x86_64/bits/signal.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/sys/signal.h, sys/sys/_sigaltstack.h, sys/x86/include/_limits.h, sys/arm64/include/_limits.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/signal.toml; deviations in abi/deviations.toml"
+notes = "reviewed freebsd source; constants transcribed into abi/signal.toml"
 
 [[import]]
 path = "libc/ravenlibc/abi/generated/include/bits/sysconf.h"
@@ -624,14 +624,14 @@ notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe6
 
 [[import]]
 path = "libc/ravenlibc/abi/signal.toml"
-upstream = "musl"
-upstream_path = "include/signal.h, arch/x86_64/bits/signal.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/sys/signal.h, sys/sys/_sigaltstack.h, sys/x86/include/_limits.h, sys/arm64/include/_limits.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/signal.toml; deviations in abi/deviations.toml"
+notes = "reviewed freebsd source; constants transcribed into abi/signal.toml"
 
 [[import]]
 path = "libc/ravenlibc/abi/socket.toml"
@@ -778,14 +778,14 @@ notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe6
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/signal.rs"
-upstream = "musl"
-upstream_path = "include/signal.h, arch/x86_64/bits/signal.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/sys/signal.h, sys/sys/_sigaltstack.h, sys/x86/include/_limits.h, sys/arm64/include/_limits.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/signal.toml; deviations in abi/deviations.toml"
+notes = "reviewed freebsd source; constants transcribed into abi/signal.toml"
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/socket.rs"

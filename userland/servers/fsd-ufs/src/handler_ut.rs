@@ -3,6 +3,7 @@
 
 //! Handler tests over a small scripted filesystem.
 
+use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_abi::types::Handle;
@@ -21,16 +22,18 @@ const LINK: u32 = 5;
 
 struct FakeFs {
     data: Vec<u8>,
-    created: Option<(u16, u32, u32)>,
     writable: bool,
+    created: Vec<Vec<u8>>,
+    created_file: Option<(u16, u32, u32)>,
 }
 
 impl FakeFs {
     fn new() -> Self {
         Self {
             data: b"hello\n".to_vec(),
-            created: None,
             writable: false,
+            created: Vec::new(),
+            created_file: None,
         }
     }
 
@@ -78,19 +81,19 @@ impl FakeFs {
 }
 
 impl FileSystem for FakeFs {
-    fn resolve(&mut self, path: &str) -> Result<u32, Errno> {
+    fn resolve(&mut self, path: &[u8]) -> Result<u32, Errno> {
         match path {
-            "" | "/" => Ok(ROOT),
-            "/file" => Ok(FILE),
-            "/dir" => Ok(DIR),
-            "/link" => Ok(FILE),
+            b"" | b"/" => Ok(ROOT),
+            b"/file" => Ok(FILE),
+            b"/dir" => Ok(DIR),
+            b"/link" => Ok(FILE),
             _ => Err(Errno::ENOENT),
         }
     }
 
-    fn resolve_nofollow(&mut self, path: &str) -> Result<u32, Errno> {
+    fn resolve_nofollow(&mut self, path: &[u8]) -> Result<u32, Errno> {
         match path {
-            "/link" | "/dangling" | "dangling" => Ok(LINK),
+            b"/link" | b"/dangling" | b"dangling" => Ok(LINK),
             _ => self.resolve(path),
         }
     }
@@ -161,7 +164,7 @@ impl FileSystem for FakeFs {
 
     fn create_file(
         &mut self,
-        _path: &str,
+        _path: &[u8],
         mode: u16,
         uid: u32,
         gid: u32,
@@ -170,8 +173,16 @@ impl FileSystem for FakeFs {
         if !self.writable {
             return Err(Errno::EROFS);
         }
-        self.created = Some((mode, uid, gid));
+        self.created_file = Some((mode, uid, gid));
         Ok(FILE)
+    }
+
+    fn mkdir(&mut self, path: &[u8], _mode: u16, _uid: u32, _gid: u32) -> Result<(), Errno> {
+        if !self.writable {
+            return Err(Errno::EROFS);
+        }
+        self.created.push(path.to_vec());
+        Ok(())
     }
 }
 
@@ -189,7 +200,7 @@ fn ctx() -> Ctx {
 }
 
 fn open(handler: &mut FsHandler<FakeFs>, id: u64, path: &str, flags: OpenFlags) -> Opened {
-    handler.expect_open(id, path);
+    handler.expect_open(id, path.as_bytes());
     handler.open_with(path, flags, 0, &ctx()).expect("open")
 }
 
@@ -217,7 +228,7 @@ fn opens_the_root_and_files() {
 #[test]
 fn create_passes_the_authenticated_mode_and_owner() {
     let mut handler = FsHandler::new(FakeFs::writable());
-    handler.expect_open(20, "/new");
+    handler.expect_open(20, b"/new");
     let mut ctx = ctx();
     ctx.credentials.euid = 1000;
     ctx.credentials.egid = 100;
@@ -227,7 +238,7 @@ fn create_passes_the_authenticated_mode_and_owner() {
         Ok(Opened::File(20)) => {}
         other => panic!("unexpected create result: {other:?}"),
     }
-    assert_eq!(handler.fs.created, Some((0o640, 1000, 100)));
+    assert_eq!(handler.fs.created_file, Some((0o640, 1000, 100)));
 }
 
 #[test]
@@ -241,7 +252,7 @@ fn write_and_create_are_rejected() {
     .into_iter()
     .enumerate()
     {
-        handler.expect_open(20 + index as u64, "/file");
+        handler.expect_open(20 + index as u64, b"/file");
         assert_eq!(
             handler
                 .open_with("/file", flags, 0, &ctx())
@@ -254,7 +265,7 @@ fn write_and_create_are_rejected() {
 #[test]
 fn directory_flag_requires_a_directory() {
     let mut handler = FsHandler::new(FakeFs::new());
-    handler.expect_open(7, "/file");
+    handler.expect_open(7, b"/file");
     assert_eq!(
         handler
             .open_with(
@@ -428,6 +439,28 @@ fn statfs_call_returns_the_record() {
         }
         other => panic!("unexpected response: {other:?}"),
     }
+}
+
+#[test]
+fn a_non_utf8_name_reaches_the_filesystem_unchanged() {
+    let mut handler = FsHandler::new(FakeFs::writable());
+    match open(&mut handler, 7, "/", OpenFlags::READ) {
+        Opened::File(7) => {}
+        other => panic!("unexpected open result: {other:?}"),
+    }
+    let path = b"\xff\xfe";
+    let request = CallRequest::new(Call::Mkdir { mode: 0o755, path });
+    let mut encoded = [0u8; 64];
+    let length = request.encode(&mut encoded).expect("encode");
+    let mut response = [0u8; 64];
+    let length = handler
+        .call(7, &encoded[..length], &mut response)
+        .expect("call");
+    assert_eq!(
+        CallResponse::decode(request.op(), &response[..length]).expect("response"),
+        CallResponse::Status(0)
+    );
+    assert_eq!(handler.fs.created, vec![path.to_vec()]);
 }
 
 #[test]

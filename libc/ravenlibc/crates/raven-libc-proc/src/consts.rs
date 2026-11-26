@@ -46,30 +46,25 @@ pub const WNOHANG: u32 = 1;
 pub const WUNTRACED: u32 = 2;
 /// `WSTOPPED` alias.
 pub const WSTOPPED: u32 = 2;
-/// Report exited children.
-pub const WEXITED: u32 = 4;
-/// Report continued children (`sys/wait.h` / musl public value).
-pub const WCONTINUED: u32 = 8;
-/// Raw `PROC_WAIT_EX` continued bit.
-///
-/// The kernel wait ABI uses 4, while the public `sys/wait.h` keeps the musl/Linux value 8.
-/// [`crate::wait_status::kernel_wait_options`] translates one to the other.
+/// Report exited children (`waitid`, FreeBSD value).
+pub const WEXITED: u32 = 16;
+/// Report continued children (FreeBSD value).
+pub const WCONTINUED: u32 = 4;
+/// Raw `PROC_WAIT_EX` continued bit; the FreeBSD public value is the same bit.
 pub const KERNEL_WCONTINUED: u32 = 4;
-/// Leave the child waitable.
-pub const WNOWAIT: u32 = 0x0100_0000;
+/// Leave the child waitable (FreeBSD value).
+pub const WNOWAIT: u32 = 8;
 /// BSD compatibility bit, accepted and ignored.
 pub const __WALL: u32 = 0x4000_0000;
 /// Every option bit accepted by `wait*`.
 pub const WAIT_OPTION_MASK: u32 = WNOHANG | WUNTRACED | WEXITED | WCONTINUED | WNOWAIT | __WALL;
 
-/// Wait for any child.
-pub const P_ALL: u32 = 0;
-/// Wait for one pid.
-pub const P_PID: u32 = 1;
-/// Wait for one process group.
+/// Wait for any child (FreeBSD `P_ALL`).
+pub const P_ALL: u32 = 7;
+/// Wait for one pid (FreeBSD `P_PID`).
+pub const P_PID: u32 = 0;
+/// Wait for one process group (FreeBSD `P_PGID`).
 pub const P_PGID: u32 = 2;
-/// Wait for one pidfd.
-pub const P_PIDFD: u32 = 3;
 
 /// `RLIMIT_CPU`.
 pub const RLIMIT_CPU: u32 = 0;

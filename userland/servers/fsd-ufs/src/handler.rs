@@ -7,7 +7,7 @@
 //! a [`FileSystem`].  It is independent of UFS and of the target, so the
 //! directory-cursor and error rules are covered by host tests.
 
-use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use raven_abi::errno::Errno;
 use raven_proto_fs::{
     ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials, MAX_PATH,
@@ -24,10 +24,10 @@ pub const MAX_OPEN_FILES: usize = 256;
 /// adapter interprets it.
 pub trait FileSystem {
     /// Resolve a path, following a final symbolic link.
-    fn resolve(&mut self, path: &str) -> Result<u32, Errno>;
+    fn resolve(&mut self, path: &[u8]) -> Result<u32, Errno>;
 
     /// Resolve a path without following a final symbolic link.
-    fn resolve_nofollow(&mut self, path: &str) -> Result<u32, Errno>;
+    fn resolve_nofollow(&mut self, path: &[u8]) -> Result<u32, Errno>;
 
     /// Read inode attributes.
     fn stat(&mut self, ino: u32) -> Result<Stat, Errno>;
@@ -54,7 +54,7 @@ pub trait FileSystem {
     /// file is an error.
     fn create_file(
         &mut self,
-        path: &str,
+        path: &[u8],
         mode: u16,
         uid: u32,
         gid: u32,
@@ -65,49 +65,49 @@ pub trait FileSystem {
     }
 
     /// Create a directory owned by `uid`/`gid`.
-    fn mkdir(&mut self, path: &str, mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
+    fn mkdir(&mut self, path: &[u8], mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
         let _ = (path, mode, uid, gid);
         Err(Errno::EROFS)
     }
 
     /// Remove one non-directory entry.
-    fn unlink(&mut self, path: &str) -> Result<(), Errno> {
+    fn unlink(&mut self, path: &[u8]) -> Result<(), Errno> {
         let _ = path;
         Err(Errno::EROFS)
     }
 
     /// Remove one empty directory.
-    fn rmdir(&mut self, path: &str) -> Result<(), Errno> {
+    fn rmdir(&mut self, path: &[u8]) -> Result<(), Errno> {
         let _ = path;
         Err(Errno::EROFS)
     }
 
     /// Rename one entry.
-    fn rename(&mut self, from: &str, to: &str) -> Result<(), Errno> {
+    fn rename(&mut self, from: &[u8], to: &[u8]) -> Result<(), Errno> {
         let _ = (from, to);
         Err(Errno::EROFS)
     }
 
     /// Create a symbolic link owned by `uid`/`gid`.
-    fn symlink(&mut self, path: &str, target: &[u8], uid: u32, gid: u32) -> Result<(), Errno> {
+    fn symlink(&mut self, path: &[u8], target: &[u8], uid: u32, gid: u32) -> Result<(), Errno> {
         let _ = (path, target, uid, gid);
         Err(Errno::EROFS)
     }
 
     /// Create a hard link.
-    fn link(&mut self, path: &str, target: &str) -> Result<(), Errno> {
+    fn link(&mut self, path: &[u8], target: &[u8]) -> Result<(), Errno> {
         let _ = (path, target);
         Err(Errno::EROFS)
     }
 
     /// Change permission bits.
-    fn chmod(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+    fn chmod(&mut self, path: &[u8], mode: u16) -> Result<(), Errno> {
         let _ = (path, mode);
         Err(Errno::EROFS)
     }
 
     /// Change ownership of `path`, optionally following a final symlink.
-    fn chown(&mut self, path: &str, uid: u32, gid: u32, follow: bool) -> Result<(), Errno> {
+    fn chown(&mut self, path: &[u8], uid: u32, gid: u32, follow: bool) -> Result<(), Errno> {
         let _ = (path, uid, gid, follow);
         Err(Errno::EROFS)
     }
@@ -121,7 +121,7 @@ pub trait FileSystem {
     /// Set atime/mtime of `path`; `None` leaves that timestamp unchanged.
     fn utimens(
         &mut self,
-        path: &str,
+        path: &[u8],
         atime: Option<i64>,
         mtime: Option<i64>,
         follow: bool,
@@ -131,13 +131,13 @@ pub trait FileSystem {
     }
 
     /// Create a FIFO owned by `uid`/`gid`.
-    fn mkfifo(&mut self, path: &str, mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
+    fn mkfifo(&mut self, path: &[u8], mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
         let _ = (path, mode, uid, gid);
         Err(Errno::EROFS)
     }
 
     /// Create a special node owned by `uid`/`gid`; `mode` carries the file type.
-    fn mknod(&mut self, path: &str, mode: u16, dev: u32, uid: u32, gid: u32) -> Result<(), Errno> {
+    fn mknod(&mut self, path: &[u8], mode: u16, dev: u32, uid: u32, gid: u32) -> Result<(), Errno> {
         let _ = (path, mode, dev, uid, gid);
         Err(Errno::EROFS)
     }
@@ -170,7 +170,7 @@ struct OpenState {
 pub struct FsHandler<F: FileSystem> {
     fs: F,
     opens: OpenTable<OpenState>,
-    pending: Option<(u64, String)>,
+    pending: Option<(u64, Vec<u8>)>,
     now: fn() -> i64,
 }
 
@@ -198,8 +198,8 @@ impl<F: FileSystem> FsHandler<F> {
     ///
     /// `raven-scheme` does not pass the kernel file id to the handler, so the
     /// server loop and host tests set this before dispatch.
-    pub fn expect_open(&mut self, file_id: u64, path: &str) {
-        self.pending = Some((file_id, path.to_string()));
+    pub fn expect_open(&mut self, file_id: u64, path: &[u8]) {
+        self.pending = Some((file_id, path.to_vec()));
     }
 
     fn status(&self, response: &mut [u8], status: i32) -> HandlerResult<usize> {
@@ -208,18 +208,20 @@ impl<F: FileSystem> FsHandler<F> {
             .map_err(|_| Errno::EPROTO.into())
     }
 
-    fn check_traverse(&mut self, path: &str, creds: &Credentials) -> Result<(), Errno> {
-        let absolute = path.starts_with('/');
-        let mut prefix = String::new();
-        for component in path.split('/').filter(|component| !component.is_empty()) {
-            if prefix.is_empty() {
-                if absolute {
-                    prefix.push('/');
-                }
-            } else {
-                prefix.push('/');
+    fn check_traverse(&mut self, path: &[u8], creds: &Credentials) -> Result<(), Errno> {
+        let absolute = path.first() == Some(&b'/');
+        let mut prefix = Vec::new();
+        if absolute {
+            prefix.push(b'/');
+        }
+        for component in path
+            .split(|byte| *byte == b'/')
+            .filter(|part| !part.is_empty())
+        {
+            if !prefix.is_empty() && prefix.last() != Some(&b'/') {
+                prefix.push(b'/');
             }
-            prefix.push_str(component);
+            prefix.extend_from_slice(component);
             let ino = self.fs.resolve(&prefix)?;
             let stat = self.fs.stat(ino)?;
             if stat.mode & S_IFMT == S_IFDIR
@@ -239,14 +241,11 @@ impl<F: FileSystem> FsHandler<F> {
     }
 }
 
-fn bytes_to_string(bytes: &[u8]) -> Result<&str, Errno> {
-    core::str::from_utf8(bytes).map_err(|_| Errno::EINVAL)
-}
-
-fn parent_path(path: &str) -> &str {
-    match path.trim_end_matches('/').rsplit_once('/') {
-        Some((parent, _)) if !parent.is_empty() => parent,
-        _ => "/",
+fn parent_path(path: &[u8]) -> &[u8] {
+    let trimmed = path.strip_suffix(b"/").unwrap_or(path);
+    match trimmed.iter().rposition(|byte| *byte == b'/') {
+        Some(index) if index > 0 => &trimmed[..index],
+        _ => b"/",
     }
 }
 
@@ -299,7 +298,8 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         let Some((file_id, expected)) = self.pending.take() else {
             return Err(Errno::EINVAL.into());
         };
-        if expected != path {
+        let path = path.as_bytes();
+        if expected.as_slice() != path {
             return Err(Errno::EINVAL.into());
         }
         let mutating = flags.writable() || flags.create() || flags.truncate() || flags.append();
@@ -499,7 +499,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
         match decoded.call {
             Call::Readlink { path } => {
-                let path = bytes_to_string(path)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
@@ -529,7 +528,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             .encode(response)
             .map_err(|_| Errno::EPROTO.into()),
             Call::Lstat { path } => {
-                let path = bytes_to_string(path)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
@@ -550,7 +548,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.result(response, result)
             }
             Call::Mkdir { mode, path } => {
-                let path = bytes_to_string(path)?;
                 let mode = u16::try_from((mode & 0o7777) & !credentials.umask)
                     .map_err(|_| Errno::EINVAL)?;
                 let result = self
@@ -559,18 +556,14 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.result(response, result)
             }
             Call::Unlink { path } => {
-                let path = bytes_to_string(path)?;
                 let result = self.fs.unlink(path);
                 self.result(response, result)
             }
             Call::Rmdir { path } => {
-                let path = bytes_to_string(path)?;
                 let result = self.fs.rmdir(path);
                 self.result(response, result)
             }
             Call::Rename { from, to } => {
-                let from = bytes_to_string(from)?;
-                let to = bytes_to_string(to)?;
                 let result = self.fs.rename(from, to);
                 self.result(response, result)
             }
@@ -592,21 +585,17 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.result(response, result)
             }
             Call::Symlink { path, target } => {
-                let path = bytes_to_string(path)?;
                 let result = self
                     .fs
                     .symlink(path, target, credentials.euid, credentials.egid);
                 self.result(response, result)
             }
             Call::Chmod { mode, path } => {
-                let path = bytes_to_string(path)?;
                 let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
                 let result = self.fs.chmod(path, mode);
                 self.result(response, result)
             }
             Call::Link { path, target } => {
-                let path = bytes_to_string(path)?;
-                let target = bytes_to_string(target)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
@@ -614,7 +603,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.result(response, result)
             }
             Call::Chown { uid, gid, path } | Call::Lchown { uid, gid, path } => {
-                let path = bytes_to_string(path)?;
                 let follow = matches!(decoded.call, Call::Chown { .. });
                 if let Err(error) = self.check_traverse(path, &credentials) {
                     return self.status(response, -i32::from(error.0));
@@ -650,7 +638,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.result(response, result)
             }
             Call::Mkfifo { mode, path } => {
-                let path = bytes_to_string(path)?;
                 let mode = u16::try_from((mode & 0o7777) & !credentials.umask)
                     .map_err(|_| Errno::EINVAL)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
@@ -662,7 +649,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.result(response, result)
             }
             Call::Mknod { mode, dev, path } => {
-                let path = bytes_to_string(path)?;
                 let mode = u16::try_from((mode & (0o170000 | 0o7777)) & !credentials.umask)
                     .map_err(|_| Errno::EINVAL)?;
                 if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
@@ -679,7 +665,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 mtime,
                 follow,
             } => {
-                let path = bytes_to_string(path)?;
                 if let Err(error) = self.check_traverse(path, &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
@@ -723,7 +708,6 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 self.status(response, -i32::from(Errno::EINVAL.0))
             }
             Call::Access { mode, path } => {
-                let path = bytes_to_string(path)?;
                 if let Err(error) = self.check_traverse(path, &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }

@@ -133,10 +133,8 @@ mod program {
             if opcode == OPEN_OPCODE || opcode == READ_OPCODE {
                 probe.record(packet.packet.trace_id, opcode);
             }
-            if opcode == OPEN_OPCODE
-                && let Ok(path) = core::str::from_utf8(packet.packet.path_bytes())
-            {
-                handler.expect_open(packet.packet.file_id, path);
+            if opcode == OPEN_OPCODE {
+                handler.expect_open(packet.packet.file_id, packet.packet.path_bytes());
             }
             let _ = server.dispatch(packet, &mut handler);
         }

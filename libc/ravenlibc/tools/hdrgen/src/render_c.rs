@@ -43,6 +43,12 @@ pub fn render_all(
             let Some(value) = values.by_name.get(&constant.name) else {
                 continue;
             };
+            // A row tagged with an architecture emits that architecture's value; an untagged row
+            // uses the canonical (x86_64) value.
+            let number = match constant.arch.first() {
+                Some(arch) => value.for_arch(arch),
+                None => value.value,
+            };
             let condition = condition_of(constant);
             if condition != conditional {
                 if conditional.is_some() {
@@ -59,7 +65,7 @@ pub fn render_all(
             if let Some(visible) = &constant.visible {
                 let _ = writeln!(out, "/* visible: {visible} */");
             }
-            let rendered = values::render_c(constant, value.value, &group.def.base);
+            let rendered = values::render_c(constant, number, &group.def.base);
             if let Some(alias) = &constant.alias {
                 let _ = writeln!(out, "#define {} {alias}", constant.name);
             } else {
