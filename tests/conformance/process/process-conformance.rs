@@ -1050,7 +1050,9 @@ fn row_exec_image(state: &mut State) {
             0o600 as c_int,
         )
     };
-    created = created && plain_fd >= 0 && write_all(plain_fd, b"P");
+    let plain_errno = errno();
+    let wrote_plain = plain_fd >= 0 && write_all(plain_fd, b"P");
+    created = created && wrote_plain;
     if plain_fd >= 0 {
         // SAFETY: the descriptor is the probe's own.
         unsafe {
@@ -1059,7 +1061,22 @@ fn row_exec_image(state: &mut State) {
     }
     // SAFETY: the path is NUL-terminated.
     let cloexec_fd = unsafe { open(cloexec_path.as_ptr(), O_RDWR | O_CLOEXEC) };
+    let cloexec_errno = errno();
     created = created && cloexec_fd >= 0;
+    conformance::note(
+        state,
+        format_args!(
+            "exec-setup created={} pipe={}/{} plain={}/{} wrote={} cloexec={}/{}",
+            flag(created),
+            fds[0],
+            fds[1],
+            plain_fd,
+            plain_errno,
+            flag(wrote_plain),
+            cloexec_fd,
+            cloexec_errno
+        ),
+    );
 
     created = created && install_handler(SIGUSR1, note_usr1) && block_signal(SIGUSR2);
 
@@ -1094,7 +1111,21 @@ fn row_exec_image(state: &mut State) {
             let outcome = wait_blocking(child);
             waited = outcome.0;
             child_status = outcome.1;
+            conformance::note(
+                state,
+                format_args!(
+                    "exec-read fork={} report={} waited={} status=0x{:x}",
+                    flag(read_fork),
+                    flag(read_report),
+                    flag(waited),
+                    child_status
+                ),
+            );
         } else {
+            conformance::note(
+                state,
+                format_args!("exec-fork failed errno={}", errno()),
+            );
             // SAFETY: the descriptor is the probe's own.
             unsafe {
                 close(fds[1]);
