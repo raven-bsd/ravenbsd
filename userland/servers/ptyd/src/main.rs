@@ -661,12 +661,17 @@ mod program {
             // then on the master sees EIO (FreeBSD tty_pts.c:223) after any queued data. A
             // deferred slave read is completed with 0, so a hanging reader cannot outlive its
             // pair.
+            let last_master = entry.role == Role::Master
+                && !self
+                    .files
+                    .values()
+                    .any(|other| other.pair == entry.pair && other.role == Role::Master);
             let last_slave = entry.role == Role::Slave
                 && !self
                     .files
                     .values()
                     .any(|other| other.pair == entry.pair && other.role == Role::Slave);
-            if last_slave {
+            if last_master || last_slave {
                 if let Some(pty) = self.pairs.get_mut(entry.pair) {
                     pty.hangup();
                 }
