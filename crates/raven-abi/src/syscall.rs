@@ -63,10 +63,12 @@ syscalls! {
     THREAD_CREATE = 0x20;
     /// `thread_exit(code: i32) -> !` terminates the calling thread.
     THREAD_EXIT = 0x21;
-    /// `futex(addr: *const u32, op: u32, val: u32, timeout_ns: u64) -> isize`. `op` is
-    /// [`crate::types::futex::WAIT`] (sleep while `*addr == val`; `-EAGAIN` if it differs, `-ETIMEDOUT` on
-    /// timeout, `timeout_ns == 0` means no timeout) or [`crate::types::futex::WAKE`] (wake up to `val`
-    /// waiters, returns the number woken).
+    /// `futex(addr: *const u32, op: u32, val: u32, arg4: u64, addr2: usize, val3: usize) -> isize`.
+    /// `op` is [`crate::types::futex::WAIT`] (sleep while `*addr == val`; `-EAGAIN` if it differs,
+    /// `-ETIMEDOUT` on timeout; `arg4` is the relative timeout in nanoseconds, 0 = no timeout),
+    /// [`crate::types::futex::WAKE`] (wake up to `val` waiters, returns the number woken) or
+    /// [`crate::types::futex::REQUEUE`] (wake up to `val` waiters at `addr`, move up to `arg4` of
+    /// the rest to `addr2`, and return the number woken plus requeued; `val3` is unused).
     FUTEX = 0x22;
 
     /// `proc_create(flags: usize) -> Handle` creates an empty process (no threads) and returns a

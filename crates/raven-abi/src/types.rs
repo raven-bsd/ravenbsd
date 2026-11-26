@@ -159,6 +159,12 @@ pub mod futex {
     pub const WAIT: u32 = 0;
     /// Wake up to `val` waiters.
     pub const WAKE: u32 = 1;
+    /// Move waiters from the source address to a destination address (PG-3).
+    ///
+    /// `val` is the number to wake at the source, the fourth `FUTEX` argument is the maximum
+    /// number to move, and the fifth is the destination address. Returns the number of waiters
+    /// woken plus requeued; see [`crate::syscall::Syscall::FUTEX`].
+    pub const REQUEUE: u32 = 3;
     /// Operate on the private `(pid, virtual address)` key (PG-3).
     ///
     /// With this bit clear the address is resolved through its VMA and, for a

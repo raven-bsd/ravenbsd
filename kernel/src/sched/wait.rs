@@ -207,6 +207,60 @@ impl WaitQueue {
         count
     }
 
+    /// Wake up to `wake` waiters for `source`, then move up to `max` of the rest to
+    /// `destination`'s key, returning the number woken plus requeued.
+    ///
+    /// This is FreeBSD `umtxq_requeue`/NetBSD `futex_wake`: take both queue locks in address
+    /// order, remove the woken threads and move the rest while the locks are held, then wake the
+    /// removed threads after releasing them. A concurrent wake therefore either sees the waiter
+    /// before the move or after it, never in both queues and never lost.
+    pub fn requeue(
+        &self,
+        source: (u64, u64),
+        destination: &WaitQueue,
+        destination_key: (u64, u64),
+        wake: usize,
+        max: usize,
+    ) -> usize {
+        // A moved waiter must stay on the exit-time purge list even when the destination queue
+        // was empty before this operation.
+        destination.register();
+        let mut woken: Vec<Arc<Thread>> = Vec::new();
+        let requeued = if ptr::eq(self, destination) {
+            let mut waiters = self.waiters.lock();
+            requeue_in_place(&mut waiters, source, destination_key, wake, max, &mut woken)
+        } else if (self as *const WaitQueue) < (destination as *const WaitQueue) {
+            let mut first = self.waiters.lock();
+            let mut second = destination.waiters.lock();
+            requeue_move(
+                &mut first,
+                &mut second,
+                source,
+                destination_key,
+                wake,
+                max,
+                &mut woken,
+            )
+        } else {
+            let mut first = destination.waiters.lock();
+            let mut second = self.waiters.lock();
+            requeue_move(
+                &mut second,
+                &mut first,
+                source,
+                destination_key,
+                wake,
+                max,
+                &mut woken,
+            )
+        };
+        let woken_count = woken.len();
+        for thread in woken {
+            let _ = super::wake(thread, None, 0);
+        }
+        woken_count.saturating_add(requeued)
+    }
+
     /// Wake one waiter for a key without allocating temporary storage.
     ///
     /// Event queues allow exactly one blocking waiter, and timer interrupt delivery must not
@@ -386,6 +440,77 @@ impl WaitQueue {
     pub fn len(&self) -> usize {
         self.waiters.lock().len()
     }
+}
+
+/// Requeue waiters when source and destination share one queue lock.
+fn requeue_in_place(
+    waiters: &mut Vec<Waiter>,
+    source: (u64, u64),
+    destination: (u64, u64),
+    wake: usize,
+    max: usize,
+    woken: &mut Vec<Arc<Thread>>,
+) -> usize {
+    let mut woken_count = 0usize;
+    let mut requeued = 0usize;
+    let mut index = 0usize;
+    while index < waiters.len() {
+        if waiters[index].space != source.0 || waiters[index].addr != source.1 {
+            index = index.saturating_add(1);
+            continue;
+        }
+        if woken_count < wake {
+            woken.push(waiters.remove(index).thread);
+            woken_count = woken_count.saturating_add(1);
+            continue;
+        }
+        if requeued < max {
+            let waiter = &mut waiters[index];
+            waiter.space = destination.0;
+            waiter.addr = destination.1;
+            requeued = requeued.saturating_add(1);
+            index = index.saturating_add(1);
+            continue;
+        }
+        break;
+    }
+    requeued
+}
+
+/// Requeue waiters from one queue into another.
+fn requeue_move(
+    source_waiters: &mut Vec<Waiter>,
+    destination_waiters: &mut Vec<Waiter>,
+    source: (u64, u64),
+    destination: (u64, u64),
+    wake: usize,
+    max: usize,
+    woken: &mut Vec<Arc<Thread>>,
+) -> usize {
+    let mut woken_count = 0usize;
+    let mut requeued = 0usize;
+    let mut index = 0usize;
+    while index < source_waiters.len() {
+        if source_waiters[index].space != source.0 || source_waiters[index].addr != source.1 {
+            index = index.saturating_add(1);
+            continue;
+        }
+        if woken_count < wake {
+            woken.push(source_waiters.remove(index).thread);
+            woken_count = woken_count.saturating_add(1);
+            continue;
+        }
+        if requeued < max {
+            let mut waiter = source_waiters.remove(index);
+            waiter.space = destination.0;
+            waiter.addr = destination.1;
+            destination_waiters.push(waiter);
+            requeued = requeued.saturating_add(1);
+            continue;
+        }
+        break;
+    }
+    requeued
 }
 
 impl Drop for WaitQueue {
