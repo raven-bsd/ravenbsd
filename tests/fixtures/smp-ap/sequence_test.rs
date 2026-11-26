@@ -10,7 +10,7 @@
 #[path = "../../../kernel/src/arch/x86_64/ap_start/sequence.rs"]
 mod sequence;
 
-use sequence::{AP_START_WAIT_NS, INIT_ASSERT, INIT_DEASSERT, sipi, start_sequence};
+use sequence::{AP_START_WAIT_NS, INIT_ASSERT, INIT_DEASSERT, reset_sequence, sipi, start_sequence};
 
 /// NetBSD `sys/arch/x86/x86/cpu.c:mp_cpu_start` sends INIT, waits 10 ms after deassert, then two
 /// SIPIs 200 us apart. The second SIPI covers a first SIPI that reaches the AP before it has
@@ -34,4 +34,16 @@ fn start_sequence_is_init_settle_then_two_sipis() {
 #[test]
 fn wait_budget_is_one_second() {
     assert_eq!(AP_START_WAIT_NS, 1_000_000_000);
+}
+
+/// The failure path parks the AP with INIT and no SIPI, so a late start cannot execute the
+/// trampoline after its low mapping is dropped.
+#[test]
+fn reset_sequence_parks_the_ap() {
+    let steps: &[sequence::StartStep] = &reset_sequence();
+    assert_eq!(steps.len(), 2);
+    assert_eq!(steps[0].icr, INIT_ASSERT);
+    assert_eq!(steps[0].delay_ns, 0);
+    assert_eq!(steps[1].icr, INIT_DEASSERT);
+    assert_eq!(steps[1].delay_ns, 10_000_000);
 }

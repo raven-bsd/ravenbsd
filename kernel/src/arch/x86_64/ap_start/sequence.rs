@@ -21,7 +21,11 @@ pub(crate) struct StartStep {
 }
 
 /// How long the boot processor waits for one AP to publish `online`.
-pub(crate) const AP_START_WAIT_NS: u64 = 200_000_000;
+///
+/// NetBSD `sys/arch/x86/x86/cpu.c:cpu_boot_secondary` waits 100000 * 10 us = 1 s for
+/// `CPUF_RUNNING` and does not send another INIT, which would reset an AP that is still
+/// executing the trampoline.
+pub(crate) const AP_START_WAIT_NS: u64 = 1_000_000_000;
 
 /// SIPI ICR value for a real-mode startup vector.
 pub(crate) fn sipi(vector: u8) -> u32 {
@@ -50,6 +54,23 @@ pub(crate) fn start_sequence(vector: u8) -> [StartStep; 4] {
         StartStep {
             icr: sipi(vector),
             delay_ns: 200_000,
+        },
+    ]
+}
+
+/// Park an AP that did not publish `online`.
+///
+/// INIT resets the AP into wait-for-SIPI and no SIPI follows, so it cannot start executing the
+/// trampoline after the boot processor drops the low mapping.
+pub(crate) fn reset_sequence() -> [StartStep; 2] {
+    [
+        StartStep {
+            icr: INIT_ASSERT,
+            delay_ns: 0,
+        },
+        StartStep {
+            icr: INIT_DEASSERT,
+            delay_ns: 10_000_000,
         },
     ]
 }

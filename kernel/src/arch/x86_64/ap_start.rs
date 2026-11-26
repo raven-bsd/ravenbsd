@@ -567,11 +567,20 @@ fn serialize() {
 mod sequence;
 
 pub(crate) use sequence::AP_START_WAIT_NS;
-use sequence::start_sequence;
+use sequence::{reset_sequence, start_sequence};
 
 /// Run one per-AP start sequence.
 pub fn start_ap(apic_id: u32) {
-    for step in start_sequence(TRAMPOLINE_VECTOR) {
+    run_sequence(apic_id, &start_sequence(TRAMPOLINE_VECTOR));
+}
+
+/// Park an AP that did not come online, before its trampoline mapping is dropped.
+pub fn reset_ap(apic_id: u32) {
+    run_sequence(apic_id, &reset_sequence());
+}
+
+fn run_sequence(apic_id: u32, steps: &[sequence::StartStep]) {
+    for step in steps {
         send_icr(apic_id, step.icr);
         time::delay_ns(step.delay_ns);
     }
