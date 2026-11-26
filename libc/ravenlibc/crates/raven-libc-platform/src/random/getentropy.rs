@@ -121,8 +121,10 @@ pub fn getrandom<B: SysBackend, L: Lock>(
     buf: &mut [u8],
     flags: u32,
 ) -> Result<usize, Errno> {
-    // `kernel/src/syscall/basic.rs:163` accepts only `GRND_NONBLOCK` and `GRND_RANDOM`.
-    if flags & !0x3 != 0 {
+    // FreeBSD `kern_getrandom` knows `GRND_NONBLOCK`, `GRND_RANDOM` and `GRND_INSECURE`
+    // (`sys/kern/sys_getrandom.c:38,55`); every other bit is `EINVAL`. The kernel owns the
+    // final flag decision, so the known bits are passed through unchanged.
+    if flags & !0x7 != 0 {
         return Err(Errno::EINVAL);
     }
     if buf.is_empty() {

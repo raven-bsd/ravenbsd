@@ -102,7 +102,6 @@ fn getrandom_rejects_unknown_flags_before_filling() {
     fake.rand(&[0x55; 8]);
     let platform = Platform::new(fake);
     let mut buffer = [0u8; 4];
-    assert_eq!(getrandom(&platform, &mut buffer, 4), Err(Errno::EINVAL));
     assert_eq!(
         getrandom(&platform, &mut buffer, 0x8000),
         Err(Errno::EINVAL)
