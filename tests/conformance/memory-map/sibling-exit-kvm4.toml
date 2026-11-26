@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S715: a user thread and an interruptible kernel thread keep running while the main thread
+# exits. The kernel must quiesce the siblings before releasing the address space, and init must
+# exit with the probe status.
+
+name = "s715-sibling-exit-kvm4"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 90
+pre = ["sh tests/conformance/memory-map/build-sibling.sh"]
+initfs = "build/fixtures/s715-sibling-exit/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s194-trace=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^S715-SIBLING user ready pid=[0-9]+ ticks=[0-9]+$'
+
+[[expect]]
+regex = '^S715-SIBLING kernel ready pid=[0-9]+ ticks=[0-9]+$'
+
+[[expect]]
+regex = '^S715-MAIN exit pid=[0-9]+ user=[0-9]+ kernel=[0-9]+$'
+
+[[expect]]
+regex = '^s194: quiesce enter pid=[0-9]+ cpu=[0-9]+$'
+
+[[expect]]
+regex = '^s194: quiesce clear pid=[0-9]+ waited=(true|false)$'
+
+[[expect]]
+regex = '^s194: last-exit pid=[0-9]+ code=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)AccessError|EXCEPTION|panic|S715-SIBLING survived|timed out'

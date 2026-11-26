@@ -40,5 +40,13 @@ cargo xtask image --arch "$arch" --profile release \
     --initfs "$out/initfs.img" \
     --output "$out/memory-map.img"
 
-sha256sum "$out/memory-map.img"
-echo "mmap-image: built $out/memory-map.img"
+# The S715 sibling row correlates the probe pid with the quiesce trace. Keep the trace out of
+# the churn image so the heap run matches the S195 measurement and does not add trace volume.
+echo "mmap-image: release image (sibling trace)"
+cargo xtask image --arch "$arch" --profile release \
+    --cmdline "console=ttyS0 loglevel=info test-exit=1 k449-metrics=5 s194-trace=1" \
+    --initfs "$out/initfs.img" \
+    --output "$out/memory-map-trace.img"
+
+sha256sum "$out/memory-map.img" "$out/memory-map-trace.img"
+echo "mmap-image: built $out/memory-map.img and $out/memory-map-trace.img"

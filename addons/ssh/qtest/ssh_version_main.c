@@ -58,6 +58,19 @@ int open(const char *path, int flags, ...) {
 }
 
 // raven-abi Syscall::DEBUG_WRITE (0x03): debug_write(ptr, len) -> bytes written.
+#if defined(__aarch64__)
+// aarch64 passes the syscall number in x8 and the arguments in x0..x5; the result is in x0.
+static long raven_debug_write(const char *bytes, size_t len) {
+    register long result asm("x0") = (long)bytes;
+    register long number asm("x8") = 3;
+    register long length asm("x1") = (long)len;
+    __asm__ volatile("svc #0"
+                     : "+r"(result)
+                     : "r"(number), "r"(length)
+                     : "memory");
+    return result;
+}
+#else
 static long raven_debug_write(const char *bytes, size_t len) {
     register long number asm("rax") = 3;
     register const char *pointer asm("rdi") = bytes;
@@ -68,6 +81,7 @@ static long raven_debug_write(const char *bytes, size_t len) {
                      : "rcx", "r11", "memory");
     return number;
 }
+#endif
 
 static int debug_format(const char *format, va_list arguments) {
     char buffer[4096];
