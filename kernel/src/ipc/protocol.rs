@@ -103,6 +103,7 @@ pub enum ObjectKind {
 
 impl ObjectKind {
     /// Every kind, for the conformance table.
+    #[cfg(test)]
     pub const ALL: [Self; 18] = [
         Self::Process,
         Self::MemObjectInitfs,
