@@ -43,20 +43,16 @@ use crate::errors::EINVAL_ERR;
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::generated::signal;
 
-/// `_NSIG`: one past the highest signal number.
+/// `_NSIG`: one past the highest signal number (`SIGRTMAX + 1`).
 pub const NSIG: usize = 65;
-/// Signal 32: the POSIX timer helper (libc-internal).
-pub const SIGTIMER: i32 = 32;
-/// Signal 33: cancellation (libc-internal).
-pub const SIGCANCEL: i32 = 33;
-/// Signal 34: `synccall` (libc-internal).
-pub const SIGSYNCCALL: i32 = 34;
-/// The first application-visible real-time signal.
+/// Highest signal number the FreeBSD signal set can hold (`_SIG_MAXSIG`).
+pub const SIG_MAXSIG: usize = 128;
+/// The first application-visible real-time signal of the supported range.
 pub const SIGRTMIN: i32 = 35;
 /// The last real-time signal.
 pub const SIGRTMAX: i32 = 64;
-/// Application mask: signals 32-34 clear (`musl src/signal/block.c`).
-pub const APP_MASK: u64 = 0xffff_fffc_7fff_ffff;
+/// Application mask: every signal bit of the supported range.
+pub const APP_MASK: u64 = !0;
 /// Kernel mask word with every bit set.
 pub const ALL_MASK: u64 = !0;
 
@@ -78,17 +74,17 @@ impl SigSet {
         Self::empty()
     }
 
-    /// Set every application signal, leaving 32..34 clear.
+    /// Set every signal of the FreeBSD set (`_SIG_WORDS`).
     pub fn fill(&mut self) {
-        if let Some(word) = self.0.first_mut() {
-            *word = APP_MASK;
+        for word in self.0.iter_mut().take(SIG_MAXSIG / 64) {
+            *word = !0;
         }
     }
 
-    /// Add `sig`. `EINVAL` for `sig < 1`, `sig > 64` and 32..=34.
+    /// Add `sig`. `EINVAL` for `sig < 1` or `sig > SIG_MAXSIG`.
     pub fn add(&mut self, sig: i32) -> Result<(), Errno> {
-        let shift = signal_shift(sig)?;
-        if let Some(word) = self.0.first_mut() {
+        let (index, shift) = signal_index(sig)?;
+        if let Some(word) = self.0.get_mut(index) {
             *word |= 1u64.wrapping_shl(shift);
         }
         Ok(())
@@ -96,23 +92,23 @@ impl SigSet {
 
     /// Delete `sig`. Same rejected numbers as [`SigSet::add`].
     pub fn del(&mut self, sig: i32) -> Result<(), Errno> {
-        let shift = signal_shift(sig)?;
-        if let Some(word) = self.0.first_mut() {
+        let (index, shift) = signal_index(sig)?;
+        if let Some(word) = self.0.get_mut(index) {
             *word &= !1u64.wrapping_shl(shift);
         }
         Ok(())
     }
 
-    /// Whether `sig` is a member. Numbers outside 1..=64 are simply not members (musl
+    /// Whether `sig` is a member. Numbers outside 1..=SIG_MAXSIG are simply not members (musl
     /// `sigismember` does not set `errno`).
     pub fn is_member(&self, sig: i32) -> Result<bool, Errno> {
-        if !(1..=64).contains(&sig) {
+        if !(1..=SIG_MAXSIG as i32).contains(&sig) {
             return Ok(false);
         }
-        let shift = (sig.wrapping_sub(1) & 63) as u32;
+        let (index, shift) = signal_index(sig)?;
         Ok(self
             .0
-            .first()
+            .get(index)
             .is_some_and(|word| word & 1u64.wrapping_shl(shift) != 0))
     }
 
@@ -177,16 +173,17 @@ impl Default for SigSet {
     }
 }
 
-/// The musl `s-1`/`sig-32U < 3` gate, returning the bit position.
-fn signal_shift(sig: i32) -> Result<u32, Errno> {
-    if !(1..=64).contains(&sig) || (32..=34).contains(&sig) {
+/// The FreeBSD gate: a signal must be in 1..=SIG_MAXSIG, and its set bit is indexed from one.
+fn signal_index(sig: i32) -> Result<(usize, u32), Errno> {
+    if !(1..=SIG_MAXSIG as i32).contains(&sig) {
         return Err(EINVAL_ERR);
     }
-    Ok((sig.wrapping_sub(1) & 63) as u32)
+    let bit = sig.wrapping_sub(1) as usize;
+    Ok((bit / 64, (bit % 64) as u32))
 }
 
 /// The `NSIG` value of the generated ABI must agree with this module.
-const _: () = assert!(NSIG == signal::_NSIG as usize);
+const _: () = assert!(NSIG == (signal::SIGRTMAX + 1) as usize);
 const _: () = assert!(core::mem::size_of::<SigSet>() == 128);
 
 #[cfg(test)]

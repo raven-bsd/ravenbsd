@@ -96,20 +96,6 @@ theirs = 16
 reason = "PF_* are aliases of the AF_* entries; the BSD route family is at 128"
 
 [[deviation]]
-name = "MINSIGSTKSZ"
-against = "musl"
-ours = 6144
-theirs = { x86_64 = 2048, riscv64 = 2048 }
-reason = "one value that fits AVX-512/SVE frames; musl aarch64 already uses 6144; sysconf(_SC_MINSIGSTKSZ) gives the dynamic value"
-
-[[deviation]]
-name = "SIGSTKSZ"
-against = "musl"
-ours = 16384
-theirs = { x86_64 = 8192, aarch64 = 12288, riscv64 = 8192 }
-reason = "one stack size that covers the largest signal frame; sysconf(_SC_SIGSTKSZ) gives the dynamic value"
-
-[[deviation]]
 name = "NGROUPS_MAX"
 against = "musl"
 ours = 1023
@@ -170,9 +156,30 @@ reason = "B.8/09 A-sig-2: libc reserves 32, 33 and 34, so the public SIGRTMIN is
 [[deviation]]
 name = "SIGSTKSZ"
 against = "linux-abi"
-ours = 16384
-theirs = { x86_64 = 8192, riscv64 = 8192 }
-reason = "same reasoned value as the musl row; aarch64 already matches"
+ours = { x86_64 = 34816, aarch64 = 36864, riscv64 = 36864 }
+theirs = { x86_64 = 8192, aarch64 = 16384, riscv64 = 8192 }
+reason = "native SIGSTKSZ follows the FreeBSD profile; the Linux personality keeps its own value"
+
+[[deviation]]
+name = "WEXITED"
+against = "musl"
+ours = 16
+theirs = 4
+reason = "native wait selectors follow the FreeBSD profile (sys/sys/wait.h); the Linux personality keeps 4"
+
+[[deviation]]
+name = "WCONTINUED"
+against = "musl"
+ours = 4
+theirs = 8
+reason = "native wait selectors follow the FreeBSD profile (sys/sys/wait.h); the Linux personality keeps 8"
+
+[[deviation]]
+name = "WNOWAIT"
+against = "musl"
+ours = 8
+theirs = 16777216
+reason = "native wait selectors follow the FreeBSD profile (sys/sys/wait.h); the Linux personality keeps 0x1000000"
 
 [[deviation]]
 name = "AF_MAX"
@@ -180,3 +187,17 @@ against = "linux-abi"
 ours = 45
 theirs = 46
 reason = "doc 14 4.6 fixes AF_MAX at 45; the pinned Linux table already counts AF_MCTP 45, so Linux's AF_MAX is 46"
+
+[[deviation]]
+name = "SIGRTMIN"
+against = "freebsd"
+ours = 35
+theirs = 65
+reason = "C19 keeps the private signal range at 1..=64 and the kernel set width at u64; the public real-time range stays 35..64 until the kernel 128-bit set-width unit. FreeBSD SIGRTMIN is 65."
+
+[[deviation]]
+name = "SIGRTMAX"
+against = "freebsd"
+ours = 64
+theirs = 126
+reason = "C19 keeps the private signal range at 1..=64 and the kernel set width at u64; the public real-time range stays 35..64 until the kernel 128-bit set-width unit. FreeBSD SIGRTMAX is 126."

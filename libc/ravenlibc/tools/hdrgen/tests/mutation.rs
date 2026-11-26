@@ -142,10 +142,12 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
     let Some((temp, resources)) = setup("constant") else {
         return;
     };
+    // The signal table is FreeBSD-leased and is measured by the FreeBSD oracle; the musl verify
+    // measures the musl-derived groups, so mutate a constant in fcntl here.
     temp.mutate(
-        "signal.toml",
-        "{ name = \"SIGABRT\", value = 6 }",
-        "{ name = \"SIGABRT\", value = 7 }",
+        "fcntl.toml",
+        "{ name = \"O_CREAT\", value = 0o100, base = \"oct\" }",
+        "{ name = \"O_CREAT\", value = 0o101, base = \"oct\" }",
     );
     let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
@@ -154,7 +156,7 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
         return;
     }
     assert_eq!(output.status.code(), Some(1));
-    assert!(stderr(&output).contains("SIGABRT"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("O_CREAT"), "{}", stderr(&output));
 }
 
 #[test]

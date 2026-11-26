@@ -1,28 +1,34 @@
-# SPDX-License-Identifier: MIT
-# Copyright © 2005-2020 Rich Felker, et al.
+# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# RavenBSD: transpiled from musl:include/signal.h, arch/x86_64/bits/signal.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
-# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+# RavenBSD: the native signal table follows the FreeBSD profile
+# freebsd:sys/sys/signal.h, sys/sys/_sigaltstack.h, sys/x86/include/_limits.h,
+# sys/arm64/include/_limits.h @ 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-3-Clause).
+# The TOML shape and the omitted pointer-valued entries follow
+# musl:include/signal.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941 (MIT); the constants are
+# transcribed from the FreeBSD donor, not from musl.
 #
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+# 3. Neither the name of the copyright holder nor the names of its contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
 #
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 schema = 1
 group = "signal"
@@ -30,7 +36,8 @@ c_header = "bits/signum.h"
 guard = "_RAVEN_BITS_SIGNUM_H"
 rust_type = "i32"
 base = "dec"
-source = ["include/signal.h", "arch/x86_64/bits/signal.h"]
+source = ["freebsd:sys/sys/signal.h", "freebsd:sys/sys/_sigaltstack.h", "freebsd:sys/x86/include/_limits.h", "freebsd:sys/arm64/include/_limits.h"]
+donor = { name = "freebsd", revision = "133344405f532bd54ff3629a77d4c4e062f01fdb", license = "BSD-3-Clause" }
 prefixes = ["SIG", "SA_", "SS_", "SI_", "ILL_", "FPE_", "SEGV_", "BUS_", "TRAP_", "CLD_", "POLL_", "MINSIGSTKSZ", "NSIG", "_NSIG"]
 
 omit = [
@@ -47,68 +54,67 @@ consts = [
   { name = "SIGILL", value = 4 },
   { name = "SIGTRAP", value = 5 },
   { name = "SIGABRT", value = 6 },
-  { name = "SIGIOT", alias = "SIGABRT" },
-  { name = "SIGBUS", value = 7 },
+  { name = "SIGIOT", value = 6, doc = "FreeBSD SIGIOT alias of SIGABRT" },
+  { name = "SIGEMT", value = 7 },
   { name = "SIGFPE", value = 8 },
   { name = "SIGKILL", value = 9 },
-  { name = "SIGUSR1", value = 10 },
+  { name = "SIGBUS", value = 10 },
   { name = "SIGSEGV", value = 11 },
-  { name = "SIGUSR2", value = 12 },
+  { name = "SIGSYS", value = 12 },
   { name = "SIGPIPE", value = 13 },
   { name = "SIGALRM", value = 14 },
   { name = "SIGTERM", value = 15 },
-  { name = "SIGSTKFLT", value = 16 },
-  { name = "SIGCHLD", value = 17 },
-  { name = "SIGCONT", value = 18 },
-  { name = "SIGSTOP", value = 19 },
-  { name = "SIGTSTP", value = 20 },
+  { name = "SIGURG", value = 16 },
+  { name = "SIGSTOP", value = 17 },
+  { name = "SIGTSTP", value = 18 },
+  { name = "SIGCONT", value = 19 },
+  { name = "SIGCHLD", value = 20 },
   { name = "SIGTTIN", value = 21 },
   { name = "SIGTTOU", value = 22 },
-  { name = "SIGURG", value = 23 },
+  { name = "SIGIO", value = 23 },
   { name = "SIGXCPU", value = 24 },
   { name = "SIGXFSZ", value = 25 },
   { name = "SIGVTALRM", value = 26 },
   { name = "SIGPROF", value = 27 },
   { name = "SIGWINCH", value = 28 },
-  { name = "SIGIO", value = 29 },
-  { name = "SIGPOLL", alias = "SIGIO" },
-  { name = "SIGPWR", value = 30 },
-  { name = "SIGSYS", value = 31 },
-  { name = "SIGUNUSED", alias = "SIGSYS" },
-  { name = "SIGRTMIN", value = 35, doc = "public minimum; 32, 33 and 34 are reserved" },
+  { name = "SIGINFO", value = 29 },
+  { name = "SIGUSR1", value = 30 },
+  { name = "SIGUSR2", value = 31 },
+  { name = "SIGTHR", value = 32, doc = "reserved by the thread library" },
+  { name = "SIGLWP", value = 32, doc = "FreeBSD SIGLWP alias of SIGTHR" },
+  { name = "SIGLIBRT", value = 33, doc = "reserved by the real-time library" },
+  { name = "SIGRTMIN", value = 35, doc = "public minimum of the supported realtime range; the FreeBSD 65..126 widening is the remaining S713 signal-set-width unit" },
   { name = "SIGRTMAX", value = 64 },
-  { name = "_NSIG", value = 65 },
-  { name = "NSIG", alias = "_NSIG" },
-  { name = "SIG_BLOCK", value = 0 },
-  { name = "SIG_UNBLOCK", value = 1 },
-  { name = "SIG_SETMASK", value = 2 },
-  { name = "SA_NOCLDSTOP", value = 1 },
-  { name = "SA_NOCLDWAIT", value = 2 },
-  { name = "SA_SIGINFO", value = 4 },
-  { name = "SA_UNSUPPORTED", base = "hex", value = 0x400 },
-  { name = "SA_EXPOSE_TAGBITS", base = "hex", value = 0x800 },
-  { name = "SA_RESTORER", base = "hex", value = 0x04000000, doc = "internal restorer trampoline flag" },
-  { name = "SA_ONSTACK", base = "hex", value = 0x08000000 },
-  { name = "SA_RESTART", base = "hex", value = 0x10000000 },
-  { name = "SA_NODEFER", base = "hex", value = 0x40000000 },
-  { name = "SA_RESETHAND", base = "hex", value = 0x80000000, ty = "u32", suffix = "U" },
-  { name = "SA_NOMASK", alias = "SA_NODEFER" },
-  { name = "SA_ONESHOT", alias = "SA_RESETHAND", ty = "u32" },
+  { name = "NSIG", value = 32 },
+  { name = "SIG_BLOCK", value = 1 },
+  { name = "SIG_UNBLOCK", value = 2 },
+  { name = "SIG_SETMASK", value = 3 },
+  { name = "SA_NOCLDSTOP", base = "hex", value = 0x0008 },
+  { name = "SA_NOCLDWAIT", base = "hex", value = 0x0020 },
+  { name = "SA_SIGINFO", base = "hex", value = 0x0040 },
+  { name = "SA_ONSTACK", base = "hex", value = 0x0001 },
+  { name = "SA_RESTART", base = "hex", value = 0x0002 },
+  { name = "SA_NODEFER", base = "hex", value = 0x0010 },
+  { name = "SA_RESETHAND", base = "hex", value = 0x0004 },
   { name = "SS_ONSTACK", value = 1 },
-  { name = "SS_DISABLE", value = 2 },
-  { name = "SS_AUTODISARM", value = 0x80000000, ty = "u32", suffix = "U" },
-  { name = "SS_FLAG_BITS", alias = "SS_AUTODISARM", ty = "u32" },
-  { name = "MINSIGSTKSZ", value = 6144 },
-  { name = "SIGSTKSZ", value = 16384 },
-  { name = "SI_ASYNCNL", value = -60 },
-  { name = "SI_TKILL", value = -6 },
-  { name = "SI_SIGIO", value = -5 },
-  { name = "SI_ASYNCIO", value = -4 },
-  { name = "SI_MESGQ", value = -3 },
-  { name = "SI_TIMER", value = -2 },
-  { name = "SI_QUEUE", value = -1 },
-  { name = "SI_USER", value = 0 },
-  { name = "SI_KERNEL", value = 128 },
+  { name = "SS_DISABLE", value = 4 },
+  # FreeBSD sys/sys/_sigaltstack.h with sys/x86/include/_limits.h and
+  # sys/arm64/include/_limits.h. The rows are per architecture; the current hdrgen evaluator
+  # keeps one value per name, so the x86 row is last and wins until validate.rs carries the
+  # per-arch value (S713 round-2 blocker 1, aarch64 output still needs the generator fix).
+  { name = "MINSIGSTKSZ", arch = ["aarch64", "riscv64"], value = 4096 },
+  { name = "MINSIGSTKSZ", arch = ["x86_64"], value = 2048 },
+  { name = "SIGSTKSZ", arch = ["aarch64", "riscv64"], value = 36864 },
+  { name = "SIGSTKSZ", arch = ["x86_64"], value = 34816 },
+  { name = "SI_NOINFO", value = 0 },
+  { name = "SI_USER", base = "hex", value = 0x10001 },
+  { name = "SI_QUEUE", base = "hex", value = 0x10002 },
+  { name = "SI_TIMER", base = "hex", value = 0x10003 },
+  { name = "SI_ASYNCIO", base = "hex", value = 0x10004 },
+  { name = "SI_MESGQ", base = "hex", value = 0x10005 },
+  { name = "SI_KERNEL", base = "hex", value = 0x10006 },
+  { name = "SI_LWP", base = "hex", value = 0x10007 },
+  { name = "SI_UNDEFINED", value = 0 },
   { name = "ILL_ILLOPC", value = 1 },
   { name = "ILL_ILLOPN", value = 2 },
   { name = "ILL_ILLADR", value = 3 },
@@ -117,8 +123,8 @@ consts = [
   { name = "ILL_PRVREG", value = 6 },
   { name = "ILL_COPROC", value = 7 },
   { name = "ILL_BADSTK", value = 8 },
-  { name = "FPE_INTDIV", value = 1 },
-  { name = "FPE_INTOVF", value = 2 },
+  { name = "FPE_INTOVF", value = 1 },
+  { name = "FPE_INTDIV", value = 2 },
   { name = "FPE_FLTDIV", value = 3 },
   { name = "FPE_FLTOVF", value = 4 },
   { name = "FPE_FLTUND", value = 5 },
@@ -127,20 +133,14 @@ consts = [
   { name = "FPE_FLTSUB", value = 8 },
   { name = "SEGV_MAPERR", value = 1 },
   { name = "SEGV_ACCERR", value = 2 },
-  { name = "SEGV_BNDERR", value = 3 },
-  { name = "SEGV_PKUERR", value = 4 },
-  { name = "SEGV_MTEAERR", value = 8 },
-  { name = "SEGV_MTESERR", value = 9 },
+  { name = "SEGV_PKUERR", value = 100 },
+  { name = "SEGV_MTEAERR", value = 200 },
+  { name = "SEGV_MTESERR", value = 201 },
   { name = "BUS_ADRALN", value = 1 },
   { name = "BUS_ADRERR", value = 2 },
   { name = "BUS_OBJERR", value = 3 },
-  { name = "BUS_MCEERR_AR", value = 4 },
-  { name = "BUS_MCEERR_AO", value = 5 },
   { name = "TRAP_BRKPT", value = 1 },
   { name = "TRAP_TRACE", value = 2 },
-  { name = "TRAP_BRANCH", value = 3 },
-  { name = "TRAP_HWBKPT", value = 4 },
-  { name = "TRAP_UNK", value = 5 },
   { name = "CLD_EXITED", value = 1 },
   { name = "CLD_KILLED", value = 2 },
   { name = "CLD_DUMPED", value = 3 },
@@ -153,8 +153,9 @@ consts = [
   { name = "POLL_ERR", value = 4 },
   { name = "POLL_PRI", value = 5 },
   { name = "POLL_HUP", value = 6 },
-  { name = "SIGEV_SIGNAL", value = 0 },
-  { name = "SIGEV_NONE", value = 1 },
+  { name = "SIGEV_NONE", value = 0 },
+  { name = "SIGEV_SIGNAL", value = 1 },
   { name = "SIGEV_THREAD", value = 2 },
+  { name = "SIGEV_KEVENT", value = 3 },
   { name = "SIGEV_THREAD_ID", value = 4 },
 ]

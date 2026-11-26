@@ -76,7 +76,7 @@ pub fn raise<K: SigKernel>(kernel: &K, table: &DispTable, sig: i32) -> Result<()
     let tp = kernel.thread_pointer();
     let bit = crate::critical::signal_bit(sig);
     raw::pending_or(tp, bit);
-    let info = user_siginfo(sig, signal::SI_TKILL);
+    let info = user_siginfo(sig, signal::SI_LWP);
     raw::store_pending_info(tp, &info);
     let mask = raw::mask_load(tp);
     if mask & bit == 0 {

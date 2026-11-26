@@ -83,13 +83,14 @@ fn headers_have_a_notice_and_guard() {
         return;
     };
     for (name, text) in files {
-        if name == "bits/errno.h" {
+        if name == "bits/errno.h" || name == "bits/signum.h" {
+            // The errno and signal tables are FreeBSD-derived, not musl.
             assert!(
                 text.starts_with("/*\n * SPDX-License-Identifier: BSD-3-Clause"),
                 "{name}"
             );
             assert!(
-                text.contains("derived from freebsd:sys/sys/errno.h"),
+                text.contains("Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors"),
                 "{name}"
             );
         } else {
@@ -161,10 +162,16 @@ fn signal_header_has_the_frozen_stack_sizes() {
         return;
     };
     let text = &files["bits/signum.h"];
-    assert!(text.contains("#define MINSIGSTKSZ 6144\n"));
-    assert!(text.contains("#define SIGSTKSZ 16384\n"));
+    assert!(text.contains(
+        "#if defined(__aarch64__) || defined(__riscv)\n#define MINSIGSTKSZ 4096\n#endif\n"
+    ));
+    assert!(text.contains("#if defined(__x86_64__)\n#define MINSIGSTKSZ 2048\n#endif\n"));
+    assert!(text.contains(
+        "#if defined(__aarch64__) || defined(__riscv)\n#define SIGSTKSZ 36864\n#endif\n"
+    ));
+    assert!(text.contains("#if defined(__x86_64__)\n#define SIGSTKSZ 34816\n#endif\n"));
     assert!(text.contains("#define SIGRTMIN 35\n"));
-    assert!(text.contains("#define NSIG _NSIG\n"));
+    assert!(text.contains("#define NSIG 32\n"));
 }
 
 #[test]
