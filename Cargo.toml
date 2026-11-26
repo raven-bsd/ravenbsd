@@ -134,6 +134,7 @@ members = [
     "tests/qtest/cases/shared-futex-fixture",
     "tests/qtest/cases/robust-futex-fixture",
     "tests/qtest/cases/handle-copy-fixture",
+    "tests/qtest/cases/kernel-log-fixture",
     "tests/qtest/cases/proc-fork-fixture",
     "tests/qtest/cases/thread-tid-fixture",
     "xtask",

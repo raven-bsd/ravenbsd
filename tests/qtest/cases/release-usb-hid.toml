@@ -1,0 +1,197 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S214: the x86_64 release console login from a routed USB-HID keyboard. The case boots the
+# release profile with QEMU's xHCI controller and boot keyboard, waits for the UART getty,
+# types the login sequence through QMP `send-key` (QEMU routes it to the USB keyboard whenever
+# one is present, so the PS/2 fallback cannot satisfy this case) and asserts the password
+# prompt, the root shell and the marker command.
+#
+# The case is red on unmodified master: the release driver table has no 0x1b36:0x000d entry,
+# the xhci driver is a one-shot poll and consd does not depend on the kbd: scheme.
+
+name = "release-usb-hid"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-device", "qemu-xhci",
+    "-device", "usb-kbd",
+    "-qmp", "unix:build/qtest/release-usb-hid.qmp,server=on,wait=off",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^R A V E N   B S D$'
+
+# devd matches the xHCI function during the early driver pass, before the boot report prints the
+# late banner, so this row is not in banner order. The match is still mandatory.
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1b36 device=0x000d irq_line=[0-9]+ irq_pin=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '(?i)^.*login: ?'
+
+[[expect]]
+regex = '(?i)^password: ?'
+
+# The root prompt has no newline before the injected keystrokes echo, so match its prefix.
+[[expect]]
+regex = '^raven# '
+
+[[expect]]
+regex = '^s214ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|getty failed|usb-keyboard: fail'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:r"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:o"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:o"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:t"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:ret"
+delay_ms = 800
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:r"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:a"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:v"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:e"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:n"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:ret"
+delay_ms = 800
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:e"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:c"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:h"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:o"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:spc"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:s"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:2"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:1"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:4"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:o"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:k"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:ret"
+delay_ms = 800
+
+[[step]]
+wait = '^s214ok$'
+timeout_secs = 30
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:e"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:x"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:i"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:t"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:spc"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:0"
+delay_ms = 800
+
+[[step]]
+send = "@qmp:build/qtest/release-usb-hid.qmp:ret"
+delay_ms = 800
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
