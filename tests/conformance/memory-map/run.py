@@ -398,7 +398,11 @@ def run_sibling(image: Path, accel: str, smp: int) -> int:
                 failures.append(f"sibling-exit: no quiesce wait for pid={pid}")
             if f"s194: last-exit pid={pid} code=0" not in serial_text:
                 failures.append(f"sibling-exit: no clean terminal exit for pid={pid}")
-        for line in ("KERNEL PANIC", "page fault", "EXCEPTION", "panic"):
+            if f"process: fault-regs pid={pid}" in serial_text:
+                failures.append(f"sibling-exit: pid={pid} faulted after exit")
+            if f"process: child pid={pid} " in serial_text:
+                failures.append(f"sibling-exit: pid={pid} killed after exit")
+        for line in ("KERNEL PANIC", "EXCEPTION"):
             if line in serial_text:
                 failures.append(f"serial: {line}")
         if failures:

@@ -4,9 +4,9 @@
 // S198 test-only login shell for the `raven` account. The release `brush` login shell faults on
 // this base before the SSH command returns (the S195 K514 handover), so the conformance runner
 // cannot drive `/bin/mmap-probe`. sshd invokes this shell as
-// `s198-shell -c "<command>"`; it scans that command text for the probe's `--iterations=` and
-// `--mutation=private-shared` tokens and execs the probe with them. The probe rows, the kernel
-// and the product under test are unchanged.
+// `s198-shell -c "<command>"`; it scans that command text for the probe's `--iterations=`,
+// `--mutation=private-shared` and `--sibling-exit` tokens and execs the probe with them. The
+// probe rows, the kernel and the product under test are unchanged.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,9 +16,13 @@
 int main(int argc, char **argv) {
     int iterations = 1;
     int mutation = 0;
+    int sibling_exit = 0;
     for (int index = 1; index < argc; index++) {
         if (strstr(argv[index], "--mutation=private-shared") != 0) {
             mutation = 1;
+        }
+        if (strstr(argv[index], "--sibling-exit") != 0) {
+            sibling_exit = 1;
         }
         const char *value = strstr(argv[index], "--iterations=");
         if (value != 0) {
@@ -34,6 +38,7 @@ int main(int argc, char **argv) {
         "/bin/mmap-probe",
         iteration_arg,
         mutation ? "--mutation=private-shared" : (char *)0,
+        sibling_exit ? "--sibling-exit" : (char *)0,
         (char *)0,
     };
     execv(args[0], args);
