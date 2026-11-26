@@ -17,7 +17,9 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 
 use crate::model::{ARCHES, ConstDef, RecordDef};
-use crate::probe::{Report, copy_tree, parse_assembly, run_command, same_mod_64};
+use crate::probe::{
+    Report, copy_tree, copy_tree_missing, parse_assembly, run_command, same_mod_64,
+};
 use crate::validate::{Tables, Values};
 
 /// Architectures the FreeBSD profile covers (DR-69).
@@ -454,7 +456,7 @@ fn materialize(donor: &Path, arch: &str, temp: &Path) -> Result<Tree> {
     // under sys/, machine/ from the architecture and x86/ for amd64.
     copy_tree(&raw.join("include"), &include)?;
     if raw.join("sys/sys").is_dir() {
-        copy_tree(&raw.join("sys/sys"), &include)?;
+        copy_tree_missing(&raw.join("sys/sys"), &include)?;
         copy_tree(&raw.join("sys/sys"), &include.join("sys"))?;
     }
     for name in ["netinet", "netinet6", "net"] {
@@ -512,7 +514,7 @@ fn family_headers(stem: &str) -> &'static [&'static str] {
     match stem {
         "errno" => &["errno.h"],
         "signal" => &["signal.h"],
-        "fcntl" => &["fcntl.h"],
+        "fcntl" => &["fcntl.h", "unistd.h", "stdio.h"],
         "mman" => &["sys/mman.h"],
         "stat" => &["sys/stat.h", "dirent.h"],
         "socket" => &[
@@ -1228,8 +1230,11 @@ fn measure_side(
     measure_runtime(includes, temp, side);
 }
 
-/// Read `pub const NAME: TYPE = VALUE;` from a generated Rust file, keeping the value per
-/// architecture when the line is guarded by `#[cfg(target_arch = "...")]`.
+/// Read the generated Rust ABI values per architecture.
+///
+/// The `ALL` table stores every evaluated value, including alias and expression rows
+/// (`POLLWRNORM = POLLOUT`), with the architecture `#[cfg]` guard on the row. A file without
+/// `ALL` falls back to literal `pub const` rows, keeping the same per-architecture guard.
 #[must_use]
 pub fn parse_rust_constants(text: &str) -> BTreeMap<String, BTreeMap<String, i128>> {
     let mut values: BTreeMap<String, BTreeMap<String, i128>> = BTreeMap::new();
@@ -1239,6 +1244,29 @@ pub fn parse_rust_constants(text: &str) -> BTreeMap<String, BTreeMap<String, i12
         if let Some(rest) = trimmed.strip_prefix("#[cfg(") {
             let inner = rest.strip_suffix(")]").unwrap_or(rest);
             cfg_arches = Some(cfg_arches_of(inner));
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("(\"") {
+            let Some((name, rest)) = rest.split_once("\", ") else {
+                continue;
+            };
+            let value = rest
+                .trim_end_matches(',')
+                .trim_end_matches(')')
+                .trim_end_matches("i128");
+            let Ok(parsed) = value.parse::<i128>() else {
+                continue;
+            };
+            let arches = cfg_arches.take().unwrap_or_else(|| {
+                ARCHES
+                    .iter()
+                    .map(|arch| (*arch).to_string())
+                    .collect::<Vec<_>>()
+            });
+            let entry = values.entry(name.to_string()).or_default();
+            for arch in arches {
+                entry.insert(arch, parsed);
+            }
             continue;
         }
         let Some(rest) = trimmed.strip_prefix("pub const ") else {
@@ -1297,7 +1325,8 @@ fn raven_includes(clang: &str, arch: &str, root: &Path, abi: &Path) -> Result<In
     // The generated include tree is the authoritative output of the ABI tables; the installed
     // tree holds the hand-written headers and byte-identical distribution copies. Listing the
     // generated tree first keeps a mutated `--abi` table visible to the oracle instead of being
-    // shadowed by the stale installed copy.
+    // shadowed by the stale installed copy, matching `libc-pack`'s generated-last copy. The
+    // public clock limit is still visible because <time.h> includes bits/abi_limits.h.
     let dirs = vec![
         abi.join("generated/include"),
         root.join("libc/ravenlibc/include"),
@@ -1321,6 +1350,22 @@ fn donor_includes(clang: &str, arch: &str, tree: &Tree) -> Result<Includes> {
 }
 
 fn approved(tables: &Tables, diff: &Diff) -> bool {
+    // A donor has no value for a name it does not define. A table that names its extension
+    // policy keeps those rows as approved extensions; deleting the public name is never the
+    // way to make the oracle green.
+    if let Value::Text(expected) = &diff.expected
+        && expected == "absent"
+        && matches!(diff.actual, Value::Int(_))
+    {
+        return tables.groups.iter().any(|group| {
+            group.stem == diff.family
+                && group
+                    .def
+                    .donor_absent
+                    .as_ref()
+                    .is_some_and(|reason| !reason.trim().is_empty())
+        });
+    }
     tables.deviations.deviation.iter().any(|row| {
         if row.against != "freebsd" || row.name != diff.name {
             return false;
