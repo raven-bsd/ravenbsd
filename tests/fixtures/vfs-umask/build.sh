@@ -39,3 +39,6 @@ cp "$target_dir/$target/release/raven-vfs-umask" "$out/probe"
 # The reused `vfsd-test` profile stages its one-shot service from this path.
 mkdir -p build/fixtures/vfsd-probe
 cp "$out/probe" build/fixtures/vfsd-probe/probe
+
+# The fixture is a standalone package; its generated lockfile is not part of the tree.
+rm -f tests/fixtures/vfs-umask/Cargo.lock
