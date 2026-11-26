@@ -1651,6 +1651,44 @@ safe_f! {
 }
 
 #[allow(dead_code)] // std does not call every declared entry point yet.
+// FreeBSD file flags, line-discipline/termios constants and the pathconf row that
+// nix's FreeBSD-compatible code expects. Values and types are taken from the
+// permissive FreeBSD libc definitions in this same crate (`unix/bsd` and
+// `unix/bsd/freebsdlike`); the native ABI model does not list them because no
+// S746 record or canonical constant group owns them yet.
+pub const UF_NODUMP: c_ulong = 0x00000001;
+pub const UF_IMMUTABLE: c_ulong = 0x00000002;
+pub const UF_APPEND: c_ulong = 0x00000004;
+pub const UF_OPAQUE: c_ulong = 0x00000008;
+pub const UF_NOUNLINK: c_ulong = 0x00000010;
+pub const UF_SETTABLE: c_ulong = 0x0000ffff;
+pub const SF_ARCHIVED: c_ulong = 0x00010000;
+pub const SF_IMMUTABLE: c_ulong = 0x00020000;
+pub const SF_APPEND: c_ulong = 0x00040000;
+pub const SF_NOUNLINK: c_ulong = 0x00100000;
+pub const SF_SETTABLE: c_ulong = 0xffff0000;
+
+pub const B7200: speed_t = 7200;
+pub const B14400: speed_t = 14400;
+pub const B28800: speed_t = 28800;
+pub const B76800: speed_t = 76800;
+
+pub const VDSUSP: usize = 11;
+pub const VERASE2: usize = 7;
+pub const VSTATUS: usize = 18;
+pub const OXTABS: crate::tcflag_t = 0x4;
+pub const ONOEOT: crate::tcflag_t = 0x8;
+pub const CIGNORE: crate::tcflag_t = 0x00000001;
+pub const MDMBUF: crate::tcflag_t = 0x00100000;
+pub const CCTS_OFLOW: crate::tcflag_t = 0x00010000;
+pub const CRTS_IFLOW: crate::tcflag_t = 0x00020000;
+pub const CDTR_IFLOW: crate::tcflag_t = 0x00040000;
+pub const CDSR_OFLOW: crate::tcflag_t = 0x00080000;
+pub const CCAR_OFLOW: crate::tcflag_t = 0x00100000;
+pub const ALTWERASE: crate::tcflag_t = 0x00000200;
+pub const NOKERNINFO: crate::tcflag_t = 0x02000000;
+pub const _PC_MIN_HOLE_SIZE: c_int = 21;
+
 extern "C" {
     // errno.h
     pub fn __errno_location() -> *mut c_int;
