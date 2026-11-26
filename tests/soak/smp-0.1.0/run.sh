@@ -8,7 +8,7 @@
 
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd -P)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 export PYTHONDONTWRITEBYTECODE=1
 exec python3 "$root/tests/soak/smp-0.1.0/run.py" "$@"

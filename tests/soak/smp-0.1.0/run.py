@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).absolute().parents[3]
 SUPERVISOR = ROOT / "tests/smp/boot/soak_boot.py"
 
 DEFAULT_IMAGES = {
@@ -221,10 +221,11 @@ def prjmgmt_root() -> Path:
     override = os.environ.get("RAVEN_PRJMGMT")
     if override:
         return Path(override).resolve()
-    for parent in (ROOT, *ROOT.parents):
-        candidate = parent / "ravenbsd-prjmgmt"
-        if (candidate / "tickets").is_dir():
-            return candidate
+    for base in (ROOT, Path(os.environ.get("PWD", ROOT))):
+        for parent in (base, *base.parents):
+            candidate = parent / "ravenbsd-prjmgmt"
+            if (candidate / "tickets").is_dir():
+                return candidate
     raise SystemExit("s85h: cannot locate ravenbsd-prjmgmt; set RAVEN_PRJMGMT")
 
 
