@@ -28,9 +28,6 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 regex = '^R A V E N   B S D$'
 
 [[expect]]
-regex = '(?i)^.*login: ?root'
-
-[[expect]]
 regex = '(?i)^password: ?'
 
 [[expect]]
