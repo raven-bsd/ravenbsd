@@ -28,20 +28,28 @@ pub(crate) fn sipi(vector: u8) -> u32 {
     (0b110 << 8) | (vector as u32) | (1 << 14) | (1 << 15)
 }
 
-/// The sequence currently sent to one AP.
-pub(crate) fn start_sequence(vector: u8) -> [StartStep; 3] {
+/// The INIT-SIPI-SIPI sequence sent to one AP.
+///
+/// NetBSD `sys/arch/x86/x86/cpu.c:mp_cpu_start` deasserts INIT, waits 10 ms, then sends two
+/// SIPIs 200 us apart. The settle delay gives the AP time to enter wait-for-SIPI; the second
+/// SIPI covers a first SIPI that arrived while the AP was still resetting.
+pub(crate) fn start_sequence(vector: u8) -> [StartStep; 4] {
     [
         StartStep {
             icr: INIT_ASSERT,
-            delay_ns: 10_000_000,
+            delay_ns: 0,
         },
         StartStep {
             icr: INIT_DEASSERT,
+            delay_ns: 10_000_000,
+        },
+        StartStep {
+            icr: sipi(vector),
             delay_ns: 200_000,
         },
         StartStep {
             icr: sipi(vector),
-            delay_ns: 0,
+            delay_ns: 200_000,
         },
     ]
 }
