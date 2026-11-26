@@ -18,7 +18,7 @@ pub const DIRENT_MAX_LEN: usize = 280;
 
 /// The FreeBSD `_GENERIC_DIRLEN`: header, name, NUL, rounded up to eight bytes.
 pub const fn dirent_reclen(namlen: usize) -> usize {
-    (DIRENT_NAME_OFFSET + namlen + 1 + 7) & !7
+    (DIRENT_NAME_OFFSET + namlen + 7) & !7
 }
 
 /// Largest private K60 record the server can return (16-byte header, 255-byte name, 8-align).
