@@ -80,7 +80,7 @@ pub use defaults::{DefaultAction, default_action};
 pub use dispositions::{
     DispTable, Disposition, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART, SA_SIGINFO,
 };
-pub use entry::{EntryOutcome, run_direct, signal_entry};
+pub use entry::{EntryOutcome, run_direct};
 pub use errors::{
     EAGAIN_ERR, EINTR_ERR, EINVAL_ERR, ENOMEM_ERR, ENOSYS_ERR, EPERM_ERR, ETIMEDOUT_ERR, errno,
 };

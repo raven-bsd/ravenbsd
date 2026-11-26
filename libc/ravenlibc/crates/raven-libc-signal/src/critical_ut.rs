@@ -70,8 +70,9 @@ fn a_kick_inside_a_critical_section_defers_and_replays_on_exit() {
         0,
         "critical_exit must never call the handler"
     );
-    let point = kernel.safe_point(&table, None, None);
-    assert!(point.terminated.is_none());
+    kernel
+        .direct(&table, crate::kernel::KICK_CHECK, None)
+        .unwrap();
     assert_eq!(COUNT.load(Ordering::SeqCst), 1);
 }
 
@@ -95,7 +96,9 @@ fn the_kick_fallback_works_without_sigresend() {
     critical_exit(&kernel, &table);
     assert_eq!(COUNT.load(Ordering::SeqCst), 0);
     assert_ne!(kernel.kick_word(), 0);
-    kernel.safe_point(&table, None, None);
+    kernel
+        .direct(&table, crate::kernel::KICK_CHECK, None)
+        .unwrap();
     assert_eq!(COUNT.load(Ordering::SeqCst), 1);
 }
 
@@ -119,8 +122,9 @@ fn ten_thousand_iterations_never_lose_or_duplicate() {
         }
         critical_exit(&kernel, &table);
         // Let the fake process the replay kick, if any.
-        let point = kernel.safe_point(&table, None, None);
-        assert!(point.terminated.is_none());
+        kernel
+            .direct(&table, crate::kernel::KICK_CHECK, None)
+            .unwrap();
         assert_eq!(
             COUNT.load(Ordering::SeqCst),
             expected,

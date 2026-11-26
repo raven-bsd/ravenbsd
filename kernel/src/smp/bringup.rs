@@ -84,22 +84,19 @@ pub fn platform_init() {
             kprintln!("smp: cannot prepare CPU {cpu}");
             break;
         }
-        let mut started = false;
-        let mut attempt = 0u32;
-        while attempt < 3 && !started {
-            ap_start::start_ap(apic_id);
-            let deadline = time::now_ns().saturating_add(200_000_000);
-            while ap_start::block(cpu).online.load(Ordering::Acquire) == 0 {
-                if time::now_ns() > deadline {
-                    break;
-                }
-                core::hint::spin_loop();
+        ap_start::start_ap(apic_id);
+        let deadline = time::now_ns().saturating_add(ap_start::AP_START_WAIT_NS);
+        while ap_start::block(cpu).online.load(Ordering::Acquire) == 0 {
+            if time::now_ns() > deadline {
+                break;
             }
-            started = ap_start::block(cpu).online.load(Ordering::Acquire) != 0;
-            attempt = attempt.saturating_add(1);
+            core::hint::spin_loop();
         }
-        if !started {
+        if ap_start::block(cpu).online.load(Ordering::Acquire) == 0 {
             kprintln!("smp: cpu {apic_id} did not start");
+            // Park the AP before the low trampoline mapping is dropped: a SIPI still in flight
+            // would otherwise fetch from the unmapped page and reset the machine.
+            ap_start::reset_ap(apic_id);
             // The APs that did start are spinning with interrupts off; let them enter idle.
             ap_start::start_ap_timers();
             set_online(cpu);
