@@ -15,13 +15,13 @@ timeout 600 sh tests/ssh/0.1.0-login-gate/run.sh --arch aarch64 --accel tcg
 ```
 
 `run.sh` builds the `release` profile image with `cargo xtask image` unless `--image PATH` names a
-prebuilt image. It boots the image with QEMU user networking and a host-forwarded port, proves the
-guest `/sbin/sshd`, `/usr/libexec/sshd-session` and `/usr/libexec/sshd-auth` are staged, runs the
-host `ssh` client with the marker command `echo S85K-SSH-LOGIN-OK`, then runs a `pwd` PTY row and
-asserts a clean close.
+prebuilt image. It boots the image with QEMU user networking and a host-forwarded port, reads the
+svcd boot report for the `sshd` service readiness (`svcd: sshd up`), runs the host `ssh` client
+with the marker command `echo S85K-SSH-LOGIN-OK`, then runs a `pwd` PTY row and asserts a clean
+close.
 
-The console login is used only to inspect the staged sshd; it is never accepted as an SSH result.
-A missing sshd, missing split-server binaries, no SSH banner, host-key/handshake failure,
+The console is never used as an SSH result. A release image without the sshd service row, an
+sshd row that never reaches readiness, no SSH banner, host-key/handshake failure,
 authentication refusal, PTY failure and session failure each have their own stage and exit code
 (see `run.sh --help`).
 

@@ -38,10 +38,10 @@ class MarkerTest(unittest.TestCase):
 
 class ClassifierTest(unittest.TestCase):
     def test_missing_sshd_probe_wins_over_the_serial_login(self) -> None:
-        serial = "login: root\npassword:\nraven# " + gate.SSHD_ABSENT
+        serial = "login: root\npassword:\nraven# " + gate.PROBE_ABSENT
         stage = gate.classify(
             serial=serial,
-            sshd_probe=gate.SSHD_ABSENT,
+            sshd_probe=gate.PROBE_ABSENT,
             client_rc=None,
             client_stdout="",
             client_stderr="",
@@ -49,10 +49,10 @@ class ClassifierTest(unittest.TestCase):
         self.assertEqual(stage, gate.SSHD_MISSING)
 
     def test_incomplete_sshd_installation_is_its_own_stage(self) -> None:
-        serial = "raven# " + gate.SSHD_INCOMPLETE
+        serial = "raven# " + gate.PROBE_INCOMPLETE
         stage = gate.classify(
             serial=serial,
-            sshd_probe=gate.SSHD_INCOMPLETE,
+            sshd_probe=gate.PROBE_INCOMPLETE,
             client_rc=None,
             client_stdout="",
             client_stderr="",
@@ -62,7 +62,7 @@ class ClassifierTest(unittest.TestCase):
     def test_connection_refused_is_not_listening(self) -> None:
         stage = gate.classify(
             serial="raven# ",
-            sshd_probe=gate.SSHD_PRESENT,
+            sshd_probe=gate.PROBE_PRESENT,
             client_rc=255,
             client_stdout="",
             client_stderr="ssh: connect to host 127.0.0.1 port 2222: Connection refused",
@@ -72,7 +72,7 @@ class ClassifierTest(unittest.TestCase):
     def test_permission_denied_is_authentication(self) -> None:
         stage = gate.classify(
             serial="raven# ",
-            sshd_probe=gate.SSHD_PRESENT,
+            sshd_probe=gate.PROBE_PRESENT,
             client_rc=255,
             client_stdout="",
             client_stderr="raven@127.0.0.1: Permission denied (password).",
@@ -82,7 +82,7 @@ class ClassifierTest(unittest.TestCase):
     def test_kex_failure_is_host_key_or_handshake(self) -> None:
         stage = gate.classify(
             serial="raven# ",
-            sshd_probe=gate.SSHD_PRESENT,
+            sshd_probe=gate.PROBE_PRESENT,
             client_rc=255,
             client_stdout="",
             client_stderr="kex_exchange_identification: Connection closed by remote host",
@@ -92,7 +92,7 @@ class ClassifierTest(unittest.TestCase):
     def test_pty_allocation_failure_is_pty(self) -> None:
         stage = gate.classify(
             serial="raven# ",
-            sshd_probe=gate.SSHD_PRESENT,
+            sshd_probe=gate.PROBE_PRESENT,
             client_rc=0,
             client_stdout=MARKER + "\n",
             client_stderr="PTY allocation request failed on channel 0\n",
@@ -102,20 +102,34 @@ class ClassifierTest(unittest.TestCase):
     def test_marker_without_clean_close_is_a_session_failure(self) -> None:
         stage = gate.classify(
             serial="raven# ",
-            sshd_probe=gate.SSHD_PRESENT,
+            sshd_probe=gate.PROBE_PRESENT,
             client_rc=0,
             client_stdout=MARKER + "\n",
             client_stderr="",
         )
         self.assertEqual(stage, gate.SESSION)
 
+    def test_marker_without_the_freed_channel_is_a_session_failure(self) -> None:
+        stage = gate.classify(
+            serial="raven# ",
+            sshd_probe=gate.PROBE_PRESENT,
+            client_rc=0,
+            client_stdout=MARKER + "\n",
+            client_stderr="debug1: Exit status 0\n",
+        )
+        self.assertEqual(stage, gate.SESSION)
+
     def test_marker_with_clean_close_passes(self) -> None:
         stage = gate.classify(
             serial="raven# ",
-            sshd_probe=gate.SSHD_PRESENT,
+            sshd_probe=gate.PROBE_PRESENT,
             client_rc=0,
             client_stdout=MARKER + "\n",
-            client_stderr="Connection to 127.0.0.1 closed.\n",
+            client_stderr=(
+                "debug1: client_input_channel_req: channel 0 rtype exit-status reply 0\n"
+                "debug1: channel 0: free: client-session, nchannels 1\n"
+                "debug1: Exit status 0\n"
+            ),
         )
         self.assertIsNone(stage)
 
@@ -150,14 +164,18 @@ class ClientArgvTest(unittest.TestCase):
         self.assertNotIn("-T", argv)
 
 
-class SshdProbeTest(unittest.TestCase):
-    def test_probe_markers_map_to_the_staged_state(self) -> None:
-        self.assertEqual(gate.sshd_probe_state("x\n" + gate.SSHD_ABSENT + "\n"), gate.SSHD_ABSENT)
-        self.assertEqual(
-            gate.sshd_probe_state("x\n" + gate.SSHD_INCOMPLETE + "\n"), gate.SSHD_INCOMPLETE
-        )
-        self.assertEqual(gate.sshd_probe_state("x\n" + gate.SSHD_PRESENT + "\n"), gate.SSHD_PRESENT)
-        self.assertEqual(gate.sshd_probe_state("no marker"), gate.SSHD_UNKNOWN)
+class SshdStateTest(unittest.TestCase):
+    def test_boot_report_without_sshd_row_is_missing(self) -> None:
+        serial = "000.00  netd   ok\n000.01  getty  ok\nlogin: "
+        self.assertEqual(gate.sshd_state_from_serial(serial), gate.PROBE_ABSENT)
+
+    def test_boot_report_with_failed_sshd_row_is_not_listening(self) -> None:
+        serial = "000.00  sshd   failed\n000.01  getty  ok\n"
+        self.assertEqual(gate.sshd_state_from_serial(serial), gate.PROBE_NOT_LISTENING)
+
+    def test_boot_report_with_ok_sshd_row_is_present(self) -> None:
+        serial = "000.00  sshd   \x1b[32mok\x1b[0m\n"
+        self.assertEqual(gate.sshd_state_from_serial(serial), gate.PROBE_PRESENT)
 
 
 if __name__ == "__main__":

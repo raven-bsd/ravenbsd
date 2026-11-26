@@ -21,9 +21,9 @@
 #   --evidence-dir DIR        prjmgmt evidence directory (default RAVEN_EVIDENCE_DIR)
 #   --password PW             host login password (default raven; mutation knob)
 #
-# Exit codes: 0 pass; 2 setup; 3 image build; 10 boot; 11 console login;
-# 12 missing sshd; 13 incomplete sshd; 14 sshd not listening; 15 handshake;
-# 16 authentication; 17 PTY; 18 session/command.
+# Exit codes: 0 pass; 2 setup; 3 image build; 10 boot; 12 missing sshd;
+# 13 incomplete sshd; 14 sshd not listening; 15 handshake; 16 authentication;
+# 17 PTY; 18 session/command.
 
 set -eu
 
@@ -47,9 +47,9 @@ usage: sh tests/ssh/0.1.0-login-gate/run.sh --arch <x86_64|aarch64> --accel <kvm
   --password PW             host login password (default raven; mutation knob)
 
 Evidence is written under tickets/evidence/artifacts/S85k/ in ravenbsd-prjmgmt.
-Exit codes: 0 pass; 2 setup; 3 image build; 10 boot; 11 console login;
-12 missing sshd; 13 incomplete sshd; 14 sshd not listening; 15 handshake;
-16 authentication; 17 PTY; 18 session/command.
+Exit codes: 0 pass; 2 setup; 3 image build; 10 boot; 12 missing sshd;
+13 incomplete sshd; 14 sshd not listening; 15 handshake; 16 authentication;
+17 PTY; 18 session/command.
 EOF
 }
 

@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -33,7 +34,6 @@ ROOT = Path(__file__).resolve().parents[3]
 MARKER = "S85K-SSH-LOGIN-OK"
 
 BOOT = "boot"
-CONSOLE_LOGIN = "console_login"
 IMAGE = "image"
 SSHD_MISSING = "sshd_missing"
 SSHD_INCOMPLETE = "sshd_incomplete"
@@ -44,31 +44,22 @@ PTY = "pty"
 SESSION = "session"
 SETUP = "setup"
 
-SSHD_PRESENT = "S85K_SSHD=present"
-SSHD_ABSENT = "S85K_SSHD=absent"
-SSHD_INCOMPLETE = "S85K_SSHD=incomplete"
-SSHD_UNKNOWN = "unknown"
-
-PROBE_COMMAND = (
-    "if [ -x /sbin/sshd ]; then "
-    "if [ -x /usr/libexec/sshd-session ] && [ -x /usr/libexec/sshd-auth ]; then "
-    "echo S85K_SSHD=present; else echo S85K_SSHD=incomplete; fi; "
-    "else echo S85K_SSHD=absent; fi"
-)
+PROBE_PRESENT = "present"
+PROBE_ABSENT = "absent"
+PROBE_INCOMPLETE = "incomplete"
+PROBE_NOT_LISTENING = "not_listening"
+PROBE_UNKNOWN = "unknown"
 
 BOOT_TIMEOUT = 300
-CONSOLE_LOGIN_TIMEOUT = 30
-PROBE_TIMEOUT = 30
 LISTEN_TIMEOUT = 90
 CLIENT_TIMEOUT = 60
-IMAGE_TIMEOUT = 480
-ADDON_TIMEOUT = 480
+IMAGE_TIMEOUT = 150
+ADDON_TIMEOUT = 180
 
 EXIT_STAGE = {
     SETUP: 2,
     IMAGE: 3,
     BOOT: 10,
-    CONSOLE_LOGIN: 11,
     SSHD_MISSING: 12,
     SSHD_INCOMPLETE: 13,
     SSHD_NOT_LISTENING: 14,
@@ -84,11 +75,28 @@ def marker_present(stdout: str) -> bool:
     return stdout.strip() == MARKER
 
 
-def sshd_probe_state(text: str) -> str:
-    for marker in (SSHD_PRESENT, SSHD_INCOMPLETE, SSHD_ABSENT):
-        if marker in text:
-            return marker
-    return SSHD_UNKNOWN
+def sshd_state_from_serial(text: str) -> str:
+    """Read the svcd boot report for the sshd service row.
+
+    The release boot prints one row per service (`<time>  sshd  ok`). The row is
+    present only when the release profile stages the service; `ok` is svcd's own
+    readiness (the listening line in /tmp/sshd.log), so it is not a console guess.
+    """
+    row = None
+    for line in text.splitlines():
+        match = re.match(r"^\s*\d+\.\d+\s+sshd\s+(\S+)", line)
+        if match:
+            row = match.group(1)
+    if row is None:
+        return PROBE_ABSENT
+    if "ok" in row:
+        return PROBE_PRESENT
+    return PROBE_NOT_LISTENING
+
+
+def clean_close(stderr: str) -> bool:
+    """OpenSSH -v reports the remote status and the freed session channel on a clean close."""
+    return "Exit status 0" in stderr and "channel 0: free: client-session" in stderr
 
 
 def classify(
@@ -101,9 +109,9 @@ def classify(
 ) -> str | None:
     """Return the exact failing stage, or None when the SSH login passed."""
     del serial
-    if sshd_probe == SSHD_ABSENT:
+    if sshd_probe == PROBE_ABSENT:
         return SSHD_MISSING
-    if sshd_probe == SSHD_INCOMPLETE:
+    if sshd_probe == PROBE_INCOMPLETE:
         return SSHD_INCOMPLETE
     if client_rc is None:
         return SESSION
@@ -127,7 +135,7 @@ def classify(
         return SESSION
     if not marker_present(client_stdout):
         return SESSION
-    if "Connection to 127.0.0.1 closed." not in client_stderr:
+    if not clean_close(client_stderr):
         return SESSION
     return None
 
@@ -321,25 +329,24 @@ def banner(port: int, deadline: float) -> str | None:
     return None
 
 
-def console_probe(child: pexpect.spawn, serial: Path) -> str:
-    child.sendline("root")
-    try:
-        child.expect(r"(?i)password:\s*", timeout=CONSOLE_LOGIN_TIMEOUT)
-    except pexpect.TIMEOUT:
-        raise GateFailure(CONSOLE_LOGIN, f"no password prompt on the console; see {serial}")
-    child.sendline("raven")
-    try:
-        child.expect(r"(?i)raven# ", timeout=CONSOLE_LOGIN_TIMEOUT)
-    except pexpect.TIMEOUT:
-        raise GateFailure(CONSOLE_LOGIN, f"console login did not reach the shell; see {serial}")
-    child.sendline(PROBE_COMMAND)
-    try:
-        child.expect_exact(
-            [SSHD_PRESENT, SSHD_INCOMPLETE, SSHD_ABSENT], timeout=PROBE_TIMEOUT
-        )
-    except pexpect.TIMEOUT:
-        raise GateFailure(CONSOLE_LOGIN, f"sshd probe produced no marker; see {serial}")
-    return child.after
+def wait_sshd(child: pexpect.spawn, initial: str) -> tuple[str, str]:
+    """Drain the serial until svcd reports `sshd up`, then return the state and text."""
+    text = initial
+    state = sshd_state_from_serial(text)
+    if state != PROBE_PRESENT:
+        return state, text
+    deadline = time.monotonic() + LISTEN_TIMEOUT
+    while True:
+        if re.search(r"(?m)^svcd: sshd up\s*$", text):
+            return PROBE_PRESENT, text
+        if time.monotonic() >= deadline:
+            return PROBE_NOT_LISTENING, text
+        try:
+            text += child.read_nonblocking(size=4096, timeout=0.5)
+        except pexpect.TIMEOUT:
+            continue
+        except pexpect.EOF:
+            return PROBE_NOT_LISTENING, text
 
 
 def run_client(
@@ -375,11 +382,13 @@ def gate(arch: str, accel: str, image: Path, evidence: Path, password: str) -> i
     client_exec = evidence / f"client-exec-{tag}.log"
     client_pty = evidence / f"client-pty-{tag}.log"
     summary = evidence / f"summary-{tag}.json"
-    code, var = firmware(arch)
+    code, var_source = firmware(arch)
+    vars_copy = evidence / f"firmware-vars-{tag}.fd"
+    shutil.copyfile(var_source, vars_copy)
     port = free_port()
     child: pexpect.spawn | None = None
     logfile = None
-    sshd_probe = SSHD_UNKNOWN
+    sshd_probe = PROBE_UNKNOWN
     banner_text = ""
     stage: str | None = None
     detail = ""
@@ -392,7 +401,7 @@ def gate(arch: str, accel: str, image: Path, evidence: Path, password: str) -> i
     started = time.monotonic()
     try:
         log(f"booting {arch}/{accel} image {image.relative_to(ROOT)} on port {port}")
-        argv = qemu_argv(arch, accel, image, code, var, port)
+        argv = qemu_argv(arch, accel, image, code, vars_copy, port)
         logfile = serial.open("w", encoding="utf-8", errors="replace")
         child = pexpect.spawn(
             argv[0],
@@ -408,22 +417,27 @@ def gate(arch: str, accel: str, image: Path, evidence: Path, password: str) -> i
             child.expect([r"(?i)login:\s*", r"(?i)panic|EXCEPTION|Kernel panic"], timeout=BOOT_TIMEOUT)
         except pexpect.TIMEOUT:
             raise GateFailure(BOOT, f"release image did not reach the login prompt; see {serial}")
+        except pexpect.EOF:
+            raise GateFailure(
+                BOOT, f"QEMU exited before the login prompt; see {serial} and the run log"
+            )
         if re.search(r"(?i)panic|EXCEPTION|Kernel panic", child.after):
             raise GateFailure(BOOT, f"guest faulted before login; see {serial}")
 
-        sshd_probe = console_probe(child, serial)
-        log(f"guest sshd probe: {sshd_probe}")
-        if sshd_probe == SSHD_ABSENT:
+        logfile.flush()
+        initial = child.before + child.after
+        sshd_probe, _ = wait_sshd(child, initial)
+        log(f"guest sshd state: {sshd_probe}")
+        if sshd_probe == PROBE_ABSENT:
             raise GateFailure(
                 SSHD_MISSING,
-                "release image has no /sbin/sshd; the OpenSSH add-on is not staged "
-                "(owner: K195, origin/ken/K195)",
+                "the release boot report has no sshd service row; the release profile "
+                "does not stage the OpenSSH add-on (owner: K195)",
             )
-        if sshd_probe == SSHD_INCOMPLETE:
+        if sshd_probe == PROBE_NOT_LISTENING:
             raise GateFailure(
-                SSHD_INCOMPLETE,
-                "release image has /sbin/sshd but not /usr/libexec/sshd-session and "
-                "/usr/libexec/sshd-auth (owner: K195)",
+                SSHD_NOT_LISTENING,
+                f"the release boot report has an sshd row but no 'svcd: sshd up'; see {serial}",
             )
 
         banner_text = banner(port, time.monotonic() + LISTEN_TIMEOUT) or ""
@@ -473,7 +487,7 @@ def gate(arch: str, accel: str, image: Path, evidence: Path, password: str) -> i
             raise GateFailure(PTY, f"sshd refused the PTY request; see {client_pty}")
         if pty_rc != 0 or not re.search(r"(?m)^/", pty_stdout):
             raise GateFailure(PTY, f"PTY command did not return a path; see {client_pty}")
-        if "Connection to 127.0.0.1 closed." not in pty_stderr:
+        if not clean_close(pty_stderr):
             raise GateFailure(SESSION, f"PTY session did not close cleanly; see {client_pty}")
         return 0
     except GateFailure as failure:
