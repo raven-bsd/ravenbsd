@@ -188,10 +188,7 @@ The global recomputation may be replaced by incremental propagation along the wa
 detection and the remaining R-LCK-7 consumers are separate tickets; `RwLock`/`Condvar` glue and
 the user-visible priority syscalls remain PROPOSED.
 
-## Lock order and IPI waits (S85a rework 3, pre-S113 historical)
-
-> Superseded for current delivery status by **Post-S113 verification (S85a rework 1)** below.
-> The failure-class analysis, the rule and the DR-52 table remain authoritative.
+## Lock order and IPI waits (S85a rework 3)
 
 Status: **OBSERVED** on `origin/master` `eb3ac161` (merged into `lance/S85a` at `192108c3`),
 pre-S113. This section is the lock-order audit required before the 50/50 TCG/KVM retry.
@@ -309,79 +306,3 @@ Donor revisions: NetBSD `36eddebcc36cb0775aa2962005b9c05419a6ff01`, FreeBSD
 
 No donor code was copied or translated, so `PROVENANCE.toml` is unchanged and there is no new
 import.
-
-## Post-S113 verification (S85a rework 1)
-
-Status: **OBSERVED** on `origin/master` `6d1b1bde` (fast-forwarded into `lance/S85a`) after the
-S113 rounds merged. The pre-S113 section above remains the failure-class analysis and the rule;
-this section updates the delivery status and the remaining lock-order work.
-
-### What S113 changed
-
-* x86-64 `sched_syscall_enter` (`kernel/src/sched/context.rs:606-665`) now enables IF after the
-  FPU save for MAP, UNMAP, PROTECT, THREAD_CREATE, THREAD_EXIT, EXIT, FUTEX, the scheme IPC
-  syscalls (SCHEME_REGISTER/OPEN/READ/WRITE/CLOSE/DUP/FSTAT/CALL/RECV/SEND) and
-  PREAD/PWRITE/SEEK. `sched_syscall_exit` (`:670-687`) masks before the FPU restore and the
-  swapgs/sysretq return.
-* The x86-64 user page-fault path wraps the address-space lock wait in `PageFaultGuard`
-  (`kernel/src/process/mod.rs:1738-1761`), so the wait is interruptible while the actual fault
-  resolution is inside `sync::critical` (`:1776-1797`). The usercopy fixup stays non-preemptible.
-* Process exit masks only the state/wake graph, IPC teardown and handle replacement
-  (`kernel/src/process/mod.rs:1350-1357,1622-1634`); the long address-space release remains
-  interruptible for the TLB IPI.
-* aarch64: the SVC vector still enters with `PSTATE.DAIF` masked and `svc_dispatch`
-  (`kernel/src/arch/aarch64/vectors.rs:255-272`, `kernel/src/syscall/mod.rs:414-445`) does not
-  unmask. The aarch64 shooter-side `ActiveGuard` (`kernel/src/sched/smp_shim.rs:221-249,267-336`)
-  is unchanged; the target-side window is still Dave/S103-r2.
-
-### Current inventory and delivery status
-
-| Site | Lock held across the flush | x86-64 delivery after S113 | aarch64 delivery | Rule verdict |
-|---|---|---|---|---|
-| `kernel/src/memory/uspace.rs:625` (`fork_clone_from` ← `process::fork`, `process/mod.rs:543-547`) | source **and** child `address_space` `spin::Mutex` | **not fixed**: `proc_fork` 0x34 is absent from the safe-unmask set (`process_ctl.rs:50-62`, `syscall/mod.rs:99`) | not fixed | **violation** |
-| `kernel/src/memory/uspace.rs:909` (`unmap` ← `memory_ctl::unmap` `:259-266`, `unmap_current` `:325-328`, `map(REPLACE)` `:188-197`) | `address_space` `spin::Mutex` | fixed for UNMAP/THREAD_EXIT/EXIT | not fixed | **violation** |
-| `kernel/src/memory/uspace.rs:979` (`protect` ← `memory_ctl::protect` `:344-346`) | `address_space` `spin::Mutex` | fixed for PROTECT | not fixed | **violation** |
-| `kernel/src/memory/uspace.rs:1065` and `:1100` (`handle_fault` ← `resolve_page_fault`, `process/mod.rs:1776-1797`) | `address_space` `spin::Mutex` | fixed: `PageFaultGuard` opens IF for the lock wait | not fixed | **violation** |
-| `kernel/src/memory/uspace.rs:1140` (`map_pager_page` ← `memory/pager.rs:77-81`, `uspace.rs:1019`) | `address_space` `spin::Mutex` | page-fault path fixed; pager-supply path not in the safe set — verify | not fixed | **violation** |
-| `kernel/src/ipc/capture.rs:788` (`unmap_partial` ← `capture.rs:707,718,740`) | `server.address_space` `spin::Mutex` (`:685`) | fixed via the scheme IPC safe set | not fixed | **violation** |
-| `kernel/src/ipc/capture.rs:494` (`Drop for Capture`) | none; guard at `:470` ends before the flush | clean | clean | **clean** |
-| `kernel/src/smp/selftest.rs:282`, `kernel/src/sched/smp_shim.rs:564`, `kernel/src/smp/call.rs:72` | none; boot self-tests | clean | clean | **clean** |
-| `kernel/src/smp/shootdown.rs:104-180`, `kernel/src/sched/smp_shim.rs:267-336` | `ActiveGuard`; interrupts enabled during the wait | clean shooter | clean shooter | **clean** |
-
-S113 fixed the **delivery** half on x86-64 for the memory, fault, exit and scheme paths. It did
-not remove the **rule** violation: the address-space `spin::Mutex` is still held across the wait
-at the seven sites marked above. `proc_fork` (raw 0x34) and the aarch64 SVC path still have the
-pre-S113 delivery gap.
-
-### S85a gate re-verification
-
-`sh tests/smp/lock-time/run.sh all` on `lance/S85a` at `6d1b1bde`, with a shared host load around
-39.5 during the run:
-
-```
-PASS smp-lock-time-tcg        iterations=50 hops=2875   p90=17,577,525 max=26,364,825 timer_p90=11,780,458 timer_max=74,616,466
-PASS smp-lock-time-kvm4       iterations=50 hops=144125 p90=23,257     max=2,247,135  timer_p90=1,024,107  timer_max=2,702,108
-PASS smp-lock-time-kvm2       iterations=50 hops=164225 p90=20,887     max=1,373,575  timer_p90=1,023,918  timer_max=2,964,885
-PASS smp-lock-time-tcg-nomem  iterations=50 hops=2699   p90=17,617,651 max=39,150,822 timer_p90=9,854,452  timer_max=60,004,037
-PASS smp-lock-time-tcg2       iterations=50 hops=5433   p90=33,018,258 max=52,599,196 timer_p90=32,526,333 timer_max=38,212,550
-PASS smp-lock-time-tlb-repro  iterations=10 hops=241    p90=68,118,901 max=68,118,901 timer_p90=0          timer_max=0
-smp-lock-time: PASSED
-```
-
-The six current serial logs contain **zero** `smp: tlb shootdown timeout` lines. The old
-`tcg.fail-iter39`/`tcg.fail-iter4` logs remain as historical pre-S113 evidence and are not part
-of this run. No test was weakened and no retry was used.
-
-### Remaining work / hand-off
-
-| Owner | Item | Action |
-|---|---|---|
-| **Stuart/S113** (or a new lock-order ticket) | `proc_fork` 0x34 delivery gap | Add `proc_fork` to the x86 safe-unmask set as an interim delivery fix, and split `fork_clone_from` from the flush. The fork path holds two address-space locks across the wait. |
-| **Stuart/S113** (or a new lock-order ticket) | Durable rule for all seven sites | Release the address-space `spin::Mutex` before `flush_range` (split-phase), or make the shootdown asynchronous. Do not rely only on the target's IF window. |
-| **Stuart/S113** | Pager-supply path | Verify `memory/pager.rs:77-81` (`map_pager_page`) when reached from the pager-supply syscall rather than the page fault. |
-| **Dave/S103-r2** | aarch64 SVC target side | `kernel/src/arch/aarch64/vectors.rs:255-272` still masks `DAIF`; `svc_dispatch` (`kernel/src/syscall/mod.rs:414-445`) never unmasks. S106 still needs the target-side window. |
-| **S85a/lance** | Model and gate | Keep `crates/raven-turnstile/src/ipi_order.rs` + `ipi_order_ut.rs`; the S85a 50/50 gate is green on this base, rerun after the split-phase change. |
-
-No new donor code or import. The S113 DR-57 table covers the exit/IPI donor loop; the pre-S113
-DR-52 table above remains the source record. The `proc_fork` gap is Raven-specific: no donor
-requires holding the address-space lock across the wait.
