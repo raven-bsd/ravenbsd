@@ -648,6 +648,8 @@ fn schedule_locked() {
     }
     // Resumed: reclaim the self-reference parked above. A filter-reaped thread never reaches this
     // point; `reap_dead` takes the parked reference instead.
+    // SAFETY: `from_ptr` is kept alive by the self-reference stored above, and no other context
+    // clears the field while this frame is switched out.
     let parked = unsafe { (*from_ptr).parked.swap(0, Ordering::AcqRel) };
     debug_assert_eq!(parked, from_raw as usize);
     // SAFETY: `parked` is the owning reference stored by this frame before the switch.
@@ -1295,14 +1297,13 @@ pub fn exiting_current() -> usize {
     let mut total = 0usize;
     for cpu in 0..smp::online_cpus() {
         let slot = lock_cpu(cpu);
-        if let Some(state) = slot.as_ref() {
-            if state
+        if let Some(state) = slot.as_ref()
+            && state
                 .current
                 .as_ref()
                 .is_some_and(|thread| thread.process.exiting.load(Ordering::Acquire))
-            {
-                total = total.saturating_add(1);
-            }
+        {
+            total = total.saturating_add(1);
         }
     }
     total
