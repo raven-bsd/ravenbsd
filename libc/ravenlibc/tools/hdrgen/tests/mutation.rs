@@ -143,9 +143,9 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
         return;
     };
     temp.mutate(
-        "errno.toml",
-        "{ name = \"EPERM\", value = 1 }",
-        "{ name = \"EPERM\", value = 2 }",
+        "signal.toml",
+        "{ name = \"SIGABRT\", value = 6 }",
+        "{ name = \"SIGABRT\", value = 7 }",
     );
     let generated = generate(&temp, &resources);
     assert!(generated.status.success(), "{}", stderr(&generated));
@@ -154,7 +154,7 @@ fn a_flipped_constant_fails_verify_and_names_the_item() {
         return;
     }
     assert_eq!(output.status.code(), Some(1));
-    assert!(stderr(&output).contains("EPERM"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("SIGABRT"), "{}", stderr(&output));
 }
 
 #[test]
