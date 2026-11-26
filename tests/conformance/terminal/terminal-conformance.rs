@@ -706,12 +706,8 @@ fn run_signal_child(pair: &Pair, setup: fn(c_int) -> c_int, signal: c_int) -> Op
     }
     if child == 0 {
         unsafe {
-            if close(pair.master) != 0 {
-                _exit(27);
-            }
-            if close(pair.slave) != 0 {
-                _exit(28);
-            }
+            close(pair.master);
+            close(pair.slave);
             close(ready[0]);
             close(result[0]);
             if setsid() < 0 {

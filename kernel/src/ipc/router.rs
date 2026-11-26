@@ -374,56 +374,8 @@ pub fn seek(
     Ok(request.response.lock().offset)
 }
 
-/// True when another live process still has a handle for `file`.
-///
-/// A fork shares the same `SchemeFile` object between processes, but the kernel also holds
-/// internal `Arc`s (a controlling-terminal record, a deferred request). Those internal refs must
-/// not keep the server file open after the last user handle closes: FreeBSD `tty_pty.c`
-/// `ptyclose` hangs up the pair when the last master descriptor goes away, not when the forked
-/// child's process eventually exits. When the registry cannot be read, stay conservative and
-/// report a holder so a live handle is never closed early.
-fn other_process_holds(caller: &Arc<Process>, file: &Arc<SchemeFile>) -> bool {
-    let Some(processes) = crate::process::processes_try() else {
-        return true;
-    };
-    for process in processes {
-        if Arc::ptr_eq(&process, caller) {
-            continue;
-        }
-        if process.id == caller.id {
-            crate::kprintln!(
-                "close-debug same-pid caller={:p} registry={:p} pid={}",
-                Arc::as_ptr(caller),
-                Arc::as_ptr(&process),
-                process.id
-            );
-        }
-        let mut holds = false;
-        {
-            let handles = process.handles.lock();
-            handles.for_each_live(|handle, object, _, _| {
-                if let Object::SchemeFile(other) = object
-                    && Arc::ptr_eq(other, file)
-                {
-                    crate::kprintln!(
-                        "close-debug holder pid={} handle={} id={}",
-                        process.id,
-                        handle.0,
-                        file.server_id()
-                    );
-                    holds = true;
-                }
-            });
-        }
-        if holds {
-            return true;
-        }
-    }
-    false
-}
-
 /// Close a scheme file (the local handle is always closed; the server sees the CLOSE only when
-/// the last user reference goes away).
+/// the last kernel reference goes away).
 pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
     let file = {
         let handles = caller.handles.lock();
@@ -436,33 +388,20 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
         }
     };
     crate::event::close_handle(caller, handle)?;
-    if let Some(file) = file {
-        // No other user handle references this open-file description. A remaining internal Arc
-        // (ctty record or deferred request) is not a user reference and must not defer the
-        // server CLOSE. Build the CLOSE requests here, in the shallow close-syscall context, so
-        // they are queued before the caller's next request.
-        let last_arc = Arc::strong_count(&file) == 1;
-        let other = !last_arc && other_process_holds(caller, &file);
-        if !last_arc {
-            crate::kprintln!(
-                "close-debug: pid={} id={} strong={} other_handle={}",
-                caller.id,
+    if let Some(file) = file
+        && Arc::strong_count(&file) == 1
+    {
+        // No other handle, transfer or in-flight request references this open-file description.
+        // Build the CLOSE requests here, in the shallow close-syscall context, so they are
+        // queued before the caller's next request.
+        let references = file.server_refs.swap(0, Ordering::AcqRel);
+        if references > 0 {
+            close_notify(
+                &file.server,
                 file.server_id(),
-                Arc::strong_count(&file),
-                other
+                file.server_cookie.load(Ordering::Acquire),
+                references,
             );
-        }
-        let last_user = last_arc || !other;
-        if last_user {
-            let references = file.server_refs.swap(0, Ordering::AcqRel);
-            if references > 0 {
-                close_notify(
-                    &file.server,
-                    file.server_id(),
-                    file.server_cookie.load(Ordering::Acquire),
-                    references,
-                );
-            }
         }
     }
     Ok(())
