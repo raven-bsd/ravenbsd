@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[workspace]
+
+[package]
+name = "raven-smp-shootdown-ack-order"
+version = "0.1.0"
+description = "S209 x86_64 TLB shootdown ack-order fixture: map/unmap a remote range."
+edition = "2024"
+license = "BSD-3-Clause"
+rust-version = "1.85"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "smp-shootdown-ack-order-init"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }

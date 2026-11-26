@@ -22,8 +22,7 @@
 //! area (`mcontext_t`), a scripted process-pending queue, a fault injector, `-EINTR`/timeout
 //! results, a trace and failure injection. `safe_point` is where a real kernel would check the
 //! kick word on the return to user mode: it copies the fake context into the area, calls the Rust
-//! body of `__raven_sigentry` and restores the fake context after `SIGRETURN` (the fake implements
-//! `sigreturn` by unwinding a private payload). No real signal is ever raised.
+//! direct-delivery body. No real signal is ever raised.
 
 use core::sync::atomic::Ordering;
 
@@ -32,9 +31,8 @@ use raven_libc_abi::structs::{McontextT, SiginfoT};
 use raven_libc_tls::tcb::Pthread;
 
 use raven_libc_signal::dispositions::DispTable;
-use raven_libc_signal::entry::{EntryOutcome, signal_entry};
+use raven_libc_signal::entry::EntryOutcome;
 use raven_libc_signal::errors::{ENOSYS_ERR, ETIMEDOUT_ERR};
-use raven_libc_signal::frame;
 use raven_libc_signal::kernel::{FaultRecord, KICK_CHECK, SigCaps, SigKernel};
 use raven_libc_signal::raw;
 
@@ -78,12 +76,8 @@ impl FakeCtx {
 pub enum Trace {
     /// A kick was delivered.
     Kick(u32),
-    /// The entry body ran.
-    Entry(u32),
     /// A handler ran with this signal.
     Handler(i32),
-    /// `SIGRETURN` restored the context.
-    Sigreturn,
     /// `SIGRESEND`.
     Resend(i32),
     /// procd kill.
@@ -92,17 +86,6 @@ pub enum Trace {
     Wait(Option<u64>),
     /// A default action terminated the process.
     Terminate(i32, bool),
-}
-
-/// The result of one `safe_point`.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct SafePoint {
-    /// What the entry did, when it returned through `SIGRETURN`.
-    pub outcome: Option<EntryOutcome>,
-    /// `(sig, core)` when a default action terminated the simulated process.
-    pub terminated: Option<(i32, bool)>,
-    /// The kick had nothing to deliver.
-    pub spurious: bool,
 }
 
 struct ThreadState {
@@ -253,92 +236,7 @@ impl HostSigKernel {
         self.inner.lock().unwrap().pending.push((sig, info));
     }
 
-    /// Simulate the return-to-user safe point: process the kick word.
-    pub fn safe_point(
-        &self,
-        table: &DispTable,
-        bits_override: Option<u32>,
-        fault: Option<FaultRecord>,
-    ) -> SafePoint {
-        let (bits, tp, handlers_before) = {
-            let mut inner = self.inner.lock().unwrap();
-            let bits = bits_override.unwrap_or(inner.thread.kick);
-            if bits == 0 {
-                return SafePoint {
-                    outcome: None,
-                    terminated: None,
-                    spurious: true,
-                };
-            }
-            if bits_override.is_none() {
-                inner.thread.kick = 0;
-            }
-            let tp = (&*inner.thread.tcb as *const Pthread) as usize;
-            let ctx = inner.thread.ctx;
-            let mut machine = McontextT::ZERO;
-            for (index, value) in ctx.regs.iter().enumerate() {
-                frame::set_ctx_greg(&mut machine, index, *value);
-            }
-            frame::set_ctx_pc(&mut machine, ctx.pc);
-            frame::set_ctx_sp(&mut machine, ctx.sp);
-            raw::store_ctx(tp, &machine);
-            raw::mask_store(tp, ctx.mask);
-            inner.trace.push(Trace::Entry(bits));
-            let handlers_before = inner
-                .trace
-                .iter()
-                .filter(|entry| matches!(entry, Trace::Handler(_)))
-                .count();
-            (bits, tp, handlers_before)
-        };
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            signal_entry(self, table, bits, fault);
-        }));
-        match result {
-            Err(payload) => {
-                if payload.downcast_ref::<SigReturn>().is_some() {
-                    let mut inner = self.inner.lock().unwrap();
-                    inner.trace.push(Trace::Sigreturn);
-                    let machine = *inner.thread.area;
-                    let mut ctx = inner.thread.ctx;
-                    ctx.pc = frame::ctx_pc(&machine);
-                    ctx.sp = frame::ctx_sp(&machine);
-                    ctx.mask = raw::mask_load(tp);
-                    for index in 0..32 {
-                        ctx.regs[index] = frame::ctx_greg(&machine, index);
-                    }
-                    inner.thread.ctx = ctx;
-                    let handlers_after = inner
-                        .trace
-                        .iter()
-                        .filter(|entry| matches!(entry, Trace::Handler(_)))
-                        .count();
-                    let delivered = handlers_after.saturating_sub(handlers_before) as u32;
-                    SafePoint {
-                        outcome: Some(EntryOutcome {
-                            delivered,
-                            spurious: delivered == 0,
-                        }),
-                        terminated: None,
-                        spurious: delivered == 0,
-                    }
-                } else if let Some(exit) = payload.downcast_ref::<Terminated>() {
-                    let mut inner = self.inner.lock().unwrap();
-                    inner.trace.push(Trace::Terminate(exit.sig, exit.core));
-                    SafePoint {
-                        outcome: None,
-                        terminated: Some((exit.sig, exit.core)),
-                        spurious: false,
-                    }
-                } else {
-                    std::panic::resume_unwind(payload)
-                }
-            }
-            Ok(never) => match never {},
-        }
-    }
-
-    /// Run one entry directly (a `raise`-style delivery) without `SIGRETURN`.
+    /// Run one direct delivery pass.
     pub fn direct(
         &self,
         table: &DispTable,
@@ -388,9 +286,6 @@ impl Default for HostSigKernel {
     }
 }
 
-/// `sigreturn` unwinds with this payload.
-pub struct SigReturn;
-
 /// A default action terminated the simulated process.
 pub struct Terminated {
     /// The signal.
@@ -420,12 +315,6 @@ impl SigKernel for HostSigKernel {
         inner.clock
     }
 
-    fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        let _ = (ctx_area_offset, flags);
-        raw::set_entry_function(entry);
-        Ok(())
-    }
-
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
         if self.failing("kick") {
             return Err(ENOSYS_ERR);
@@ -433,10 +322,6 @@ impl SigKernel for HostSigKernel {
         let _ = handle;
         self.kick_self(bits);
         Ok(())
-    }
-
-    fn sigreturn(&self) -> ! {
-        std::panic::resume_unwind(Box::new(SigReturn))
     }
 
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno> {

@@ -58,6 +58,7 @@ cases:
       echo hello | var=value
 
   - name: "printf broken pipe returns 141 in PIPESTATUS"
+    min_oracle_version: "5.2" # bash 5.1 reports 0 for the builtin printf stage
     stdin: |
       printf '%s\n' {0..10000} | x=1
       echo "Last: $?, PIPESTATUS: ${PIPESTATUS[*]}"

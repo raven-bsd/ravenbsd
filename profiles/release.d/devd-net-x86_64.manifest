@@ -3,11 +3,13 @@
 
 # x86_64 release: devd launches virtio-net in `serve` mode from the PCI scheme. The driver
 # registers `nic:` before devd finishes its device pass, so `nic:` is the readiness gate.
-# `dev:` is still provided for the rest of the system.
+# `dev:` is still provided for the rest of the system. `scheme:kbd` is the S214 requirement: the
+# xHCI driver it launches pushes decoded keys to the `usb-hid` `kbd:` queue, and a child takes its
+# scheme namespace from devd at spawn time.
 name = "devd"
 exec = "/sbin/devd"
 args = ["devd"]
-needs = ["scheme:pci"]
+needs = ["scheme:pci", "scheme:kbd"]
 provides = ["scheme:nic", "scheme:dev"]
 readiness = "scheme"
 ready_timeout_ms = 60_000

@@ -2,7 +2,9 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # Device manager. Matches `pci:` devices against `/etc/drivers.toml`, launches each driver with a
-# BAR MMIO grant, and serves the `dev:` scheme.
+# BAR MMIO grant, and serves the `dev:` scheme. `platform-root` is the only device grant the
+# policy allows for `devd`; it lands at handle 3 so `irq_create(ROOT_DEVICE, IRQ_MSIX, ...)` can
+# create one MSI-X vector per function instead of falling back to a shared legacy INTx line.
 name = "devd"
 exec = "/sbin/devd"
 args = ["devd"]
@@ -11,3 +13,4 @@ provides = ["scheme:dev"]
 readiness = "scheme"
 ready_timeout_ms = 60_000
 restart = "on-failure"
+grants = ["platform-root"]

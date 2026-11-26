@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S715: the same sibling-exit lifecycle on one CPU. The sibling threads are scheduled by
+# preemption rather than placed on separate CPUs; the quiesce path and clean init exit still hold.
+
+name = "s715-sibling-exit-kvm1"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 90
+pre = ["sh tests/conformance/memory-map/build-sibling.sh"]
+initfs = "build/fixtures/s715-sibling-exit/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s194-trace=1"
+qemu_extra = ["-enable-kvm", "-cpu", "host", "-smp", "1"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^S715-SIBLING user ready pid=[0-9]+ ticks=[0-9]+$'
+
+[[expect]]
+regex = '^S715-SIBLING kernel ready pid=[0-9]+ ticks=[0-9]+$'
+
+[[expect]]
+regex = '^S715-MAIN exit pid=[0-9]+ user=[0-9]+ kernel=[0-9]+$'
+
+[[expect]]
+regex = '^s194: quiesce enter pid=[0-9]+ cpu=[0-9]+$'
+
+[[expect]]
+regex = '^s194: quiesce clear pid=[0-9]+ waited=(true|false)$'
+
+# On one CPU the terminal probe thread exits through the scheduler filter, which does not print
+# the cross-CPU `last-exit` line; `init exited (0)` is the termination marker for this variant.
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)AccessError|EXCEPTION|panic|S715-SIBLING survived|timed out'

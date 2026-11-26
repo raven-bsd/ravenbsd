@@ -127,6 +127,10 @@ pub struct AcpiInfo {
     pub reset_value: u8,
     /// True when the FADT advertises a usable system-reset register.
     pub reset_supported: bool,
+    /// Firmware `\_S5` SLP_TYPa for the PM1a control register.
+    pub s5_sleep_type_a: Option<u8>,
+    /// Firmware `\_S5` SLP_TYPb for the PM1b control register.
+    pub s5_sleep_type_b: Option<u8>,
 }
 
 impl AcpiInfo {
@@ -151,6 +155,8 @@ impl AcpiInfo {
             reset_register: 0,
             reset_value: 0,
             reset_supported: false,
+            s5_sleep_type_a: None,
+            s5_sleep_type_b: None,
         }
     }
 
@@ -221,6 +227,9 @@ pub fn init() {
                 );
             }
             store(parsed);
+            if let (Some(a), Some(b)) = (parsed.s5_sleep_type_a, parsed.s5_sleep_type_b) {
+                kprintln!("acpi: s5 sleep type a={a} b={b}");
+            }
             kprintln!(
                 "acpi: {} cpus, {} ioapics, {} overrides",
                 parsed.cpus,
@@ -356,6 +365,23 @@ fn parse(rsdp: usize) -> Result<AcpiInfo, ()> {
             info.reset_supported = true;
         }
     }
+    // The S5 sleep type is firmware data: `\_S5` lives in the DSDT or one of the SSDTs. Take
+    // the first valid declaration; a table without it is not the one that names the state.
+    if let Ok(dsdt) = tables.dsdt()
+        && let Some((sleep_a, sleep_b)) = s5_sleep_types(dsdt.address, dsdt.length)
+    {
+        info.s5_sleep_type_a = Some(sleep_a);
+        info.s5_sleep_type_b = Some(sleep_b);
+    }
+    if info.s5_sleep_type_a.is_none() {
+        for ssdt in tables.ssdts() {
+            if let Some((sleep_a, sleep_b)) = s5_sleep_types(ssdt.address, ssdt.length) {
+                info.s5_sleep_type_a = Some(sleep_a);
+                info.s5_sleep_type_b = Some(sleep_b);
+                break;
+            }
+        }
+    }
     info.cpus = 0;
     info.io_apic_count = 0;
     info.local_apic_address = if local_apic_address == 0 {
@@ -465,6 +491,144 @@ fn push_apic_id(info: &mut AcpiInfo, apic_id: u32) {
         *slot = apic_id;
         info.cpus = info.cpus.saturating_add(1);
     }
+}
+
+/// AML opcodes used to locate the firmware `\_S5` declaration and its package elements.
+const AML_NAME_OP: u8 = 0x08;
+const AML_PACKAGE_OP: u8 = 0x12;
+const AML_ZERO_OP: u8 = 0x00;
+const AML_ONE_OP: u8 = 0x01;
+const AML_BYTE_PREFIX: u8 = 0x0A;
+const AML_WORD_PREFIX: u8 = 0x0B;
+const AML_DWORD_PREFIX: u8 = 0x0C;
+const AML_QWORD_PREFIX: u8 = 0x0E;
+const AML_ROOT_CHAR: u8 = 0x5C;
+/// SLP_TYP is a three-bit field in PM1_CNT.
+const AML_MAX_SLEEP_TYPE: u32 = 7;
+
+fn s5_sleep_types(address: usize, length: u32) -> Option<(u8, u8)> {
+    let length = usize::try_from(length).ok()?;
+    if length == 0 {
+        return None;
+    }
+    let physical = u64::try_from(address).ok()?;
+    let pointer = map_physical(physical, length);
+    if pointer.is_null() {
+        return None;
+    }
+    // SAFETY: `map_physical` mapped `length` readable bytes at `pointer`.
+    let aml = unsafe { core::slice::from_raw_parts(pointer, length) };
+    find_s5_sleep_types(aml)
+}
+
+/// Find the root `\_S5` name declaration and return its SLP_TYPa/SLP_TYPb pair.
+///
+/// `_S5` is a predefined root-namespace object, so only a plain `_S5_` NameSeg or the
+/// root-qualified `\_S5_` form is accepted. The package must hold at least two integer
+/// constants; strings, buffers and references are rejected rather than guessed.
+fn find_s5_sleep_types(aml: &[u8]) -> Option<(u8, u8)> {
+    let mut offset = 0usize;
+    while offset < aml.len() {
+        if *aml.get(offset)? != AML_NAME_OP {
+            offset = offset.saturating_add(1);
+            continue;
+        }
+        let name = offset.saturating_add(1);
+        let object = if aml.get(name..name.saturating_add(4)) == Some(b"_S5_".as_slice()) {
+            name.saturating_add(4)
+        } else if aml.get(name) == Some(&AML_ROOT_CHAR)
+            && aml.get(name.saturating_add(1)..name.saturating_add(5)) == Some(b"_S5_".as_slice())
+        {
+            name.saturating_add(5)
+        } else {
+            offset = offset.saturating_add(1);
+            continue;
+        };
+        if let Some(types) = parse_s5_package(aml, object) {
+            return Some(types);
+        }
+        offset = offset.saturating_add(1);
+    }
+    None
+}
+
+fn parse_s5_package(aml: &[u8], at: usize) -> Option<(u8, u8)> {
+    if *aml.get(at)? != AML_PACKAGE_OP {
+        return None;
+    }
+    let pkg_start = at.checked_add(1)?;
+    let (length, body_start) = read_pkg_length(aml, pkg_start)?;
+    let end = pkg_start.checked_add(length)?;
+    if end > aml.len() {
+        return None;
+    }
+    let mut offset = body_start;
+    let count = usize::from(*aml.get(offset)?);
+    offset = offset.checked_add(1)?;
+    if count < 2 {
+        return None;
+    }
+    let sleep_a = read_aml_integer(aml, &mut offset, end)?;
+    let sleep_b = read_aml_integer(aml, &mut offset, end)?;
+    if sleep_a > AML_MAX_SLEEP_TYPE || sleep_b > AML_MAX_SLEEP_TYPE {
+        return None;
+    }
+    Some((u8::try_from(sleep_a).ok()?, u8::try_from(sleep_b).ok()?))
+}
+
+/// Read an AML PkgLength and return `(length, first byte after the field)`.
+fn read_pkg_length(aml: &[u8], at: usize) -> Option<(usize, usize)> {
+    let lead = *aml.get(at)?;
+    let extra = usize::from(lead >> 6);
+    if extra == 0 {
+        return Some((usize::from(lead & 0x3f), at.checked_add(1)?));
+    }
+    let mut length = usize::from(lead & 0x0f);
+    let mut index = at.checked_add(1)?;
+    let mut shift = 4u32;
+    for _ in 0..extra {
+        let byte = usize::from(*aml.get(index)?);
+        length = length.checked_add(byte.checked_shl(shift)?)?;
+        index = index.checked_add(1)?;
+        shift = shift.checked_add(8)?;
+    }
+    Some((length, index))
+}
+
+fn read_aml_integer(aml: &[u8], offset: &mut usize, end: usize) -> Option<u32> {
+    let mut at = *offset;
+    let opcode = *aml.get(at)?;
+    at = at.checked_add(1)?;
+    let value = match opcode {
+        AML_ZERO_OP => 0,
+        AML_ONE_OP => 1,
+        AML_BYTE_PREFIX => {
+            let value = u32::from(*aml.get(at)?);
+            at = at.checked_add(1)?;
+            value
+        }
+        AML_WORD_PREFIX => {
+            let value = u32::from(read_u16(aml, at)?);
+            at = at.checked_add(2)?;
+            value
+        }
+        AML_DWORD_PREFIX => {
+            let value = read_u32(aml, at)?;
+            at = at.checked_add(4)?;
+            value
+        }
+        AML_QWORD_PREFIX => {
+            let value = u32::try_from(read_u64(aml, at)?).ok()?;
+            at = at.checked_add(8)?;
+            value
+        }
+        _ => return None,
+    };
+    if at > end {
+        return None;
+    }
+    *offset = at;
+    Some(value)
 }
 
 /// Upper bound of the captured ACPI bundle, including header, directory and table copies.

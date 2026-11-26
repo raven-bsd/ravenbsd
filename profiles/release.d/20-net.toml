@@ -21,6 +21,14 @@ package = "virtio-net"
 path = "/sbin/virtio-net"
 
 [[initfs.programs]]
+package = "usb-hid"
+path = "/sbin/usb-hid"
+
+[[initfs.programs]]
+package = "xhci"
+path = "/sbin/xhci"
+
+[[initfs.programs]]
 package = "netd"
 path = "/sbin/netd"
 
@@ -72,6 +80,13 @@ path = "/etc/services.d/netd.toml"
 [[initfs.files]]
 src = "rootfs/server/etc/services.d/resolvd.toml"
 path = "/etc/services.d/resolvd.toml"
+
+# S214: the keyboard queue that the xHCI driver writes and consd reads. The manifest is the
+# board-neutral S62 `kbd:` provider; `enable` is default so the release starts it even when no
+# keyboard is attached, and `required = false` keeps UART boot independent.
+[[initfs.files]]
+src = "profiles/pi4-release.d/usb-hid.manifest"
+path = "/etc/services.d/usb-hid.toml"
 
 [[initfs.files]]
 src = "etc/resolv.conf"

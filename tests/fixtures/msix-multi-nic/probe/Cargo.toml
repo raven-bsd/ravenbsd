@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "msix-multi-nic-probe"
+version = "0.1.0"
+description = "S199 fixture: quit each sequential virtio-net nic: service after devd launches it."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+# Standalone so the fixture needs no root-workspace members line; the path dependencies keep
+# their own workspace roots for inheritance.
+[workspace]
+
+[[bin]]
+name = "msix-multi-nic-probe"
+path = "src/main.rs"
+
+[dependencies]
+raven-rt = { path = "../../../../userland/rt", features = ["alloc"] }
+raven-scheme = { path = "../../../../crates/raven-scheme" }

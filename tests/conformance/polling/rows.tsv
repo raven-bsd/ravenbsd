@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S173 polling table: name <TAB> requirement <TAB> gate.
+pipe-readable	S173-R01	1
+pipe-hup	S173-R01	1
+select-readable	S173-R01	1
+timeout	S173-R01	1
+eintr	S173-R01	1
+socket-error	S173-R01	1
+eventfd	S173-R01	1
+timerfd	S173-R01	1
