@@ -299,7 +299,8 @@ fn settle() {
 fn spawn(start: extern "C" fn(*mut c_void) -> *mut c_void, arg: usize) -> Option<usize> {
     let mut thread = 0usize;
     // SAFETY: a default (joinable) attribute and a live start routine; `arg` is a scalar index.
-    let status = unsafe { pthread_create(&mut thread, core::ptr::null(), start, arg as *mut c_void) };
+    let status =
+        unsafe { pthread_create(&mut thread, core::ptr::null(), start, arg as *mut c_void) };
     if status == 0 { Some(thread) } else { None }
 }
 
@@ -375,11 +376,7 @@ fn row_futex_eagain(state: &mut State) {
 }
 
 static LIMIT_WORD: AtomicU32 = AtomicU32::new(0);
-static LIMIT_ARMED: [AtomicU32; 3] = [
-    AtomicU32::new(0),
-    AtomicU32::new(0),
-    AtomicU32::new(0),
-];
+static LIMIT_ARMED: [AtomicU32; 3] = [AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0)];
 static LIMIT_RC: [AtomicI32; 3] = [
     AtomicI32::new(i32::MIN),
     AtomicI32::new(i32::MIN),
@@ -414,12 +411,19 @@ fn run_wake_limit(state: &mut State, mutation: bool) {
             }
         }
     }
-    let armed = spin_until(|| LIMIT_ARMED.iter().all(|slot| slot.load(Ordering::SeqCst) == 1));
+    let armed = spin_until(|| {
+        LIMIT_ARMED
+            .iter()
+            .all(|slot| slot.load(Ordering::SeqCst) == 1)
+    });
     let first = first_wake(&LIMIT_WORD, 1);
     for thread in threads {
         join(thread);
     }
-    let returned = LIMIT_RC.iter().filter(|slot| slot.load(Ordering::SeqCst) == 0).count();
+    let returned = LIMIT_RC
+        .iter()
+        .filter(|slot| slot.load(Ordering::SeqCst) == 0)
+        .count();
     let timed_out = LIMIT_RC
         .iter()
         .filter(|slot| slot.load(Ordering::SeqCst) == -(ETIMEDOUT as i32))
@@ -485,7 +489,11 @@ fn row_futex_requeue(state: &mut State) {
             }
         }
     }
-    let armed = spin_until(|| REQ_ARMED.iter().all(|slot| slot.load(Ordering::SeqCst) == 1));
+    let armed = spin_until(|| {
+        REQ_ARMED
+            .iter()
+            .all(|slot| slot.load(Ordering::SeqCst) == 1)
+    });
     // The native `futex(addr, op, val, timeout_ns)` contract has no argument slot for the
     // destination address or the requeue maximum; a requeue request is the best the ABI permits.
     let requeue = futex(&REQ_SOURCE, FUTEX_REQUEUE, 1, 0);
@@ -497,7 +505,10 @@ fn row_futex_requeue(state: &mut State) {
     for thread in threads {
         join(thread);
     }
-    let released = REQ_RC.iter().filter(|slot| slot.load(Ordering::SeqCst) == 0).count();
+    let released = REQ_RC
+        .iter()
+        .filter(|slot| slot.load(Ordering::SeqCst) == 0)
+        .count();
     let pass = requeue == 0 && wake_source == 0 && wake_target == 2 && released == 2;
     state.check(
         "futex-requeue",
@@ -610,12 +621,20 @@ fn row_robust_owner_died(state: &mut State) {
         state.node = 0;
     }
     let Some(owner) = spawn(robust_owner, 0) else {
-        state.check("robust-owner-died", false, format_args!("owner_spawn=failed"));
+        state.check(
+            "robust-owner-died",
+            false,
+            format_args!("owner_spawn=failed"),
+        );
         return;
     };
     let owner_armed = spin_until(|| ROBUST_OWNER_ARMED.load(Ordering::SeqCst) != 0);
     let Some(waiter) = spawn(robust_waiter, 0) else {
-        state.check("robust-owner-died", false, format_args!("waiter_spawn=failed"));
+        state.check(
+            "robust-owner-died",
+            false,
+            format_args!("waiter_spawn=failed"),
+        );
         return;
     };
     let waited = spin_until(|| ROBUST_WAIT_RC.load(Ordering::SeqCst) != i32::MIN);
@@ -626,11 +645,7 @@ fn row_robust_owner_died(state: &mut State) {
     let wait_rc = ROBUST_WAIT_RC.load(Ordering::SeqCst);
     let word = robust_word().load(Ordering::SeqCst);
     let extra = futex(robust_word(), FUTEX_WAKE, 1, 0);
-    let pass = owner_armed
-        && waited
-        && wait_rc == 0
-        && word == OWNER_DIED
-        && extra == 0;
+    let pass = owner_armed && waited && wait_rc == 0 && word == OWNER_DIED && extra == 0;
     state.check(
         "robust-owner-died",
         pass,
@@ -688,10 +703,12 @@ fn run_tls(state: &mut State, mutation: bool) {
     }
     let first = TLS_TP[0].load(Ordering::SeqCst);
     let second = TLS_TP[1].load(Ordering::SeqCst);
-    let stable = TLS_STABLE[0].load(Ordering::SeqCst) == 1 && TLS_STABLE[1].load(Ordering::SeqCst) == 1;
+    let stable =
+        TLS_STABLE[0].load(Ordering::SeqCst) == 1 && TLS_STABLE[1].load(Ordering::SeqCst) == 1;
     // The mutation believes the two threads share one TLS base; the correct product keeps them
     // distinct and each stable across yields and preemption.
-    let distinct = first != 0 && second != 0 && first != second && first != main_base && second != main_base;
+    let distinct =
+        first != 0 && second != 0 && first != second && first != main_base && second != main_base;
     let pass = stable && distinct != mutation;
     state.check(
         "tls-per-thread",
@@ -803,17 +820,22 @@ fn row_thread_exit_tid(state: &mut State) {
     let first = create_raw(0);
     let second = create_raw(1);
     let ran = RAW_RAN[0].load(Ordering::SeqCst) == 1 && RAW_RAN[1].load(Ordering::SeqCst) == 1;
-    let tls_match =
-        RAW_TLS_MATCH[0].load(Ordering::SeqCst) == 1 && RAW_TLS_MATCH[1].load(Ordering::SeqCst) == 1;
-    let cleared = RAW_CLEAR[0].load(Ordering::SeqCst) == 0 && RAW_CLEAR[1].load(Ordering::SeqCst) == 0;
+    let tls_match = RAW_TLS_MATCH[0].load(Ordering::SeqCst) == 1
+        && RAW_TLS_MATCH[1].load(Ordering::SeqCst) == 1;
+    let cleared =
+        RAW_CLEAR[0].load(Ordering::SeqCst) == 0 && RAW_CLEAR[1].load(Ordering::SeqCst) == 0;
     let tids = match (first, second) {
         (Some(first), Some(second)) => Some((first, second)),
         _ => None,
     };
-    let released_once = tids.is_some_and(|(first, second)| first != 0 && second != 0 && first != second);
+    let released_once =
+        tids.is_some_and(|(first, second)| first != 0 && second != 0 && first != second);
     // The kernel runs no destructor: the thread's TLS self pointer is untouched after exit.
     // SAFETY: both blocks are static and the raw threads have terminated.
-    let tls_intact = unsafe { *tls_block(0) == tls_block(0) as usize as u64 && *tls_block(1) == tls_block(1) as usize as u64 };
+    let tls_intact = unsafe {
+        *tls_block(0) == tls_block(0) as usize as u64
+            && *tls_block(1) == tls_block(1) as usize as u64
+    };
     let pass = ran && tls_match && cleared && released_once && tls_intact;
     state.check(
         "thread-exit-tid",
@@ -845,13 +867,7 @@ fn row_sched_getaffinity(state: &mut State, expected_cpus: usize) {
         pass,
         format_args!(
             "rc={} reported={} expected={} mask={:02x}{:02x}{:02x}{:02x}",
-            result,
-            reported,
-            expected_cpus,
-            mask[0],
-            mask[1],
-            mask[2],
-            mask[3]
+            result, reported, expected_cpus, mask[0], mask[1], mask[2], mask[3]
         ),
     );
 }
@@ -970,15 +986,13 @@ pub extern "C" fn main(argc: c_int, argv: *const *const u8) -> c_int {
             conformance::mutation_begin(TOPIC, "wake-one-extra");
             let mut section = State::begin(TOPIC);
             run_wake_limit(&mut section, true);
-            let failures = conformance::mutation_end(&section, "wake-one-extra");
-            let _ = failures;
+            let _ = conformance::mutation_end(&section, "wake-one-extra");
         }
         if tls_shared_base || mutation.is_none() {
             conformance::mutation_begin(TOPIC, "tls-shared-base");
             let mut section = State::begin(TOPIC);
             run_tls(&mut section, true);
-            let failures = conformance::mutation_end(&section, "tls-shared-base");
-            let _ = failures;
+            let _ = conformance::mutation_end(&section, "tls-shared-base");
         }
     } else {
         state.check("selection", false, format_args!("no --all"));
