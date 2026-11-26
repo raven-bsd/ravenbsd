@@ -43,14 +43,7 @@ pub fn proc_chroot(path: &[u8]) -> Result<(), Errno> {
 pub fn getrandom(buf: &mut [u8], flags: u32) -> Result<usize, Errno> {
     // SAFETY: `buf` is a live writable slice; the kernel copies at most `buf.len()` bytes into
     // it through the fault-safe user layer.
-    let raw = unsafe {
-        arch::syscall3(
-            0x08,
-            buf.as_mut_ptr() as usize,
-            buf.len(),
-            flags as usize,
-        )
-    };
+    let raw = unsafe { arch::syscall3(0x08, buf.as_mut_ptr() as usize, buf.len(), flags as usize) };
     crate::errno::ret(raw)
 }
 
