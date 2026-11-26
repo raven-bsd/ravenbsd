@@ -1687,30 +1687,50 @@ fn mptcp_sol_control_adds_marks_and_reports_paths() {
     );
     let length = usize::from(u16::from_le_bytes([reply[2], reply[3]]));
     assert_eq!(length, 2 * MPTCP_SUBFLOW_LEN);
-    let backups = reply[4..4 + length]
+    let records: Vec<&[u8]> = reply[4..4 + length]
         .chunks_exact(MPTCP_SUBFLOW_LEN)
-        .filter(|record| record[4] == 1)
-        .count();
-    assert_eq!(backups, 1, "exactly the added path is backup");
+        .collect();
+    assert_eq!(
+        records.iter().filter(|record| record[4] == 1).count(),
+        1,
+        "exactly the added path is backup"
+    );
+    let primary_record = records
+        .iter()
+        .find(|record| record[4] == 0)
+        .expect("the primary subflow is not backup");
+    let primary = u32::from_le_bytes([
+        primary_record[0],
+        primary_record[1],
+        primary_record[2],
+        primary_record[3],
+    ]);
+    assert!(primary <= u32::from(u8::MAX), "subflow id fits the PM id");
+    let primary = primary as u8;
 
     let reply = call_raw(&mut netd, client, &mptcp_request(OP_MPTCP_DEL_ADDR, &[1]));
     assert_eq!(reply.as_slice(), &MPTCP_REPLY_OK.to_le_bytes());
     assert_eq!(mptcp_info(&mut netd, client), (1, 1, 1));
 
+    // The primary subflow has no path-manager id; reusing its numeric value as a PM id must not
+    // silently retarget the primary path.
     let reply = call_raw(
         &mut netd,
         client,
-        &mptcp_request(OP_MPTCP_SET_FLAGS, &mptcp_pm_addr(9, 1, [127, 0, 0, 1])),
+        &mptcp_request(
+            OP_MPTCP_SET_FLAGS,
+            &mptcp_pm_addr(primary, 1, [127, 0, 0, 1]),
+        ),
     );
     assert_eq!(
         u16::from_le_bytes([reply[0], reply[1]]),
         MPTCP_REPLY_ERR,
-        "unknown path id"
+        "a subflow id is not a registered path id"
     );
     assert_eq!(
         u16::from_le_bytes([reply[2], reply[3]]),
         Errno::ENOENT.0,
-        "unknown path id is ENOENT"
+        "an unregistered path id is ENOENT"
     );
 
     let reply = call_raw(
