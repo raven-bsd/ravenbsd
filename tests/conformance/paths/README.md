@@ -9,6 +9,9 @@ path travels in the request buffer and the filesystem wire carries up to 4095 by
 
 * `long-path` - a 302-byte, three-component path created with `mkdir` and confirmed with `stat`
   (the old filesystem field was 255 bytes).
+* `long-path-1000` - a 1010-byte path, same checks.
+* `long-path-max` - a maximum 4095-byte path (sixteen components), same checks. The resulting
+  4113-byte control request is captured and served, so the whole public path boundary is proven.
 * `component-255` - a 255-byte component is a directory; a 256-byte component returns
   `ENAMETOOLONG`.
 * `symlink-suffix` - opening `link/<remaining>` reaches the link target plus the unprocessed
