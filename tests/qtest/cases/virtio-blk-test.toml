@@ -2,21 +2,21 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # S205: DRV1's acceptance case for the virtio-blk function. The image boots the `base` profile
-# with the virtio-blk device added by this case; the fixture stages the userland initfs
-# (pcid, devd, the virtio-blk driver, blockd and the K15 probe). Cycle 1 writes/flushes/verifies
-# a deterministic pattern across the 1 GiB disk, blockd scans the GPT prefix, and the probe reads
-# the pattern partition through `block:0`. Cycle 2 re-reads the persisted data.
+# with the virtio-blk device added by this case; the fixture stages the Rust userland initfs
+# (pcid, devd, the virtio-blk driver and the S205 Rust probe). Cycle 1 writes/verifies the
+# deterministic partition and data patterns on a small raw disk, the probe reads both back
+# through `disk:0` and flushes, and cycle 2 re-reads the persisted data after the driver restarts.
 
 name = "virtio-blk-test"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 600
+timeout_secs = 300
 pre = ["sh tests/fixtures/virtio-blk/build.sh"]
 initfs = "build/fixtures/virtio-blk/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-smp", "1",
-    "-drive", "if=none,id=d0,format=raw,file=build/fixtures/k15-blk/disk.img",
+    "-drive", "if=none,id=d0,format=raw,file=build/fixtures/virtio-blk/disk.img",
     "-device", "virtio-blk-pci,drive=d0,disable-legacy=on",
 ]
 expect_exit = "success"
@@ -37,13 +37,16 @@ regex = '^devd: driver virtio-blk bar=4 size=16384$'
 regex = '^devd: driver virtio-blk dma bus=0x[0-9a-f]+ len=65536$'
 
 [[expect]]
-regex = '^devd: driver virtio-blk irq line=[0-9]+$'
+regex = '^devd: driver virtio-blk msix capability table_bar=1 table=0x0 entries=2$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk msix vector=[0-9]+ table=0x0 bar=1$'
 
 [[expect]]
 regex = '^virtio-blk: id=1af4:1042$'
 
 [[expect]]
-regex = '^virtio-blk: capacity=2097152 sector_size=512 ro=0$'
+regex = '^virtio-blk: capacity=4096 sector_size=512 ro=0$'
 
 [[expect]]
 regex = '^virtio-blk: features=0x[0-9a-f]{8} version1=1$'
@@ -55,7 +58,7 @@ regex = '^virtio-blk: queue0 size=8 notify=0x[0-9a-f]+$'
 regex = '^virtio-blk: dma bus=0x[0-9a-f]+ len=65536 irq=[0-9]+$'
 
 [[expect]]
-regex = '^virtio-blk: pattern sectors=2095104 checksum=0x[0-9a-f]{16}$'
+regex = '^virtio-blk: pattern sectors=2048 checksum=0x[0-9a-f]{16}$'
 
 [[expect]]
 regex = '^virtio-blk: marker ok$'
@@ -64,40 +67,26 @@ regex = '^virtio-blk: marker ok$'
 regex = '^virtio-blk: serving$'
 
 [[expect]]
-regex = '^blockd: remote disk=disk:0 sectors=2097152 ro=0$'
-
-[[expect]]
-regex = '^blockd: gpt ok partitions=1$'
-
-[[expect]]
-regex = '^blockd: part 1 pattern 34\.\.1800$'
-
-[[expect]]
-regex = '^svcd: blockd up$'
-
-[[expect]]
-regex = '^k15: probe info sectors=2097152 ro=0$'
-
-[[expect]]
-regex = '^k15: probe list partitions=1$'
-
-[[expect]]
-regex = '^k15: probe part 1 pattern 34\.\.1800$'
-
-[[expect]]
-regex = '^k15: probe pattern sectors=1767 checksum=0x[0-9a-f]{16}$'
-
-[[expect]]
-regex = '^k15: probe flush ok$'
+regex = '^svcd: devd up$'
 unordered = true
+
+[[expect]]
+regex = '^s205: probe info sectors=4096 ro=0$'
+
+[[expect]]
+regex = '^s205: probe partition 34\.\.1800$'
+
+[[expect]]
+regex = '^s205: probe data sectors=2048$'
+
+[[expect]]
+regex = '^s205: probe flush ok$'
 
 [[expect]]
 regex = '^virtio-blk: serve done$'
-unordered = true
 
 [[expect]]
 regex = '^devd: driver virtio-blk cycle 1 exit=0$'
-unordered = true
 
 [[expect]]
 regex = '^virtio-blk: partition pattern ok sectors=1767$'
@@ -115,7 +104,10 @@ regex = '^devd: driver virtio-blk cycle 2 exit=0$'
 regex = '^devd: driver virtio-blk cycles=2$'
 
 [[expect]]
-regex = '^k15: probe ok$'
+regex = '^s205: probe devd done$'
+
+[[expect]]
+regex = '^s205: probe ok$'
 
 [[expect]]
 regex = '^svcd: settled$'
@@ -124,4 +116,4 @@ regex = '^svcd: settled$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|virtio-blk: .*timed out|I/O error'
+regex = '(?i)panic|EXCEPTION|virtio-blk: .*error|virtio-blk: .*timed out|I/O error|s205: probe:'

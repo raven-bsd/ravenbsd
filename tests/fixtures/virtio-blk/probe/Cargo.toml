@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "s205-virtio-blk-probe"
+version = "0.1.0"
+description = "S205 fixture: verify the virtio-blk pattern through the driver's disk: service."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+# Standalone so the fixture needs no root-workspace members line; the path dependencies keep
+# their own workspace roots for inheritance.
+[workspace]
+
+[[bin]]
+name = "s205-virtio-blk-probe"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-proto-block = { path = "../../../../crates/raven-proto-block" }
+raven-rt = { path = "../../../../userland/rt", features = ["alloc"] }
+raven-scheme = { path = "../../../../crates/raven-scheme" }
+virtio-blk = { path = "../../../../userland/drivers/virtio-blk" }

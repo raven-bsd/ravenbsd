@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Stage the S205 virtio-blk initfs. The case boots the `base` profile and passes this image as
-# its initfs override; the image stages the existing virtio-blk-test profile userland (pcid,
-# devd, the Rust virtio-blk driver, blockd and the K15 Rust probe) plus the K15 GPT disk.
+# Stage the S205 virtio-blk initfs. The case boots the `base` profile and passes this image as its
+# initfs override; the image stages the Rust userland explicitly (init, pcid, devd, the virtio-blk
+# driver and the S205 Rust probe) with the product devd entry plus the `platform-root` grant.
 
 set -eu
 
@@ -20,6 +20,29 @@ fi
 out=build/fixtures/virtio-blk
 mkdir -p "$out"
 
-sh tests/fixtures/k15-blk/build.sh
-cargo xtask initfs --arch "$arch" --profile virtio-blk-test > /dev/null
-cp "build/$arch/initfs.img" "$out/initfs.img"
+cargo xtask build user --arch x86_64 --release \
+    -p raven-init -p raven-devd -p raven-pcid -p virtio-blk
+
+RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld" \
+    cargo build --manifest-path tests/fixtures/virtio-blk/probe/Cargo.toml \
+    --target x86_64-unknown-none --target-dir "$out/probe-target"
+cp "$out/probe-target/x86_64-unknown-none/debug/s205-virtio-blk-probe" "$out/probe"
+rm -f tests/fixtures/virtio-blk/probe/Cargo.lock
+
+cargo run -q --manifest-path tests/fixtures/virtio-blk/mkdisk/Cargo.toml \
+    --target-dir "$out/mkdisk-target" -- "$out/disk.img"
+rm -f tests/fixtures/virtio-blk/mkdisk/Cargo.lock
+
+user=build/x86_64/user
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/initfs.img" \
+    "/init=$user/raven-init:0755" \
+    "/sbin/pcid=$user/raven-pcid:0755" \
+    "/sbin/devd=$user/raven-devd:0755" \
+    "/sbin/virtio-blk=$user/virtio-blk:0755" \
+    "/sbin/s205-probe=$out/probe:0755" \
+    "/etc/services.d/pcid.toml=$root/etc/services.d/pcid.toml:0644" \
+    "/etc/services.d/devd.toml=$root/tests/fixtures/virtio-blk/devd.manifest:0644" \
+    "/etc/services.d/s205-probe.toml=$root/tests/fixtures/virtio-blk/probe.manifest:0644" \
+    "/etc/drivers.toml=$root/tests/fixtures/virtio-blk/drivers.toml:0644" \
+    "/etc/svcd.conf=$root/tests/fixtures/virtio-blk/svcd.conf:0644"
