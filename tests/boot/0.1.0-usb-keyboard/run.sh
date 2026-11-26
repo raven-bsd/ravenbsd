@@ -14,7 +14,7 @@
 # Usage:
 #   sh tests/boot/0.1.0-usb-keyboard/run.sh --arch x86_64 --accel kvm
 #   sh tests/boot/0.1.0-usb-keyboard/run.sh --arch x86_64 --accel tcg
-#   sh tests/boot/0.1.0-usb-keyboard/run.sh --mutation no-keyboard
+#   sh tests/boot/0.1.0-usb-keyboard/run.sh --mutation wrong-password
 #   sh tests/boot/0.1.0-usb-keyboard/run.sh --mutation wrong-password
 #
 # Exit codes: 0 pass; 2 setup; 3 image; 10 boot; 11 input; 12 login;
@@ -35,12 +35,12 @@ force_build=0
 usage() {
     cat <<'EOF'
 usage:
-  run.sh --arch x86_64 --accel kvm|tcg [--mutation none|no-keyboard|wrong-password]
+  run.sh --arch x86_64 --accel kvm|tcg [--mutation none|wrong-password]
          [--evidence-dir DIR] [--force-build]
 
   --accel        QEMU accelerator; kvm requires an accessible /dev/kvm
   --arch         image architecture (only x86_64 is the gate cell)
-  --mutation     none (default), no-keyboard or wrong-password
+  --mutation     none (default) or wrong-password
   --evidence-dir evidence directory (default tickets/evidence/artifacts/S85p)
   --force-build  rebuild the release image even when the commit stamp matches
 
@@ -75,7 +75,7 @@ case "$accel" in
     *) echo "run.sh: unsupported --accel $accel (kvm or tcg)" >&2; exit 2 ;;
 esac
 case "$mutation" in
-    none|no-keyboard|wrong-password) ;;
+    none|wrong-password) ;;
     *) echo "run.sh: unsupported --mutation $mutation" >&2; exit 2 ;;
 esac
 

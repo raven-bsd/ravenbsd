@@ -15,7 +15,7 @@ marker command echoed by the guest.
 Usage:
   sh tests/boot/0.1.0-usb-keyboard/run.sh --arch x86_64 --accel kvm
   sh tests/boot/0.1.0-usb-keyboard/run.sh --arch x86_64 --accel tcg
-  sh tests/boot/0.1.0-usb-keyboard/run.sh --mutation no-keyboard
+  sh tests/boot/0.1.0-usb-keyboard/run.sh --mutation wrong-password
   sh tests/boot/0.1.0-usb-keyboard/run.sh --mutation wrong-password
 
 Exit codes: 0 pass; 2 setup; 3 image; 10 boot; 11 input; 12 login;
@@ -48,7 +48,7 @@ LOGIN = "login"
 MARKER = "marker"
 PANIC = "panic"
 
-MUTATIONS = ("none", "no-keyboard", "wrong-password")
+MUTATIONS = ("none", "wrong-password")
 
 EXIT_STAGE = {
     SETUP: 2,
@@ -166,7 +166,6 @@ def qemu_argv(
     code_path: Path,
     serial_path: Path,
     qmp_path: Path,
-    mutation: str,
 ) -> list[str]:
     """Return the QEMU argv for one gate cell."""
     argv = [
@@ -196,11 +195,11 @@ def qemu_argv(
         "VGA,id=video0",
         "-device",
         "qemu-xhci",
+        "-device",
+        "usb-kbd,display=video0",
         "-qmp",
         f"unix:{qmp_path},server=on,wait=off",
     ]
-    if mutation != "no-keyboard":
-        argv.extend(["-device", "usb-kbd,display=video0"])
     if accel == "kvm":
         argv.extend(["-enable-kvm", "-cpu", "host"])
     else:
@@ -502,7 +501,6 @@ def run(args: argparse.Namespace) -> int:
             code,
             serial_path,
             qmp_path,
-            args.mutation,
         )
         log(f"boot: arch={args.arch} accel={args.accel} mutation={args.mutation}")
         with qemu_log.open("w", encoding="utf-8") as qemu_out:

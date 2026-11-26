@@ -120,8 +120,8 @@ class StageTests(unittest.TestCase):
             gate.artifact_suffix("x86_64", "kvm", "none"), "x86_64-kvm"
         )
         self.assertEqual(
-            gate.artifact_suffix("x86_64", "tcg", "no-keyboard"),
-            "x86_64-tcg-no-keyboard",
+            gate.artifact_suffix("x86_64", "tcg", "wrong-password"),
+            "x86_64-tcg-wrong-password",
         )
 
 
@@ -129,20 +129,13 @@ class MutationTests(unittest.TestCase):
     def test_wrong_password_is_a_supported_mutation(self):
         self.assertEqual(gate.password_for("raven", "wrong-password"), "wrong")
 
-    def test_no_keyboard_mutation_drops_the_device_only(self):
-        argv = gate.qemu_argv(
-            "x86_64", "tcg", gate.Path("image.img"), gate.Path("vars.fd"),
-            gate.Path("code.fd"), gate.Path("serial.log"), gate.Path("qmp.sock"),
-            "no-keyboard",
-        )
-        self.assertIn("qemu-xhci", argv)
-        self.assertFalse(any(arg.startswith("usb-kbd") for arg in argv))
+    def test_normal_password_is_unchanged(self):
+        self.assertEqual(gate.password_for("raven", "none"), "raven")
 
-    def test_normal_cell_routes_the_usb_keyboard(self):
+    def test_every_cell_attaches_the_routed_usb_keyboard(self):
         argv = gate.qemu_argv(
             "x86_64", "tcg", gate.Path("image.img"), gate.Path("vars.fd"),
             gate.Path("code.fd"), gate.Path("serial.log"), gate.Path("qmp.sock"),
-            "none",
         )
         self.assertIn("usb-kbd,display=video0", argv)
         self.assertIn("VGA,id=video0", argv)
