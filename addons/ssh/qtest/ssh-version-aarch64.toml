@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S213: the upstream OpenSSH 10.6p2 sshd built for the aarch64 target runs from a minimal initfs
+# and prints its version. The minimal initfs carries the aarch64 /init and ssh-version wrapper; the
+# pre step builds the add-on binaries for the requested case architecture.
+
+name = "ssh-version-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 180
+initfs = "build/ssh/aarch64/ssh-version-initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+pre = ["sh addons/ssh/build.sh --qtest"]
+
+[[expect]]
+regex = '^OpenSSH_10\.6p2'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|sshd: no hostkeys|No such file'
