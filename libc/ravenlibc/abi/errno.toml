@@ -2,7 +2,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # RavenBSD: native error numbers transcribed from freebsd:sys/sys/errno.h @
-# 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-2-Clause, tier A, DR-69). Constants are
+# 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-3-Clause, tier A, DR-69). Constants are
 # transcribed to TOML and generated, not copied. Linux numbers live in raven-linux-abi.
 
 schema = 1
@@ -123,4 +123,4 @@ consts = [
 [donor]
 name = "freebsd"
 revision = "133344405f532bd54ff3629a77d4c4e062f01fdb"
-license = "BSD-2-Clause"
+license = "BSD-3-Clause"

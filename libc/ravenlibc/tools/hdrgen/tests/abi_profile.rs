@@ -49,15 +49,19 @@ _Static_assert(
     "FreeBSD sockaddr.sa_family follows sa_len");
 "#;
 
-/// Baseline rows the staged Raven headers must report before the FreeBSD cutovers.
-const BASELINE_ROWS: [&str; 6] = [
-    "FreeBSD errno: EAGAIN is 35",
+/// Baseline rows the staged Raven headers still report as red after the FreeBSD cutovers.
+///
+/// The errno row (`EAGAIN` 35) is satisfied by S722 and is asserted separately as green.
+const BASELINE_ROWS: [&str; 5] = [
     "FreeBSD signal: SIGUSR1 is 30",
     "FreeBSD sa_family_t is one byte",
     "FreeBSD sockaddr_in.sin_family is at offset 1 after sin_len",
     "no member named 'sa_len'",
     "FreeBSD sockaddr.sa_family follows sa_len",
 ];
+
+/// The row S722 makes true in the staged Raven headers.
+const SATISFIED_ERRNO_ROW: &str = "FreeBSD errno: EAGAIN is 35";
 
 const SYNTHETIC_ERRNO: &str = "#define EAGAIN 35\n";
 const SYNTHETIC_SIGNAL: &str = "#define SIGUSR1 30\n";
@@ -230,5 +234,9 @@ fn the_generated_probe_compiles_and_names_every_baseline_row() {
                 "{arch} probe did not name baseline row {row:?}:\n{text}"
             );
         }
+        assert!(
+            !text.contains(SATISFIED_ERRNO_ROW),
+            "{arch} Raven headers still reject the satisfied errno row {SATISFIED_ERRNO_ROW:?}:\n{text}"
+        );
     }
 }

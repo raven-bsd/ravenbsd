@@ -338,14 +338,14 @@ notes = "DHCPv4 client state machine adapted from smoltcp (0BSD): discover/reque
 
 [[import]]
 path = "libc/ravenlibc/abi/errno.toml"
-upstream = "musl"
-upstream_path = "arch/generic/bits/errno.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/sys/errno.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/errno.toml; deviations in abi/deviations.toml"
+notes = "Native error values transcribed from FreeBSD sys/sys/errno.h (DR-69); generated from abi/errno.toml; Linux numbers stay in raven-linux-abi."
 
 [[import]]
 path = "libc/ravenlibc/abi/fcntl.toml"
@@ -514,14 +514,14 @@ notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe6
 
 [[import]]
 path = "libc/ravenlibc/abi/generated/include/bits/errno.h"
-upstream = "musl"
-upstream_path = "arch/generic/bits/errno.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/sys/errno.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/errno.toml; deviations in abi/deviations.toml"
+notes = "Generated from abi/errno.toml, whose native error values are transcribed from FreeBSD sys/sys/errno.h (DR-69)."
 
 [[import]]
 path = "libc/ravenlibc/abi/generated/include/bits/signum.h"
@@ -679,14 +679,14 @@ notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe6
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/errno.rs"
-upstream = "musl"
-upstream_path = "arch/generic/bits/errno.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/sys/errno.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/errno.toml; deviations in abi/deviations.toml"
+notes = "Generated from abi/errno.toml, whose native error values are transcribed from FreeBSD sys/sys/errno.h (DR-69)."
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/fcntl.rs"

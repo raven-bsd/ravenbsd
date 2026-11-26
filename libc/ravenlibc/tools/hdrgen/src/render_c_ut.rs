@@ -83,14 +83,25 @@ fn headers_have_a_notice_and_guard() {
         return;
     };
     for (name, text) in files {
-        assert!(
-            text.starts_with("/*\n * SPDX-License-Identifier: MIT"),
-            "{name}"
-        );
-        assert!(
-            text.contains("Copyright © 2005-2020 Rich Felker, et al."),
-            "{name}"
-        );
+        if name == "bits/errno.h" {
+            assert!(
+                text.starts_with("/*\n * SPDX-License-Identifier: BSD-3-Clause"),
+                "{name}"
+            );
+            assert!(
+                text.contains("derived from freebsd:sys/sys/errno.h"),
+                "{name}"
+            );
+        } else {
+            assert!(
+                text.starts_with("/*\n * SPDX-License-Identifier: MIT"),
+                "{name}"
+            );
+            assert!(
+                text.contains("Copyright © 2005-2020 Rich Felker, et al."),
+                "{name}"
+            );
+        }
         assert!(text.contains("#ifndef "), "{name}");
         assert!(text.contains("#endif /* "), "{name}");
     }
@@ -103,8 +114,10 @@ fn errno_header_has_the_values() {
     };
     let text = &files["bits/errno.h"];
     assert!(text.contains("#define EPERM 1\n"));
-    assert!(text.contains("#define EWOULDBLOCK EAGAIN\n"));
-    assert!(text.contains("#define ENOATTR ENODATA\n"));
+    assert!(text.contains("#define EWOULDBLOCK 35\n"));
+    assert!(text.contains("#define ENOTSUP 45\n"));
+    assert!(text.contains("#define ENOATTR 87\n"));
+    assert!(!text.contains("#define ENOATTR ENODATA"));
     assert!(!text.contains("#define ENOATTR 61"));
 }
 
