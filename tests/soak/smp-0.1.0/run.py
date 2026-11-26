@@ -36,7 +36,7 @@ SUPERVISOR = ROOT / "tests/smp/boot/soak_boot.py"
 
 DEFAULT_IMAGES = {
     "x86_64": "build/x86_64/ravenbsd-x86_64.img",
-    "aarch64": "build/aarch64/login-cold-start-release.img",
+    "aarch64": "build/aarch64/k546-release.img",
 }
 DEFAULT_OVMF_CODE = "/usr/share/OVMF/OVMF_CODE_4M.fd"
 DEFAULT_OVMF_VARS = "/usr/share/OVMF/OVMF_VARS_4M.fd"

@@ -15,8 +15,8 @@ sh tests/soak/smp-0.1.0/run.sh --arch aarch64 --accel tcg --smp 4 --cycles 100
 ```
 
 The default images are `build/x86_64/ravenbsd-x86_64.img` and
-`build/aarch64/login-cold-start-release.img`. Override them with `--image` or
-`RAVEN_SOAK_IMAGE`. Firmware paths follow the existing `RAVEN_OVMF_*` and
+`build/aarch64/k546-release.img`, matching the existing soak runner. Override
+them with `--image` or `RAVEN_SOAK_IMAGE`. Firmware paths follow the existing `RAVEN_OVMF_*` and
 `RAVEN_AAVMF_*` variables. Evidence is written below
 `<prjmgmt>/tickets/evidence/artifacts/S85h/runs/`; set `RAVEN_PRJMGMT` when the
 management checkout is not a sibling of this clone. `--out` selects another run
