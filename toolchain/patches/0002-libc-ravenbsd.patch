@@ -120397,7 +120397,7 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..eda6d18dc67ed988a4c9ff5a819463c73d912182
+index 0000000..cc838a44d9c1af034ad066adfe43344e0f85dc19
 --- /dev/null
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 @@ -0,0 +1,2498 @@
@@ -121643,13 +121643,13 @@ index 0000000..eda6d18dc67ed988a4c9ff5a819463c73d912182
 +pub const NOFLSH: crate::tcflag_t = 0x8000_0000;
 +pub const XCASE: crate::tcflag_t = 0o000_004;
 +
-+pub const TCOOFF: c_int = 0;
-+pub const TCOON: c_int = 1;
-+pub const TCIOFF: c_int = 2;
-+pub const TCION: c_int = 3;
-+pub const TCIFLUSH: c_int = 0;
-+pub const TCOFLUSH: c_int = 1;
-+pub const TCIOFLUSH: c_int = 2;
++pub const TCOOFF: c_int = 1;
++pub const TCOON: c_int = 2;
++pub const TCIOFF: c_int = 3;
++pub const TCION: c_int = 4;
++pub const TCIFLUSH: c_int = 1;
++pub const TCOFLUSH: c_int = 2;
++pub const TCIOFLUSH: c_int = 3;
 +pub const TCSANOW: c_int = 0;
 +pub const TCSADRAIN: c_int = 1;
 +pub const TCSAFLUSH: c_int = 2;
