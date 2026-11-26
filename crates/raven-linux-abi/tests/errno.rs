@@ -7,77 +7,31 @@ use raven_linux_abi::errno;
 
 mod support;
 
-macro_rules! check_raven_abi {
-    ($($name:ident),+ $(,)?) => {
-        $(
-            assert_eq!(
-                raven_abi::errno::Errno::$name.0,
-                errno::$name,
-                "{} differs between raven-abi and raven-linux-abi",
-                stringify!($name)
-            );
-        )+
-    };
-}
-
 #[test]
-fn raven_abi_errno_values_match() {
-    check_raven_abi!(
-        EPERM,
-        ENOENT,
-        ESRCH,
-        EINTR,
-        EIO,
-        ENXIO,
-        E2BIG,
-        ENOEXEC,
-        EBADF,
-        ECHILD,
-        EAGAIN,
-        ENOMEM,
-        EACCES,
-        EFAULT,
-        EBUSY,
-        EEXIST,
-        EXDEV,
-        ENODEV,
-        ENOTDIR,
-        EISDIR,
-        EINVAL,
-        ENFILE,
-        EMFILE,
-        ENOTTY,
-        EFBIG,
-        ENOSPC,
-        ESPIPE,
-        EROFS,
-        EMLINK,
-        EPIPE,
-        EDOM,
-        ERANGE,
-        ENAMETOOLONG,
-        ENOSYS,
-        ENOTEMPTY,
-        ELOOP,
-        EPROTO,
-        EOVERFLOW,
-        ENOTSOCK,
-        EOPNOTSUPP,
-        EAFNOSUPPORT,
-        EADDRINUSE,
-        EADDRNOTAVAIL,
-        ENETUNREACH,
-        ECONNABORTED,
-        ECONNRESET,
-        ENOBUFS,
-        EISCONN,
-        ENOTCONN,
-        ETIMEDOUT,
-        ECONNREFUSED,
-        EHOSTUNREACH,
-        EALREADY,
-        EINPROGRESS,
-    );
+fn native_values_are_unchanged_and_linux_names_resolve() {
+    // The Linux UAPI table resolves every Linux name, including the names that have no native
+    // equivalent and that S722 removed from the FreeBSD-valued native domain (DR-69).
+    assert_eq!(errno::EAGAIN, 11);
+    assert_eq!(errno::EDEADLK, 35);
+    assert_eq!(errno::ENOSYS, 38);
+    assert_eq!(errno::ECHRNG, 44);
+    assert_eq!(errno::EBADE, 52);
+    assert_eq!(errno::EADV, 68);
+    assert_eq!(errno::ENOMEDIUM, 123);
+    assert_eq!(errno::EWOULDBLOCK, errno::EAGAIN);
+
+    // The native contract keeps the FreeBSD values and does not alias the Linux numbers.
+    assert_eq!(raven_abi::errno::Errno::EAGAIN.0, 35);
+    assert_eq!(raven_abi::errno::Errno::EDEADLK.0, 11);
+    assert_eq!(raven_abi::errno::Errno::ENOSYS.0, 78);
+    assert_eq!(raven_abi::errno::Errno::EADDRINUSE.0, 48);
+    assert_eq!(raven_abi::errno::Errno::EOVERFLOW.0, 84);
+    assert_eq!(raven_abi::errno::Errno::EILSEQ.0, 86);
+
+    // Numeric collisions across domains are not aliases: native 68 is EUSERS, not Linux EADV.
+    assert_eq!(raven_abi::errno::Errno::EUSERS.0, 68);
+    assert_eq!(raven_abi::errno::Errno(68).description(), "too many users");
+    assert_eq!(errno::EUSERS, 87);
 }
 
 #[test]
