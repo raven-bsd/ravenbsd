@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S199 probe: it starts with the boot, waits for the sequential virtio-net `nic:` services and
+# quits each one so devd can launch the next function.
+name = "msix-probe"
+exec = "/sbin/msix-probe"
+args = ["msix-probe"]
+needs = ["scheme:nic"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
