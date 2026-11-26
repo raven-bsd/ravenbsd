@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S176 controlled mutation: mutation <TAB> targeted row <TAB> requirement.
+early-sleep	sleep	S176-R03

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S176: one one-shot clock and sleep conformance probe. It runs the normal rows and the
+# controlled early-sleep mutation; the host runner parses the row contract and owns the exit
+# mapping.
+
+name = "clocks-conformance"
+exec = "/bin/conformance-probe"
+args = ["clocks-conformance", "--all"]
+needs = ["scheme:tty"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false
