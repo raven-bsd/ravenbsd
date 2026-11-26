@@ -1730,6 +1730,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-fmd"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fm",
+]
+
+[[package]]
 name = "raven-frames"
 version = "0.1.0"
 
@@ -3163,6 +3170,10 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-proto-dev"
+version = "0.1.0"
+
+[[package]]
+name = "raven-proto-fm"
 version = "0.1.0"
 
 [[package]]
