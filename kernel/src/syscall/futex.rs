@@ -32,7 +32,7 @@ const SHARED_KEY_TAG: u64 = 1 << 63;
 static QUEUES: [WaitQueue; BUCKETS] = [const { WaitQueue::new() }; BUCKETS];
 static FALLBACK: WaitQueue = WaitQueue::new();
 
-/// `futex(addr, op, val, timeout_ns)`.
+/// `futex(addr, op, val, arg4, addr2, val3)`.
 pub fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     let addr = frame.rdi;
     let op = frame.rsi as u32;
@@ -45,9 +45,6 @@ pub fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let private = op & futex::PRIVATE != 0;
     let command = op & !futex::PRIVATE;
-    if command > futex::WAKE {
-        return Err(Errno::EINVAL);
-    }
     let slice = UserSlice::new(addr, 4)?;
     let (space, key) = futex_key(&process, addr, private)?;
     match command {
@@ -57,8 +54,39 @@ pub fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
             let count = bucket(space, key).wake(space, key, max);
             Ok(count)
         }
+        futex::REQUEUE => requeue(frame, &process, private, space, key, val),
         _ => Err(Errno::EINVAL),
     }
+}
+
+/// `FUTEX_REQUEUE`: wake `val` waiters at the source, move up to `arg4` of the rest to `addr2`.
+fn requeue(
+    frame: &SyscallFrame,
+    process: &Arc<process::Process>,
+    private: bool,
+    source_space: u64,
+    source_key: u64,
+    val: u32,
+) -> Result<usize, Errno> {
+    let destination = frame.r8;
+    if destination & 3 != 0 {
+        return Err(Errno::EINVAL);
+    }
+    // NetBSD `futex_func_requeue` rejects negative wake and requeue counts.
+    let wake = val as i32;
+    let max = (frame.r10 as u32) as i32;
+    if wake < 0 || max < 0 {
+        return Err(Errno::EINVAL);
+    }
+    let _destination_slice = UserSlice::new(destination, 4)?;
+    let (destination_space, destination_key) = futex_key(process, destination, private)?;
+    Ok(bucket(source_space, source_key).requeue(
+        (source_space, source_key),
+        bucket(destination_space, destination_key),
+        (destination_space, destination_key),
+        wake as usize,
+        max as usize,
+    ))
 }
 
 /// Resolve the wait-queue key for `address`.
@@ -118,7 +146,9 @@ fn wait(
 
     let status = sched::block_current();
     let kicked = sched::take_kick();
-    queue.remove(space, key, thread_id);
+    // A requeue can move this waiter to a different bucket, so the queue and key captured before
+    // the block no longer identify its entry. Remove it by thread id from every futex bucket.
+    remove_thread(thread_id);
     sched::end_block(token);
     if status == Errno::EINTR.to_ret() || kicked {
         Err(Errno::EINTR)
