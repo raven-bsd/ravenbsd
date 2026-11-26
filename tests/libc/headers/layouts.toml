@@ -1797,7 +1797,7 @@ offset = 32
 [[type]]
 name = "struct ifreq"
 headers = ["net/if.h"]
-size = 32
+size = 40
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
 
@@ -1809,61 +1809,36 @@ offset = 0
 name = "ifr_ifru"
 offset = 16
 
-# FreeBSD 133344405 sys/net/route.h exposes rt_msghdr, not the Linux rtentry.
 [[type]]
-name = "struct rt_msghdr"
+name = "struct rtentry"
 headers = ["net/route.h"]
-size = 152
+size = 120
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
 
 [[type.field]]
-name = "rtm_msglen"
+name = "rt_pad1"
 offset = 0
 
 [[type.field]]
-name = "rtm_version"
-offset = 2
-
-[[type.field]]
-name = "rtm_type"
-offset = 3
-
-[[type.field]]
-name = "rtm_index"
-offset = 4
-
-[[type.field]]
-name = "rtm_flags"
+name = "rt_dst"
 offset = 8
 
 [[type.field]]
-name = "rtm_addrs"
-offset = 12
-
-[[type.field]]
-name = "rtm_pid"
-offset = 16
-
-[[type.field]]
-name = "rtm_seq"
-offset = 20
-
-[[type.field]]
-name = "rtm_errno"
+name = "rt_gateway"
 offset = 24
 
 [[type.field]]
-name = "rtm_fmask"
-offset = 28
-
-[[type.field]]
-name = "rtm_inits"
-offset = 32
-
-[[type.field]]
-name = "rtm_rmx"
+name = "rt_genmask"
 offset = 40
+
+[[type.field]]
+name = "rt_flags"
+offset = 56
+
+[[type.field]]
+name = "rt_dev"
+offset = 88
 
 [[type]]
 name = "struct ifaddrs"
