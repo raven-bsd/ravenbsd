@@ -7,7 +7,7 @@
 # --dry-run` report `file=present`, lets `raven config check/get` see the effective network
 # section, and gives the TUI a real file to save atomically on the writable UFS root.
 [[initfs.files]]
-src = "build/fixtures/modern-admin/{arch}/raven"
+src = "build/fixtures/modern-admin/raven"
 path = "/usr/sbin/raven"
 mode = 0o755
 generated = true
