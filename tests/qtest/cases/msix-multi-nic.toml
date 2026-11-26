@@ -2,12 +2,13 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # S199: two virtio-net functions on the x86_64 profile. devd must create one MSI-X vector per
-# function from its ROOT_DEVICE capability and run both functions through the `nic:` service;
-# on the unfixed tree both MSI-X creates return EBADF, both functions fall back to legacy IRQ 11
-# and the second launch fails with `irq: resource busy`.
+# function from its ROOT_DEVICE capability and run both functions through the `nic:` service.
+# On the unfixed tree both MSI-X creates return EBADF and fall back to legacy IRQ 11; in the
+# production launch order the second function then fails with `irq: resource busy`, and in this
+# sequential two-function case there is no MSI-X vector at all.
 #
-# The fixture stages the real `etc/services.d/devd.toml` (only the devd mode token becomes
-# `test` so the two functions run sequentially), so removing its grant makes this case red again.
+# The fixture stages the real `etc/services.d/devd.toml` (only the devd test mode token and the
+# driver's `nic:` readiness name change), so removing its grant makes this case red again.
 
 name = "msix-multi-nic"
 arch = "x86_64"
