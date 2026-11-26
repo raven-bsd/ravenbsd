@@ -1,5 +1,8 @@
 # S85h 0.1.0 SMP soak
 
+SPDX-License-Identifier: BSD-3-Clause
+Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
 Repeats one requested QEMU cell until `login:` appears, then stops QEMU and
 starts the next cycle. Each cycle keeps the raw and timestamped serial, and the
 runner fails on a missing CPU, a missing login marker, a panic/exception/TLB
