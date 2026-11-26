@@ -263,6 +263,42 @@ def qemu_argv(arch: str, accel: str, image: Path, out: Path, serial: Path) -> li
     return argv
 
 
+QEMU_EXIT_OK = (0, 33)  # 33 is `isa-debug-exit` success (guest exit code 0).
+
+
+def qemu_exit_failure(returncode: int | None) -> str | None:
+    """Return a failure label for a QEMU child exit, or None for the expected sentinel."""
+    if returncode is None or returncode in QEMU_EXIT_OK:
+        return None
+    return f"qemu:exit={returncode}"
+
+
+def collect_serial(serial: Path, qemu: subprocess.Popen[bytes], deadline: float) -> str:
+    """Read the serial log until both runs finish or the deadline expires.
+
+    QEMU can exit between the poll and the next capture read, so the final bytes are read once
+    more after the loop. This does not extend the deadline or relax the marker requirement.
+    """
+    text = ""
+    while time.monotonic() < deadline:
+        if qemu.poll() is not None:
+            break
+        text = serial.read_text(encoding="utf-8", errors="replace")
+        if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
+            break
+        time.sleep(0.2)
+    final = serial.read_text(encoding="utf-8", errors="replace")
+    return final if final else text
+
+
+def mutation_incomplete(text: str) -> bool:
+    """Whether the mutation run is missing its completion marker."""
+    if MUTATION_MARKER not in text:
+        return True
+    _, mutation = text.split(MUTATION_MARKER, 1)
+    return "S175-TERM done failures=" not in mutation
+
+
 def main() -> int:
     arch, accel, no_build = parse_args(sys.argv)
     image = Path(os.environ.get("S175_TERM_IMAGE", ROOT / f"build/qtest/s175-terminal-{arch}.img"))
@@ -285,15 +321,11 @@ def main() -> int:
     failures: list[str] = []
     try:
         deadline = time.monotonic() + (300 if arch == "aarch64" else 180)
-        text = ""
-        while time.monotonic() < deadline:
-            if qemu.poll() is not None:
-                break
-            text = serial.read_text(encoding="utf-8", errors="replace")
-            if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
-                break
-            time.sleep(0.2)
+        text = collect_serial(serial, qemu, deadline)
         (out / "serial-copy.log").write_text(text, encoding="utf-8")
+        exit_failure = qemu_exit_failure(qemu.poll())
+        if exit_failure:
+            failures.append(exit_failure)
 
         if MUTATION_MARKER in text:
             normal, mutation = text.split(MUTATION_MARKER, 1)
@@ -304,7 +336,7 @@ def main() -> int:
         failures.extend(normal_failures(normal))
         if mutation_rows.get("termios") != "FAIL":
             failures.append(f"mutation:termios={mutation_rows.get('termios')}")
-        if "S175-TERM done failures=" not in mutation:
+        if mutation_incomplete(text):
             failures.append("mutation:incomplete-output")
 
         # Test-only mutation: remove the signal rows from a copy of the normal output. The
