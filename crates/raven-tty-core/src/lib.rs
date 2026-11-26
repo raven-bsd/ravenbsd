@@ -421,19 +421,22 @@ impl Discipline {
                 byte = b'\r';
             }
 
-            // Raw mode skips editing and echo, but the input translation flags above still apply,
-            // as in the BSD line discipline (cfmakeraw clears those flags for a true byte pipe).
-            if self.termios.settings().mode == Mode::Raw {
-                out.data.push(byte);
-                continue;
-            }
-
+            // ISIG is independent of canonical mode: FreeBSD `ttyinput` tests the signal
+            // characters before the canonical/raw branch, so ^C still interrupts in a raw
+            // terminal unless cfmakeraw cleared ISIG.
             if self.termios.lflag & ISIG != 0 && self.special(VINTR, byte) {
                 self.interrupt(out);
                 continue;
             }
             if self.termios.lflag & ISIG != 0 && self.special(VQUIT, byte) {
                 self.quit(out);
+                continue;
+            }
+
+            // Raw mode skips editing and echo, but the input translation flags above still apply,
+            // as in the BSD line discipline (cfmakeraw clears those flags for a true byte pipe).
+            if self.termios.settings().mode == Mode::Raw {
+                out.data.push(byte);
                 continue;
             }
             if byte == NEWLINE || (self.special(VEOL, byte) && self.termios.lflag & IEXTEN != 0) {
