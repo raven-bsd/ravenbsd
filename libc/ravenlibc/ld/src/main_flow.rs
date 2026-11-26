@@ -157,7 +157,7 @@ pub fn register_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf:
     phnum: u16,
     name: &[u8],
 ) -> Result<ObjId, LoadError> {
-    let id = register_object(loader, phdr, phnum, name)?;
+    let id = register_object(loader, phdr, phnum, name, true)?;
     loader.scope.main = id;
     Ok(id)
 }
@@ -177,7 +177,7 @@ pub fn register_premapped<
     phnum: u16,
     name: &[u8],
 ) -> Result<ObjId, LoadError> {
-    register_object(loader, phdr, phnum, name)
+    register_object(loader, phdr, phnum, name, false)
 }
 
 fn register_object<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier>(
@@ -185,6 +185,7 @@ fn register_object<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::R
     phdr: u64,
     phnum: u16,
     name: &[u8],
+    main: bool,
 ) -> Result<ObjId, LoadError> {
     let bias = main_bias(&loader.mem, phdr, phnum)
         .ok_or(LoadError::Elf(raven_libc_elf::ElfError::BadEntry))?;
@@ -224,9 +225,11 @@ fn register_object<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::R
         fini_done: false,
         dl_open: false,
     };
-    // `dl_iterate_phdr` reports the main program with an empty `dlpi_name`; the path is an
-    // alias used by diagnostics.
-    object.add_name(b"");
+    // `dl_iterate_phdr` reports the main program with an empty `dlpi_name`; a pre-mapped
+    // library must keep its own name there.
+    if main {
+        object.add_name(b"");
+    }
     object.add_name(name);
     let id = loader.insert(object).ok_or(LoadError::TooManyObjects)?;
     Ok(id)
