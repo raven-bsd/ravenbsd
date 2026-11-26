@@ -66,8 +66,8 @@ struct stat {
 	dev_t st_rdev;
 	struct timespec st_atim;
 	struct timespec st_mtim;
-	struct timespec st_ctim;
 	struct timespec st_birthtim;
+	struct timespec st_ctim;
 	off_t st_size;
 	blkcnt_t st_blocks;
 	blksize_t st_blksize;
