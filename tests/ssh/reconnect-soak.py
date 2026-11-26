@@ -88,8 +88,11 @@ def parse_args(argv: list[str]) -> dict:
     options = {
         "sessions": 100,
         "batch": 10,
-        "session_timeout": 20.0,
-        "connect_timeout": 8.0,
+        # A loaded host (the ticket's class) can take >8 s to spawn the first
+        # sshd-session child under TCG, and one measured session took 15.6 s
+        # wall. The gate must still fail a real hang, so both remain bounded.
+        "session_timeout": 60.0,
+        "connect_timeout": 30.0,
         "tty_sessions": 0,
         "keep_going": False,
         "image": IMAGE,
