@@ -309,6 +309,19 @@ fn c_str_eq(pointer: *const c_char, expected: &[u8]) -> bool {
     unsafe { *cursor == 0 }
 }
 
+fn c_str_starts(pointer: *const c_char, prefix: &[u8]) -> bool {
+    let mut cursor = pointer as *const u8;
+    for byte in prefix {
+        // SAFETY: the caller supplies a NUL-terminated environment entry.
+        if unsafe { *cursor } != *byte {
+            return false;
+        }
+        // SAFETY: advance within the same NUL-terminated string.
+        cursor = unsafe { cursor.add(1) };
+    }
+    true
+}
+
 fn c_str_i32(pointer: *const c_char) -> i32 {
     let mut cursor = pointer as *const u8;
     let mut sign = 1;
@@ -955,13 +968,26 @@ fn exec_image_child(argc: c_int, argv: *const *const c_char, envp: *const *const
             null::<c_char>()
         }
     };
-    report.env_ok = u64::from(
-        env_count == 4
-            && c_str_eq(environment(0), b"PATH=/bin")
-            && c_str_eq(environment(1), b"PROC_TOKEN=a b")
-            && c_str_eq(environment(2), b"EMPTY=")
-            && c_str_eq(environment(3), b"HOME=/tmp"),
-    );
+    // The caller's entries arrive first and byte-exactly. The C library then appends its recorded
+    // exec hand-off entries (K431 RSH_FD0/1/2, K222/K431 __RAVEN_FDMAP, S189 __RAVEN_UMASK); the
+    // startup consumes the two __RAVEN_* entries before the application reads `environ`. No other
+    // extension is accepted, so truncation, reordering or corruption still fails the row.
+    let mut env_ok = env_count >= 4
+        && c_str_eq(environment(0), b"PATH=/bin")
+        && c_str_eq(environment(1), b"PROC_TOKEN=a b")
+        && c_str_eq(environment(2), b"EMPTY=")
+        && c_str_eq(environment(3), b"HOME=/tmp");
+    let mut index = 4;
+    while env_ok && index < env_count {
+        let entry = environment(index);
+        env_ok = c_str_starts(entry, b"RSH_FD0=")
+            || c_str_starts(entry, b"RSH_FD1=")
+            || c_str_starts(entry, b"RSH_FD2=")
+            || c_str_starts(entry, b"__RAVEN_FDMAP=")
+            || c_str_starts(entry, b"__RAVEN_UMASK=");
+        index += 1;
+    }
+    report.env_ok = u64::from(env_ok);
 
     // The C8 block starts at argc; argv is the next word, so entry sp0 is argv - 8.
     let sp0 = (argv as usize).wrapping_sub(8);
@@ -1219,7 +1245,7 @@ fn row_exec_image(state: &mut State) {
         "at-random-policy",
         random_ok && child_ok,
         format_args!(
-            "present={} nonzero={} readable={} bytes_nonzero={} first=0x{:x} policy=nonzero-or-unseeded",
+            "present={} nonzero={} readable={} bytes_nonzero={} first=0x{:x} policy=nonzero-seeded",
             flag(report.aux_present == 1),
             flag(report.aux_nonzero == 1),
             flag(report.aux_readable == 1),

@@ -20,7 +20,7 @@ changed here, and a red row is a fix ticket for the owning lane (S168/S169).
 | `fork-signal-inheritance` | a forked child inherits the caught handler and the blocked mask |
 | `exec-sigreset` | `exec` resets caught handlers to `SIG_DFL` and preserves the blocked mask |
 | `fd-inheritance` | `fork` copies plain and `O_CLOEXEC` descriptors; `exec` closes the `O_CLOEXEC` one and keeps the plain one |
-| `exec-start-layout` | `argv` and `envp` reach the image byte-exactly, `AT_EXECFN` names the image, the entry stack is 16-byte aligned and `argv[argc]`/`envp` are terminated |
+| `exec-start-layout` | `argv` and the caller's `envp` entries reach the image byte-exactly and in order, `AT_EXECFN` names the image, the entry stack is 16-byte aligned and `argv[argc]`/`envp` are terminated; the only trailing entries are the recorded libc exec hand-off keys (`RSH_FD0/1/2`, `__RAVEN_FDMAP`, `__RAVEN_UMASK`) |
 | `at-random-policy` | `AT_RANDOM` is present and, on the seeded release image, nonzero and 16 readable nonzero bytes |
 | `reparent-reap` | an orphan is reparented to init (ppid 1), is no longer the probe's child, and is reaped |
 
