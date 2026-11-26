@@ -35,10 +35,15 @@ fi
 
 tmp=${TMPDIR:-/tmp}/rl-shape-$$.txt
 loads_file=${TMPDIR:-/tmp}/rl-shape-loads-$$.txt
-trap 'rm -f "$tmp" "$loads_file"' EXIT HUP INT TERM
+secs=${TMPDIR:-/tmp}/rl-shape-secs-$$.txt
+trap 'rm -f "$tmp" "$loads_file" "$loads_file.tls" "$secs"' EXIT HUP INT TERM
 
 if ! "$readelf" -lW "$elf" > "$tmp" 2>/dev/null; then
     printf 'shape: FAIL cannot read program headers\n'
+    exit 1
+fi
+if ! "$readelf" -SW "$elf" > "$secs" 2>/dev/null; then
+    printf 'shape: FAIL cannot read section headers\n'
     exit 1
 fi
 
@@ -90,5 +95,87 @@ while read -r offset virt size flags align; do
         exit 1
     fi
 done < "$loads_file"
+
+# The static TLS image is an ELF invariant the loader and libc both consume: a section named
+# `.tdata`/`.tbss` without a PT_TLS is a foreign TLS image that __raven_init_main_thread cannot
+# find, and a PT_TLS that does not cover its sections leaves the thread pointer over the wrong
+# memory.
+awk '
+function hex(value, alphabet, result, i) {
+    alphabet = "0123456789abcdef"
+    sub(/^0x/, "", value)
+    result = 0
+    for (i = 1; i <= length(value); i++) {
+        result = result * 16 + index(alphabet, tolower(substr(value, i, 1))) - 1
+    }
+    return result
+}
+{
+    line = $0
+    if (line ~ /^ *\[ *[0-9]+\] /) {
+        sub(/^ *\[ *[0-9]+\] +/, "", line)
+        split(line, field, / +/)
+        if (field[1] == ".tdata" || field[1] == ".tbss") {
+            print field[1], field[2], hex(field[3]), hex(field[5])
+        }
+    }
+}' "$secs" > "$loads_file.tls"
+
+tls_count=$(awk '$1 == "TLS" { count = count + 1 } END { print count + 0 }' "$tmp")
+if [ "$tls_count" -gt 1 ]; then
+    printf 'shape: FAIL %s PT_TLS segments\n' "$tls_count"
+    exit 1
+fi
+if [ "$tls_count" -eq 0 ]; then
+    if grep -qE '^\.(tdata|tbss) ' "$loads_file.tls"; then
+        printf 'shape: FAIL TLS sections without PT_TLS\n'
+        exit 1
+    fi
+else
+    tls_line=$(awk '$1 == "TLS" { print $2, $3, $5, $6, $NF; exit }' "$tmp")
+    set -- $tls_line
+    tls_vaddr=$2
+    tls_filesz=$3
+    tls_memsz=$4
+    tls_align=$5
+    if [ $((tls_align)) -le 0 ] || [ $((tls_align & (tls_align - 1))) -ne 0 ]; then
+        printf 'shape: FAIL PT_TLS align %s (want a power of two)\n' "$tls_align"
+        exit 1
+    fi
+    if [ $((tls_vaddr % tls_align)) -ne 0 ]; then
+        printf 'shape: FAIL PT_TLS vaddr %s not aligned to %s\n' "$tls_vaddr" "$tls_align"
+        exit 1
+    fi
+    if [ "$((tls_filesz))" -gt "$((tls_memsz))" ]; then
+        printf 'shape: FAIL PT_TLS filesz %s exceeds memsz %s\n' "$tls_filesz" "$tls_memsz"
+        exit 1
+    fi
+    while read -r sec_name sec_type sec_addr sec_size; do
+        case $sec_name in
+            .tdata)
+                if [ "$sec_type" != "PROGBITS" ]; then
+                    printf 'shape: FAIL .tdata type %s (want PROGBITS)\n' "$sec_type"
+                    exit 1
+                fi
+                if [ "$((sec_addr))" -lt "$((tls_vaddr))" ] ||
+                    [ "$(((sec_addr - tls_vaddr) + sec_size))" -gt "$((tls_filesz))" ]; then
+                    printf 'shape: FAIL .tdata outside the PT_TLS file image\n'
+                    exit 1
+                fi
+                ;;
+            .tbss)
+                if [ "$sec_type" != "NOBITS" ]; then
+                    printf 'shape: FAIL .tbss type %s (want NOBITS)\n' "$sec_type"
+                    exit 1
+                fi
+                if [ "$((sec_addr))" -lt "$((tls_vaddr))" ] ||
+                    [ "$(((sec_addr - tls_vaddr) + sec_size))" -gt "$((tls_memsz))" ]; then
+                    printf 'shape: FAIL .tbss outside the PT_TLS memory image\n'
+                    exit 1
+                fi
+                ;;
+        esac
+    done < "$loads_file.tls"
+fi
 
 printf 'shape: ok\n'
