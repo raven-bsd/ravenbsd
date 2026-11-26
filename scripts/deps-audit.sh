@@ -92,11 +92,15 @@ def parse_vendor():
     }
 
 
-def tool_version(name, args):
-    code, out, _ = run(args)
-    if code != 0:
-        return None
-    return out.splitlines()[0].strip() if out.splitlines() else name
+def tool_version(name):
+    candidates = [[name, "--version"]]
+    if name.startswith("cargo-"):
+        candidates.append(["cargo", name[len("cargo-") :], "--version"])
+    for args in candidates:
+        code, out, _ = run(args)
+        if code == 0 and out.strip():
+            return out.splitlines()[0].strip()
+    return None
 
 
 def metadata():
@@ -194,7 +198,7 @@ def audit():
 
 
 def deny_advisories():
-    version = tool_version("cargo-deny", ["cargo", "deny", "--version"])
+    version = tool_version("cargo-deny")
     if version is None:
         return {
             "status": "unavailable",
@@ -216,12 +220,12 @@ def osv():
             "status": "unavailable",
             "reason": "osv-scanner is not installed on this host; RustSec coverage via cargo-audit",
         }
-    version = tool_version("osv-scanner", ["osv-scanner", "--version"])
+    version = tool_version("osv-scanner")
     return {"status": "available", "version": version}
 
 
 def udeps():
-    version = tool_version("cargo-udeps", ["cargo", "udeps", "--version"])
+    version = tool_version("cargo-udeps")
     if version is None:
         return {
             "status": "unavailable",
@@ -440,9 +444,7 @@ def live_report():
         "tools": {
             "cargo-audit": {
                 "status": "ok",
-                "version": tool_version(
-                    "cargo-audit", ["cargo", "audit", "--version"]
-                ),
+                "version": tool_version("cargo-audit"),
             },
             "cargo-deny": deny_advisories(),
             "osv-scanner": osv(),
