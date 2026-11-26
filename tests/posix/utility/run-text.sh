@@ -9,8 +9,9 @@
 # The Raven target binaries need the Raven kernel, so the host build exercises
 # the same utility source; the runner is the ticket's executable evidence.
 #
-# A present tool with a failing case fails the run. A missing source tool is a
-# DEFECT row (partial): it is reported, not counted as a pass.
+# A present tool with a failing case fails the run. The awk, sed, grep, cmp,
+# diff and strings rows are first-party and covered by run-text2.sh; they are
+# not defects of this uutils text batch.
 
 set -eu
 
@@ -20,7 +21,7 @@ target=$root/build/posix-utility/uutils-host
 log=$root/build/posix-utility/build.log
 
 present="sort cut tr wc head tail uniq comm fold expand unexpand paste join nl pr od split csplit tsort tee printf basename dirname expr"
-missing="awk sed grep cmp diff strings"
+missing=""
 
 if [ "${1:-}" = "--list" ]; then
     for tool in $present; do
