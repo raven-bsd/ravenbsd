@@ -10,7 +10,21 @@
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+here_logical=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$here/../../.." && pwd -P)
+root_logical=$(CDPATH= cd -- "$here_logical/../../.." && pwd)
+
+find_prjmgmt() {
+    base=$1
+    while [ "$base" != "/" ]; do
+        if [ -f "$base/ravenbsd-prjmgmt/Makefile" ]; then
+            printf '%s\n' "$base/ravenbsd-prjmgmt"
+            return 0
+        fi
+        base=$(dirname "$base")
+    done
+    return 1
+}
 
 arch=x86_64
 accel=
@@ -56,16 +70,7 @@ if [ -z "$out" ]; then
     if [ -n "${RAVEN_PRJMGMT:-}" ]; then
         prjmgmt=$RAVEN_PRJMGMT
     else
-        probe=$root
-        prjmgmt=
-        while [ "$probe" != "/" ]; do
-            parent=$(dirname "$probe")
-            if [ -d "$parent/ravenbsd-prjmgmt" ]; then
-                prjmgmt=$parent/ravenbsd-prjmgmt
-                break
-            fi
-            probe=$parent
-        done
+        prjmgmt=$(find_prjmgmt "$root_logical" || find_prjmgmt "$root") || prjmgmt=
         [ -n "$prjmgmt" ] || {
             echo "s85m: cannot locate ravenbsd-prjmgmt; set RAVEN_PRJMGMT" >&2
             exit 2
