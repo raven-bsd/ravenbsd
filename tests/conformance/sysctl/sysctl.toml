@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S744 sysctl public-contract target case. The build.sh stages /bin/conformance-probe and a
+# one-shot service over the release initfs; the probe prints the CONFORM row contract. The
+# summary line is the normal verdict; the three mutation end lines prove the negative checks.
+
+name = "sysctl-conformance"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/conformance/sysctl/build.sh"]
+initfs = "build/conformance/sysctl/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = 'CONFORM sysctl begin'
+
+[[expect]]
+regex = 'CONFORM sysctl summary passed=12 total=12 failures=0'
+
+[[expect]]
+regex = 'CONFORM sysctl done failures=0'
+
+[[expect]]
+regex = 'CONFORM-MUTATION topic=sysctl end=required-length failures=1'
+
+[[expect]]
+regex = 'CONFORM-MUTATION topic=sysctl end=unknown-mib failures=1'
+
+[[expect]]
+regex = 'CONFORM-MUTATION topic=sysctl end=privilege failures=1'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

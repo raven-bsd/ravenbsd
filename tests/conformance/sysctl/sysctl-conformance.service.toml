@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S744: one one-shot sysctl conformance probe. It runs the normal rows and the three controlled
+# mutations; the probe exits zero only when every normal row passes and every mutation is caught.
+
+name = "sysctl-conformance"
+exec = "/bin/conformance-probe"
+args = ["sysctl-conformance", "--all"]
+needs = ["sysd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false
