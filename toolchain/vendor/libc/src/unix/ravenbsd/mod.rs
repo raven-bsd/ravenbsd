@@ -2328,8 +2328,8 @@ pub const MFD_HUGE_MASK: c_uint = 63;
 pub const MFD_HUGE_SHIFT: c_uint = 26;
 
 // sys/eventfd.h, errno and sys/sysinfo.h.
-pub const EFD_CLOEXEC: c_int = 0o200_0000;
-pub const EFD_NONBLOCK: c_int = 0o4_000;
+pub const EFD_CLOEXEC: c_int = crate::O_CLOEXEC;
+pub const EFD_NONBLOCK: c_int = crate::O_NONBLOCK;
 pub const SI_LOAD_SHIFT: c_uint = 16;
 
 // x86_64 syscall numbers used by the brush dependency graph.
