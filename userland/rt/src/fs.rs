@@ -145,9 +145,14 @@ pub fn resolve(path: &str) -> String {
     resolve_with_pwd(path, &cwd())
 }
 
-/// Resolve `path` for the scheme client.
+/// Resolve `path` and qualify a plain path with the `file:` scheme.
 fn scheme_path(path: &str) -> String {
-    resolve(path)
+    let resolved = resolve(path);
+    if has_scheme(&resolved) {
+        resolved
+    } else {
+        alloc_crate::format!("file:{resolved}")
+    }
 }
 
 /// Normalise an absolute path.

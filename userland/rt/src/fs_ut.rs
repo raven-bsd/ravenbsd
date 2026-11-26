@@ -3,8 +3,7 @@
 
 use super::*;
 use raven_proto_fs::{
-    DIRENT_HEADER_LEN, DT_DIR, DT_REG, O_APPEND, O_CREAT, O_EXCL, O_RDWR, O_TRUNC, S_IFDIR,
-    S_IFREG,
+    DIRENT_HEADER_LEN, DT_DIR, DT_REG, O_APPEND, O_CREAT, O_EXCL, O_RDWR, O_TRUNC, S_IFDIR, S_IFREG,
 };
 
 #[test]
