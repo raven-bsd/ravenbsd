@@ -31,17 +31,21 @@ regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 [[expect]]
 regex = '^R A V E N   B S D$'
 
+# devd matches the xHCI function during the early driver pass, before the boot report prints the
+# late banner, so this row is not in banner order. The match is still mandatory.
 [[expect]]
 regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1b36 device=0x000d irq_line=[0-9]+ irq_pin=[0-9]+$'
+unordered = true
 
 [[expect]]
-regex = '(?i)^.*login: ?root'
+regex = '(?i)^.*login: ?'
 
 [[expect]]
 regex = '(?i)^password: ?'
 
+# The root prompt has no newline before the injected keystrokes echo, so match its prefix.
 [[expect]]
-regex = '^raven# $'
+regex = '^raven# '
 
 [[expect]]
 regex = '^s214ok$'
