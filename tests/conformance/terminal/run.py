@@ -41,7 +41,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 SERVICE = ROOT / "tests/conformance/terminal/terminal-conformance.service.toml"
 PROBE = ROOT / "build/conformance/terminal/terminal-conformance"
-GATE_ROWS = ("termios", "pty-both-ways", "ctty", "eio")
+GATE_ROWS = ("termios", "pty-both-ways", "ctty", "eio", "target-vintr")
 SIGNAL_ROWS = ("sigwinch", "sighup", "isig")
 MUTATION_MARKER = "S175-TERM-MUTATION-BEGIN"
 
@@ -63,17 +63,18 @@ HEADER_PROBE = r"""
 #include <termios.h>
 #include <sys/ioctl.h>
 
-_Static_assert(sizeof(struct termios) == 44, "FreeBSD termios size");
-_Static_assert(_Alignof(struct termios) == 4, "FreeBSD termios alignment");
-_Static_assert(offsetof(struct termios, c_cc) == 16, "c_cc offset");
-_Static_assert(offsetof(struct termios, c_ispeed) == 36, "c_ispeed offset");
-_Static_assert(offsetof(struct termios, c_ospeed) == 40, "c_ospeed offset");
-_Static_assert(NCCS == 20, "NCCS");
-_Static_assert(VINTR == 8 && VMIN == 16 && VTIME == 17, "control-character indexes");
-_Static_assert(TIOCGETA == 0x402c7413UL, "TIOCGETA");
-_Static_assert(TIOCSETA == 0x802c7414UL, "TIOCSETA");
-_Static_assert(TIOCSETAW == 0x802c7415UL, "TIOCSETAW");
-_Static_assert(TIOCSETAF == 0x802c7416UL, "TIOCSETAF");
+_Static_assert(sizeof(struct termios) == 60, "native termios size");
+_Static_assert(_Alignof(struct termios) == 4, "native termios alignment");
+_Static_assert(offsetof(struct termios, c_line) == 16, "c_line offset");
+_Static_assert(offsetof(struct termios, c_cc) == 17, "c_cc offset");
+_Static_assert(offsetof(struct termios, __c_ispeed) == 52, "c_ispeed offset");
+_Static_assert(offsetof(struct termios, __c_ospeed) == 56, "c_ospeed offset");
+_Static_assert(NCCS == 32, "NCCS");
+_Static_assert(VINTR == 0 && VMIN == 6 && VTIME == 5, "control-character indexes");
+_Static_assert(TIOCGETA == 0x403c7413UL, "TIOCGETA");
+_Static_assert(TIOCSETA == 0x803c7414UL, "TIOCSETA");
+_Static_assert(TIOCSETAW == 0x803c7415UL, "TIOCSETAW");
+_Static_assert(TIOCSETAF == 0x803c7416UL, "TIOCSETAF");
 _Static_assert(TIOCGWINSZ == 0x40087468UL, "TIOCGWINSZ");
 _Static_assert(TIOCSWINSZ == 0x80087467UL, "TIOCSWINSZ");
 _Static_assert(TIOCGPGRP == 0x40047477UL, "TIOCGPGRP");

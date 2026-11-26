@@ -3,11 +3,12 @@
 
 //! S742 terminal conformance probe (test-only, Rust).
 //!
-//! Replaces the C fixture build so the old `terminal-conformance.c` blob stays byte-identical
-//! while the public terminal contract moves to the FreeBSD 13334440 record. It runs the same
-//! S175 rows: termios round-trip through `TCSANOW`/`TCSADRAIN`/`TCSAFLUSH`, a pty byte pair in both
-//! directions, controlling-terminal and foreground-group changes, `EIO` after the last slave
-//! closes, and the terminal-generated `SIGWINCH`, `SIGHUP` and `SIGINT` (ISIG on and off) rows.
+//! Replaces the C fixture build so the old `terminal-conformance.c` blob stays byte-identical.
+//! It runs the same S175 rows: termios round-trip through `TCSANOW`/`TCSADRAIN`/`TCSAFLUSH`, a pty
+//! byte pair in both directions, controlling-terminal and foreground-group changes, `EIO` after
+//! the last slave closes, the terminal-generated `SIGWINCH`, `SIGHUP` and `SIGINT` (ISIG on and
+//! off) rows, and the target-libc `VINTR`/`VMIN`/`VTIME` regression that compares the Rust target
+//! libc constants with the tty's control-character indexes on a real pty.
 //!
 //! The request encodings and record shape are pinned independently by the runner's host clang
 //! oracle against the public headers; this probe exercises the same numbers through libc.
@@ -35,14 +36,38 @@ const TCSANOW: c_int = 0;
 const TCSADRAIN: c_int = 1;
 const TCSAFLUSH: c_int = 2;
 
-const NCCS: usize = 20;
-const VEOF: usize = 0;
-const VERASE: usize = 3;
-const VKILL: usize = 5;
-const VINTR: usize = 8;
-const VQUIT: usize = 9;
-const VMIN: usize = 16;
-const VTIME: usize = 17;
+const NCCS: usize = 32;
+const VEOF: usize = 4;
+const VERASE: usize = 2;
+const VKILL: usize = 3;
+const VINTR: usize = 0;
+const VQUIT: usize = 1;
+const VMIN: usize = 6;
+const VTIME: usize = 5;
+
+const ICRNL: u32 = 0o000400;
+const IXON: u32 = 0o002000;
+const OPOST: u32 = 0o000001;
+const ONLCR: u32 = 0o000004;
+const CSIZE: u32 = 0o000060;
+const CS8: u32 = 0o000060;
+const CREAD: u32 = 0o000200;
+const PARENB: u32 = 0o000400;
+const CLOCAL: u32 = 0o010000;
+const ISIG: u32 = 0o000001;
+const ICANON: u32 = 0o000002;
+const ECHO: u32 = 0o000010;
+const ECHOE: u32 = 0o000020;
+const ECHOK: u32 = 0o000040;
+const IEXTEN: u32 = 0o100000;
+const B9600: u32 = 0o000015;
+
+// The `c_cc` indexes of the Rust target libc as committed in the toolchain. S742 proves that the
+// target module and the native tty agree; the build writes this file from
+// `toolchain/vendor/libc/src/unix/ravenbsd/mod.rs`, so the test uses the target's own constants
+// instead of a copy of the public header.
+include!(concat!(env!("TERMIOS_TARGET_CONSTANTS")));
+const _: () = assert!(NCCS == TARGET_NCCS);
 
 const EPERM: c_int = 1;
 const EINTR: c_int = 4;
@@ -69,6 +94,7 @@ struct Termios {
     c_oflag: u32,
     c_cflag: u32,
     c_lflag: u32,
+    c_line: u8,
     c_cc: [u8; NCCS],
     c_ispeed: u32,
     c_ospeed: u32,
@@ -80,13 +106,14 @@ impl Termios {
         c_oflag: 0,
         c_cflag: 0,
         c_lflag: 0,
+        c_line: 0,
         c_cc: [0; NCCS],
         c_ispeed: 0,
         c_ospeed: 0,
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Termios>() == 44);
+const _: () = assert!(core::mem::size_of::<Termios>() == 60);
 const _: () = assert!(core::mem::align_of::<Termios>() == 4);
 
 #[repr(C)]
@@ -297,12 +324,13 @@ fn make_raw(fd: c_int) -> bool {
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
         return false;
     }
-    // IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON, OPOST, and ECHO|ECHONL|ICANON|ISIG|IEXTEN.
+    // IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON, OPOST, and
+    // ECHO|ECHONL|ICANON|ISIG|IEXTEN (the public `<bits/termios.h>` values).
     termios.c_iflag &= !(0x1 | 0x2 | 0x8 | 0x20 | 0x40 | 0x80 | 0x100 | 0x200);
-    termios.c_oflag &= !0x1;
-    termios.c_lflag &= !(0x8 | 0x10 | 0x100 | 0x80 | 0x8000);
-    termios.c_cflag &= !(0x300 | 0x1000);
-    termios.c_cflag |= 0x300;
+    termios.c_oflag &= !OPOST;
+    termios.c_lflag &= !(ECHO | 0x100 | ICANON | ISIG | IEXTEN);
+    termios.c_cflag &= !(CSIZE | PARENB);
+    termios.c_cflag |= CS8;
     termios.c_cc[VMIN] = 1;
     termios.c_cc[VTIME] = 0;
     unsafe { tcsetattr(fd, TCSANOW, &termios) == 0 }
@@ -360,10 +388,10 @@ fn row_termios(mutation: bool) {
         return;
     }
     let mut want = original;
-    want.c_iflag = 0x100 | 0x200;
-    want.c_oflag = 0x1 | 0x2;
-    want.c_lflag = 0x80 | 0x100 | 0x8 | 0x2 | 0x4;
-    want.c_cflag = (original.c_cflag & !(0x300 | 0x1000)) | 0x300 | 0x800 | 0x8000;
+    want.c_iflag = ICRNL | IXON;
+    want.c_oflag = OPOST | ONLCR;
+    want.c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK | IEXTEN;
+    want.c_cflag = (original.c_cflag & !(CSIZE | PARENB)) | CS8 | CREAD | CLOCAL;
     want.c_cc[VINTR] = 3;
     want.c_cc[VQUIT] = 28;
     want.c_cc[VERASE] = 127;
@@ -372,8 +400,8 @@ fn row_termios(mutation: bool) {
     want.c_cc[VMIN] = 1;
     want.c_cc[VTIME] = 0;
     unsafe {
-        cfsetispeed(&mut want, 9600);
-        cfsetospeed(&mut want, 9600);
+        cfsetispeed(&mut want, B9600);
+        cfsetospeed(&mut want, B9600);
     }
     if unsafe { tcsetattr(pair.slave, TCSANOW, &want) } != 0 {
         let error = errno();
@@ -414,7 +442,7 @@ fn row_termios(mutation: bool) {
     }
     if mutation {
         let mut wrong = want;
-        wrong.c_lflag ^= 0x8;
+        wrong.c_lflag ^= ECHO;
         let detected = cmp_termios(&wrong, &back).is_some();
         pair.close();
         if detected {
@@ -632,9 +660,9 @@ fn setup_isig(fd: c_int) -> c_int {
     if unsafe { tcgetattr(fd, &mut termios) } != 0 {
         return -1;
     }
-    termios.c_lflag |= 0x80;
-    termios.c_lflag &= !0x100;
-    termios.c_lflag &= !0x8;
+    termios.c_lflag |= ISIG;
+    termios.c_lflag &= !ICANON;
+    termios.c_lflag &= !ECHO;
     termios.c_cc[VINTR] = 3;
     termios.c_cc[VMIN] = 1;
     termios.c_cc[VTIME] = 0;
@@ -885,6 +913,115 @@ fn row_isig(enabled: bool) {
     }
 }
 
+/// `tcsetattr` with every control character cleared, `index` set to `^C`, and the raw-mode
+/// `VMIN`/`VTIME` indexes from the Rust target libc set to 1/0.
+fn setup_target_intr(fd: c_int, index: usize) -> c_int {
+    let mut termios = Termios::ZERO;
+    if unsafe { tcgetattr(fd, &mut termios) } != 0 {
+        return -1;
+    }
+    termios.c_lflag |= ISIG;
+    termios.c_lflag &= !ICANON;
+    termios.c_lflag &= !ECHO;
+    termios.c_cc = [0; NCCS];
+    termios.c_cc[index] = 3;
+    termios.c_cc[TARGET_VMIN] = 1;
+    termios.c_cc[TARGET_VTIME] = 0;
+    unsafe { tcsetattr(fd, TCSANOW, &termios) }
+}
+
+fn target_intr(fd: c_int) -> c_int {
+    setup_target_intr(fd, TARGET_VINTR)
+}
+
+fn old_default_intr(fd: c_int) -> c_int {
+    setup_target_intr(fd, VINTR)
+}
+
+/// The exact raw-mode assertion for the target-libc `VMIN`/`VTIME` indexes.
+fn target_raw_mode(fd: c_int) -> bool {
+    let mut termios = Termios::ZERO;
+    if unsafe { tcgetattr(fd, &mut termios) } != 0 {
+        return false;
+    }
+    termios.c_lflag &= !ICANON;
+    termios.c_lflag &= !ECHO;
+    termios.c_cc = [0; NCCS];
+    termios.c_cc[TARGET_VMIN] = 1;
+    termios.c_cc[TARGET_VTIME] = 0;
+    if unsafe { tcsetattr(fd, TCSANOW, &termios) } != 0 {
+        return false;
+    }
+    let mut back = Termios::ZERO;
+    if unsafe { tcgetattr(fd, &mut back) } != 0 {
+        return false;
+    }
+    back.c_cc[TARGET_VMIN] == 1 && back.c_cc[TARGET_VTIME] == 0
+}
+
+fn signal_exchange(pair: &Pair, setup: fn(c_int) -> c_int) -> Option<c_int> {
+    let signals = run_signal_child(pair, setup, SIGINT)?;
+    wait_ready(signals.ready);
+    let intr = 3u8;
+    let written = unsafe { write(pair.master, (&intr as *const u8).cast::<c_void>(), 1) };
+    let received = collect_signal(signals.result);
+    let mut status = 0;
+    unsafe {
+        waitpid(signals.child, &mut status, 0);
+        close(signals.ready);
+        close(signals.result);
+    }
+    if written == 1 { Some(received) } else { None }
+}
+
+/// Real-pty regression for the Rust target libc `c_cc` indexes.
+///
+/// The public tty interprets `c_cc[VINTR]`; a program built against the target libc writes the
+/// byte at `TARGET_VINTR`. The two indexes must be the same, and the raw-mode `VMIN`/`VTIME`
+/// indexes must agree too. The default `^C` at the public index must not stand in for the
+/// target's byte: index `VINTR` is cleared before the target index is set, so a mismatch is a
+/// real failure rather than the inherited default.
+fn row_target_vintr() {
+    let pair = match Pair::open() {
+        Some(pair) => pair,
+        None => {
+            fail("target-vintr", format_args!("open pair errno={}", errno()));
+            return;
+        }
+    };
+    let raw = target_raw_mode(pair.slave);
+    let target = signal_exchange(&pair, target_intr);
+    let old = if TARGET_VINTR == VINTR {
+        None
+    } else {
+        signal_exchange(&pair, old_default_intr)
+    };
+    pair.close();
+    let Some(target_signal) = target else {
+        fail("target-vintr", format_args!("target write errno={}", errno()));
+        return;
+    };
+    let old_ok = match old {
+        None => true,
+        Some(signal) => signal == 0,
+    };
+    if raw && target_signal == SIGINT && old_ok {
+        pass(
+            "target-vintr",
+            format_args!(
+                "target VINTR={TARGET_VINTR} delivered SIGINT; public VINTR={VINTR} did not; target VMIN={TARGET_VMIN} VTIME={TARGET_VTIME} raw"
+            ),
+        );
+    } else {
+        fail(
+            "target-vintr",
+            format_args!(
+                "raw={raw} target VINTR={TARGET_VINTR} signal={target_signal} public VINTR={VINTR} old_signal={old:?} (want SIGINT at the target index only)"
+            ),
+        );
+    }
+}
+
 fn slice_bytes<T>(pointer: *const T, count: usize) -> &'static [T] {
     // SAFETY: the caller keeps the pointed-to storage alive for the process lifetime.
     unsafe { &*slice_from_raw_parts(pointer, count) }
@@ -912,6 +1049,7 @@ extern "C" fn run(argc: c_int, argv: *const *const c_char) -> c_int {
     row_pair();
     row_ctty();
     row_eio();
+    row_target_vintr();
     if run_signals {
         row_sigwinch();
         row_sighup();
