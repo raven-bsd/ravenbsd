@@ -104,6 +104,39 @@ fn mptcp_socket_opens_immediately_without_bare_open() {
 }
 
 #[test]
+fn mptcp_bind_reaches_the_server_and_listen_reports_the_assigned_port() {
+    let net = net_without_unix(Caps::default());
+    let fd = net
+        .socket(AF_INET, SOCK_STREAM, crate::mptcp::IPPROTO_MPTCP)
+        .expect("mptcp socket");
+    let requested = addr([127, 0, 0, 1], 0);
+    net.bind(fd, &requested).expect("bind port 0");
+    let calls = logs(&net);
+    assert!(
+        calls.contains(&WireLog::Call(Call::Bind(Endpoint {
+            ip: [127, 0, 0, 1],
+            port: 0
+        }))),
+        "bind on the bare-opened MPTCP handle must reach netd: {calls:?}"
+    );
+    let mut out = [0u8; 16];
+    assert_eq!(net.getsockname(fd, &mut out), Ok(16));
+    let assigned = crate::parse_sockaddr(&out).expect("parse").port();
+    assert_ne!(assigned, 0, "the server must assign the ephemeral port");
+    net.listen(fd, 1).expect("listen on the assigned port");
+    let calls = logs(&net);
+    let bind_at = calls
+        .iter()
+        .position(|entry| matches!(entry, WireLog::Call(Call::Bind(_))))
+        .expect("bind call on the wire");
+    let listen_at = calls
+        .iter()
+        .position(|entry| matches!(entry, WireLog::Call(Call::Listen { .. })))
+        .expect("listen call on the wire");
+    assert!(bind_at < listen_at, "bind must precede listen: {calls:?}");
+}
+
+#[test]
 fn mptcp_datagram_protocol_is_eprotonosupport() {
     let net = net_without_unix(Caps::default());
     assert_eq!(
