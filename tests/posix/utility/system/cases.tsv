@@ -3,18 +3,22 @@
 #
 # P4d/P4o system/process utility matrix. Fields: row, tool, command, defect.
 # An empty defect is a POSIX profile row exercised by the posix-util-system qtest.
-# A non-empty defect is a known missing or non-conforming implementation; it is
-# reported as DEFECT and is never claimed present.
-util.id	id	id
-util.ps	ps	ps -e
-util.uname	uname	uname -a
-util.env	env	env
-util.getconf	getconf	getconf ARG_MAX
+# A non-empty defect is a known missing, non-conforming or evidence-blocked row;
+# it is reported as DEFECT and is never claimed present.
+#
+# P4eb: the qtest is red on master because rsh refuses the console's documented
+# EAGAIN retry contract (userland/bin/rsh/src/main.rs read_line), so no guest
+# step runs. Owner: otto/P4a or kevin/K26h. This is not a defect in the tools.
+util.id	id	id	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.ps	ps	ps -e	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.uname	uname	uname -a	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.env	env	env	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.getconf	getconf	getconf ARG_MAX	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
 util.tty	tty	tty
 util.stty	stty	stty -a
-util.kill	kill	kill -l
-util.nice	nice	nice -n 5 true
-util.nohup	nohup	nohup true
-util.mesg	mesg	mesg
-util.logger	logger	logger -t p4u hello
-util.renice	renice	renice -n 5 -p 1
+util.kill	kill	kill -l	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.nice	nice	nice -n 5 true	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.nohup	nohup	nohup true	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.mesg	mesg	mesg	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.logger	logger	logger -t p4u hello	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
+util.renice	renice	renice -n 5 -p 1	qtest posix-util-system red: rsh exits on console EAGAIN after K570 (42685f630); owner otto/P4a or kevin/K26h
