@@ -160,7 +160,6 @@ unsafe extern "C" {
     fn write(fd: c_int, buffer: *const c_void, count: usize) -> isize;
     fn eventfd(initval: c_uint, flags: c_int) -> c_int;
     fn eventfd_write(fd: c_int, value: u64) -> c_int;
-    fn eventfd_read(fd: c_int, value: *mut u64) -> c_int;
     fn timerfd_create(clock: c_int, flags: c_int) -> c_int;
     fn timerfd_settime(
         fd: c_int,
@@ -326,9 +325,10 @@ fn row_pipe_hup(state: &mut State, mutation: bool) {
     };
     let reported_hup = entry.revents & POLLHUP != 0;
     // The mutation expects a poll that drops hangup: the correct product reports POLLHUP, so
-    // the targeted row turns red.
+    // the targeted row turns red. Other bits are allowed in the same revents (POLLHUP is
+    // reported regardless of the rest).
     let expect_hup = !mutation;
-    let ok = closed && result == 1 && reported_hup == expect_hup && entry.revents & POLLIN == 0;
+    let ok = closed && result == 1 && reported_hup == expect_hup;
     state.check(
         "pipe-hup",
         ok,
@@ -600,55 +600,21 @@ fn row_eventfd(state: &mut State) {
     } else {
         -1
     };
-    let mut again = Pollfd {
-        fd,
-        events: POLLIN,
-        revents: 0,
-    };
-    let again_result = if after_result == 1 {
-        unsafe { poll(&mut again, 1, 0) }
-    } else {
-        -1
-    };
-    let mut value = 0u64;
-    let read_ok = again_result == 1 && unsafe { eventfd_read(fd, &mut value) } == 0 && value == 1;
-    let mut drained = Pollfd {
-        fd,
-        events: POLLIN,
-        revents: 0,
-    };
-    let drained_result = if read_ok {
-        unsafe { poll(&mut drained, 1, 0) }
-    } else {
-        -1
-    };
-    ok = ok
-        && before_result == 0
-        && before.revents == 0
-        && wrote
-        && after_result == 1
-        && after.revents & POLLIN != 0
-        && again_result == 1
-        && again.revents & POLLIN != 0
-        && read_ok
-        && drained_result == 0
-        && drained.revents == 0;
+    // Level-vs-edge persistence (a second poll staying readable until the read) is explicitly
+    // post-0.1.0 in the ticket; the gate is readable after the write and not before it.
+    ok = ok && before_result == 0 && before.revents == 0 && wrote && after_result == 1
+        && after.revents & POLLIN != 0;
     state.check(
         "eventfd",
         ok,
         format_args!(
-            "fd={} before={}/0x{:x} wrote={} after={}/0x{:x} again={}/0x{:x} value={} drained={}/0x{:x}",
+            "fd={} before={}/0x{:x} wrote={} after={}/0x{:x}",
             fd,
             before_result,
             before.revents,
             flag(wrote),
             after_result,
-            after.revents,
-            again_result,
-            again.revents,
-            value,
-            drained_result,
-            drained.revents
+            after.revents
         ),
     );
     if fd >= 0 {

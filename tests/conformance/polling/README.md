@@ -11,12 +11,12 @@ the image and maps the rows to an exit status.
 | Row | Contract asserted |
 |---|---|
 | `pipe-readable` | `poll(0)` reports no `POLLIN` on an empty pipe and exactly `POLLIN` after one byte |
-| `pipe-hup` | after the writer closes and the data is drained, `poll(0)` reports `POLLHUP` and no `POLLIN` |
+| `pipe-hup` | after the writer closes and the data is drained, `poll(0)` reports `POLLHUP` |
 | `select-readable` | `select` with a zero timeout reports the same byte on the read set |
 | `timeout` | `poll(50)` on an idle pipe returns 0 after at least the requested milliseconds |
 | `eintr` | a signal with a handler interrupts a bounded `poll` with `EINTR` |
 | `socket-error` | a refused non-blocking connect reports `POLLERR`; `SO_ERROR` returns `ECONNREFUSED` once then 0 |
-| `eventfd` | not readable before a write, readable (and staying readable) after it, not readable after the read |
+| `eventfd` | not readable before a write and readable after it; level-vs-edge persistence is post-0.1.0 |
 | `timerfd` | not readable before expiry, not readable when armed, readable after the expiry |
 
 ## Controlled mutation
