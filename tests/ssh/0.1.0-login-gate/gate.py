@@ -210,25 +210,37 @@ def build_addon(arch: str, evidence: Path) -> None:
         )
 
 
-def run_image_build(arch: str, image: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [
-            "cargo",
-            "xtask",
-            "image",
-            "--arch",
-            arch,
-            "--profile",
-            "release",
-            "--output",
-            str(image.relative_to(ROOT)),
-        ],
+def run_image_build(arch: str, image: Path, log_path: Path) -> tuple[int, str]:
+    argv = [
+        "cargo",
+        "xtask",
+        "image",
+        "--arch",
+        arch,
+        "--profile",
+        "release",
+        "--output",
+        str(image.relative_to(ROOT)),
+    ]
+    proc = subprocess.Popen(
+        argv,
         cwd=ROOT,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
-        timeout=IMAGE_TIMEOUT,
-        check=False,
     )
+    try:
+        output, _ = proc.communicate(timeout=IMAGE_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        output, _ = proc.communicate()
+        write_text(log_path, output)
+        raise GateFailure(
+            IMAGE,
+            f"release image build exceeded {IMAGE_TIMEOUT}s; see {log_path}",
+        )
+    write_text(log_path, output)
+    return proc.returncode or 0, output
 
 
 def build_image(arch: str, evidence: Path) -> Path:
@@ -237,21 +249,18 @@ def build_image(arch: str, evidence: Path) -> Path:
     if not addon.is_file():
         build_addon(arch, evidence)
     log(f"building release image {image.relative_to(ROOT)}")
+    log(f"image build RUSTUP_HOME={os.environ.get('RUSTUP_HOME', '<unset>')}")
     log_path = evidence / f"image-build-{arch}.log"
-    result = run_image_build(arch, image)
-    stale = result.returncode != 0 and (
-        "stale addon binary" in result.stdout or "stale addon binary" in result.stderr
-    )
+    code, output = run_image_build(arch, image, log_path)
+    stale = code != 0 and "stale addon binary" in output
     if stale:
         log("staged OpenSSH binaries are stale; rebuilding the add-on once")
-        write_text(log_path, result.stdout + result.stderr)
         build_addon(arch, evidence)
-        result = run_image_build(arch, image)
-    write_text(log_path, result.stdout + result.stderr)
-    if result.returncode != 0:
+        code, output = run_image_build(arch, image, log_path)
+    if code != 0:
         raise GateFailure(
             IMAGE,
-            f"release image build failed with exit {result.returncode}; see {log_path}",
+            f"release image build failed with exit {code}; see {log_path}",
         )
     return image
 
