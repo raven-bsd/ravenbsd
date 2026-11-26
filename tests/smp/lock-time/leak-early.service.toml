@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Early frame-window probe: vfsd is settled, but start before resolvd so resolver startup falls
+# inside the exit-90/exit-91 window. This is the negative control for the settled case.
+
+name = "smp-lock-time-leak"
+exec = "/bin/smp-lock-time"
+args = ["/bin/smp-lock-time", "leak"]
+needs = ["scheme:file"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false
