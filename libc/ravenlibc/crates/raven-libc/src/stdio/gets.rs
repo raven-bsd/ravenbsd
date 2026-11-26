@@ -53,10 +53,14 @@ pub unsafe extern "C" fn renameat2(
     flags: u32,
 ) -> c_int {
     if flags != 0 {
-        return crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno(38)));
+        return crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno::from_generated(
+            raven_libc_abi::errno::ENOSYS,
+        )));
     }
     if oldpath.is_null() || newpath.is_null() {
-        return crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno(22)));
+        return crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno::from_generated(
+            raven_libc_abi::errno::EINVAL,
+        )));
     }
     // SAFETY: both paths are NUL-terminated.
     let old = unsafe { crate::ffi::cstr::slice(oldpath) };

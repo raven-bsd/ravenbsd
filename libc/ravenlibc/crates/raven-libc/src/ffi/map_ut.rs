@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::ffi::errno;
+use raven_libc_abi::errno::Errno;
 
 #[test]
 fn ok_leaves_errno_alone() {
@@ -27,7 +28,10 @@ fn range_is_erange() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     apply(IntStatus::Range);
-    assert_eq!(errno::get(), 34);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::ERANGE).0)
+    );
 }
 
 #[test]
@@ -35,5 +39,8 @@ fn invalid_base_is_einval() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     apply(IntStatus::InvalidBase);
-    assert_eq!(errno::get(), 22);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::EINVAL).0)
+    );
 }

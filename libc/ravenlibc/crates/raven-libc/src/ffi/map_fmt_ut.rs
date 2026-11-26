@@ -11,7 +11,10 @@ fn invalid_is_einval() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     assert_eq!(apply(FmtErr::Invalid), -1);
-    assert_eq!(errno::get(), 22);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::EINVAL).0)
+    );
 }
 
 #[test]
@@ -19,7 +22,10 @@ fn no_mem_is_enomem() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     assert_eq!(apply(FmtErr::NoMem), -1);
-    assert_eq!(errno::get(), 12);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::ENOMEM).0)
+    );
 }
 
 #[test]
@@ -27,7 +33,10 @@ fn overflow_is_eoverflow() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     assert_eq!(apply(FmtErr::Overflow), -1);
-    assert_eq!(errno::get(), 75);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::EOVERFLOW).0)
+    );
 }
 
 #[test]
@@ -35,7 +44,10 @@ fn encoding_is_eilseq() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     assert_eq!(apply(FmtErr::Encoding), -1);
-    assert_eq!(errno::get(), 84);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::EILSEQ).0)
+    );
 }
 
 #[test]
@@ -51,7 +63,10 @@ fn pct_n_abort_is_einval_at_the_shell_boundary() {
     let _guard = crate::ffi::TestLock::acquire();
     errno::set_raw(0);
     assert_eq!(apply(FmtErr::PctNAbort), -1);
-    assert_eq!(errno::get(), 22);
+    assert_eq!(
+        errno::get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::EINVAL).0)
+    );
 }
 
 #[test]

@@ -11,7 +11,7 @@ fn set_and_get_round_trip() {
     let _guard = TestLock::acquire();
     set_raw(7);
     assert_eq!(get(), 7);
-    set(Errno(34));
+    set(Errno::from_generated(raven_libc_abi::errno::ERANGE));
     assert_eq!(get(), 34);
 }
 
@@ -28,7 +28,10 @@ fn the_pointer_reaches_the_same_cell() {
 fn platform_errors_store_their_number() {
     let _guard = crate::ffi::TestLock::acquire();
     set_platform(raven_libc_platform::Errno::ENOSYS);
-    assert_eq!(get(), 38);
+    assert_eq!(
+        get(),
+        i32::from(Errno::from_generated(raven_libc_abi::errno::ENOSYS).0)
+    );
 }
 
 #[test]

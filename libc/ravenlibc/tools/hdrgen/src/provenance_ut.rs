@@ -104,11 +104,16 @@ fn import_entries_cover_every_derived_file() {
         .iter()
         .filter(|entry| entry.upstream == "musl")
         .collect();
+    let freebsd: Vec<&ImportEntry> = entries
+        .iter()
+        .filter(|entry| entry.upstream == "freebsd")
+        .collect();
     let linux: Vec<&ImportEntry> = entries
         .iter()
         .filter(|entry| entry.upstream == "linux-raw-sys")
         .collect();
-    assert_eq!(musl.len(), 42);
+    assert_eq!(musl.len(), 39);
+    assert_eq!(freebsd.len(), 3);
     assert_eq!(linux.len(), 3);
     assert!(entries.windows(2).all(|pair| pair[0].path < pair[1].path));
     for entry in &musl {
@@ -121,6 +126,13 @@ fn import_entries_cover_every_derived_file() {
                 .notes
                 .contains("checkout 7813e9119eb5fe681b6750b8a033a0490bca0941")
         );
+    }
+    for entry in &freebsd {
+        assert_eq!(entry.license, "BSD-3-Clause");
+        assert_eq!(entry.tier, "A");
+        assert_eq!(entry.upstream_rev, lock.freebsd);
+        assert_eq!(entry.upstream_path, "sys/sys/errno.h");
+        assert!(entry.notes.contains("reviewed freebsd source"));
     }
     for entry in &linux {
         assert_eq!(entry.upstream_path.split('/').count(), 3);
