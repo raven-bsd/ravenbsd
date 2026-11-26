@@ -5,7 +5,11 @@
 // the received descriptor usable after the sender closes and with the rights mask honored,
 // SO_PEERCRED exact pid/uid/gid, MSG_CMSG_CLOEXEC closing on exec, FIFO blocking open and
 // non-blocking behavior, and socketpair message boundaries for SOCK_SEQPACKET vs SOCK_STREAM.
-// It changes no product code.
+//
+// The N05 rows from the ticket's 2026-11-24 re-evaluation drive the raw duplex ABI (0x110) as the
+// unprivileged caller the probe runs as: an unprivileged caller must not run the global cycle
+// collector, repeated triggers must stay bounded, and a concurrent collection must never discard a
+// reachable queued handle. It changes no product code.
 
 #include <errno.h>
 #include <fcntl.h>
@@ -19,17 +23,60 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef MSG_CMSG_CLOEXEC
 #define MSG_CMSG_CLOEXEC 0x40000000
 #endif
 
+// Raw duplex ABI used by the N05 collector rows. The numbers are kernel-owned
+// (kernel/src/syscall/duplex.rs) and stay out of raven-abi until the reviewer promotes them.
+#define RAVEN_HANDLE_CLOSE 0x50
+#define RAVEN_DUPLEX_PAIR 0x110
+#define RAVEN_DUPLEX_SENDMSG 0x112
+#define RAVEN_DUPLEX_RECVMSG 0x113
+#define RAVEN_DUPLEX_DIAGNOSTIC 0x80000000u
+#define RAVEN_DUPLEX_COLLECT 0x40000000u
+#define RAVEN_DUPLEX_NONBLOCK 04000
+#define RAVEN_SOL_SOCKET 1u
+#define RAVEN_SCM_RIGHTS 1u
+#define RAVEN_CONTROL_BYTES 20u
+
 struct ucred_local {
     pid_t pid;
     uid_t uid;
     gid_t gid;
 };
+
+struct duplex_stats {
+    uint64_t pairs;
+    uint64_t ends;
+    uint64_t pending;
+    uint64_t controls;
+};
+
+struct duplex_message {
+    uint64_t data;
+    uint64_t data_len;
+    uint64_t control;
+    uint64_t control_len;
+    uint32_t flags;
+    uint32_t handle_count;
+};
+
+struct duplex_control {
+    uint32_t len;
+    uint32_t level;
+    uint32_t type;
+    uint32_t count;
+    uint32_t handles[1];
+};
+
+_Static_assert(sizeof(struct duplex_stats) == 32, "DuplexStats must stay 32 bytes");
+_Static_assert(sizeof(struct duplex_message) == 40, "DuplexMessage must stay 40 bytes");
+_Static_assert(sizeof(struct duplex_control) == RAVEN_CONTROL_BYTES,
+               "one SCM_RIGHTS handle header must stay 20 bytes");
 
 static int failures;
 
@@ -46,6 +93,99 @@ static void fail_row(const char *name, const char *what, int error) {
     char detail[192];
     snprintf(detail, sizeof detail, "%s errno=%d", what, error);
     row(name, 0, detail);
+}
+
+// Raw two-argument call: number in rax, arguments in rdi/rsi, result in rax; a negative result in
+// -errno range is the kernel's error return (raven-abi Errno::from_ret).
+static long raven_call(long number, long arg0, long arg1) {
+    long result;
+    __asm__ volatile("syscall"
+                     : "=a"(result)
+                     : "a"(number), "D"(arg0), "S"(arg1)
+                     : "rcx", "r11", "memory");
+    return result;
+}
+
+static int raven_errno(long result) {
+    return result < 0 && result >= -4095 ? (int)-result : 0;
+}
+
+static int raw_pair(uint32_t flags, uint32_t handles[2]) {
+    long result = raven_call(RAVEN_DUPLEX_PAIR, (long)handles, (long)flags);
+    if (result < 0) {
+        errno = raven_errno(result);
+        return -1;
+    }
+    return 0;
+}
+
+// Run one diagnostic query; `collect` also runs one collector pass.
+static int raw_collect(int collect, struct duplex_stats *stats) {
+    uint32_t flags = RAVEN_DUPLEX_DIAGNOSTIC | (collect ? RAVEN_DUPLEX_COLLECT : 0u);
+    memset(stats, 0, sizeof *stats);
+    long result = raven_call(RAVEN_DUPLEX_PAIR, (long)stats, (long)flags);
+    if (result < 0) {
+        errno = raven_errno(result);
+        return -1;
+    }
+    return 0;
+}
+
+static int raw_close(uint32_t handle) {
+    long result = raven_call(RAVEN_HANDLE_CLOSE, (long)handle, 0);
+    if (result < 0) {
+        errno = raven_errno(result);
+        return -1;
+    }
+    return 0;
+}
+
+static int raw_send_handle(uint32_t end, uint32_t handle, char byte) {
+    struct duplex_control control;
+    struct duplex_message message;
+    memset(&control, 0, sizeof control);
+    memset(&message, 0, sizeof message);
+    control.len = RAVEN_CONTROL_BYTES;
+    control.level = RAVEN_SOL_SOCKET;
+    control.type = RAVEN_SCM_RIGHTS;
+    control.count = 1;
+    control.handles[0] = handle;
+    message.data = (uint64_t)(uintptr_t)&byte;
+    message.data_len = 1;
+    message.control = (uint64_t)(uintptr_t)&control;
+    message.control_len = RAVEN_CONTROL_BYTES;
+    long result = raven_call(RAVEN_DUPLEX_SENDMSG, (long)end, (long)&message);
+    if (result < 0) {
+        errno = raven_errno(result);
+        return -1;
+    }
+    return (int)result;
+}
+
+// Receive one byte and its single SCM_RIGHTS handle. Returns bytes or -1; got_handle is 1 only
+// when the kernel installed exactly one handle.
+static int raw_recv_handle(uint32_t end, char *byte, uint32_t *handle, int *got_handle) {
+    struct duplex_control control;
+    struct duplex_message message;
+    memset(&control, 0, sizeof control);
+    memset(&message, 0, sizeof message);
+    *got_handle = 0;
+    message.data = (uint64_t)(uintptr_t)byte;
+    message.data_len = 1;
+    message.control = (uint64_t)(uintptr_t)&control;
+    message.control_len = RAVEN_CONTROL_BYTES;
+    long result = raven_call(RAVEN_DUPLEX_RECVMSG, (long)end, (long)&message);
+    if (result < 0) {
+        errno = raven_errno(result);
+        return -1;
+    }
+    if (message.handle_count == 1 && control.len == RAVEN_CONTROL_BYTES &&
+        control.level == RAVEN_SOL_SOCKET && control.type == RAVEN_SCM_RIGHTS &&
+        control.count == 1) {
+        *handle = control.handles[0];
+        *got_handle = 1;
+    }
+    return (int)result;
 }
 
 static int send_fd(int sock, int fd) {
@@ -357,6 +497,193 @@ static void test_stream(void) {
     close(sv[1]);
 }
 
+// N05 authorisation: the probe runs as the unprivileged ssh user (uid 1000). Collection is a
+// kernel-owned operation in the donor model (FreeBSD schedules unp_gc on taskqueue_thread); a
+// caller without authority must not be able to run the global pass. The row holds a live endpoint
+// so an authorised pass cannot be mistaken for a safe no-op; any refusal satisfies the row and the
+// detail records the exact errno the product returned.
+static void test_collector_auth(void) {
+    uint32_t pair[2];
+    struct duplex_stats stats;
+    char detail[192];
+    if (raw_pair(0, pair) < 0) {
+        fail_row("collector-auth", "raw duplex_pair failed", errno);
+        return;
+    }
+    errno = 0;
+    int result = raw_collect(1, &stats);
+    int call_errno = errno;
+    int denied = result < 0;
+    snprintf(detail, sizeof detail, "uid=%u collect=%d errno=%d pairs=%llu", (unsigned)getuid(),
+             result, call_errno, (unsigned long long)stats.pairs);
+    row("collector-auth", denied, detail);
+    raw_close(pair[0]);
+    raw_close(pair[1]);
+}
+
+// N05 bounded cost: repeated user-issued triggers must not grow without bound. 32 live pairs stay
+// reachable for the whole run, so every pass scans a non-empty registry; the row asserts the
+// counters still cover those pairs and the 100 calls stay inside one second. A product that
+// refuses the unprivileged trigger trivially has no user-issued cost and passes.
+static void test_collector_bounded(void) {
+    enum { PAIRS = 32, CALLS = 100 };
+    uint32_t live[PAIRS][2];
+    struct duplex_stats stats;
+    struct timespec start;
+    struct timespec end;
+    char detail[224];
+    int created = 0;
+    while (created < PAIRS) {
+        if (raw_pair(0, live[created]) < 0) {
+            break;
+        }
+        created++;
+    }
+    if (created != PAIRS) {
+        fail_row("collector-bounded", "raw duplex_pair failed", errno);
+        for (int index = 0; index < created; index++) {
+            raw_close(live[index][0]);
+            raw_close(live[index][1]);
+        }
+        return;
+    }
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0) {
+        fail_row("collector-bounded", "clock_gettime failed", errno);
+        for (int index = 0; index < PAIRS; index++) {
+            raw_close(live[index][0]);
+            raw_close(live[index][1]);
+        }
+        return;
+    }
+    int calls = 0;
+    int denied = 0;
+    int call_errno = 0;
+    while (calls < CALLS) {
+        if (raw_collect(1, &stats) < 0) {
+            denied = 1;
+            call_errno = errno;
+            break;
+        }
+        calls++;
+    }
+    if (clock_gettime(CLOCK_MONOTONIC, &end) != 0) {
+        fail_row("collector-bounded", "clock_gettime failed", errno);
+        for (int index = 0; index < PAIRS; index++) {
+            raw_close(live[index][0]);
+            raw_close(live[index][1]);
+        }
+        return;
+    }
+    long long elapsed_ms = (long long)(end.tv_sec - start.tv_sec) * 1000 +
+                           (long long)(end.tv_nsec - start.tv_nsec) / 1000000;
+    int retained = denied || stats.pairs >= (uint64_t)created;
+    int ok = denied || (calls == CALLS && retained && elapsed_ms < 1000);
+    snprintf(detail, sizeof detail,
+             "uid=%u pairs=%d calls=%d elapsed_ms=%lld retained=%d denied=%d errno=%d",
+             (unsigned)getuid(), created, calls, elapsed_ms, retained, denied, call_errno);
+    row("collector-bounded", ok, detail);
+    for (int index = 0; index < PAIRS; index++) {
+        raw_close(live[index][0]);
+        raw_close(live[index][1]);
+    }
+}
+
+// N05 concurrent collection: one child churns reachable handle transfers (pair, send its own
+// endpoint, receive it back, close) while the parent runs collector passes. After the child exits,
+// a reachable queued handle must still be delivered: the collector's mark/sweep is not an atomic
+// snapshot, so a pass that clears the live receiver's queue is the defect this row measures.
+static void test_collector_concurrent(void) {
+    enum { CHURN = 64 };
+    char detail[256];
+    pid_t child = fork();
+    if (child == 0) {
+        for (int index = 0; index < CHURN; index++) {
+            uint32_t pair[2];
+            uint32_t handle = 0;
+            int got_handle = 0;
+            char byte = 'C';
+            char received = 0;
+            if (raw_pair(RAVEN_DUPLEX_NONBLOCK, pair) < 0) {
+                _exit(2);
+            }
+            if (raw_send_handle(pair[0], pair[0], byte) != 1) {
+                _exit(3);
+            }
+            if (raw_recv_handle(pair[1], &received, &handle, &got_handle) != 1 ||
+                received != 'C' || !got_handle) {
+                _exit(4);
+            }
+            raw_close(handle);
+            raw_close(pair[0]);
+            raw_close(pair[1]);
+        }
+        _exit(0);
+    }
+    if (child < 0) {
+        fail_row("collector-concurrent", "fork failed", errno);
+        return;
+    }
+    int calls = 0;
+    int denied = 0;
+    int call_errno = 0;
+    int reaped = 0;
+    int status = 0;
+    while (!reaped) {
+        struct duplex_stats stats;
+        if (!denied && raw_collect(1, &stats) < 0) {
+            denied = 1;
+            call_errno = errno;
+        } else if (!denied) {
+            calls++;
+        }
+        pid_t waited = waitpid(child, &status, WNOHANG);
+        if (waited == child) {
+            reaped = 1;
+        } else if (waited < 0 && errno != EINTR) {
+            break;
+        }
+        if (denied) {
+            if (waitpid(child, &status, 0) == child) {
+                reaped = 1;
+            }
+            break;
+        }
+    }
+    uint32_t pair[2];
+    if (raw_pair(RAVEN_DUPLEX_NONBLOCK, pair) < 0) {
+        fail_row("collector-concurrent", "raw duplex_pair failed", errno);
+        return;
+    }
+    char byte = 'S';
+    if (raw_send_handle(pair[0], pair[0], byte) != 1) {
+        fail_row("collector-concurrent", "raw duplex_sendmsg failed", errno);
+        raw_close(pair[0]);
+        raw_close(pair[1]);
+        return;
+    }
+    struct duplex_stats stats;
+    int collect_denied = raw_collect(1, &stats) < 0;
+    int collect_errno = errno;
+    uint32_t handle = 0;
+    int got_handle = 0;
+    char received = 0;
+    int received_bytes = raw_recv_handle(pair[1], &received, &handle, &got_handle);
+    int retained = received_bytes == 1 && received == 'S' && got_handle;
+    int child_ok = reaped && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    int ok = child_ok && retained;
+    snprintf(detail, sizeof detail,
+             "child=%d collect_calls=%d denied=%d errno=%d collect_denied=%d collect_errno=%d "
+             "recv=%d retained=%d",
+             status, calls, denied, call_errno, collect_denied, collect_errno, received_bytes,
+             retained);
+    row("collector-concurrent", ok, detail);
+    if (got_handle) {
+        raw_close(handle);
+    }
+    raw_close(pair[0]);
+    raw_close(pair[1]);
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "--all";
     if (strcmp(mode, "--check-fd") == 0) {
@@ -374,6 +701,9 @@ int main(int argc, char **argv) {
     test_fifo();
     test_seqpacket();
     test_stream();
+    test_collector_auth();
+    test_collector_bounded();
+    test_collector_concurrent();
     printf("S180-IPC done failures=%d\n", failures);
     fflush(stdout);
     return failures == 0 ? 0 : 1;

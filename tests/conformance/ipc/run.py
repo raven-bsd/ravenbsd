@@ -4,8 +4,11 @@
 """S180 IPC conformance runner (test-only).
 
 Builds /bin/ipc-conformance, installs it in a release image, boots the image, and runs the probe
-over `ssh`: the normal `--all` run must PASS every row, and the `--mutation-rights` run must
+over `ssh`: the normal `--all` run must PASS every gate row, and the `--mutation-rights` run must
 turn the SCM_RIGHTS rights row red. The mutation is test-only; no product code changes.
+
+The probe also carries the N05 collector rows (authorisation, bounded cost, concurrent collection)
+from the 2026-11-24 re-evaluation note in the S180 ticket.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path("/media/bo/Rustworx/work/ravenbsd-minions/phil/ravenbsd")
+ROOT = Path(__file__).resolve().parents[3]
 IMAGE = Path(os.environ.get("S180_IPC_IMAGE", ROOT / "build/qtest/s180-ipc.img"))
 OUT = Path(os.environ.get("S180_IPC_OUT", "/tmp/opencode/s180-ipc"))
 OVMF_CODE = Path("/usr/share/OVMF/OVMF_CODE_4M.fd")
@@ -165,7 +168,17 @@ def main() -> int:
         (OUT / "normal.stderr").write_text(normal_err, encoding="utf-8")
         print(normal, end="", flush=True)
         normal_rows = rows(normal)
-        for name in ("rights", "credentials", "cloexec", "fifo", "seqpacket", "stream"):
+        for name in (
+            "rights",
+            "credentials",
+            "cloexec",
+            "fifo",
+            "seqpacket",
+            "stream",
+            "collector-auth",
+            "collector-bounded",
+            "collector-concurrent",
+        ):
             if normal_rows.get(name) != "PASS":
                 failures.append(f"normal:{name}={normal_rows.get(name)}")
         if "S180-IPC done failures=" not in normal:
