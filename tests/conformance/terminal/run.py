@@ -147,7 +147,7 @@ def normal_failures(text: str) -> list[str]:
 
 def build_image(arch: str, image: Path, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    step(out, "fixture-build", ["sh", "tests/conformance/terminal/build.sh"], 240)
+    step(out, "fixture-build", ["sh", "tests/conformance/terminal/build.sh", arch], 240)
     shutil.rmtree(ROOT / f"build/cargo/uutils-{arch}", ignore_errors=True)
     step(out, "initfs-build",
          ["cargo", "xtask", "initfs", "--arch", arch, "--profile", "release"], 600)

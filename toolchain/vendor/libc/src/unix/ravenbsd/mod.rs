@@ -2058,7 +2058,6 @@ pub const TCGETS2: c_ulong = 0x802c542a;
 pub const TCSETS2: c_ulong = 0x402c542b;
 pub const TCSETSW2: c_ulong = 0x402c542c;
 pub const TCSETSF2: c_ulong = 0x402c542d;
-pub const FIONCLEX: c_ulong = 0x5450;
 pub const UIO_MAXIOV: usize = 1024;
 pub const BOTHER: crate::speed_t = 0o010_000;
 pub const IBSHIFT: crate::tcflag_t = 16;
