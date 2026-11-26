@@ -113,7 +113,7 @@ mod program {
         /// error unchanged.
         fn read(self, tty: Handle, buffer: &mut [u8]) -> Result<usize, Errno> {
             let handle = self.handle(tty)?;
-            read_console_waiting(
+            crate::read_console_waiting(
                 self.is_console(),
                 Errno::EAGAIN,
                 |buffer| Client::new().read(handle, 0, buffer),
