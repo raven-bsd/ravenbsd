@@ -1,5 +1,0 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-# mutation<TAB>row<TAB>requirement
-old-stat-layout	stat-layout	S733-R01
-old-dirent-layout	dirent-bytes	S733-R01

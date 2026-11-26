@@ -1,4 +1,0 @@
-suffix-dropped	symlink-suffix	S732-R01
-length-255-only	long-path	S732-R01
-component-limit-ignored	component-255	S732-R01
-chroot-not-applied	chroot-confinement	S732-R01
