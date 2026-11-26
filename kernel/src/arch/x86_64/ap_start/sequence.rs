@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! The x86_64 per-AP INIT-SIPI-SIPI protocol.
+//!
+//! The sequence is pure data so the host test under `tests/fixtures/smp-ap` can prove the exact
+//! ICR writes and settle delays; [`super::start_ap`] performs them.
+
+/// INIT IPI with level assert and level trigger set.
+pub(crate) const INIT_ASSERT: u32 = (0b101 << 8) | (1 << 14) | (1 << 15);
+/// INIT IPI with level deassert and level trigger set.
+pub(crate) const INIT_DEASSERT: u32 = (0b101 << 8) | (1 << 15);
+
+/// One ICR write and the delay that follows it in a per-AP sequence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct StartStep {
+    /// ICR low value delivered to the target APIC.
+    pub icr: u32,
+    /// Delay after the write, in nanoseconds.
+    pub delay_ns: u64,
+}
+
+/// How long the boot processor waits for one AP to publish `online`.
+pub(crate) const AP_START_WAIT_NS: u64 = 200_000_000;
+
+/// SIPI ICR value for a real-mode startup vector.
+pub(crate) fn sipi(vector: u8) -> u32 {
+    (0b110 << 8) | (vector as u32) | (1 << 14) | (1 << 15)
+}
+
+/// The sequence currently sent to one AP.
+pub(crate) fn start_sequence(vector: u8) -> [StartStep; 3] {
+    [
+        StartStep {
+            icr: INIT_ASSERT,
+            delay_ns: 10_000_000,
+        },
+        StartStep {
+            icr: INIT_DEASSERT,
+            delay_ns: 200_000,
+        },
+        StartStep {
+            icr: sipi(vector),
+            delay_ns: 0,
+        },
+    ]
+}

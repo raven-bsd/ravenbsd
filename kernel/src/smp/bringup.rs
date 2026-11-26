@@ -20,6 +20,9 @@ use super::{MAX_CPUS, set_online};
 
 static STARTED: AtomicBool = AtomicBool::new(false);
 
+/// How many INIT-SIPI-SIPI sequences are sent to one AP.
+pub(crate) const AP_START_ATTEMPTS: u32 = 3;
+
 /// Bring up every enabled MADT CPU except the boot processor.
 pub fn platform_init() {
     if STARTED.swap(true, Ordering::AcqRel) {
@@ -86,9 +89,9 @@ pub fn platform_init() {
         }
         let mut started = false;
         let mut attempt = 0u32;
-        while attempt < 3 && !started {
+        while attempt < AP_START_ATTEMPTS && !started {
             ap_start::start_ap(apic_id);
-            let deadline = time::now_ns().saturating_add(200_000_000);
+            let deadline = time::now_ns().saturating_add(ap_start::AP_START_WAIT_NS);
             while ap_start::block(cpu).online.load(Ordering::Acquire) == 0 {
                 if time::now_ns() > deadline {
                     break;
