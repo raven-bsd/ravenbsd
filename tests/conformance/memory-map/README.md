@@ -74,8 +74,8 @@ the next 1440-byte allocation panics.
 The counters answer different questions. `procs` is the live `Process` value count, while
 `class3072_in_use` is the allocator block count: a dead `Weak` entry that keeps a `Process`
 `ArcInner` alive raises `class3072_in_use` without raising `procs`. `heap_used` includes `Vec`
-capacity, cached slabs and every other kernel allocation, and `frames_alloc`/`pt_frames` count
-page frames and page-table (PTE) metadata respectively, so those use large measured bounds.
+capacity, cached slabs and every other kernel allocation, `frames_alloc` counts page frames with a
+large bound, and `pt_frames` counts page-table (PTE) metadata with a small measured bound.
 
 ## Donor map
 

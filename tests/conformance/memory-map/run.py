@@ -90,6 +90,9 @@ SIBLING_SSH_TIMEOUT = 20
 # iteration must cross these tolerances.
 CLASS1536_TOLERANCE = 32
 CLASS3072_TOLERANCE = 16
+# Measured 100-iteration page-table growth is one frame; the tolerance still catches one leaked
+# PTE frame per iteration.
+PT_FRAME_TOLERANCE = 8
 # The size-class allocator caches freed slabs and never returns them to the arena, so heap_used
 # and frames_alloc settle above the pre-loop value by roughly the peak slab set, not by the live
 # objects. The class in_use counters are the exact leak measure; these two bounds only reject a
@@ -204,6 +207,8 @@ def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) 
         failures.append(f"churn: heap_used {h0}->{h1} above {HEAP_TOLERANCE}")
     if f1 > f0 + FRAME_TOLERANCE:
         failures.append(f"churn: frames_alloc {f0}->{f1} above {FRAME_TOLERANCE}")
+    if q1 > q0 + PT_FRAME_TOLERANCE:
+        failures.append(f"churn: pt_frames {q0}->{q1} above {PT_FRAME_TOLERANCE}")
     if p1 > p0 + PROC_TOLERANCE:
         failures.append(f"churn: procs {p0}->{p1} above {PROC_TOLERANCE}")
     if t1 > t0 + THREAD_TOLERANCE:
@@ -245,7 +250,12 @@ def selftest() -> int:
         print("memory-map: selftest FAIL: flat footprint reported as a leak", file=sys.stderr)
         return 1
     leaked = dict(
-        base, class1536_in_use="504", class3072_in_use="250", heap_used="2700000", procs="509"
+        base,
+        class1536_in_use="504",
+        class3072_in_use="250",
+        heap_used="2700000",
+        pt_frames="400",
+        procs="509",
     )
     detected = check_footprint(base, leaked, CHURN_MIN_ITERATIONS)
     if not any("class1536_in_use" in failure for failure in detected):
@@ -253,6 +263,9 @@ def selftest() -> int:
         return 1
     if not any("class3072_in_use" in failure for failure in detected):
         print("memory-map: selftest FAIL: class3072 leak not detected", file=sys.stderr)
+        return 1
+    if not any("pt_frames" in failure for failure in detected):
+        print("memory-map: selftest FAIL: page-table leak not detected", file=sys.stderr)
         return 1
     if not any("procs" in failure for failure in detected):
         print("memory-map: selftest FAIL: process leak not detected", file=sys.stderr)
