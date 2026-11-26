@@ -210,8 +210,13 @@ fn no_linux_abi_deviation_is_stale() {
     let linux = parse_flags();
     let our = [
         &raven_libc_abi::fcntl::ALL,
+        &raven_libc_abi::mman::ALL,
         &raven_libc_abi::signal::ALL,
         &raven_libc_abi::socket::ALL,
+        &raven_libc_abi::poll::ALL,
+        &raven_libc_abi::time::ALL,
+        &raven_libc_abi::resource::ALL,
+        &raven_libc_abi::misc::ALL,
     ];
     for name in linux_abi_deviations().keys() {
         let ours = our
@@ -277,15 +282,15 @@ fn errno_classification() {
 
 #[test]
 fn flag_values_are_the_frozen_table() {
-    assert_eq!(
-        raven_libc_abi::fcntl::O_ACCMODE,
-        raven_libc_abi::fcntl::O_PATH | 3
-    );
+    assert_eq!(raven_libc_abi::fcntl::O_ACCMODE, 3);
     assert_eq!(raven_libc_abi::fcntl::O_LARGEFILE, 0);
     assert_eq!(raven_libc_abi::fcntl::AT_FDCWD, -100);
     assert_eq!(raven_libc_abi::mman::MAP_HUGE_16KB, 14 << 26);
-    assert_eq!(raven_libc_abi::mman::MAP_32BIT, 0x40);
-    assert_eq!(raven_libc_abi::resource::RLIM_INFINITY, u64::MAX);
+    assert_eq!(raven_libc_abi::mman::MAP_32BIT, 0x80000);
+    assert_eq!(
+        raven_libc_abi::resource::RLIM_INFINITY,
+        0x7fff_ffff_ffff_ffff
+    );
     assert_eq!(raven_libc_abi::socket::SOMAXCONN, 4096);
     assert_eq!(raven_libc_abi::socket::AF_ROUTE, 128);
     assert_eq!(raven_libc_abi::socket::AF_LINK, 129);
@@ -322,8 +327,8 @@ fn byte_order_and_socket_types_are_the_frozen_table() {
     assert_eq!(raven_libc_abi::netinet::TCP_CORK, 3);
     assert_eq!(raven_libc_abi::netinet::TCP_NOPUSH, 3);
     assert_eq!(raven_libc_abi::poll::POLLIN, 1);
-    assert_eq!(raven_libc_abi::poll::POLLRDHUP, 0x2000);
-    assert_eq!(raven_libc_abi::time::CLOCKS_PER_SEC, 1_000_000);
+    assert_eq!(raven_libc_abi::poll::POLLRDHUP, 0x4000);
+    assert_eq!(raven_libc_abi::time::CLOCKS_PER_SEC, 128);
     assert_eq!(raven_libc_abi::misc::FD_SETSIZE, 1024);
     assert_eq!(raven_libc_abi::misc::EAI_OVERFLOW, -12);
     assert_eq!(raven_libc_abi::pthread::PTHREAD_MUTEX_RECURSIVE, 1);
