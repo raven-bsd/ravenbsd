@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K571 no-brush acceptance: the public libc sigaction installs a handler, raise delivers through
+# the kernel frame/sigcode, the handler reads the interrupted rip/rsp from ucontext, and execution
+# returns exactly. No shell and no libc user entry.
+
+name = "k571-signal"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/libc/signals/build-k571-signal.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^K571: handler ok sig=10$'
+
+[[expect]]
+regex = '^K571: ucontext ok rip=0x[0-9a-f]+ rsp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^K571: return ok$'
+
+[[expect]]
+regex = '^K571: PASS$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|K571: fail|AccessError'

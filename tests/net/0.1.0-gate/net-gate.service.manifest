@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S85n test-only service: wait for the release netd `net:` scheme, verify the
+# static virtio-net eth0 interface, listen on the guest NIC address and echo the
+# host payload back. The probe exits 0 after the exact byte round trip.
+name = "net-gate"
+exec = "/sbin/net-gate"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

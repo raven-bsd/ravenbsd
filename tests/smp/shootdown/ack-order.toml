@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S209: the TLB wait re-reads ACKED/LAST after the diagnostic deadline. The boot flag arms a
+# one-shot target ack delay and a bounded shooter stall between the acknowledgement test and the
+# deadline check, so the sequence is already covered when the deadline branch runs. A completed
+# shootdown must not log a timeout or an ack-delay diagnostic.
+name = "smp-shootdown-ack-order"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/shootdown/build.sh"]
+initfs = "build/smp/shootdown/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s209-tlb-ack-order=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^smp: tlb shootdown ack-order stall cpu=\d+ seq=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s209-shootdown: ok rounds=\d+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp: tlb shootdown timeout|smp: tlb shootdown ack delay'

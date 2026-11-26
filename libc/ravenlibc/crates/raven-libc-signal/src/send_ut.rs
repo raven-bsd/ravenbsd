@@ -59,8 +59,9 @@ fn raise_while_masked_leaves_it_pending() {
         None,
     )
     .unwrap();
-    let point = kernel.safe_point(&table, None, None);
-    assert!(point.terminated.is_none());
+    kernel
+        .direct(&table, crate::kernel::KICK_CHECK, None)
+        .unwrap();
     assert_eq!(RAISE_COUNT.load(Ordering::SeqCst), 1);
 }
 

@@ -3,7 +3,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # Build the signal acceptance fixtures and stage them as one-shot svcd services over the arch's
-# release initfs. Test-only; no product source is changed.
+# shell initfs. Test-only; no product source is changed.
 #
 # RAVEN_QT_ARCH selects x86_64 (default) or aarch64. Each architecture gets its own output
 # directory. The boundary image runs the Rust public-libc sigaction/sigprocmask rows without the
@@ -49,6 +49,36 @@ for file in crt1.o crti.o crtn.o libc.a; do
         exit 1
     }
 done
+
+# S710b item 6: the installed public `struct sigaction` must match the Rust fixture's local
+# assertions for this architecture (152 bytes; handler 0, mask 8, flags 136, restorer 144).
+# The probe is generated into the build tree at run time and compiled against the freshly
+# packed sysroot, so no C source is committed to the scaffold (the S721 abi-profile probe
+# generates its fixture the same way).
+layout_cc=${CC:-clang}
+if command -v "$layout_cc" >/dev/null 2>&1; then
+    cat > "$out/layout_check.c" <<'EOF'
+/* SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+ */
+#include <signal.h>
+#include <stddef.h>
+
+_Static_assert(sizeof(struct sigaction) == 152, "public struct sigaction size");
+_Static_assert(offsetof(struct sigaction, __sa_handler) == 0, "public handler offset");
+_Static_assert(offsetof(struct sigaction, sa_mask) == 8, "public mask offset");
+_Static_assert(offsetof(struct sigaction, sa_flags) == 136, "public flags offset");
+_Static_assert(offsetof(struct sigaction, sa_restorer) == 144, "public restorer offset");
+EOF
+    "$layout_cc" --target="$c_target" --sysroot="$sysroot" -std=gnu11 -fsyntax-only \
+        -D__ravenbsd__=1 -D__unix__=1 -D__BSD_VISIBLE=1 $fp_flags \
+        "$out/layout_check.c" || {
+            echo "signals: installed public sigaction layout mismatch for $arch" >&2
+            exit 1
+        }
+else
+    echo "signals: $layout_cc not found; installed public layout check skipped" >&2
+fi
 
 # Public-libc boundary rows: Rust extern "C" calls linked against the freshly packed archive,
 # in the tests/libc/std-link pattern. Guard pages, canaries and the flags/mask readback stay in
@@ -123,7 +153,9 @@ if [ "$arch" = x86_64 ]; then
 fi
 
 base=$root/build/$arch/initfs.img
-[ -f "$base" ] || cargo xtask initfs --arch "$arch" --profile release
+# The acceptance rows need svcd and the base services only; the `shell` profile stages those and
+# avoids the `release` profile's ssh add-on, whose binaries a clean tree has not built yet.
+[ -f "$base" ] || cargo xtask initfs --arch "$arch" --profile shell
 cargo build -q -p raven-b70-overlay
 overlay=${CARGO_TARGET_DIR:-$root/target}/debug/raven-b70-overlay
 

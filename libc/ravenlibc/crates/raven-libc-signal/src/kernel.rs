@@ -3,10 +3,10 @@
 
 //! The kernel seam [`SigKernel`] and the production `SysKernel`.
 //!
-//! The kernel only kicks (PG-7): it never reads a mask or a disposition. Every missing primitive
-//! is represented by a capability flag and a documented fallback; `SysKernel` forwards to
-//! `raven-libc-sys` where a wrapper exists and returns `ENOSYS` otherwise. No syscall number is
-//! invented here: the PG-7 `SIG_SETUP`/`SIGRETURN`/kick values are the `raven-abi` contract.
+//! The kernel owns signal dispositions, masks, pending state and the caught-signal frame. Every
+//! missing primitive is represented by a capability flag and a documented fallback; `SysKernel`
+//! forwards to `raven-libc-sys` where a wrapper exists and returns `ENOSYS` otherwise. No syscall
+//! number is invented here: the kick and provider values are the `raven-abi` contract.
 
 pub use raven_abi::signal::{KICK_CANCEL, KICK_CHECK, KICK_KNOWN, KICK_SYNCCALL, KICK_TIMER};
 use raven_libc_abi::errno::Errno;
@@ -67,12 +67,8 @@ pub struct FaultRecord {
 /// What the kernel can do today.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SigCaps {
-    /// PG-7 `SIG_SETUP`, `THREAD_KICK`, `SIGRETURN` and the entry stack.
-    pub entry: bool,
     /// PG-7 `THREAD_KICK`.
     pub kick: bool,
-    /// PG-7 `SIGRETURN` (0x82).
-    pub sigreturn: bool,
     /// PG-7 optional `SIGRESEND` (0x84).
     pub resend: bool,
     /// PG-8 `-EINTR` and the sticky kick word.
@@ -92,13 +88,11 @@ pub struct SigCaps {
 impl SigCaps {
     /// The production capability set.
     ///
-    /// On the Raven target the committed PG-7 `SIG_SETUP`/`THREAD_KICK`/`SIGRETURN` entry and
-    /// the PG-8 interruptible wait exist; `SIGRESEND`, stop and FP-in-frame do not. Host unit
-    /// tests keep every kernel bit false because there is no Raven kernel behind them.
+    /// On the Raven target `THREAD_KICK` and the PG-8 interruptible wait exist; `SIGRESEND`,
+    /// stop and FP-in-frame do not. Host unit tests keep every kernel bit false because there is
+    /// no Raven kernel behind them.
     pub const PRODUCTION: Self = Self {
-        entry: cfg!(target_os = "none"),
         kick: cfg!(target_os = "none"),
-        sigreturn: cfg!(target_os = "none"),
         resend: false,
         eintr: cfg!(target_os = "none"),
         proc_kill: cfg!(target_os = "none"),
@@ -109,9 +103,7 @@ impl SigCaps {
 
     /// Every capability available (host fake only).
     pub const HOST: Self = Self {
-        entry: true,
         kick: true,
-        sigreturn: true,
         resend: true,
         eintr: true,
         proc_kill: true,
@@ -139,12 +131,8 @@ pub trait SigKernel: Sync {
     fn yield_now(&self);
     /// Monotonic nanoseconds.
     fn now_ns(&self) -> u64;
-    /// PG-7 `SIG_SETUP`.
-    fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno>;
     /// PG-7 `THREAD_KICK`.
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno>;
-    /// PG-7 `SIGRETURN`; never returns.
-    fn sigreturn(&self) -> !;
     /// PG-7 optional `SIGRESEND`.
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno>;
     /// PG-44 procd `kill`/`killpg`/`sigqueue`.
@@ -236,20 +224,12 @@ impl SigKernel for SysKernel {
         }
     }
 
-    fn sig_setup(&self, entry: usize, ctx_area_offset: usize, flags: u32) -> Result<(), Errno> {
-        raw::sig_setup(entry, ctx_area_offset, flags)
-    }
-
     fn kick(&self, handle: u32, bits: u32) -> Result<(), Errno> {
         // `Pthread.handle == 0` means the calling thread (the main thread never takes a kernel
         // object handle). THREAD_KICK spells that `Handle::NONE` (`u32::MAX`); passing 0 would
         // ask for the process handle and fail with `EBADF` (K443).
         let handle = if handle == 0 { u32::MAX } else { handle };
         raw::kick(handle, bits)
-    }
-
-    fn sigreturn(&self) -> ! {
-        raw::sigreturn()
     }
 
     fn resend(&self, sig: i32, info: &SiginfoT, mask: u64) -> Result<(), Errno> {

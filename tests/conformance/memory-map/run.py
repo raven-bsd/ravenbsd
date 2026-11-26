@@ -79,6 +79,10 @@ GATE_ROWS = [
 ]
 
 KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
+SIBLING_ROW_RE = re.compile(
+    r"^mmap: sibling-exit pid=(\d+) user=(\d+) kernel=(\d+) ok=([01])$", re.MULTILINE
+)
+SIBLING_SSH_TIMEOUT = 20
 
 # S198 churn tolerances. A 1440-byte allocation is served from the 1536-byte class (the K434
 # panic), and the measured fork-child Process block (2488 bytes) is served from the 3072-byte
@@ -86,6 +90,9 @@ KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 # iteration must cross these tolerances.
 CLASS1536_TOLERANCE = 32
 CLASS3072_TOLERANCE = 16
+# Measured 100-iteration page-table growth is one frame; the tolerance still catches one leaked
+# PTE frame per iteration.
+PT_FRAME_TOLERANCE = 8
 # The size-class allocator caches freed slabs and never returns them to the arena, so heap_used
 # and frames_alloc settle above the pre-loop value by roughly the peak slab set, not by the live
 # objects. The class in_use counters are the exact leak measure; these two bounds only reject a
@@ -170,6 +177,7 @@ def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) 
         "class3072_in_use",
         "heap_used",
         "frames_alloc",
+        "pt_frames",
         "procs",
         "threads",
     )
@@ -182,11 +190,13 @@ def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) 
     f0, f1 = int(base["frames_alloc"]), int(end["frames_alloc"])
     p0, p1 = int(base["procs"]), int(end["procs"])
     t0, t1 = int(base["threads"]), int(end["threads"])
+    q0, q1 = int(base["pt_frames"]), int(end["pt_frames"])
     print(
         "memory-map: footprint class1536={c15_0}->{c15_1} class3072={c30_0}->{c30_1} "
-        "heap={h0}->{h1} frames={f0}->{f1} procs={p0}->{p1} threads={t0}->{t1}".format(
+        "heap={h0}->{h1} frames={f0}->{f1} pt_frames={q0}->{q1} "
+        "procs={p0}->{p1} threads={t0}->{t1}".format(
             c15_0=c15_0, c15_1=c15_1, c30_0=c30_0, c30_1=c30_1,
-            h0=h0, h1=h1, f0=f0, f1=f1, p0=p0, p1=p1, t0=t0, t1=t1,
+            h0=h0, h1=h1, f0=f0, f1=f1, q0=q0, q1=q1, p0=p0, p1=p1, t0=t0, t1=t1,
         )
     )
     if c15_1 > c15_0 + CLASS1536_TOLERANCE:
@@ -197,6 +207,8 @@ def check_footprint(base: dict[str, str], end: dict[str, str], iterations: int) 
         failures.append(f"churn: heap_used {h0}->{h1} above {HEAP_TOLERANCE}")
     if f1 > f0 + FRAME_TOLERANCE:
         failures.append(f"churn: frames_alloc {f0}->{f1} above {FRAME_TOLERANCE}")
+    if q1 > q0 + PT_FRAME_TOLERANCE:
+        failures.append(f"churn: pt_frames {q0}->{q1} above {PT_FRAME_TOLERANCE}")
     if p1 > p0 + PROC_TOLERANCE:
         failures.append(f"churn: procs {p0}->{p1} above {PROC_TOLERANCE}")
     if t1 > t0 + THREAD_TOLERANCE:
@@ -229,6 +241,7 @@ def selftest() -> int:
         "class3072_in_use": "7",
         "heap_used": "1000000",
         "frames_alloc": "2000000",
+        "pt_frames": "20",
         "procs": "9",
         "threads": "40",
     }
@@ -237,7 +250,12 @@ def selftest() -> int:
         print("memory-map: selftest FAIL: flat footprint reported as a leak", file=sys.stderr)
         return 1
     leaked = dict(
-        base, class1536_in_use="504", class3072_in_use="250", heap_used="2700000", procs="509"
+        base,
+        class1536_in_use="504",
+        class3072_in_use="250",
+        heap_used="2700000",
+        pt_frames="400",
+        procs="509",
     )
     detected = check_footprint(base, leaked, CHURN_MIN_ITERATIONS)
     if not any("class1536_in_use" in failure for failure in detected):
@@ -245,6 +263,9 @@ def selftest() -> int:
         return 1
     if not any("class3072_in_use" in failure for failure in detected):
         print("memory-map: selftest FAIL: class3072 leak not detected", file=sys.stderr)
+        return 1
+    if not any("pt_frames" in failure for failure in detected):
+        print("memory-map: selftest FAIL: page-table leak not detected", file=sys.stderr)
         return 1
     if not any("procs" in failure for failure in detected):
         print("memory-map: selftest FAIL: process leak not detected", file=sys.stderr)
@@ -354,6 +375,72 @@ def stop(child: subprocess.Popen) -> None:
             pass
 
 
+def run_sibling(image: Path, accel: str, smp: int) -> int:
+    """S715: exit while a sibling runs user memory work and an interruptible kernel wait."""
+    if not image.is_file():
+        print(f"memory-map: image {image} is missing", file=sys.stderr)
+        return 2
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    run_dir = ROOT / "build" / "conformance" / "memory-map" / f"run-sibling-{stamp}"
+    child, serial, port = boot(run_dir, image, accel, smp)
+    try:
+        try:
+            code, stdout, stderr = ssh(port, f"{PROBE} --sibling-exit", SIBLING_SSH_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            print(
+                "memory-map: FAIL: sibling-exit command did not return within "
+                f"{SIBLING_SSH_TIMEOUT}s (terminal cleanup deadlock)"
+            )
+            print(f"memory-map: run={run_dir}")
+            return 1
+        probe_text = stdout.decode("utf-8", "replace")
+        (run_dir / "probe.out").write_text(probe_text, encoding="utf-8")
+        (run_dir / "probe.err").write_text(stderr.decode("utf-8", "replace"), encoding="utf-8")
+        serial_text = serial.read_text(encoding="utf-8", errors="replace")
+        failures: list[str] = []
+        if code != 0:
+            failures.append(f"sibling-exit: ssh exit {code}")
+        match = SIBLING_ROW_RE.search(probe_text)
+        if match is None:
+            failures.append("sibling-exit: row missing")
+        else:
+            pid, user, kernel, ok = (
+                match.group(1), int(match.group(2)), int(match.group(3)), match.group(4)
+            )
+            if ok != "1":
+                failures.append(f"sibling-exit: ok={ok} expected 1")
+            if user == 0:
+                failures.append("sibling-exit: user worker never ran")
+            if kernel == 0:
+                failures.append("sibling-exit: kernel worker never ran")
+            if f"s194: quiesce enter pid={pid}" not in serial_text:
+                failures.append(f"sibling-exit: quiesce path not entered for pid={pid}")
+            if f"s194: quiesce clear pid={pid} waited=" not in serial_text:
+                failures.append(f"sibling-exit: quiesce path did not clear for pid={pid}")
+            if f"s194: last-exit pid={pid} code=0" not in serial_text:
+                failures.append(f"sibling-exit: no clean terminal exit for pid={pid}")
+            if f"process: fault-regs pid={pid}" in serial_text:
+                failures.append(f"sibling-exit: pid={pid} faulted after exit")
+            if f"process: child pid={pid} " in serial_text:
+                failures.append(f"sibling-exit: pid={pid} killed after exit")
+        for line in ("KERNEL PANIC", "EXCEPTION"):
+            if line in serial_text:
+                failures.append(f"serial: {line}")
+        if failures:
+            for failure in failures:
+                print(f"memory-map: FAIL: {failure}")
+            print(f"memory-map: run={run_dir}")
+            return 1
+        print(
+            f"memory-map: PASS sibling-exit pid={match.group(1)} "
+            f"user={match.group(2)} kernel={match.group(3)}"
+        )
+        print(f"memory-map: run={run_dir}")
+        return 0
+    finally:
+        stop(child)
+
+
 def run(
     image: Path, accel: str, mutation: bool, keep: bool, iterations: int, smp: int
 ) -> int:
@@ -369,7 +456,15 @@ def run(
         # first sample can lag the sshd-up marker; wait for it rather than comparing with nothing.
         base, base_graphs = wait_metrics(
             serial,
-            ("class1536_in_use", "class3072_in_use", "heap_used", "frames_alloc", "procs", "threads"),
+            (
+                "class1536_in_use",
+                "class3072_in_use",
+                "heap_used",
+                "frames_alloc",
+                "pt_frames",
+                "procs",
+                "threads",
+            ),
             1,
             20,
         )
@@ -390,7 +485,15 @@ def run(
         # children are reflected, then take the last sample as the post-loop footprint.
         end, _ = wait_metrics(
             serial,
-            ("class1536_in_use", "class3072_in_use", "heap_used", "frames_alloc", "procs", "threads"),
+            (
+                "class1536_in_use",
+                "class3072_in_use",
+                "heap_used",
+                "frames_alloc",
+                "pt_frames",
+                "procs",
+                "threads",
+            ),
             base_graphs + 4,
             20,
         )
@@ -465,6 +568,7 @@ def main() -> int:
     parser.add_argument("--image", type=Path)
     parser.add_argument("--accel", choices=("tcg", "kvm"), default="tcg")
     parser.add_argument("--mutation", action="store_true")
+    parser.add_argument("--sibling-exit", action="store_true")
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--smp", type=int, default=4)
@@ -474,6 +578,8 @@ def main() -> int:
         return selftest()
     if args.image is None:
         parser.error("--image is required")
+    if args.sibling_exit:
+        return run_sibling(args.image, args.accel, args.smp)
     return run(args.image, args.accel, args.mutation, args.keep, args.iterations, args.smp)
 
 

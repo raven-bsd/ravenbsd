@@ -358,3 +358,58 @@ fn a_stored_readiness_mask_is_not_a_poll_verdict() {
     assert_eq!(poll(&platform, &mut fds, 1), Ok(0));
     assert_eq!(fds[0].revents, 0);
 }
+
+#[test]
+fn zero_timeout_reports_current_readiness() {
+    let fake = FakeSys::new();
+    fake.tty(b"/dev/tty");
+    let platform = Platform::new(fake);
+    let fd = platform
+        .open(b"/dev/tty", fcntl::O_RDWR as u32, 0)
+        .expect("open");
+    let handle = platform.get(fd).expect("ref").handle();
+    platform.backend().ready(handle, 1);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 0), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+}
+
+#[test]
+fn eventfd_signaled_level_is_readable() {
+    let platform = Platform::new(FakeSys::new());
+    let fd = platform
+        .install(Handle(7), OfdKind::EventFd, 2, None, false)
+        .expect("install");
+    let ofd = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(ofd, Handle(9)).expect("event");
+    platform.backend().ready(Handle(9), EV_SIGNALED);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 0), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+}
+
+#[test]
+fn timerfd_signaled_level_is_readable() {
+    let platform = Platform::new(FakeSys::new());
+    let fd = platform
+        .install(Handle(7), OfdKind::Timer, 2, None, false)
+        .expect("install");
+    let ofd = platform.get(fd).expect("fd").index();
+    platform.set_ofd_event(ofd, Handle(9)).expect("event");
+    platform.backend().ready(Handle(9), EV_SIGNALED);
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
+    assert_eq!(fds[0].revents as i32, POLLIN);
+}
