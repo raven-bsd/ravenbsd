@@ -52,6 +52,14 @@ pub enum PendingCall {
 pub trait SysBackend {
     /// Open a scheme path with wire open flags.
     fn open(&self, path: &[u8], wire_flags: u32) -> Result<Handle, Errno>;
+    /// Open a scheme path with wire open flags and the requested creation mode.
+    ///
+    /// The kernel records the mode and the caller's mask so the serving filesystem applies them
+    /// at inode creation. A backend without creation support may still implement this by
+    /// forwarding the mode; the platform never repairs permissions after the open.
+    fn open_mode(&self, path: &[u8], wire_flags: u32, mode: u32) -> Result<Handle, Errno>;
+    /// Swap the process file-creation mask and return the previous value.
+    fn umask(&self, mask: u32) -> Result<u32, Errno>;
     /// Read from a handle.
     fn read(&self, handle: Handle, buf: &mut [u8]) -> Result<usize, Errno>;
     /// Write to a handle.
@@ -170,7 +178,15 @@ pub struct RealSys;
 
 impl SysBackend for RealSys {
     fn open(&self, path: &[u8], wire_flags: u32) -> Result<Handle, Errno> {
-        raven_libc_sys::sys::open(path, wire_flags)
+        raven_libc_sys::sys::open(path, wire_flags, 0)
+    }
+
+    fn open_mode(&self, path: &[u8], wire_flags: u32, mode: u32) -> Result<Handle, Errno> {
+        raven_libc_sys::sys::open(path, wire_flags, mode)
+    }
+
+    fn umask(&self, mask: u32) -> Result<u32, Errno> {
+        raven_libc_sys::sys::umask(mask)
     }
 
     fn read(&self, handle: Handle, buf: &mut [u8]) -> Result<usize, Errno> {
@@ -358,6 +374,8 @@ struct FakeWorld {
     record_lock_error: Option<Errno>,
     /// Handle returned for the caller's controlling terminal (`/dev/tty`), if any.
     ctty_handle: Option<Handle>,
+    /// File-creation mask of the fake process (kernel state in the real system).
+    umask: u32,
 }
 
 /// Deterministic in-memory backend for host tests.
@@ -406,6 +424,7 @@ impl FakeSys {
                 },
                 record_lock_error: None,
                 ctty_handle: None,
+                umask: 0o022,
             }),
         }
     }
@@ -664,6 +683,10 @@ fn open_kind(wire_flags: u32) -> (bool, bool) {
 
 impl SysBackend for FakeSys {
     fn open(&self, path: &[u8], wire_flags: u32) -> Result<Handle, Errno> {
+        self.open_mode(path, wire_flags, 0o666)
+    }
+
+    fn open_mode(&self, path: &[u8], wire_flags: u32, mode: u32) -> Result<Handle, Errno> {
         self.take_fault(Fault::Open)?;
         self.record(0x4F50_454E);
         let mut world = self.world.borrow_mut();
@@ -679,7 +702,8 @@ impl SysBackend for FakeSys {
             None if create => {
                 let node = FakeNode {
                     data: Vec::new(),
-                    mode: 0o100_666,
+                    mode: 0o100_000
+                        | (raven_abi::types::umask::open_create_mode(mode, world.umask) & 0o7777),
                     kind: OfdKind::File,
                     target: None,
                     legacy_tty: false,
@@ -725,6 +749,13 @@ impl SysBackend for FakeSys {
         );
         world.handles.insert(handle, file);
         Ok(Handle(handle))
+    }
+
+    fn umask(&self, mask: u32) -> Result<u32, Errno> {
+        let mut world = self.world.borrow_mut();
+        let previous = world.umask;
+        world.umask = mask & raven_abi::types::umask::ALLPERMS;
+        Ok(previous)
     }
 
     fn read(&self, handle: Handle, buf: &mut [u8]) -> Result<usize, Errno> {
@@ -991,11 +1022,12 @@ impl SysBackend for FakeSys {
             },
             raven_proto_fs::Call::Mkdir { mode, path } => {
                 let full = key(path);
+                let mode = (mode & 0o7777) & !world.umask;
                 world.nodes.insert(
                     full,
                     FakeNode {
                         data: Vec::new(),
-                        mode: raven_libc_abi::stat::S_IFDIR | (mode & 0o7777),
+                        mode: raven_libc_abi::stat::S_IFDIR | mode,
                         kind: OfdKind::Dir,
                         target: None,
                         legacy_tty: false,

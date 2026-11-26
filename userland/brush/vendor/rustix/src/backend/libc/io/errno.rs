@@ -47,6 +47,7 @@ impl Errno {
     /// `EADV`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -72,6 +73,7 @@ impl Errno {
     /// `EBADE`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -88,6 +90,7 @@ impl Errno {
     /// `EBADFD`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -105,6 +108,7 @@ impl Errno {
     /// `EBADR`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -122,6 +126,7 @@ impl Errno {
     /// `EBADRQC`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -136,6 +141,7 @@ impl Errno {
     /// `EBADSLT`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -150,6 +156,7 @@ impl Errno {
     /// `EBFONT`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -176,6 +183,7 @@ impl Errno {
     /// `ECHRNG`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -189,6 +197,7 @@ impl Errno {
     /// `ECOMM`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -212,6 +221,7 @@ impl Errno {
     /// `EDEADLOCK`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "android",
@@ -238,6 +248,7 @@ impl Errno {
     /// `EDOTDOT`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -272,6 +283,7 @@ impl Errno {
     /// `EHWPOISON`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -324,6 +336,7 @@ impl Errno {
     /// `EISNAM`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -341,6 +354,7 @@ impl Errno {
     /// `EKEYEXPIRED`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -358,6 +372,7 @@ impl Errno {
     /// `EKEYREJECTED`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -375,6 +390,7 @@ impl Errno {
     /// `EKEYREVOKED`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -392,6 +408,7 @@ impl Errno {
     /// `EL2HLT`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -405,6 +422,7 @@ impl Errno {
     /// `EL2NSYNC`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -418,6 +436,7 @@ impl Errno {
     /// `EL3HLT`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -431,6 +450,7 @@ impl Errno {
     /// `EL3RST`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -444,6 +464,7 @@ impl Errno {
     /// `ELIBACC`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -458,6 +479,7 @@ impl Errno {
     /// `ELIBBAD`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -472,6 +494,7 @@ impl Errno {
     /// `ELIBEXEC`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -485,6 +508,7 @@ impl Errno {
     /// `ELIBMAX`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -499,6 +523,7 @@ impl Errno {
     /// `ELIBSCN`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -513,6 +538,7 @@ impl Errno {
     /// `ELNRNG`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -528,6 +554,7 @@ impl Errno {
     /// `EMEDIUMTYPE`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -558,6 +585,7 @@ impl Errno {
     /// `ENAVAIL`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -588,6 +616,7 @@ impl Errno {
     /// `ENOANO`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -608,6 +637,7 @@ impl Errno {
     /// `ENOCSI`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -621,6 +651,7 @@ impl Errno {
     /// `ENODATA`
     #[cfg(not(any(
         freebsdlike,
+        target_os = "ravenbsd",
         windows,
         target_os = "haiku",
         target_os = "openbsd",
@@ -640,6 +671,7 @@ impl Errno {
     #[cfg(not(any(
         solarish,
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "cygwin",
@@ -662,6 +694,7 @@ impl Errno {
     /// `ENOMEDIUM`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -687,6 +720,7 @@ impl Errno {
     /// `ENONET`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -701,6 +735,7 @@ impl Errno {
     /// `ENOPKG`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -721,6 +756,7 @@ impl Errno {
     /// `ENOSR`
     #[cfg(not(any(
         freebsdlike,
+        target_os = "ravenbsd",
         windows,
         target_os = "haiku",
         target_os = "l4re",
@@ -731,6 +767,7 @@ impl Errno {
     /// `ENOSTR`
     #[cfg(not(any(
         freebsdlike,
+        target_os = "ravenbsd",
         windows,
         target_os = "haiku",
         target_os = "l4re",
@@ -764,6 +801,7 @@ impl Errno {
     /// `ENOTNAM`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -781,6 +819,7 @@ impl Errno {
     /// `ENOTRECOVERABLE`
     #[cfg(not(any(
         freebsdlike,
+        target_os = "ravenbsd",
         netbsdlike,
         windows,
         target_os = "haiku",
@@ -799,6 +838,7 @@ impl Errno {
     /// `ENOTUNIQ`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -821,6 +861,7 @@ impl Errno {
     /// `EOWNERDEAD`
     #[cfg(not(any(
         freebsdlike,
+        target_os = "ravenbsd",
         netbsdlike,
         windows,
         target_os = "haiku",
@@ -869,6 +910,7 @@ impl Errno {
     /// `EREMCHG`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -893,6 +935,7 @@ impl Errno {
     /// `EREMOTEIO`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -910,6 +953,7 @@ impl Errno {
     /// `ERESTART`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "cygwin",
         target_os = "espidf",
@@ -924,6 +968,7 @@ impl Errno {
     /// `ERFKILL`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -974,6 +1019,7 @@ impl Errno {
     /// `ESRMNT`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -990,6 +1036,7 @@ impl Errno {
     /// `ESTRPIPE`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",
@@ -1004,6 +1051,7 @@ impl Errno {
     /// `ETIME`
     #[cfg(not(any(
         freebsdlike,
+        target_os = "ravenbsd",
         windows,
         target_os = "l4re",
         target_os = "openbsd",
@@ -1025,6 +1073,7 @@ impl Errno {
     /// `EUCLEAN`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         solarish,
         windows,
         target_os = "aix",
@@ -1042,6 +1091,7 @@ impl Errno {
     /// `EUNATCH`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "espidf",
         target_os = "haiku",
@@ -1070,6 +1120,7 @@ impl Errno {
     /// `EXFULL`
     #[cfg(not(any(
         bsd,
+        target_os = "ravenbsd",
         windows,
         target_os = "aix",
         target_os = "espidf",

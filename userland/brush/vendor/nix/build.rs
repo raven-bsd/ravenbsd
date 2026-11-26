@@ -23,6 +23,11 @@ fn main() {
         bsd: { any(freebsd, dragonfly, netbsd, openbsd, apple_targets) },
         bsd_without_apple: { any(freebsd, dragonfly, netbsd, openbsd) },
         linux_android: { any(android, linux, ravenbsd) },
+        // `ravenbsd` borrows the Linux syscall/struct shape but its native errno domain is the
+        // FreeBSD table (DR-69), so the errno tables and descriptions use their own aliases.
+        linux_errno: { any(android, linux) },
+        bsd_errno: { any(bsd, ravenbsd) },
+        freebsdlike_errno: { any(freebsdlike, ravenbsd) },
         freebsdlike: { any(dragonfly, freebsd) },
         netbsdlike: { any(netbsd, openbsd) },
         solarish: { any(illumos, solaris) },

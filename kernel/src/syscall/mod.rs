@@ -245,6 +245,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::PROC_CREATION_CONTEXT {
         return process_ctl::creation_context(frame);
     }
+    if number == raven_abi::syscall::PROC_DELEGATE {
+        return process_ctl::delegate(frame);
+    }
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
     }

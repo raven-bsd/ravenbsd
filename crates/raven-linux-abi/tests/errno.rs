@@ -85,6 +85,33 @@ fn native_and_linux_errno_domains_are_separate() {
 }
 
 #[test]
+fn linux_only_names_resolve_and_do_not_alias() {
+    // The Linux UAPI table resolves every Linux name, including the names that have no native
+    // equivalent and that S722 removed from the FreeBSD-valued native domain (DR-69).
+    assert_eq!(errno::EAGAIN, 11);
+    assert_eq!(errno::EDEADLK, 35);
+    assert_eq!(errno::ENOSYS, 38);
+    assert_eq!(errno::ECHRNG, 44);
+    assert_eq!(errno::EBADE, 52);
+    assert_eq!(errno::EADV, 68);
+    assert_eq!(errno::ENOMEDIUM, 123);
+    assert_eq!(errno::EWOULDBLOCK, errno::EAGAIN);
+
+    // The native contract keeps the FreeBSD values and does not alias the Linux numbers.
+    assert_eq!(raven_abi::errno::Errno::EAGAIN.0, 35);
+    assert_eq!(raven_abi::errno::Errno::EDEADLK.0, 11);
+    assert_eq!(raven_abi::errno::Errno::ENOSYS.0, 78);
+    assert_eq!(raven_abi::errno::Errno::EADDRINUSE.0, 48);
+    assert_eq!(raven_abi::errno::Errno::EOVERFLOW.0, 84);
+    assert_eq!(raven_abi::errno::Errno::EILSEQ.0, 86);
+
+    // Numeric collisions across domains are not aliases: native 68 is EUSERS, not Linux EADV.
+    assert_eq!(raven_abi::errno::Errno::EUSERS.0, 68);
+    assert_eq!(raven_abi::errno::Errno(68).description(), "too many users");
+    assert_eq!(errno::EUSERS, 87);
+}
+
+#[test]
 fn table_is_sorted_by_name() {
     assert!(errno::ERRNOS.windows(2).all(|pair| pair[0].0 < pair[1].0));
 }

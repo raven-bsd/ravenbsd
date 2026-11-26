@@ -348,21 +348,28 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
         self.read_only
     }
 
-    fn create_file(&mut self, path: &[u8], mode: u16, exclusive: bool) -> Result<u32, Errno> {
+    fn create_file(
+        &mut self,
+        path: &[u8],
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        exclusive: bool,
+    ) -> Result<u32, Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
-        match self.ufs.create(parent, &name, mode, 0, 0) {
+        match self.ufs.create(parent, &name, mode, uid, gid) {
             Ok(ino) => Ok(ino),
             Err(UfsError::Exists) if !exclusive => self.resolve(path),
             Err(error) => Err(self.note_error(error)),
         }
     }
 
-    fn mkdir(&mut self, path: &[u8], mode: u16) -> Result<(), Errno> {
+    fn mkdir(&mut self, path: &[u8], mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mkdir(parent, &name, mode, 0, 0)
+            .mkdir(parent, &name, mode, uid, gid)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
@@ -392,11 +399,11 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
             .map_err(|error| self.note_error(error))
     }
 
-    fn symlink(&mut self, path: &[u8], target: &[u8]) -> Result<(), Errno> {
+    fn symlink(&mut self, path: &[u8], target: &[u8], uid: u32, gid: u32) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .symlink(parent, &name, target, 0, 0)
+            .symlink(parent, &name, target, uid, gid)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
@@ -459,16 +466,16 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
             .map_err(|error| self.note_error(error))
     }
 
-    fn mkfifo(&mut self, path: &[u8], mode: u16) -> Result<(), Errno> {
+    fn mkfifo(&mut self, path: &[u8], mode: u16, uid: u32, gid: u32) -> Result<(), Errno> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mknod(parent, &name, 0o010000 | (mode & 0o7777), 0, 0, 0)
+            .mknod(parent, &name, 0o010000 | (mode & 0o7777), 0, uid, gid)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
 
-    fn mknod(&mut self, path: &[u8], mode: u16, dev: u32) -> Result<(), Errno> {
+    fn mknod(&mut self, path: &[u8], mode: u16, dev: u32, uid: u32, gid: u32) -> Result<(), Errno> {
         self.ensure_writable()?;
         let kind = mode & 0o170000;
         if !matches!(kind, 0o010000 | 0o020000 | 0o060000 | 0o140000) {
@@ -476,7 +483,7 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
         }
         let (parent, name) = self.parent_and_name(path)?;
         self.ufs
-            .mknod(parent, &name, mode, u64::from(dev), 0, 0)
+            .mknod(parent, &name, mode, u64::from(dev), uid, gid)
             .map(|_| ())
             .map_err(|error| self.note_error(error))
     }

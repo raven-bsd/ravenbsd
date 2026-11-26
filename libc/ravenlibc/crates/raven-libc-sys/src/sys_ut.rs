@@ -177,12 +177,12 @@ fn scheme_wrappers_route_to_a_registered_server() {
             b"/hello", b"world",
         )])),
     );
-    let handle = open(b"test:/hello", 0).unwrap();
+    let handle = open(b"test:/hello", 0, 0).unwrap();
     let mut buffer = [0u8; 16];
     assert_eq!(read(handle, &mut buffer).unwrap(), 5);
     assert_eq!(&buffer[..5], b"world");
     close(handle).unwrap();
-    assert_eq!(open(b"nope:/hello", 0), Err(Errno::ENOENT));
+    assert_eq!(open(b"nope:/hello", 0, 0), Err(Errno::ENOENT));
 }
 
 #[cfg(feature = "host-fake")]

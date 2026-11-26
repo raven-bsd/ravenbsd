@@ -28,6 +28,36 @@ use super::protocol::{
 use super::{PendingRequest, RequestBuffers, SchemeFile};
 use super::{next_file_id, next_request_id, registry};
 
+/// One-shot delegated creation contexts, keyed by the submitting thread id.
+///
+/// A broker records the context of the request it is serving with `PROC_DELEGATE`; the next
+/// request that thread submits consumes it. Keeping this out of the process or thread struct
+/// leaves the scheduler and process model untouched; the slot is bounded by the thread count and
+/// a stale entry can only lower the credentials of a later request, never raise them.
+static DELEGATIONS: Mutex<Vec<(u32, super::CreationStamp)>> = Mutex::new(Vec::new());
+
+/// Record `stamp` as the next request context for the calling thread.
+pub fn set_delegation(stamp: super::CreationStamp) -> Result<(), Errno> {
+    let tid = sched::current_thread().map_or(0, |thread| thread.tid);
+    if tid == 0 {
+        return Err(Errno::ESRCH);
+    }
+    let mut slots = DELEGATIONS.lock();
+    slots.retain(|(slot, _)| *slot != tid);
+    slots.push((tid, stamp));
+    Ok(())
+}
+
+/// Take the delegated context queued for `tid`, if any.
+pub fn take_delegation(tid: u32) -> Option<super::CreationStamp> {
+    if tid == 0 {
+        return None;
+    }
+    let mut slots = DELEGATIONS.lock();
+    let index = slots.iter().position(|(slot, _)| *slot == tid)?;
+    Some(slots.swap_remove(index).1)
+}
+
 /// Maximum outstanding client requests one process may hold.
 const MAX_CLIENT_REQUESTS: usize = 1024;
 
@@ -51,6 +81,8 @@ const WIRE_OPEN_MASK: u32 = 0xFF;
 const WIRE_OPEN_READ: u32 = 1;
 /// Write access bit.
 const WIRE_OPEN_WRITE: u32 = 2;
+/// Create a missing file (`O_CREAT`) bit.
+const WIRE_OPEN_CREATE: u32 = 4;
 /// Access-mode mask.
 const WIRE_OPEN_ACCESS: u32 = WIRE_OPEN_READ | WIRE_OPEN_WRITE;
 
@@ -78,6 +110,7 @@ pub fn open(
     path: &str,
     root: Option<&str>,
     flags: u32,
+    mode: u32,
 ) -> Result<Handle, Errno> {
     if flags & !WIRE_OPEN_MASK != 0 {
         return Err(Errno::EINVAL);
@@ -102,6 +135,14 @@ pub fn open(
     let mut packet = SchemePacket::request(Opcode::Open, next_request_id(), file.id);
     packet.trace_id = current_trace_id();
     packet.flags = flags as u16;
+    // Pre-S731 callers pass no mode (zero) with `O_CREAT`; keep the historical 0666 request for
+    // them instead of silently creating mode 0000. `libc` always supplies the caller's mode.
+    let mode = if flags & WIRE_OPEN_CREATE != 0 && mode == 0 {
+        0o666
+    } else {
+        mode
+    };
+    packet.mode = mode & raven_abi::types::umask::ALLPERMS;
     if packet.set_path(path.as_bytes()).is_err() {
         // The server never saw an OPEN, so no CLOSE is owed.
         file.server_refs.store(0, Ordering::Release);

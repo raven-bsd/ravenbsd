@@ -281,20 +281,20 @@ fn debug_read_with_a_timeout_advances_the_clock() {
 #[test]
 fn open_of_an_unregistered_scheme_is_enoent() {
     let _guard = fresh();
-    assert_eq!(sys::open(b"nope:/x", 0), Err(Errno::ENOENT));
+    assert_eq!(sys::open(b"nope:/x", 0, 0), Err(Errno::ENOENT));
 }
 
 #[test]
 fn scheme_read_and_write_route_to_the_handler() {
     let _guard = fresh();
     register_scheme(b"test", mem_scheme());
-    let handle = sys::open(b"test:/hello", 2).unwrap();
+    let handle = sys::open(b"test:/hello", 2, 0).unwrap();
     let mut buffer = [0u8; 8];
     assert_eq!(sys::read(handle, &mut buffer).unwrap(), 5);
     assert_eq!(&buffer[..5], b"world");
     assert_eq!(sys::write(handle, b"!!").unwrap(), 2);
     sys::close(handle).unwrap();
-    let handle = sys::open(b"test:/hello", 0).unwrap();
+    let handle = sys::open(b"test:/hello", 0, 0).unwrap();
     let mut buffer = [0u8; 8];
     assert_eq!(sys::read(handle, &mut buffer).unwrap(), 5);
     assert_eq!(&buffer[..5], b"world");
@@ -304,7 +304,7 @@ fn scheme_read_and_write_route_to_the_handler() {
 fn write_only_file_rejects_read_and_fstat() {
     let _guard = fresh();
     register_scheme(b"test", mem_scheme());
-    let handle = sys::open(b"test:/hello", 1).unwrap();
+    let handle = sys::open(b"test:/hello", 1, 0).unwrap();
     let mut buffer = [0u8; 8];
     assert_eq!(sys::read(handle, &mut buffer), Err(Errno::EACCES));
     let mut stat = [0u8; 64];
@@ -315,7 +315,7 @@ fn write_only_file_rejects_read_and_fstat() {
 fn read_only_file_rejects_write() {
     let _guard = fresh();
     register_scheme(b"test", mem_scheme());
-    let handle = sys::open(b"test:/hello", 0).unwrap();
+    let handle = sys::open(b"test:/hello", 0, 0).unwrap();
     assert_eq!(sys::write(handle, b"x"), Err(Errno::EACCES));
 }
 
@@ -323,7 +323,7 @@ fn read_only_file_rejects_write() {
 fn fstat_writes_the_size_record() {
     let _guard = fresh();
     register_scheme(b"test", mem_scheme());
-    let handle = sys::open(b"test:/hello", 0).unwrap();
+    let handle = sys::open(b"test:/hello", 0, 0).unwrap();
     let mut stat = [0u8; 64];
     sys::fstat(handle, &mut stat).unwrap();
     let size = u64::from_le_bytes(stat[8..16].try_into().unwrap());
@@ -334,7 +334,7 @@ fn fstat_writes_the_size_record() {
 fn call_uses_the_server_rpc() {
     let _guard = fresh();
     register_scheme(b"test", mem_scheme());
-    let handle = sys::open(b"test:/hello", 0).unwrap();
+    let handle = sys::open(b"test:/hello", 0, 0).unwrap();
     let mut response = [0u8; 8];
     let count = sys::call(handle, b"size", &mut response).unwrap();
     assert_eq!(&response[..count], b"5");
@@ -348,7 +348,7 @@ fn call_uses_the_server_rpc() {
 fn scheme_dup_intersects_rights() {
     let _guard = fresh();
     register_scheme(b"test", mem_scheme());
-    let handle = sys::open(b"test:/hello", 0).unwrap();
+    let handle = sys::open(b"test:/hello", 0, 0).unwrap();
     let duplicate = sys::dup(handle, Rights::READ.bits()).unwrap();
     assert_eq!(sys::write(duplicate, b"x"), Err(Errno::EACCES));
     sys::close(duplicate).unwrap();
