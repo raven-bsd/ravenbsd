@@ -49,7 +49,6 @@ LOGIN = "login"
 MARKER = "marker"
 PANIC = "panic"
 
-STAGES = (IMAGE, BOOT, INPUT, LOGIN, MARKER, PANIC)
 MUTATIONS = ("none", "no-keyboard", "wrong-password")
 
 EXIT_STAGE = {
@@ -396,10 +395,7 @@ def prepare_image(evidence: Path, force: bool) -> Path:
         "--output",
         str(image.relative_to(ROOT)),
     ]
-    try:
-        result = run_command(argv, IMAGE_TIMEOUT, evidence / "image-build.log")
-    except GateFailure:
-        raise
+    result = run_command(argv, IMAGE_TIMEOUT, evidence / "image-build.log")
     if result.returncode != 0:
         raise GateFailure(IMAGE, "release image build failed; see image-build.log")
     if not image.is_file():
@@ -470,7 +466,6 @@ def run(args: argparse.Namespace) -> int:
     shutil.copyfile(vars_src, vars_path)
 
     started = time.monotonic()
-    stage = SETUP
     failure: GateFailure | None = None
     serial = Serial(serial_path, TOTAL_TIMEOUT)
     image: Path | None = None
@@ -499,7 +494,6 @@ def run(args: argparse.Namespace) -> int:
             )
             serial.process = process
 
-            stage = BOOT
             serial.expect(LOGIN_PROMPT, BOOT_TIMEOUT, BOOT)
             qmp = Qmp(qmp_path)
             try:
@@ -507,11 +501,9 @@ def run(args: argparse.Namespace) -> int:
             except OSError as error:
                 raise GateFailure(INPUT, f"QMP unavailable: {error}") from None
 
-            stage = INPUT
             qmp.type_text("root")
             serial.expect(PASSWORD_PROMPT, STEP_TIMEOUT, INPUT)
 
-            stage = LOGIN
             password_at = serial.mark()
             qmp.type_text(password_for("raven", args.mutation))
             serial.expect(
@@ -523,12 +515,10 @@ def run(args: argparse.Namespace) -> int:
                 reject_detail="credentials rejected by login",
             )
 
-            stage = MARKER
             qmp.type_text(MARKER_COMMAND)
             serial.expect(MARKER_LINE, STEP_TIMEOUT, MARKER)
     except GateFailure as error:
         failure = error
-        stage = error.stage
     finally:
         if qmp is not None:
             qmp.close()
