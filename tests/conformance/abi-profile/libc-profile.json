@@ -33,12 +33,12 @@
     "AT_EACCESS": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 512
+      "value": 256
     },
     "AT_EMPTY_PATH": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 4096
+      "value": 16384
     },
     "AT_FDCWD": {
       "group": "fcntl",
@@ -48,32 +48,42 @@
     "AT_NO_AUTOMOUNT": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 2048
+      "value": 65536
     },
     "AT_RECURSIVE": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 32768
+      "value": 1048576
     },
     "AT_REMOVEDIR": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 512
+      "value": 2048
+    },
+    "AT_RENAME_EXCHANGE": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 2
+    },
+    "AT_RENAME_NOREPLACE": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 1
     },
     "AT_RESOLVE_BENEATH": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 65536
+      "value": 8192
     },
     "AT_STATX_DONT_SYNC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 16384
+      "value": 524288
     },
     "AT_STATX_FORCE_SYNC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 8192
+      "value": 262144
     },
     "AT_STATX_SYNC_AS_STAT": {
       "group": "fcntl",
@@ -83,7 +93,7 @@
     "AT_STATX_SYNC_TYPE": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 24576
+      "value": 131072
     },
     "AT_SYMLINK_FOLLOW": {
       "group": "fcntl",
@@ -93,7 +103,7 @@
     "AT_SYMLINK_NOFOLLOW": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 256
+      "value": 512
     },
     "CLD_CONTINUED": {
       "group": "signal",
@@ -128,36 +138,41 @@
     "CLOCKS_PER_SEC": {
       "group": "time",
       "ty": "crate::clock_t",
-      "value": 1000000
-    },
-    "CLOCK_BOOTTIME": {
-      "group": "time",
-      "ty": "crate::clockid_t",
-      "value": 7
+      "value": 128
     },
     "CLOCK_BOOTTIME_ALARM": {
       "group": "time",
       "ty": "crate::clockid_t",
-      "value": 9
+      "value": 19
     },
     "CLOCK_MONOTONIC": {
       "group": "time",
       "ty": "c_int",
-      "value": 1
+      "value": 4
     },
-    "CLOCK_MONOTONIC_COARSE": {
+    "CLOCK_MONOTONIC_FAST": {
       "group": "time",
       "ty": "crate::clockid_t",
-      "value": 6
+      "value": 12
+    },
+    "CLOCK_MONOTONIC_PRECISE": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 11
     },
     "CLOCK_MONOTONIC_RAW": {
       "group": "time",
       "ty": "crate::clockid_t",
-      "value": 4
+      "value": 17
     },
     "CLOCK_PROCESS_CPUTIME_ID": {
       "group": "time",
       "ty": "crate::clockid_t",
+      "value": 15
+    },
+    "CLOCK_PROF": {
+      "group": "time",
+      "ty": "c_int",
       "value": 2
     },
     "CLOCK_REALTIME": {
@@ -168,17 +183,57 @@
     "CLOCK_REALTIME_ALARM": {
       "group": "time",
       "ty": "crate::clockid_t",
-      "value": 8
+      "value": 18
     },
-    "CLOCK_REALTIME_COARSE": {
+    "CLOCK_REALTIME_FAST": {
       "group": "time",
       "ty": "crate::clockid_t",
-      "value": 5
+      "value": 10
+    },
+    "CLOCK_REALTIME_PRECISE": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 9
+    },
+    "CLOCK_SECOND": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 13
+    },
+    "CLOCK_SGI_CYCLE": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 20
+    },
+    "CLOCK_TAI": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 16
     },
     "CLOCK_THREAD_CPUTIME_ID": {
       "group": "time",
       "ty": "crate::clockid_t",
-      "value": 3
+      "value": 14
+    },
+    "CLOCK_UPTIME": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 5
+    },
+    "CLOCK_UPTIME_FAST": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 8
+    },
+    "CLOCK_UPTIME_PRECISE": {
+      "group": "time",
+      "ty": "crate::clockid_t",
+      "value": 7
+    },
+    "CLOCK_VIRTUAL": {
+      "group": "time",
+      "ty": "c_int",
+      "value": 1
     },
     "E2BIG": {
       "group": "errno",
@@ -743,12 +798,12 @@
     "F_ADD_SEALS": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1033
+      "value": 19
     },
     "F_CANCELLK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1029
+      "value": 33
     },
     "F_DUPFD": {
       "group": "fcntl",
@@ -758,7 +813,7 @@
     "F_DUPFD_CLOEXEC": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1030
+      "value": 17
     },
     "F_GETFD": {
       "group": "fcntl",
@@ -773,52 +828,52 @@
     "F_GETLEASE": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1025
+      "value": 35
     },
     "F_GETLK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 5
+      "value": 11
     },
     "F_GETOWN": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 9
+      "value": 5
     },
     "F_GETOWNER_UIDS": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 17
+      "value": 29
     },
     "F_GETOWN_EX": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 16
+      "value": 28
     },
     "F_GETPIPE_SZ": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1032
+      "value": 38
     },
     "F_GETSIG": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 11
+      "value": 25
     },
     "F_GET_FILE_RW_HINT": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1037
+      "value": 41
     },
     "F_GET_RW_HINT": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1035
+      "value": 39
     },
     "F_GET_SEALS": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1034
+      "value": 20
     },
     "F_LOCK": {
       "group": "fcntl",
@@ -828,22 +883,22 @@
     "F_NOTIFY": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1026
+      "value": 36
     },
     "F_OFD_GETLK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 36
+      "value": 30
     },
     "F_OFD_SETLK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 37
+      "value": 31
     },
     "F_OFD_SETLKW": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 38
+      "value": 32
     },
     "F_OK": {
       "group": "fcntl",
@@ -873,7 +928,7 @@
     "F_RDLCK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 0
+      "value": 1
     },
     "F_SEAL_FUTURE_WRITE": {
       "group": "fcntl",
@@ -913,47 +968,47 @@
     "F_SETLEASE": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1024
+      "value": 34
     },
     "F_SETLK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 6
+      "value": 12
     },
     "F_SETLKW": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 7
+      "value": 13
     },
     "F_SETOWN": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 8
+      "value": 6
     },
     "F_SETOWN_EX": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 15
+      "value": 27
     },
     "F_SETPIPE_SZ": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1031
+      "value": 37
     },
     "F_SETSIG": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 10
+      "value": 26
     },
     "F_SET_FILE_RW_HINT": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1038
+      "value": 42
     },
     "F_SET_RW_HINT": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1036
+      "value": 40
     },
     "F_TEST": {
       "group": "fcntl",
@@ -978,7 +1033,7 @@
     "F_WRLCK": {
       "group": "fcntl",
       "ty": "i32",
-      "value": 1
+      "value": 3
     },
     "IPPROTO_DCCP": {
       "group": "netinet",
@@ -1260,15 +1315,45 @@
       "ty": "c_int",
       "value": 8
     },
+    "MADV_AUTOSYNC": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 7
+    },
+    "MADV_CORE": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 9
+    },
     "MADV_DONTNEED": {
       "group": "mman",
       "ty": "c_int",
       "value": 4
     },
+    "MADV_FREE": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 5
+    },
+    "MADV_NOCORE": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 8
+    },
     "MADV_NORMAL": {
       "group": "mman",
       "ty": "c_int",
       "value": 0
+    },
+    "MADV_NOSYNC": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 6
+    },
+    "MADV_PROTECT": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 10
     },
     "MADV_RANDOM": {
       "group": "mman",
@@ -1285,15 +1370,50 @@
       "ty": "c_int",
       "value": 3
     },
+    "MAP_32BIT": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 524288
+    },
     "MAP_ANON": {
       "group": "mman",
       "ty": "c_int",
-      "value": 32
+      "value": 4096
+    },
+    "MAP_EXCL": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 16384
+    },
+    "MAP_FILE": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 0
     },
     "MAP_FIXED": {
       "group": "mman",
       "ty": "c_int",
       "value": 16
+    },
+    "MAP_GUARD": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 8192
+    },
+    "MAP_NOCORE": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 131072
+    },
+    "MAP_NOSYNC": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 2048
+    },
+    "MAP_PREFAULT_READ": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 262144
     },
     "MAP_PRIVATE": {
       "group": "mman",
@@ -1304,6 +1424,11 @@
       "group": "mman",
       "ty": "c_int",
       "value": 1
+    },
+    "MAP_STACK": {
+      "group": "mman",
+      "ty": "c_int",
+      "value": 1024
     },
     "MFD_ALLOW_SEALING": {
       "group": "mman",
@@ -1378,87 +1503,112 @@
     "MS_SYNC": {
       "group": "mman",
       "ty": "c_int",
-      "value": 4
+      "value": 0
     },
     "NSIG": {
       "group": "signal",
       "ty": "c_int",
       "value": 32
     },
+    "O_ACCMODE": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 3
+    },
     "O_APPEND": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 1024
+      "value": 8
     },
     "O_ASYNC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 8192
+      "value": 64
     },
     "O_CLOEXEC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 524288
+      "value": 1048576
+    },
+    "O_CLOFORK": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 134217728
     },
     "O_CREAT": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 64
+      "value": 512
     },
     "O_DIRECT": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 16384
+      "value": 65536
     },
     "O_DIRECTORY": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 65536
+      "value": 131072
     },
     "O_DSYNC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 4096
+      "value": 16777216
+    },
+    "O_EMPTY_PATH": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 33554432
     },
     "O_EXCL": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 128
+      "value": 2048
+    },
+    "O_EXEC": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 262144
     },
     "O_EXLOCK": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 268435456
+      "value": 32
     },
     "O_LARGEFILE": {
       "group": "fcntl",
       "ty": "c_int",
       "value": 0
     },
+    "O_NAMEDATTR": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 67108864
+    },
     "O_NOATIME": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 262144
+      "value": 536870912
     },
     "O_NOCTTY": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 256
+      "value": 32768
     },
     "O_NOFOLLOW": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 131072
+      "value": 256
     },
     "O_NONBLOCK": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 2048
+      "value": 4
     },
     "O_PATH": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 2097152
+      "value": 4194304
     },
     "O_RDONLY": {
       "group": "fcntl",
@@ -1473,32 +1623,37 @@
     "O_RESOLVE_BENEATH": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 1073741824
+      "value": 8388608
     },
     "O_SHLOCK": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 536870912
+      "value": 16
     },
     "O_SYNC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 1052672
+      "value": 128
     },
     "O_TMPFILE": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 4259840
+      "value": 268435456
     },
     "O_TRUNC": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 512
+      "value": 1024
     },
     "O_TTY_INIT": {
       "group": "fcntl",
       "ty": "c_int",
-      "value": 0
+      "value": 524288
+    },
+    "O_VERIFY": {
+      "group": "fcntl",
+      "ty": "c_int",
+      "value": 2097152
     },
     "O_WRONLY": {
       "group": "fcntl",
@@ -1550,6 +1705,16 @@
       "ty": "c_short",
       "value": 1
     },
+    "POLLINIGNEOF": {
+      "group": "poll",
+      "ty": "c_short",
+      "value": 8192
+    },
+    "POLLMSG": {
+      "group": "poll",
+      "ty": "c_short",
+      "value": 1024
+    },
     "POLLNVAL": {
       "group": "poll",
       "ty": "c_short",
@@ -1570,6 +1735,11 @@
       "ty": "c_short",
       "value": 128
     },
+    "POLLRDHUP": {
+      "group": "poll",
+      "ty": "c_short",
+      "value": 16384
+    },
     "POLLRDNORM": {
       "group": "poll",
       "ty": "c_short",
@@ -1578,12 +1748,12 @@
     "POLLWRBAND": {
       "group": "poll",
       "ty": "c_short",
-      "value": 512
+      "value": 256
     },
     "POLLWRNORM": {
       "group": "poll",
       "ty": "c_short",
-      "value": 256
+      "value": 4
     },
     "POSIX_FADV_DONTNEED": {
       "group": "fcntl",
@@ -1685,11 +1855,6 @@
       "ty": "size_t",
       "value": 16384
     },
-    "RLIMIT_AS": {
-      "group": "resource",
-      "ty": "c_int",
-      "value": 9
-    },
     "RLIMIT_CORE": {
       "group": "resource",
       "ty": "c_int",
@@ -1710,40 +1875,55 @@
       "ty": "c_int",
       "value": 1
     },
-    "RLIMIT_LOCKS": {
-      "group": "resource",
-      "ty": "c_int",
-      "value": 10
-    },
-    "RLIMIT_MEMLOCK": {
-      "group": "resource",
-      "ty": "c_int",
-      "value": 8
-    },
-    "RLIMIT_MSGQUEUE": {
-      "group": "resource",
-      "ty": "c_int",
-      "value": 12
-    },
-    "RLIMIT_NICE": {
+    "RLIMIT_KQUEUES": {
       "group": "resource",
       "ty": "c_int",
       "value": 13
     },
+    "RLIMIT_LOCKS": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 18
+    },
+    "RLIMIT_MEMLOCK": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 6
+    },
+    "RLIMIT_MSGQUEUE": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 20
+    },
+    "RLIMIT_NICE": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 21
+    },
     "RLIMIT_NLIMITS": {
       "group": "resource",
       "ty": "c_int",
-      "value": 16
+      "value": 17
     },
     "RLIMIT_NOFILE": {
       "group": "resource",
       "ty": "c_int",
-      "value": 7
+      "value": 8
     },
     "RLIMIT_NPROC": {
       "group": "resource",
       "ty": "c_int",
-      "value": 6
+      "value": 7
+    },
+    "RLIMIT_NPTS": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 11
+    },
+    "RLIMIT_PIPEBUF": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 15
     },
     "RLIMIT_RSS": {
       "group": "resource",
@@ -1753,27 +1933,52 @@
     "RLIMIT_RTPRIO": {
       "group": "resource",
       "ty": "c_int",
-      "value": 14
+      "value": 22
     },
     "RLIMIT_RTTIME": {
       "group": "resource",
       "ty": "c_int",
-      "value": 15
+      "value": 23
+    },
+    "RLIMIT_SBSIZE": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 9
     },
     "RLIMIT_SIGPENDING": {
       "group": "resource",
       "ty": "c_int",
-      "value": 11
+      "value": 19
     },
     "RLIMIT_STACK": {
       "group": "resource",
       "ty": "c_int",
       "value": 3
     },
+    "RLIMIT_SWAP": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 12
+    },
+    "RLIMIT_UMTXP": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 14
+    },
+    "RLIMIT_VMEM": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 10
+    },
+    "RLIMIT_VMM": {
+      "group": "resource",
+      "ty": "c_int",
+      "value": 16
+    },
     "RLIM_INFINITY": {
       "group": "resource",
       "ty": "rlim_t",
-      "value": 18446744073709551615
+      "value": 9223372036854775807
     },
     "RTLD_GLOBAL": {
       "group": "misc",
@@ -2563,247 +2768,247 @@
     "_CS_PATH": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 0
+      "value": 1
     },
     "_CS_POSIX_V5_WIDTH_RESTRICTED_ENVS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 4
+      "value": 2002
     },
     "_CS_POSIX_V6_ILP32_OFF32_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1116
+      "value": 2
     },
     "_CS_POSIX_V6_ILP32_OFF32_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1117
+      "value": 3
     },
     "_CS_POSIX_V6_ILP32_OFF32_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1118
+      "value": 4
     },
     "_CS_POSIX_V6_ILP32_OFF32_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1119
+      "value": 2004
     },
     "_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1120
+      "value": 5
     },
     "_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1121
+      "value": 6
     },
     "_CS_POSIX_V6_ILP32_OFFBIG_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1122
+      "value": 7
     },
     "_CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1123
+      "value": 2005
     },
     "_CS_POSIX_V6_LP64_OFF64_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1124
+      "value": 8
     },
     "_CS_POSIX_V6_LP64_OFF64_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1125
+      "value": 9
     },
     "_CS_POSIX_V6_LP64_OFF64_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1126
+      "value": 10
     },
     "_CS_POSIX_V6_LP64_OFF64_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1127
+      "value": 2006
     },
     "_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1128
+      "value": 11
     },
     "_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1129
+      "value": 12
     },
     "_CS_POSIX_V6_LPBIG_OFFBIG_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1130
+      "value": 13
     },
     "_CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1131
+      "value": 2007
     },
     "_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1
+      "value": 14
     },
     "_CS_POSIX_V7_ILP32_OFF32_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1132
+      "value": 2008
     },
     "_CS_POSIX_V7_ILP32_OFF32_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1133
+      "value": 2009
     },
     "_CS_POSIX_V7_ILP32_OFF32_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1134
+      "value": 2010
     },
     "_CS_POSIX_V7_ILP32_OFF32_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1135
+      "value": 2011
     },
     "_CS_POSIX_V7_ILP32_OFFBIG_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1136
+      "value": 2012
     },
     "_CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1137
+      "value": 2013
     },
     "_CS_POSIX_V7_ILP32_OFFBIG_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1138
+      "value": 2014
     },
     "_CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1139
+      "value": 2015
     },
     "_CS_POSIX_V7_LP64_OFF64_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1140
+      "value": 2016
     },
     "_CS_POSIX_V7_LP64_OFF64_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1141
+      "value": 2017
     },
     "_CS_POSIX_V7_LP64_OFF64_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1142
+      "value": 2018
     },
     "_CS_POSIX_V7_LP64_OFF64_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1143
+      "value": 2019
     },
     "_CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1144
+      "value": 2020
     },
     "_CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1145
+      "value": 2021
     },
     "_CS_POSIX_V7_LPBIG_OFFBIG_LIBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1146
+      "value": 2022
     },
     "_CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1147
+      "value": 2023
     },
     "_CS_POSIX_V7_WIDTH_RESTRICTED_ENVS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 5
+      "value": 2003
     },
     "_PC_2_SYMLINKS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 20
+      "value": 3001
     },
     "_PC_ALLOC_SIZE_MIN": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 18
+      "value": 10
     },
     "_PC_ASYNC_IO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 10
+      "value": 53
     },
     "_PC_CHOWN_RESTRICTED": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 6
+      "value": 7
     },
     "_PC_FILESIZEBITS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 13
+      "value": 12
     },
     "_PC_LINK_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 0
+      "value": 1
     },
     "_PC_MAX_CANON": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1
+      "value": 2
     },
     "_PC_MAX_INPUT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 2
+      "value": 3
     },
     "_PC_NAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 3
+      "value": 4
     },
     "_PC_NO_TRUNC": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 7
+      "value": 8
     },
     "_PC_PATH_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 4
+      "value": 5
     },
     "_PC_PIPE_BUF": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 5
+      "value": 6
     },
     "_PC_PRIO_IO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 11
+      "value": 54
     },
     "_PC_REC_INCR_XFER_SIZE": {
       "group": "sysconf",
@@ -2828,737 +3033,737 @@
     "_PC_SOCK_MAXBUF": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 12
+      "value": 3000
     },
     "_PC_SYMLINK_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 19
+      "value": 18
     },
     "_PC_SYNC_IO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 9
+      "value": 55
     },
     "_PC_VDISABLE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 8
+      "value": 9
     },
     "_SC_2_CHAR_TERM": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 95
+      "value": 20
     },
     "_SC_2_C_BIND": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 47
+      "value": 18
     },
     "_SC_2_C_DEV": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 48
+      "value": 19
     },
     "_SC_2_FORT_DEV": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 49
+      "value": 21
     },
     "_SC_2_FORT_RUN": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 50
+      "value": 22
     },
     "_SC_2_LOCALEDEF": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 52
+      "value": 23
     },
     "_SC_2_PBS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 168
+      "value": 59
     },
     "_SC_2_PBS_ACCOUNTING": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 169
+      "value": 60
     },
     "_SC_2_PBS_CHECKPOINT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 175
+      "value": 61
     },
     "_SC_2_PBS_LOCATE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 170
+      "value": 62
     },
     "_SC_2_PBS_MESSAGE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 171
+      "value": 63
     },
     "_SC_2_PBS_TRACK": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 172
+      "value": 64
     },
     "_SC_2_SW_DEV": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 51
+      "value": 24
     },
     "_SC_2_UPE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 97
+      "value": 25
     },
     "_SC_2_VERSION": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 46
+      "value": 17
     },
     "_SC_ADVISORY_INFO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 132
+      "value": 65
     },
     "_SC_AIO_LISTIO_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 23
+      "value": 42
     },
     "_SC_AIO_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 24
+      "value": 43
     },
     "_SC_AIO_PRIO_DELTA_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 25
+      "value": 44
     },
     "_SC_ARG_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 0
+      "value": 1
     },
     "_SC_ASYNCHRONOUS_IO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 12
+      "value": 28
     },
     "_SC_ATEXIT_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 87
+      "value": 107
     },
     "_SC_AVPHYS_PAGES": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 86
+      "value": 1001
     },
     "_SC_BARRIERS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 133
+      "value": 66
     },
     "_SC_BC_BASE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 36
+      "value": 9
     },
     "_SC_BC_DIM_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 37
+      "value": 10
     },
     "_SC_BC_SCALE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 38
+      "value": 11
     },
     "_SC_BC_STRING_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 39
+      "value": 12
     },
     "_SC_CHILD_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 1
+      "value": 2
     },
     "_SC_CLK_TCK": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 2
+      "value": 3
     },
     "_SC_CLOCK_SELECTION": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 137
+      "value": 67
     },
     "_SC_COLL_WEIGHTS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 40
+      "value": 13
     },
     "_SC_CPUTIME": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 138
+      "value": 68
     },
     "_SC_DELAYTIMER_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 26
+      "value": 45
     },
     "_SC_EXPR_NEST_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 42
+      "value": 14
     },
     "_SC_FSYNC": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 15
+      "value": 38
     },
     "_SC_GETGR_R_SIZE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 69
+      "value": 70
     },
     "_SC_GETPW_R_SIZE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 70
+      "value": 71
     },
     "_SC_HOST_NAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 180
+      "value": 72
     },
     "_SC_IOV_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 60
+      "value": 56
     },
     "_SC_IPV6": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 235
+      "value": 118
     },
     "_SC_JOB_CONTROL": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 7
+      "value": 6
     },
     "_SC_LINE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 43
+      "value": 15
     },
     "_SC_LOGIN_NAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 71
+      "value": 73
     },
     "_SC_MAPPED_FILES": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 16
+      "value": 29
     },
     "_SC_MEMLOCK": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 17
+      "value": 30
     },
     "_SC_MEMLOCK_RANGE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 18
+      "value": 31
     },
     "_SC_MEMORY_PROTECTION": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 19
+      "value": 32
     },
     "_SC_MESSAGE_PASSING": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 20
+      "value": 33
     },
     "_SC_MINSIGSTKSZ": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 249
+      "value": 1023
     },
     "_SC_MONOTONIC_CLOCK": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 149
+      "value": 74
     },
     "_SC_MQ_OPEN_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 27
+      "value": 46
     },
     "_SC_MQ_PRIO_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 28
+      "value": 75
     },
     "_SC_NGROUPS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 3
+      "value": 4
     },
     "_SC_NPROCESSORS_CONF": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 83
+      "value": 57
     },
     "_SC_NPROCESSORS_ONLN": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 84
+      "value": 58
     },
     "_SC_NZERO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 109
+      "value": 1006
     },
     "_SC_OPEN_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 4
+      "value": 5
     },
     "_SC_PAGESIZE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 30
+      "value": 47
     },
     "_SC_PAGE_SIZE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 30
+      "value": 47
     },
     "_SC_PASS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 88
+      "value": 1002
     },
     "_SC_PHYS_PAGES": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 85
+      "value": 121
     },
     "_SC_PRIORITIZED_IO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 13
+      "value": 34
     },
     "_SC_PRIORITY_SCHEDULING": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 10
+      "value": 35
     },
     "_SC_RAW_SOCKETS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 236
+      "value": 119
     },
     "_SC_READER_WRITER_LOCKS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 153
+      "value": 76
     },
     "_SC_REALTIME_SIGNALS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 9
+      "value": 36
     },
     "_SC_REGEXP": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 155
+      "value": 77
     },
     "_SC_RE_DUP_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 44
+      "value": 16
     },
     "_SC_RTSIG_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 31
+      "value": 48
     },
     "_SC_SAVED_IDS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 8
+      "value": 7
     },
     "_SC_SEMAPHORES": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 21
+      "value": 37
     },
     "_SC_SEM_NSEMS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 32
+      "value": 49
     },
     "_SC_SEM_VALUE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 33
+      "value": 50
     },
     "_SC_SHARED_MEMORY_OBJECTS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 22
+      "value": 39
     },
     "_SC_SHELL": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 157
+      "value": 78
     },
     "_SC_SIGQUEUE_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 34
+      "value": 51
     },
     "_SC_SIGSTKSZ": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 250
+      "value": 1024
     },
     "_SC_SPAWN": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 159
+      "value": 79
     },
     "_SC_SPIN_LOCKS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 154
+      "value": 80
     },
     "_SC_SPORADIC_SERVER": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 160
+      "value": 81
     },
     "_SC_SS_REPL_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 241
+      "value": 1016
     },
     "_SC_STREAMS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 174
+      "value": 1011
     },
     "_SC_STREAM_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 5
+      "value": 26
     },
     "_SC_SYMLOOP_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 173
+      "value": 120
     },
     "_SC_SYNCHRONIZED_IO": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 14
+      "value": 40
     },
     "_SC_THREADS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 67
+      "value": 96
     },
     "_SC_THREAD_ATTR_STACKADDR": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 77
+      "value": 82
     },
     "_SC_THREAD_ATTR_STACKSIZE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 78
+      "value": 83
     },
     "_SC_THREAD_CPUTIME": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 139
+      "value": 84
     },
     "_SC_THREAD_DESTRUCTOR_ITERATIONS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 73
+      "value": 85
     },
     "_SC_THREAD_KEYS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 74
+      "value": 86
     },
     "_SC_THREAD_PRIORITY_SCHEDULING": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 79
+      "value": 89
     },
     "_SC_THREAD_PRIO_INHERIT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 80
+      "value": 87
     },
     "_SC_THREAD_PRIO_PROTECT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 81
+      "value": 88
     },
     "_SC_THREAD_PROCESS_SHARED": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 82
+      "value": 90
     },
     "_SC_THREAD_ROBUST_PRIO_INHERIT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 247
+      "value": 1021
     },
     "_SC_THREAD_ROBUST_PRIO_PROTECT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 248
+      "value": 1022
     },
     "_SC_THREAD_SAFE_FUNCTIONS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 68
+      "value": 91
     },
     "_SC_THREAD_SPORADIC_SERVER": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 161
+      "value": 92
     },
     "_SC_THREAD_STACK_MIN": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 75
+      "value": 93
     },
     "_SC_THREAD_THREADS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 76
+      "value": 94
     },
     "_SC_TIMEOUTS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 164
+      "value": 95
     },
     "_SC_TIMERS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 11
+      "value": 41
     },
     "_SC_TIMER_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 35
+      "value": 52
     },
     "_SC_TRACE": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 181
+      "value": 97
     },
     "_SC_TRACE_EVENT_FILTER": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 182
+      "value": 98
     },
     "_SC_TRACE_EVENT_NAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 242
+      "value": 1017
     },
     "_SC_TRACE_INHERIT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 183
+      "value": 99
     },
     "_SC_TRACE_LOG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 184
+      "value": 100
     },
     "_SC_TRACE_NAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 243
+      "value": 1018
     },
     "_SC_TRACE_SYS_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 244
+      "value": 1019
     },
     "_SC_TRACE_USER_EVENT_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 245
+      "value": 1020
     },
     "_SC_TTY_NAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 72
+      "value": 101
     },
     "_SC_TYPED_MEMORY_OBJECTS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 165
+      "value": 102
     },
     "_SC_TZNAME_MAX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 6
+      "value": 27
     },
     "_SC_UIO_MAXIOV": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 60
+      "value": 1000
     },
     "_SC_V6_ILP32_OFF32": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 176
+      "value": 103
     },
     "_SC_V6_ILP32_OFFBIG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 177
+      "value": 104
     },
     "_SC_V6_LP64_OFF64": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 178
+      "value": 105
     },
     "_SC_V6_LPBIG_OFFBIG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 179
+      "value": 106
     },
     "_SC_V7_ILP32_OFF32": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 237
+      "value": 1012
     },
     "_SC_V7_ILP32_OFFBIG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 238
+      "value": 1013
     },
     "_SC_V7_LP64_OFF64": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 239
+      "value": 1014
     },
     "_SC_V7_LPBIG_OFFBIG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 240
+      "value": 1015
     },
     "_SC_VERSION": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 29
+      "value": 8
     },
     "_SC_XBS5_ILP32_OFF32": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 125
+      "value": 1007
     },
     "_SC_XBS5_ILP32_OFFBIG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 126
+      "value": 1008
     },
     "_SC_XBS5_LP64_OFF64": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 127
+      "value": 1009
     },
     "_SC_XBS5_LPBIG_OFFBIG": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 128
+      "value": 1010
     },
     "_SC_XOPEN_CRYPT": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 92
+      "value": 108
     },
     "_SC_XOPEN_ENH_I18N": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 93
+      "value": 109
     },
     "_SC_XOPEN_LEGACY": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 129
+      "value": 110
     },
     "_SC_XOPEN_REALTIME": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 130
+      "value": 111
     },
     "_SC_XOPEN_REALTIME_THREADS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 131
+      "value": 112
     },
     "_SC_XOPEN_SHM": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 94
+      "value": 113
     },
     "_SC_XOPEN_STREAMS": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 246
+      "value": 114
     },
     "_SC_XOPEN_UNIX": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 91
+      "value": 115
     },
     "_SC_XOPEN_VERSION": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 89
+      "value": 116
     },
     "_SC_XOPEN_XCU_VERSION": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 90
+      "value": 117
     },
     "_SC_XOPEN_XPG2": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 98
+      "value": 1003
     },
     "_SC_XOPEN_XPG3": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 99
+      "value": 1004
     },
     "_SC_XOPEN_XPG4": {
       "group": "sysconf",
       "ty": "c_int",
-      "value": 100
+      "value": 1005
     }
   },
   "donor": {
@@ -4692,23 +4897,23 @@
     "model": {
       "bsd-extras.toml": "3d5e4560e190e6ca402d94029162cea74b98dafdeb925d60654e322c69368bbb",
       "data-symbols.toml": "686ec89334a97fd69c19c41e156fef8fc47aa08265e77d816c451eebda09d2e4",
-      "deviations.toml": "f27b90572b93d5184be43b89e109551cffec7f2187ff0174596d43c35b9e7d1a",
+      "deviations.toml": "ca0bf993c83ebbfa76c29266cd60315f7e002e1479231ae13c94f1575ebdfde2",
       "errno.toml": "7e0983f00564995e07f8ce8d8ea65dbf21b0951e0dbd31badeab2c8cabadc95e",
-      "fcntl.toml": "8d38f0341861f46ec02437795a1ce14fe2ed4609dd3f8d5d9cf9e1a6a60859c2",
+      "fcntl.toml": "69b8c18997984a92eb75a45ae55253490a8b036e5503d5248d9e018c09d0a543",
       "limits.toml": "2cfab601137e494f5dffb6a47c9947371b4d2f259ec7226b61e6fd09821ae892",
       "misc.toml": "8e640a33da5f6b930cb8400526e16f229053a602745475d1d2beba0b2d432500",
-      "mman.toml": "c4795f55d280af976bab8677cfc2cf713efac89976c47694e3071500c9e87ea6",
+      "mman.toml": "dfbe024514c4cea9a2b8aa019b57c87ca23bb06b3099b0b57e03f3f2ffecd2f7",
       "netinet.toml": "36c4a3fce94ee2416377337e4c717d026de672b82d7f4582d7095a48e89bc6f6",
-      "poll.toml": "b04269bc8887589517d6e57db515c5fb308dd494b6375ef7d274333b76b74f29",
+      "poll.toml": "3b50971f9de820b486720b5aa33234da05c7513c8eea8a5e55a9e57dc3c8d986",
       "pthread.toml": "2846eba947d322fd812ea2d2ea4610c0c97b81eaf0cdc4e2bdae640de83bf2a2",
-      "resource.toml": "61c8740b6f9c415be9574c49e61b498bc09338d784a536b759ea40a51054d597",
+      "resource.toml": "df6450635162a3aa68351945e4677b5505e02225c7935aa2571f18542247c52a",
       "ring-changes.toml": "f9064f0f90715001526c3b62cb267e1e3ed3cb40fa225517a7b28a155ba1ac33",
       "signal.toml": "742c90697206935938c5947f850a7dd46c3c75b989afefcca5bed142605166db",
       "socket.toml": "4ba387dc14b36d76572a7ce55f68c2a69203a803718fcbdd166e6ecc3e98e68f",
       "stat.toml": "449a8b182cbd02a4dd179936f6a3f13b1181f065a28ab564071dcf78c2144cc4",
-      "structs.toml": "1751c1b320bacd418ccd57fc1bcfe7d53067677df69143fc54a2047d8b2fc815",
-      "sysconf.toml": "24bba459d600a5e65cf4ae26d254c3cad5fae3253bc4e81cb9934daf6a91a59e",
-      "time.toml": "1cf4071970c9124fc1660b290414611968451656a7c57e48b86049f2622a2704",
+      "structs.toml": "c561d3ce956dd534422824b3e3366af96bff0754a45d25b89f4697e541603cad",
+      "sysconf.toml": "667fbeff301776a6e3b24f47f62817d6ee72bf4f7cbf1a851aec210378d0f501",
+      "time.toml": "441208c2f196d783842f2c773d2e03f2e18b3f92be6060deface346f80c5b191",
       "types.toml": "d980c831877790acd11d99d4df25e4f4831266809ed32f3c5cc977e0c82305c5"
     },
     "target": "toolchain/vendor/libc/src/unix/ravenbsd/mod.rs"
