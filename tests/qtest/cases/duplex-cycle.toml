@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S207: the duplex cycle collector requires authority on the user-triggerable path. The fixture
+# builds an unreachable two-process cycle, refuses the unprivileged trigger with EPERM and keeps
+# both queued handles, then collects as root and clears both queues.
+
+name = "duplex-cycle"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/duplex-cycle-fixture/build.sh"]
+initfs = "build/fixtures/duplex-cycle/duplex-cycle.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^duplex-cycle: denied=1 errno=1 pairs=1 pending=2$'
+
+[[expect]]
+regex = '^duplex-cycle: collected=1 pairs=0 pending=0$'
+
+[[expect]]
+regex = '^duplex-cycle: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|duplex-cycle: FAIL'

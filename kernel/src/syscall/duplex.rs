@@ -18,6 +18,7 @@ use raven_usercopy::UserSlice;
 use crate::process::duplex::{self, PendingHandle};
 use crate::process::{self, handle::Object};
 use crate::syscall::SyscallFrame;
+use crate::syscall::basic::require_root;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// Raw `duplex_pair(out: *mut [u32; 2], flags: u32) -> 0`.
@@ -128,6 +129,11 @@ const _: () = assert!(core::mem::size_of::<ControlHeader>() == CMSG_BYTES);
 pub fn pair(frame: &SyscallFrame) -> Result<usize, Errno> {
     let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     if flags & DUPLEX_COLLECT != 0 {
+        // Collection is a global pass over every live pair's queues, so it crosses handles owned
+        // by other processes. The 0.1.0 authority model reserves that operation for root
+        // (`require_root`, the same gate as clock/power administration); an unauthorised caller
+        // fails closed before any queue is detached.
+        require_root()?;
         duplex::collect_cycles();
     }
     if flags & (DUPLEX_COLLECT | DUPLEX_DIAGNOSTIC) != 0 {
