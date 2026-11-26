@@ -9,6 +9,9 @@
 #
 # Keep this file as the reviewed-exception mechanism: every future entry needs an advisory ID,
 # an owner, a reason/reachability note and an expiry date. No blanket ignore.
+#
+# Weekly audit: `sh scripts/deps-audit.sh`; decision queue and metrics:
+# `docs/dependency-dashboard.md` and `metrics/deps.json`.
 
 [advisories]
 ignore = []
