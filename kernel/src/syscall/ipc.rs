@@ -73,9 +73,6 @@ fn register(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno>
 
 fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
-    if path.contains("urandom") {
-        crate::kprintln!("ipc-open: path={} flags={:#x}", path, frame.rdx);
-    }
     let (scheme, suffix) = model::split_path(&path).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
     let mode = u32::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
@@ -121,9 +118,6 @@ fn fault_in_read_buffer(address: u64, len: u64) {
 }
 
 fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
-    if frame.rdx <= 64 {
-        crate::kprintln!("ipc-read: small handle={} addr={:#x} len={}", frame.rdi, frame.rsi, frame.rdx);
-    }
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let object = caller.handles.lock().get(handle, Rights::NONE)?.clone();
     if let Object::Pipe(end) = object {
@@ -144,17 +138,8 @@ fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
             raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
         );
     }
-    let file = match ipc::file_from_handle(caller, handle, Rights::READ) {
-        Ok(file) => file,
-        Err(error) => {
-            crate::kprintln!("ipc-read: file_from_handle {:?}", error);
-            return Err(error);
-        }
-    };
-    if let Err(error) = crate::process::tty::check_access(caller, &file, false) {
-        crate::kprintln!("ipc-read: check_access {:?}", error);
-        return Err(error);
-    }
+    let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
+    crate::process::tty::check_access(caller, &file, false)?;
     fault_in_read_buffer(frame.rsi, frame.rdx);
     router::read(caller, &file, frame.rsi, frame.rdx)
 }

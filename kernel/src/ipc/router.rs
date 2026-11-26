@@ -112,14 +112,6 @@ pub fn open(
     flags: u32,
     mode: u32,
 ) -> Result<Handle, Errno> {
-    if path.contains("urandom") {
-        crate::kprintln!(
-            "router-open: path={} flags={:#x} mask={:#x}",
-            path,
-            flags,
-            WIRE_OPEN_MASK
-        );
-    }
     if flags & !WIRE_OPEN_MASK != 0 {
         return Err(Errno::EINVAL);
     }
@@ -174,13 +166,6 @@ pub fn open(
         RequestBuffers::default(),
     );
     let result = submit(&request).and_then(|_| wait(caller, &request));
-    if path.contains("urandom") {
-        match &result {
-            Ok((0, _)) => crate::kprintln!("router-open: /dev/urandom ok"),
-            Ok((status, _)) => crate::kprintln!("router-open: /dev/urandom status={}", status),
-            Err(error) => crate::kprintln!("router-open: /dev/urandom error {:?}", error),
-        }
-    }
     match result {
         Ok((0, _)) => {
             let response = *request.response.lock();
@@ -249,17 +234,8 @@ fn read_at(
     }
     let trace = super::trace_k147() && K147_RT.fetch_add(1, Ordering::Relaxed) < 64;
     let trace_start = if trace { crate::time::now_ns() } else { 0 };
-    if let Err(error) = ensure_server(&file.server) {
-        crate::kprintln!("ipc-read: ensure_server failed {:?}", error);
-        return Err(error);
-    }
-    let capture = match capture::create(caller, &file.server, address, len, true) {
-        Ok(capture) => capture,
-        Err(error) => {
-            crate::kprintln!("ipc-read: capture failed {:?}", error);
-            return Err(error);
-        }
-    };
+    ensure_server(&file.server)?;
+    let capture = capture::create(caller, &file.server, address, len, true)?;
     let trace_capture = if trace { crate::time::now_ns() } else { 0 };
     let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.server_id());
     packet.trace_id = current_trace_id();
@@ -283,21 +259,9 @@ fn read_at(
         },
     );
     let trace_new = if trace { crate::time::now_ns() } else { 0 };
-    if let Err(error) = submit(&request) {
-        crate::kprintln!("ipc-read: submit {:?}", error);
-        return Err(error);
-    }
+    submit(&request)?;
     let trace_submit = if trace { crate::time::now_ns() } else { 0 };
-    let (status, result) = match wait(caller, &request) {
-        Ok(reply) => reply,
-        Err(error) => {
-            crate::kprintln!("ipc-read: wait {:?}", error);
-            return Err(error);
-        }
-    };
-    if len <= 64 || status == 22 {
-        crate::kprintln!("ipc-read: reply status={} result={} len={}", status, result, len);
-    }
+    let (status, result) = wait(caller, &request)?;
     let trace_wait = if trace { crate::time::now_ns() } else { 0 };
     if trace {
         crate::kprintln!(

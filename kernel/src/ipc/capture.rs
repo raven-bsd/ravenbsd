@@ -739,7 +739,6 @@ pub fn create(
         };
         while mapped < pages {
             let Some(virt) = VirtAddr::new(base.saturating_add(mapped.saturating_mul(PAGE))) else {
-                crate::kprintln!("capture: virt invalid base={:#x} mapped={}", base, mapped);
                 if !unmap_partial(&mut mapper, base, mapped) {
                     frames.leak();
                 }
