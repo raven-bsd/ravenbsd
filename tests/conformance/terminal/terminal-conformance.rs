@@ -83,13 +83,12 @@ const TIOCSCTTY: c_ulong = 0x2000_7461;
 const TIOCSWINSZ: c_ulong = 0x8008_7467;
 
 const IO_TIMEOUT_MS: c_int = 2000;
-const CLOCK_MONOTONIC: c_int = 1;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct Timespec {
+struct Timeval {
     tv_sec: i64,
-    tv_nsec: i64,
+    tv_usec: i64,
 }
 
 static FAILURES: AtomicU32 = AtomicU32::new(0);
@@ -188,7 +187,7 @@ unsafe extern "C" {
     fn pipe(fds: *mut c_int) -> c_int;
     fn sigaction(signal: c_int, action: *const Sigaction, old: *mut Sigaction) -> c_int;
     fn usleep(microseconds: c_uint) -> c_int;
-    fn clock_gettime(clockid: c_int, value: *mut Timespec) -> c_int;
+    fn gettimeofday(value: *mut Timeval, zone: *mut c_void) -> c_int;
     fn __errno_location() -> *mut c_int;
     fn _exit(status: c_int) -> !;
 }
@@ -1000,15 +999,15 @@ fn signal_exchange(pair: &Pair, byte: u8) -> Option<c_int> {
 }
 
 fn now_ms() -> i64 {
-    let mut value = Timespec {
+    let mut value = Timeval {
         tv_sec: 0,
-        tv_nsec: 0,
+        tv_usec: 0,
     };
-    // SAFETY: `value` is a valid writable timespec for the duration of the call.
+    // SAFETY: `value` is a valid writable timeval and the zone pointer is null.
     unsafe {
-        clock_gettime(CLOCK_MONOTONIC, &mut value);
+        gettimeofday(&mut value, null_mut());
     }
-    value.tv_sec.saturating_mul(1000) + value.tv_nsec / 1_000_000
+    value.tv_sec.saturating_mul(1000) + value.tv_usec / 1000
 }
 
 /// Real-pty regression for the Rust target libc `c_cc` indexes.
