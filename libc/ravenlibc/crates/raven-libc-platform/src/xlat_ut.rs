@@ -197,6 +197,26 @@ fn open_unknown_bit_is_einval() {
 }
 
 #[test]
+fn open_cloexec_is_the_native_freebsd_value() {
+    // FreeBSD sys/sys/fcntl.h:130 (pinned donor): O_CLOEXEC 0x00100000.
+    assert_eq!(fcntl::O_CLOEXEC, 0x0010_0000);
+}
+
+#[test]
+fn open_cloexec_is_kept_in_the_fd_table_only() {
+    let spec = xlat::open_flags((fcntl::O_RDONLY | fcntl::O_CLOEXEC) as u32).expect("valid");
+    assert_eq!(spec.wire, WIRE_OPEN_READ);
+    assert_eq!(spec.status, 0);
+    assert!(spec.cloexec);
+}
+
+#[test]
+fn musl_open_cloexec_value_is_rejected() {
+    // The pre-S723 musl value must not be silently accepted as a flag alias.
+    assert_eq!(xlat::open_flags(0o2000000), Err(Errno::EINVAL));
+}
+
+#[test]
 fn fcntl_actions() {
     assert_eq!(xlat::fcntl_action(fcntl::F_DUPFD), FcntlAction::DupFd);
     assert_eq!(
