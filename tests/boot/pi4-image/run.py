@@ -145,8 +145,13 @@ class GptSource:
 
 
 def product_root() -> Path:
-    """The checked-out product repository (tests/boot/pi4-image -> repository)."""
-    return HERE.parents[2]
+    """The product repository as invoked (tests/boot/pi4-image -> repository).
+
+    `run.sh` exports the logical workspace path so a minion clone reached through
+    a symlink still finds its sibling management checkout. A direct invocation
+    falls back to the physical location of this file.
+    """
+    return Path(os.environ.get("RAVEN_PRODUCT_ROOT") or HERE.parents[2])
 
 
 def parse_gpt_bytes(data: bytes) -> list[Partition]:
@@ -395,10 +400,10 @@ def find_firmware(product_root: Path) -> Path:
     )
 
 
-def find_management_root(product_root: Path) -> Path:
-    configured = os.environ.get("RAVEN_MGMT_ROOT")
-    if configured:
-        path = Path(configured).expanduser().resolve()
+def find_management_root(product_root: Path, configured: str | None = None) -> Path:
+    raw = os.environ.get("RAVEN_MGMT_ROOT") if configured is None else configured
+    if raw:
+        path = Path(raw).expanduser()
         if path.is_dir():
             return path
         raise VerifyError(f"RAVEN_MGMT_ROOT is not a directory: {path}")
@@ -690,23 +695,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args(argv)
 
-    product_root = HERE.parents[2]
+    repo = product_root()
     try:
         if args.arch != "aarch64":
             raise VerifyError("the Pi 4 image requires --arch aarch64")
         if args.profile != "0.1.0-ufs":
             raise VerifyError("the 0.1.0 Pi 4 image requires --profile 0.1.0-ufs")
         evidence_dir = args.evidence_dir or (
-            find_management_root(product_root)
+            find_management_root(repo)
             / "tickets"
             / "evidence"
             / "artifacts"
             / "S85o"
         )
-        image = args.image or product_root / "build" / "aarch64" / IMAGE_NAME
+        image = args.image or repo / "build" / "aarch64" / IMAGE_NAME
         if args.mutation:
             return mutate_missing_boot_file(image, evidence_dir)
-        build_image(product_root, image, evidence_dir)
+        build_image(repo, image, evidence_dir)
         manifest = verify_image(image, evidence_dir)
     except VerifyError as error:
         print(f"pi4-image: FAIL {error}", file=sys.stderr)

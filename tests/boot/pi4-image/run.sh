@@ -14,6 +14,8 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd -P)
+workspace=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd -L)
 cd "$root"
+export RAVEN_PRODUCT_ROOT="$workspace"
 export PYTHONDONTWRITEBYTECODE=1
 exec python3 "$root/tests/boot/pi4-image/run.py" "$@"

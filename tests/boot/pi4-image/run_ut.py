@@ -9,9 +9,12 @@ Run: python3 tests/boot/pi4-image/run_ut.py
 from __future__ import annotations
 
 import importlib.util
+import os
 import struct
 import sys
+import tempfile
 import unittest
+import unittest.mock
 import zlib
 from pathlib import Path
 
@@ -278,6 +281,25 @@ class RootTests(unittest.TestCase):
         run = load_runner()
         self.assertTrue((run.product_root() / "Makefile").is_file())
         self.assertTrue((run.product_root() / "tests" / "boot" / "pi4-image").is_dir())
+
+    def test_product_root_uses_the_invoked_workspace(self):
+        run = load_runner()
+        with unittest.mock.patch.dict(os.environ, {"RAVEN_PRODUCT_ROOT": "/tmp/invoked"}):
+            self.assertEqual(str(run.product_root()), "/tmp/invoked")
+
+    def test_management_root_is_the_sibling_checkout(self):
+        run = load_runner()
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            (workspace / "ravenbsd-prjmgmt").mkdir()
+            found = run.find_management_root(workspace / "minions" / "dave" / "ravenbsd", "")
+            self.assertEqual(found, workspace / "ravenbsd-prjmgmt")
+
+    def test_missing_management_root_names_the_override(self):
+        run = load_runner()
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(run.VerifyError, "RAVEN_MGMT_ROOT"):
+                run.find_management_root(Path(temporary), "")
 
 
 class SuperblockTests(unittest.TestCase):
