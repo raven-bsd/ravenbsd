@@ -3,16 +3,20 @@
 
 //! Reserved-but-not-yet-defined syscalls (`19-platform-gaps.md`).
 //!
-//! None of these has a number in `raven-abi`. They are safe typed stubs that return `ENOSYS`
-//! until the kernel lands the primitive; the lead then edits this one file and adds the typed
-//! wrapper to [`crate::sys`]. No syscall number is fabricated here.
+//! `GETRANDOM` has landed in the kernel as raw number `0x08` and is implemented here. The other
+//! entries have no number in `raven-abi` and remain safe typed stubs that return `ENOSYS` until
+//! the kernel lands the primitive; the lead then edits this one file and adds the typed wrapper
+//! to [`crate::sys`]. No syscall number is fabricated here.
 
 use core::sync::atomic::AtomicU32;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Timespec};
 
-/// Every entry in this module is pending a kernel primitive.
+/// `GETRANDOM` (`kernel/src/syscall/basic.rs:157`), raw because `raven-abi` has no variant.
+pub const GETRANDOM: usize = 0x08;
+
+/// The module still holds entries pending a kernel primitive.
 pub const PENDING: bool = true;
 
 /// `SYSINFO` record proposed by PG-21.
@@ -43,10 +47,27 @@ pub fn thread_kick(_thread: Handle, _bits: u32) -> Result<(), Errno> {
     Err(Errno::ENOSYS)
 }
 
-/// Fill `buf` from the kernel CSPRNG (PG-52, proposed `GETRANDOM` 0x08).
+/// Fill `buf` from the kernel CSPRNG (PG-52).
+///
+/// The kernel returns the filled byte count, `EINVAL` for unknown flag bits (`GRND_NONBLOCK`
+/// and `GRND_RANDOM` only) and `EAGAIN` when the boot-seeded pool is not ready. A zero-length
+/// request is `0`. The bytes are not generated here; the kernel pool owns the entropy.
 #[doc = "PG-52"]
-pub fn getrandom(_buf: &mut [u8], _flags: u32) -> Result<usize, Errno> {
-    Err(Errno::ENOSYS)
+pub fn getrandom(buf: &mut [u8], flags: u32) -> Result<usize, Errno> {
+    if buf.is_empty() {
+        return Ok(0);
+    }
+    // SAFETY: `buf` is a live writable slice and the kernel copies at most `buf.len()` bytes
+    // through the fault-safe user layer.
+    let raw = unsafe {
+        crate::arch::syscall3(
+            GETRANDOM,
+            buf.as_mut_ptr() as usize,
+            buf.len(),
+            flags as usize,
+        )
+    };
+    crate::errno::ret(raw)
 }
 
 /// Poll a futex once without sleeping (PG-3, proposed futex v2 `HAS_TIMEOUT`).

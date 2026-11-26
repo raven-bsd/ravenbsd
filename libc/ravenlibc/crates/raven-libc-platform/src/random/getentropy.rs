@@ -29,12 +29,16 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 // RavenBSD: transpiled from bionic:libc/bionic/getentropy.cpp @
 // 731631f300090436d7f5df80d50b6275c8c60a93; the 256-byte limit, the fill loop
-// and the save/restore rule are kept; `getrandom(2)` and `/dev/urandom` are
-// replaced by `S:GETRANDOM*` (PG-52) and, until it lands, a cached `rand:`
-// handle with EINTR retry. The source is NOT cryptographic today (A-sys-14):
-// callers that need it must wait for PG-52.
+// and the save/restore rule are kept. `getrandom(2)` is the native `GETRANDOM`
+// syscall (PG-52) with the cached `rand:` handle and EINTR retry only as the
+// fallback; `getentropy` keeps the interim `rand:` source, which is NOT
+// cryptographic today (A-sys-14).
 
-//! `getentropy` over the `rand:` scheme until PG-52.
+//! `getentropy` over the `rand:` scheme; `getrandom` over the native `GETRANDOM` syscall.
+//!
+//! `getrandom` fills from the kernel's boot-seeded pool (PG-52) and keeps `rand:` only as the
+//! documented weak fallback. `getentropy` still reads `rand:`; the interim source is not
+//! cryptographic (A-sys-14).
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -74,8 +78,8 @@ pub fn getentropy<B: SysBackend, L: Lock>(
     if buf.is_empty() {
         return Ok(());
     }
-    // PG-52 will replace the whole body with one `S:GETRANDOM*` call; until then the cached
-    // `rand:` handle is the only source, and it is not cryptographic (A-sys-14).
+    // The kernel CSPRNG is reached through `getrandom` below; this public path keeps the
+    // cached `rand:` handle, which is not cryptographic (A-sys-14).
     let _ = platform.backend().pending(PendingCall::Getrandom);
     let handle = platform.random_handle()?;
     let mut collected = 0usize;
@@ -106,28 +110,48 @@ pub fn seed<B: SysBackend, L: Lock>(platform: &Platform<B, L>) -> Result<[u8; 32
     Ok(seed)
 }
 
-/// `getrandom(buf, flags)`: `ENOSYS` until PG-52; `GRND_NONBLOCK` would be `EAGAIN` without a
-/// seeded kernel source. The interim path reads `rand:` like `getentropy` but does not claim to
-/// be cryptographic.
+/// `getrandom(buf, flags)` over the native `GETRANDOM` syscall.
+///
+/// The kernel fills the buffer from its boot-seeded pool and owns the error values: unknown
+/// flags `EINVAL`, zero length `0`, an unseeded pool `EAGAIN`. The `rand:` scheme is only a
+/// fallback for a kernel without the primitive (`ENOSYS`) or before its pool is ready
+/// (`EAGAIN`); it never replaces the kernel's own error contract.
 pub fn getrandom<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     buf: &mut [u8],
     flags: u32,
 ) -> Result<usize, Errno> {
-    // The kernel CSPRNG (PG-52/G-7) is not available. Rust std's HashMap seed calls this
-    // primitive; use the documented weak `rand:` source in 256-byte chunks rather than making
-    // every std collection panic. ENTROPY_WEAK stays set until PG-52 lands (A-sys-14).
-    if flags & !0x7 != 0 {
+    // `kernel/src/syscall/basic.rs:163` accepts only `GRND_NONBLOCK` and `GRND_RANDOM`.
+    if flags & !0x3 != 0 {
         return Err(Errno::EINVAL);
     }
-    let mut done = 0usize;
-    while done < buf.len() {
-        let end = done.saturating_add(GETENTROPY_MAX).min(buf.len());
-        let chunk = buf.get_mut(done..end).ok_or(Errno::EIO)?;
-        getentropy(platform, chunk)?;
-        done = end;
+    if buf.is_empty() {
+        return Ok(0);
     }
-    Ok(buf.len())
+    let kernel_error = match raven_libc_sys::pending::getrandom(buf, flags) {
+        Ok(count) => return Ok(count),
+        Err(error @ (Errno::ENOSYS | Errno::EAGAIN)) => error,
+        Err(error) => return Err(error),
+    };
+    match fill_rand(platform, buf) {
+        Ok(()) => Ok(buf.len()),
+        Err(_) => Err(kernel_error),
+    }
+}
+
+/// Fill `buf` from the `rand:` scheme in `GETENTROPY_MAX` chunks.
+fn fill_rand<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    buf: &mut [u8],
+) -> Result<(), Errno> {
+    let mut collected = 0usize;
+    while collected < buf.len() {
+        let end = collected.saturating_add(GETENTROPY_MAX).min(buf.len());
+        let chunk = buf.get_mut(collected..end).ok_or(Errno::EIO)?;
+        getentropy(platform, chunk)?;
+        collected = end;
+    }
+    Ok(())
 }
 
 /// The bytes read from a `rand:` handle; kept for tests that need a deterministic source.

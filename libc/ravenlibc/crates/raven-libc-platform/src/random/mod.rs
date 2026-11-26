@@ -3,8 +3,10 @@
 
 //! Entropy for ravenlibc.
 //!
-//! `getrandom` and `getentropy` read the `rand:` scheme until PG-52 adds a kernel CSPRNG. The
-//! `ENTROPY_WEAK` flag stays set until then (H-5) and is queryable by the hardening area.
+//! `getrandom` fills from the kernel's boot-seeded pool through the native `GETRANDOM` syscall
+//! (PG-52) and falls back to the `rand:` scheme only when the kernel cannot serve it.
+//! `getentropy` still reads `rand:`. The `ENTROPY_WEAK` flag stays set (H-5) and is queryable by
+//! the hardening area.
 
 pub mod getentropy;
 

@@ -65,17 +65,66 @@ fn seed_is_32_bytes_and_clock_mixed() {
 }
 
 #[test]
-fn getrandom_uses_the_weak_rand_source_until_pg_52() {
+fn getrandom_prefers_the_kernel_pool() {
+    raven_libc_sys::fake::reset();
+    raven_libc_sys::fake::seed_entropy(&[0x42; 32]);
     let fake = FakeSys::new();
     fake.rand(&[0u8; 32]);
     let platform = Platform::new(fake);
+    let mut buffer = [0u8; 16];
+    assert_eq!(getrandom(&platform, &mut buffer, 0), Ok(16));
+    assert_eq!(buffer, [0x42; 16]);
+}
+
+#[test]
+fn getrandom_falls_back_to_rand_without_kernel_entropy() {
+    raven_libc_sys::fake::reset();
+    let fake = FakeSys::new();
+    fake.rand(&[0x33; 8]);
+    let platform = Platform::new(fake);
     let mut buffer = [0u8; 8];
     assert_eq!(getrandom(&platform, &mut buffer, 0), Ok(8));
-    assert_eq!(buffer, [0u8; 8]);
+    assert_eq!(buffer, [0x33; 8]);
+}
+
+#[test]
+fn getrandom_keeps_eagain_when_both_sources_are_empty() {
+    raven_libc_sys::fake::reset();
+    let platform = Platform::new(FakeSys::new());
+    let mut buffer = [0u8; 4];
+    assert_eq!(getrandom(&platform, &mut buffer, 0), Err(Errno::EAGAIN));
+}
+
+#[test]
+fn getrandom_rejects_unknown_flags_before_filling() {
+    raven_libc_sys::fake::reset();
+    let fake = FakeSys::new();
+    fake.rand(&[0x55; 8]);
+    let platform = Platform::new(fake);
+    let mut buffer = [0u8; 4];
+    assert_eq!(getrandom(&platform, &mut buffer, 4), Err(Errno::EINVAL));
     assert_eq!(
         getrandom(&platform, &mut buffer, 0x8000),
         Err(Errno::EINVAL)
     );
+    assert_eq!(buffer, [0u8; 4]);
+}
+
+#[test]
+fn getrandom_zero_length_is_zero() {
+    raven_libc_sys::fake::reset();
+    let platform = Platform::new(FakeSys::new());
+    assert_eq!(getrandom(&platform, &mut [], 0), Ok(0));
+}
+
+#[test]
+fn getrandom_fills_large_buffers_from_the_kernel() {
+    raven_libc_sys::fake::reset();
+    raven_libc_sys::fake::seed_entropy(&[0x77; 300]);
+    let platform = Platform::new(FakeSys::new());
+    let mut buffer = [0u8; 300];
+    assert_eq!(getrandom(&platform, &mut buffer, 0), Ok(300));
+    assert!(buffer.iter().all(|&byte| byte == 0x77));
 }
 
 #[test]

@@ -73,6 +73,8 @@ pub struct Kernel {
     pub threads: usize,
     /// Deterministic `(syscall, result)` trace.
     pub trace: Vec<u64>,
+    /// Deterministic bytes served by `GETRANDOM`; empty means the pool is unseeded.
+    pub entropy: Vec<u8>,
 }
 
 impl Default for Kernel {
@@ -98,6 +100,7 @@ impl Kernel {
             exit_code: 0,
             threads: 1,
             trace: Vec::new(),
+            entropy: Vec::new(),
         }
     }
 
@@ -234,6 +237,10 @@ impl Kernel {
         // Raw PIPE2 (`kernel/src/syscall/pipe.rs:21`) is not a raven-abi `Syscall` variant.
         if number == 0x6f {
             return self.sys_pipe2(args);
+        }
+        // Raw GETRANDOM (`kernel/src/syscall/basic.rs:157`) is not a raven-abi `Syscall` variant.
+        if number == crate::pending::GETRANDOM {
+            return self.sys_getrandom(args);
         }
         let call = Syscall::from_usize(number).ok_or(Errno::ENOSYS)?;
         match call {
@@ -722,6 +729,27 @@ impl Kernel {
         }
     }
 
+    fn sys_getrandom(&mut self, args: [usize; 6]) -> Result<usize, Errno> {
+        // `kernel/src/syscall/basic.rs:157-193`.
+        let len = args[1];
+        let flags = args[2] as u32;
+        if flags & !0x3 != 0 {
+            return Err(Errno::EINVAL);
+        }
+        if len > 0x1fff_ffff {
+            return Err(Errno::EINVAL);
+        }
+        if len == 0 {
+            return Ok(0);
+        }
+        if self.entropy.len() < len {
+            return Err(Errno::EAGAIN);
+        }
+        let bytes: Vec<u8> = self.entropy.drain(..len).collect();
+        self.write_user(args[0], &bytes)?;
+        Ok(len)
+    }
+
     fn sys_pipe2(&mut self, args: [usize; 6]) -> Result<usize, Errno> {
         // `kernel/src/process/pipe.rs:35-38` and `:149`.
         const O_NONBLOCK: u32 = 0o4000;
@@ -854,6 +882,11 @@ pub(crate) fn test_lock() -> MutexGuard<'static, ()> {
 pub fn reset() {
     let mut guard = lock();
     *guard = Some(Kernel::new());
+}
+
+/// Seed the deterministic fake `GETRANDOM` pool; the bytes are served in order.
+pub fn seed_entropy(bytes: &[u8]) {
+    with_kernel(|kernel| kernel.entropy = bytes.to_vec());
 }
 
 fn lock() -> MutexGuard<'static, Option<Kernel>> {
