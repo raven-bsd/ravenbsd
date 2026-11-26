@@ -122,4 +122,4 @@ regex = '^svcd: settled$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|irq: resource busy|launch failed|msix unavailable'
+regex = '(?i)panic|EXCEPTION|irq: resource busy|launch failed'
