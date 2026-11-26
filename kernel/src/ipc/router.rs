@@ -295,7 +295,7 @@ fn read_at(
             return Err(error);
         }
     };
-    if len <= 64 {
+    if len <= 64 || status == 22 {
         crate::kprintln!("ipc-read: reply status={} result={} len={}", status, result, len);
     }
     let trace_wait = if trace { crate::time::now_ns() } else { 0 };
