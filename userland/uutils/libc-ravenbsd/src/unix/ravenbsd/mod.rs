@@ -20,9 +20,9 @@ pub type nfds_t = c_ulong;
 pub type nlink_t = u32;
 pub type off_t = c_longlong;
 pub type pthread_t = *mut c_void;
-// Must be usize due to library/std/sys_common/thread_local.rs,
-// should technically be *mut c_void
-pub type pthread_key_t = usize;
+pub type pthread_key_t = c_int;
+#[doc = "FreeBSD pthread_spinlock_t is a pointer to the opaque struct"]
+pub type pthread_spinlock_t = *mut c_void;
 pub type rlim_t = c_ulonglong;
 pub type sa_family_t = u16;
 pub type sem_t = *mut c_void;
@@ -49,7 +49,6 @@ s! {
         pub release: [c_char; UTSLENGTH],
         pub version: [c_char; UTSLENGTH],
         pub machine: [c_char; UTSLENGTH],
-        pub domainname: [c_char; UTSLENGTH],
     }
 
     pub struct sigset_t {
@@ -315,11 +314,6 @@ s! {
     pub struct pthread_once_t {
         bytes: [u8; _PTHREAD_ONCE_SIZE],
     }
-    #[repr(C)]
-    #[repr(align(4))]
-    pub struct pthread_spinlock_t {
-        bytes: [u8; _PTHREAD_SPINLOCK_SIZE],
-    }
 
     pub struct rlimit {
         pub rlim_cur: crate::rlim_t,
@@ -379,7 +373,6 @@ const _PTHREAD_COND_SIZE: usize = 48;
 const _PTHREAD_MUTEX_SIZE: usize = 40;
 const _PTHREAD_MUTEXATTR_SIZE: usize = 4;
 const _PTHREAD_ONCE_SIZE: usize = 4;
-const _PTHREAD_SPINLOCK_SIZE: usize = 4;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -429,7 +422,7 @@ impl siginfo_t {
     }
 }
 
-pub const UTSLENGTH: usize = 65;
+pub const UTSLENGTH: usize = 256;
 
 // intentionally not public, only used for fd_set
 cfg_if! {
@@ -810,10 +803,10 @@ pub const POLLWRNORM: c_short = 0x100;
 pub const POLLWRBAND: c_short = 0x200;
 
 // pthread.h
-pub const PTHREAD_MUTEX_DEFAULT: c_int = 0;
-pub const PTHREAD_MUTEX_NORMAL: c_int = 0;
-pub const PTHREAD_MUTEX_RECURSIVE: c_int = 1;
-pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 2;
+pub const PTHREAD_MUTEX_DEFAULT: c_int = 1;
+pub const PTHREAD_MUTEX_NORMAL: c_int = 3;
+pub const PTHREAD_MUTEX_RECURSIVE: c_int = 2;
+pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 1;
 
 pub const PTHREAD_MUTEX_STALLED: c_int = 0;
 pub const PTHREAD_MUTEX_ROBUST: c_int = 1;
@@ -1371,8 +1364,8 @@ pub const _SC_REGEXP: c_int = 155;
 pub const _SC_RTSIG_MAX: c_int = 31;
 pub const _SC_SAVED_IDS: c_int = 8;
 pub const _SC_SEMAPHORES: c_int = 21;
-pub const _SC_SEM_NSEMS_MAX: c_int = 32;
-pub const _SC_SEM_VALUE_MAX: c_int = 33;
+pub const _SC_SEM_NSEMS_MAX: c_int = 49;
+pub const _SC_SEM_VALUE_MAX: c_int = 50;
 pub const _SC_SHARED_MEMORY_OBJECTS: c_int = 22;
 pub const _SC_SHELL: c_int = 157;
 pub const _SC_SIGSTKSZ: c_int = 250;
