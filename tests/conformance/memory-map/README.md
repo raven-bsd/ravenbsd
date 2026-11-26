@@ -33,8 +33,16 @@ sh tests/conformance/memory-map/build.sh
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --iterations 100
 python3 tests/conformance/memory-map/run.py --image ... --iterations 100 --smp 1
+python3 tests/conformance/memory-map/run.py --image ... --sibling-exit
 python3 tests/conformance/memory-map/run.py --image build/conformance/memory-map/memory-map.img --mutation
 ```
+
+`--sibling-exit` (S715) runs `/bin/mmap-probe --sibling-exit`: one thread keeps writing a shared
+user page and periodically enters an interruptible one-millisecond `poll` while the main thread
+calls `_exit(0)`. The runner requires the probe exit status 0 and correlates the printed pid with
+the kernel's `s194: quiesce waited pid=<pid>` and `s194: last-exit pid=<pid> code=0` lines. A
+missing quiesce wait, a page fault/panic, or a command that does not return inside the bounded
+window fails the row. The image command line enables `s194-trace=1` for that correlation.
 
 `--smp N` sets the CPU count (default 4). `--smp 1` isolates the kernel heap churn from the
 separate S195 R10 TLB-shootdown timeout, which is quoted as an S195 finding and does not gate the
@@ -56,10 +64,16 @@ product boot/login defect is handed to its owner with the serial lines above.
 fork/exit cycles exercise the kernel heap. The image command line also enables `k449-metrics=1`;
 the runner records the pre-loop and post-loop `K449-GRAPH`/`K449-METRICS` samples. The 1440-byte
 allocation in the S195 panic is served from the kernel 1536-byte size class, so the gate requires
-`class1536_in_use` (plus `heap_used`, `procs` and `threads`) to return to the pre-loop baseline
-within a small tolerance for `--iterations` of 10 or more. A leaking per-mapping or per-child
-object grows the class until its 512-object slab table is exhausted and the next 1440-byte
-allocation panics.
+`class1536_in_use` (plus `heap_used`, `procs`, `threads` and `pt_frames`) to return to the
+pre-loop baseline within a small tolerance for `--iterations` of 10 or more. A leaking
+per-mapping or per-child object grows the class until its 512-object slab table is exhausted and
+the next 1440-byte allocation panics.
+
+The counters answer different questions. `procs` is the live `Process` value count, while
+`class3072_in_use` is the allocator block count: a dead `Weak` entry that keeps a `Process`
+`ArcInner` alive raises `class3072_in_use` without raising `procs`. `heap_used` includes `Vec`
+capacity, cached slabs and every other kernel allocation, and `frames_alloc`/`pt_frames` count
+page frames and page-table (PTE) metadata respectively, so those use large measured bounds.
 
 ## Donor map
 

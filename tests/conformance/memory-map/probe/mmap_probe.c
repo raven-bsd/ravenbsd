@@ -8,17 +8,83 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <pthread.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PAGE 4096
 
 static int mutation_private_shared = 0;
+
+// S715 sibling-exit state. The worker keeps touching a shared user page and periodically blocks
+// in an interruptible one-millisecond poll while the main thread calls _exit. The kernel must
+// quiesce the worker before it releases the address space; the serial trace names the probe pid.
+static char *sibling_page;
+static int sibling_pipe[2];
+static volatile sig_atomic_t sibling_ready;
+static volatile unsigned long sibling_ticks;
+
+static void *sibling_worker(void *argument) {
+    (void)argument;
+    unsigned long ticks = 0;
+    sibling_page[0] = (char)0xa5;
+    for (;;) {
+        sibling_page[1] = (char)(ticks & 0xff);
+        if ((ticks & 63) == 0) {
+            struct pollfd ready = {.fd = sibling_pipe[0], .events = POLLIN, .revents = 0};
+            (void)poll(&ready, 1, 1);
+        }
+        ticks++;
+        sibling_ticks = ticks;
+        if (!sibling_ready) {
+            sibling_ready = 1;
+            printf("S715-SIBLING ready pid=%d ticks=%lu\n", (int)getpid(), ticks);
+            fflush(stdout);
+        }
+    }
+    return NULL;
+}
+
+// Exit while the sibling is running user memory writes and an interruptible kernel wait. The
+// row itself is printed before _exit; the runner correlates its pid with the kernel's
+// `s194: quiesce waited` and `s194: last-exit` lines.
+static int sibling_exit(void) {
+    sibling_page = mmap(NULL, PAGE, PROT_READ | PROT_WRITE,
+                        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (sibling_page == MAP_FAILED) {
+        printf("S715-MAIN fail=map errno=%d\n", errno);
+        return 1;
+    }
+    if (pipe(sibling_pipe) != 0) {
+        printf("S715-MAIN fail=pipe errno=%d\n", errno);
+        return 1;
+    }
+    pthread_t worker;
+    int created = pthread_create(&worker, NULL, sibling_worker, NULL);
+    if (created != 0) {
+        printf("S715-MAIN fail=create rc=%d\n", created);
+        return 1;
+    }
+    while (!sibling_ready) {
+        sched_yield();
+    }
+    struct timespec delay = {.tv_sec = 0, .tv_nsec = 200 * 1000 * 1000};
+    (void)nanosleep(&delay, NULL);
+    unsigned long ticks = sibling_ticks;
+    int pid = (int)getpid();
+    printf("S715-MAIN exit pid=%d ticks=%lu\n", pid, ticks);
+    printf("mmap: sibling-exit pid=%d ticks=%lu ok=%d\n", pid, ticks, ticks > 0);
+    fflush(stdout);
+    _exit(0);
+}
 
 static void row(const char *name, int ok, const char *extra) {
     printf("mmap: %s %sok=%d\n", name, extra ? extra : "", ok);
@@ -219,12 +285,18 @@ static void run_rows(void) {
 
 int main(int argc, char **argv) {
     int iterations = 1;
+    int run_sibling_exit = 0;
     for (int index = 1; index < argc; index++) {
         if (strcmp(argv[index], "--mutation=private-shared") == 0) {
             mutation_private_shared = 1;
+        } else if (strcmp(argv[index], "--sibling-exit") == 0) {
+            run_sibling_exit = 1;
         } else if (strncmp(argv[index], "--iterations=", 13) == 0) {
             iterations = atoi(argv[index] + 13);
         }
+    }
+    if (run_sibling_exit) {
+        return sibling_exit();
     }
     if (iterations < 1) {
         iterations = 1;

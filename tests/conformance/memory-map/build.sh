@@ -36,7 +36,7 @@ overlay=${CARGO_TARGET_DIR:-target}/debug/raven-b70-overlay
 
 echo "mmap-image: release image"
 cargo xtask image --arch "$arch" --profile release \
-    --cmdline "console=ttyS0 loglevel=info test-exit=1 k449-metrics=5" \
+    --cmdline "console=ttyS0 loglevel=info test-exit=1 k449-metrics=5 s194-trace=1" \
     --initfs "$out/initfs.img" \
     --output "$out/memory-map.img"
 
