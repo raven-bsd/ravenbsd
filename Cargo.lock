@@ -5005,6 +5005,7 @@ dependencies = [
  "raven-abi",
  "raven-driver",
  "raven-rt",
+ "raven-scheme",
  "raven-usb-core",
  "raven-usb-hid",
  "raven-xhci",
