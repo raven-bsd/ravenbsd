@@ -270,6 +270,7 @@ fn validate_name(name: &[u8]) -> Result<(), ProtoError> {
     if name.contains(&b'/') || name.contains(&0) {
         return Err(ProtoError::InvalidName);
     }
+    // POSIX path names are byte strings; non-UTF-8 names are legal and must not be dropped.
     Ok(())
 }
 

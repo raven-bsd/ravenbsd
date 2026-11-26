@@ -66,9 +66,9 @@ impl SysFile for ShellEnv {
     fn fstat(&self, fd: i32) -> Result<StatLite, Errno> {
         let stat = platform::global().fstat(fd).map_err(error)?;
         Ok(StatLite {
-            mode: stat.st_mode,
+            mode: u32::from(stat.st_mode),
             blksize: u32::try_from(stat.st_blksize).unwrap_or(0),
-            is_char_dev: stat.st_mode & raven_libc_abi::stat::S_IFMT
+            is_char_dev: u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT
                 == raven_libc_abi::stat::S_IFCHR,
         })
     }

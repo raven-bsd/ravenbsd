@@ -34,7 +34,8 @@ pub const DT_REG: u32 = 8;
 pub const DT_SOCK: u32 = 12;
 pub const DT_UNKNOWN: u32 = 0;
 pub const DT_WHT: u32 = 14;
-pub const S_IEXEC: u32 = S_IXUSR;
+/// visible: bsd
+pub const S_IEXEC: u32 = 0o100;
 pub const S_IFBLK: u32 = 0o60000;
 pub const S_IFCHR: u32 = 0o20000;
 pub const S_IFDIR: u32 = 0o40000;
@@ -43,7 +44,8 @@ pub const S_IFLNK: u32 = 0o120000;
 pub const S_IFMT: u32 = 0o170000;
 pub const S_IFREG: u32 = 0o100000;
 pub const S_IFSOCK: u32 = 0o140000;
-pub const S_IREAD: u32 = S_IRUSR;
+/// visible: bsd
+pub const S_IREAD: u32 = 0o400;
 pub const S_IRGRP: u32 = 0o40;
 pub const S_IROTH: u32 = 0o4;
 pub const S_IRUSR: u32 = 0o400;
@@ -52,18 +54,19 @@ pub const S_IRWXO: u32 = 0o7;
 pub const S_IRWXU: u32 = 0o700;
 pub const S_ISGID: u32 = 0o2000;
 /// visible: bsd
-pub const S_ISTXT: u32 = S_ISVTX;
+pub const S_ISTXT: u32 = 0o1000;
 pub const S_ISUID: u32 = 0o4000;
 pub const S_ISVTX: u32 = 0o1000;
 pub const S_IWGRP: u32 = 0o20;
 pub const S_IWOTH: u32 = 0o2;
-pub const S_IWRITE: u32 = S_IWUSR;
+/// visible: bsd
+pub const S_IWRITE: u32 = 0o200;
 pub const S_IWUSR: u32 = 0o200;
 pub const S_IXGRP: u32 = 0o10;
 pub const S_IXOTH: u32 = 0o1;
 pub const S_IXUSR: u32 = 0o100;
-pub const UTIME_NOW: u32 = 0x3fffffff;
-pub const UTIME_OMIT: u32 = 0x3ffffffe;
+pub const UTIME_NOW: i32 = -1;
+pub const UTIME_OMIT: i32 = -2;
 
 /// Every entry of this group as `(name, value)`, sorted by name.
 pub const ALL: &[(&str, i128)] = &[
@@ -103,6 +106,6 @@ pub const ALL: &[(&str, i128)] = &[
     ("S_IXGRP", 8i128),
     ("S_IXOTH", 1i128),
     ("S_IXUSR", 64i128),
-    ("UTIME_NOW", 1073741823i128),
-    ("UTIME_OMIT", 1073741822i128),
+    ("UTIME_NOW", -1i128),
+    ("UTIME_OMIT", -2i128),
 ];

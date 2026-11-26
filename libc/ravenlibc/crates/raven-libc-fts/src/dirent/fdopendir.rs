@@ -49,7 +49,7 @@ impl DirStream {
         if sys.fcntl_getfl(fd)? & O_PATH != 0 {
             return Err(Errno(EBADF as u16));
         }
-        if stat.st_mode & S_IFMT != S_IFDIR {
+        if u32::from(stat.st_mode) & S_IFMT != S_IFDIR {
             return Err(Errno(ENOTDIR as u16));
         }
         Ok(Self::with_fd(fd))

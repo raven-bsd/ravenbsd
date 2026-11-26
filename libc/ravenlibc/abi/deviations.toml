@@ -12,9 +12,16 @@ schema = 1
 [[deviation]]
 name = "stat"
 against = "musl"
-ours = "128/8"
-theirs = { x86_64 = "144/8" }
-reason = "DV5/H-15: one 128-byte struct stat on all three arches; musl x86_64 is Linux's 144-byte kernel shape; linuxd converts"
+ours = "224/8"
+theirs = { x86_64 = "144/8", aarch64 = "128/8", riscv64 = "128/8" }
+reason = "H-15/DV5: the public struct stat is the FreeBSD 133344405 record on all arches; musl carries the Linux shapes (144 on x86_64, 128 on the asm-generic arches); linuxd converts"
+
+[[deviation]]
+name = "statvfs"
+against = "musl"
+ours = "88/8"
+theirs = { x86_64 = "112/8", aarch64 = "112/8", riscv64 = "112/8" }
+reason = "DR-69: the public struct statvfs is the FreeBSD 133344405 field order (88 bytes); musl's 112-byte order is the Linux one and stays confined to linuxd"
 
 [[deviation]]
 name = "nlink_t"

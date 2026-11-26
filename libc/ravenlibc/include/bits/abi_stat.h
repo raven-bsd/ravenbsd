@@ -39,7 +39,10 @@
 #define DT_SOCK 12
 #define DT_UNKNOWN 0
 #define DT_WHT 14
-#define S_IEXEC S_IXUSR
+#if __BSD_VISIBLE
+/* visible: bsd */
+#define S_IEXEC 0100
+#endif
 #define S_IFBLK 060000
 #define S_IFCHR 020000
 #define S_IFDIR 040000
@@ -48,7 +51,10 @@
 #define S_IFMT 0170000
 #define S_IFREG 0100000
 #define S_IFSOCK 0140000
-#define S_IREAD S_IRUSR
+#if __BSD_VISIBLE
+/* visible: bsd */
+#define S_IREAD 0400
+#endif
 #define S_IRGRP 040
 #define S_IROTH 04
 #define S_IRUSR 0400
@@ -58,18 +64,21 @@
 #define S_ISGID 02000
 #if __BSD_VISIBLE
 /* visible: bsd */
-#define S_ISTXT S_ISVTX
+#define S_ISTXT 01000
 #endif
 #define S_ISUID 04000
 #define S_ISVTX 01000
 #define S_IWGRP 020
 #define S_IWOTH 02
-#define S_IWRITE S_IWUSR
+#if __BSD_VISIBLE
+/* visible: bsd */
+#define S_IWRITE 0200
+#endif
 #define S_IWUSR 0200
 #define S_IXGRP 010
 #define S_IXOTH 01
 #define S_IXUSR 0100
-#define UTIME_NOW 0x3fffffff
-#define UTIME_OMIT 0x3ffffffe
+#define UTIME_NOW (-1)
+#define UTIME_OMIT (-2)
 
 #endif /* _RAVEN_BITS_ABI_STAT_H */
