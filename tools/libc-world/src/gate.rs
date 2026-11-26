@@ -18,12 +18,14 @@ pub struct GateReport {
 /// Evaluate the gate.
 #[must_use]
 pub fn evaluate(results: &[PackageResult], world: &World, phase: u8, min_built: u32) -> GateReport {
+    // Only packages named by the world list count: a result for an unknown package is not a
+    // built world package and must never satisfy C13.
     let non_optional: Vec<&PackageResult> = results
         .iter()
         .filter(|result| {
             world
                 .package(&result.name)
-                .is_none_or(|package| !package.optional)
+                .is_some_and(|package| !package.optional)
         })
         .collect();
     let built = non_optional
@@ -100,7 +102,11 @@ pub fn evaluate(results: &[PackageResult], world: &World, phase: u8, min_built: 
             }
         }
         _ => {
-            let total = non_optional.len();
+            let total = world
+                .packages()
+                .iter()
+                .filter(|package| !package.optional)
+                .count();
             let all = total > 0 && built == total;
             met &= all;
             lines.push(format!(
