@@ -13,7 +13,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$ROOT" || exit 1
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp/opencode}/k376-selftest.XXXXXX") || exit 1
-trap 'rm -rf "$tmp"' EXIT INT TERM
+trap 'sh tests/smp/tlb/load-generator.sh stop "$tmp/load.pids" >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT INT TERM
 
 fail() {
     echo "selftest: FAIL: $*" >&2
