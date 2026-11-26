@@ -17,7 +17,6 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-smp", "1",
     "-drive", "if=none,id=d0,format=raw,file=build/fixtures/virtio-blk/disk.img",
-    "-device", "virtio-blk-pci,drive=d0,disable-legacy=on",
 ]
 expect_exit = "success"
 
