@@ -306,16 +306,22 @@ class SuperblockTests(unittest.TestCase):
     def setUp(self):
         self.run = load_runner()
 
-    def test_accepts_ufs2_magic(self):
+    def block(self, magic=0x19540119, location=65536):
         block = bytearray(8192)
-        struct.pack_into("<I", block, 1372, 0x19540119)
-        self.run.check_ufs2_superblock(bytes(block))
+        struct.pack_into("<I", block, 1372, magic)
+        struct.pack_into("<Q", block, 1000, location)
+        return bytes(block)
+
+    def test_accepts_ufs2_magic(self):
+        self.run.check_ufs2_superblock(self.block())
 
     def test_rejects_ufs1_magic(self):
-        block = bytearray(8192)
-        struct.pack_into("<I", block, 1372, 0x01195401)
         with self.assertRaisesRegex(self.run.VerifyError, "UFS2"):
-            self.run.check_ufs2_superblock(bytes(block))
+            self.run.check_ufs2_superblock(self.block(magic=0x00011954))
+
+    def test_rejects_wrong_superblock_location(self):
+        with self.assertRaisesRegex(self.run.VerifyError, "superblock location"):
+            self.run.check_ufs2_superblock(self.block(location=8192))
 
 
 if __name__ == "__main__":

@@ -33,9 +33,11 @@ BOOT_MANIFEST = HERE / "boot-manifest.txt"
 SECTOR = 512
 FAT_TYPE = "28732ac11ff8d211ba4b00a0c93ec93b"
 UFS_TYPE = "b67c6e51cf6ed6118ff800022d09712b"
-SBLOCK_UFS2 = 65536
+SBLOCK_PROBE = 8192
+UFS2_SBLOCKLOC = 65536
 UFS2_MAGIC = 0x19540119
 SUPERBLOCK_MAGIC_OFFSET = 1372
+SUPERBLOCK_LOC_OFFSET = 1000
 
 IMAGE_NAME = "ravenbsd-pi4-0.1.0.img"
 DEFAULT_EPOCH = "1700000000"
@@ -358,6 +360,11 @@ def check_ufs2_superblock(block: bytes) -> None:
     magic = struct.unpack_from("<I", block, SUPERBLOCK_MAGIC_OFFSET)[0]
     if magic != UFS2_MAGIC:
         raise VerifyError(f"UFS2 superblock magic is {magic:#010x}, need {UFS2_MAGIC:#010x}")
+    location = struct.unpack_from("<Q", block, SUPERBLOCK_LOC_OFFSET)[0]
+    if location != UFS2_SBLOCKLOC:
+        raise VerifyError(
+            f"UFS2 superblock location is {location}, need {UFS2_SBLOCKLOC}"
+        )
 
 
 def sha256_file(path: Path) -> str:
@@ -532,7 +539,7 @@ def verify_image(image: Path, evidence_dir: Path) -> dict:
     source = GptSource.from_path(image)
     try:
         parts = parse_gpt(source)
-        check_ufs2_superblock(source.read(parts[1].offset + SBLOCK_UFS2, 8192))
+        check_ufs2_superblock(source.read(parts[1].offset + SBLOCK_PROBE, 8192))
         entries = load_boot_manifest(BOOT_MANIFEST)
         files = {entry.path: fat_read(image, parts[0], entry.path) for entry in entries}
     finally:
