@@ -202,18 +202,21 @@ fn scalar_types_match_the_abi() {
 
 #[test]
 fn stat_layout_matches_the_abi() {
+    // FreeBSD 133344405 `struct stat` (224 bytes): nlink is 64-bit, mode 16-bit, the
+    // birth timespec follows ctim, and the tail is blksize/flags/gen/filerev/spare.
     const FIELDS: &[&str] = &[
-        "u64", "u64", "u32", "u32", "u32", "u32", "u64", "u64", "i64", "i32", "i32", "i64", "i64",
-        "i64", "i64", "i64", "i64", "i64", "[u32; 2]",
+        "u64", "u64", "u64", "u16", "i16", "u32", "u32", "i32", "u64", "i64", "i64", "i64", "i64",
+        "i64", "i64", "i64", "i64", "i64", "i64", "i32", "u32", "u64", "u64", "[u64; 9]",
     ];
     assert_clean(compare_struct("stat", FIELDS), "stat");
 }
 
 #[test]
 fn statvfs_layout_matches_the_abi() {
+    // FreeBSD `struct statvfs` is eleven 64-bit words (88 bytes); the old snapshot
+    // carried two extra padding words.
     const FIELDS: &[&str] = &[
-        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u32",
-        "[i32; 5]",
+        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64",
     ];
     assert_clean(compare_struct("statvfs", FIELDS), "statvfs");
 }
