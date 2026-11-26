@@ -16,7 +16,11 @@ fn area_sizes_and_alignment() {
     assert_eq!(core::mem::align_of::<PwdArea>(), 8);
     assert_eq!(core::mem::align_of::<GrpArea>(), 8);
     assert_eq!(core::mem::align_of::<Area>(), 8);
-    assert_eq!(core::mem::size_of::<Passwd>(), 48);
+    assert_eq!(core::mem::size_of::<Passwd>(), 80);
+    assert_eq!(core::mem::offset_of!(Passwd, pw_change), 24);
+    assert_eq!(core::mem::offset_of!(Passwd, pw_class), 32);
+    assert_eq!(core::mem::offset_of!(Passwd, pw_expire), 64);
+    assert_eq!(core::mem::offset_of!(Passwd, pw_fields), 72);
     assert_eq!(core::mem::size_of::<Group>(), 32);
 }
 
@@ -60,6 +64,10 @@ fn passwd_record_points_into_the_buffer() {
         );
     }
     assert_eq!(record.pw_uid, 0);
+    assert_eq!(record.pw_change, 0);
+    assert!(record.pw_class.is_null());
+    assert_eq!(record.pw_expire, 0);
+    assert_eq!(record.pw_fields, raven_libc_pwd::PWF_PLAIN);
 }
 
 #[test]

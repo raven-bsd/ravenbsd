@@ -4,22 +4,24 @@
 # BSD-only reservation ledger (view of C36's abi/*.toml data).
 
 [errno]
-range = [1000, 1099]
-EDOOFUS = 1000
-EFTYPE = 1001
-EAUTH = 1002
-ENEEDAUTH = 1003
-EPROCLIM = 1004
-EBADRPC = 1005
-ERPCMISMATCH = 1006
-EPROGUNAVAIL = 1007
-EPROGMISMATCH = 1008
-EPROCUNAVAIL = 1009
-ENOTCAPABLE = 1010
-ECAPMODE = 1011
-EINTEGRITY = 1012
-EIPSEC = 1013
-ENOATTR = "ENODATA"
+# Native errors are the FreeBSD set (DR-69); the values live in abi/errno.toml. This ledger names
+# the errors that FreeBSD defines and the Linux UAPI does not, so a Linux-personality conversion
+# has an explicit destination at the boundary (raven-linux-abi::errno).
+range = [1, 97]
+EPROCLIM = 67
+EBADRPC = 72
+ERPCMISMATCH = 73
+EPROGUNAVAIL = 74
+EPROGMISMATCH = 75
+EPROCUNAVAIL = 76
+EFTYPE = 79
+EAUTH = 80
+ENEEDAUTH = 81
+ENOATTR = 87
+EDOOFUS = 88
+ENOTCAPABLE = 93
+ECAPMODE = 94
+EINTEGRITY = 97
 
 [open]
 bits = [28, 29, 30]

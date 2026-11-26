@@ -46,6 +46,21 @@ The qtest harness defaults to `-smp 4` for x86_64. The KVM cases append `-accel 
 runner exits non-zero and the serial log is kept under `build/smp/lock-time/logs/`. A flake or a
 lost wake is a blocker, not a retry.
 
+## Frame-window case
+
+`leak.toml` runs the same futex wake/timeout churn as the S36 lifecycle fixture, but as a boot
+service. The fixture starts after `vfsd` and `resolvd` are ready, then emits exit-90 and exit-91
+marker children; the kernel's `s36-lockcheck` diagnostic samples `frame::stats().allocated_bytes`
+between them. Because the late services are settled before the baseline, the delta covers only
+the lock/time churn.
+
+`leak-early.toml` is the negative control: the same service without the `resolvd` dependency.
+It starts before the resolver, so resolvd's resident frames land inside the window and the
+forbidden `s36: lockcheck leak` row appears. It is expected to fail; `leak.toml` is the gate.
+
+Both cases build `build/smp/lock-time/leak*-initfs.img` from the core base image and overlay the
+fixture, a core-built `resolvd`, their service manifests and a one-shot `svcd.conf`.
+
 ## TLB narrowing variants
 
 `lock-time-tcg-nomem.toml` disables the TLB pressure (`mem_period=0`) and keeps the timers and
@@ -60,7 +75,9 @@ case is a strict clean gate.
 `lock-time-tcg2.toml` runs the full TLB+timer workload on TCG `-smp 2`; the guest completes
 50/50 with no timeout. It is now a strict clean gate like `lock-time-tcg.toml` (4 CPUs).
 
-The 50/50 TCG and KVM `-smp 2/4` gate is green for S113; see `tickets/stuart/reports/S113.md`.
+The 50/50 TCG and KVM `-smp 2/4` gate was re-verified by S85a on master `6d1b1bde`:
+`sh tests/smp/lock-time/run.sh all` PASSED (six cases, 50/50 each, no TLB timeout); see
+`tickets/lance/reports/S85a.md`.
 
 Expected tail for a clean run:
 

@@ -6,7 +6,7 @@
 use super::*;
 
 fn user(uid: u32, gid: u32) -> Credentials {
-    Credentials::new(uid, uid, gid, gid, [0; MAX_GROUPS], 0)
+    Credentials::new(uid, uid, gid, gid, [0; MAX_GROUPS], 0, 0)
 }
 
 #[test]
@@ -35,6 +35,7 @@ fn owner_group_and_other_classes_are_selected() {
         1001,
         [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         1,
+        0,
     );
     assert!(group.in_group(10));
     assert!(group.permitted(0o040, 1000, 10, ACCESS_READ));
@@ -51,7 +52,7 @@ fn owner_group_and_other_classes_are_selected() {
 fn group_count_is_clamped_and_group_list_is_bounded() {
     let mut groups = [0u32; MAX_GROUPS];
     groups[0] = 7;
-    let creds = Credentials::new(1, 1, 1, 1, groups, u32::MAX);
+    let creds = Credentials::new(1, 1, 1, 1, groups, u32::MAX, 0);
     assert_eq!(creds.group_count as usize, MAX_GROUPS);
     assert_eq!(creds.group_list().len(), MAX_GROUPS);
     assert!(creds.in_group(7));

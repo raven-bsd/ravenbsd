@@ -133,8 +133,10 @@ impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
             return Err(Errno::EAFNOSUPPORT);
         }
         let endpoint = parsed.to_endpoint().ok_or(Errno::EAFNOSUPPORT)?;
-        if self.backend.caps().bare_open {
-            let sock = rec.sock.ok_or(Errno::EBADF)?;
+        // The handle is opened at `socket()` both for a bare-open transport and for MPTCP
+        // (`socket()` opens it regardless of the cap), so the bind must be sent whenever the
+        // handle already exists. Keying on `caps().bare_open` dropped the bind for MPTCP.
+        if let Some(sock) = rec.sock {
             self.backend.call(sock, Call::Bind(endpoint))?;
             let mut local = endpoint;
             if endpoint.port == 0 {

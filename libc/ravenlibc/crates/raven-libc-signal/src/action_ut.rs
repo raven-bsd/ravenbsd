@@ -9,15 +9,15 @@ fn kill_and_stop_refuse_a_new_action() {
     let table = DispTable::new();
     let action = Disposition::IGNORE;
     assert_eq!(sigaction(&table, 9, Some(&action), None), Err(EINVAL_ERR));
-    assert_eq!(sigaction(&table, 19, Some(&action), None), Err(EINVAL_ERR));
+    assert_eq!(sigaction(&table, 17, Some(&action), None), Err(EINVAL_ERR));
     assert_eq!(table.read(9), Disposition::DEFAULT);
 }
 
 #[test]
-fn internal_signals_are_refused() {
+fn out_of_range_signals_are_refused() {
     let table = DispTable::new();
     let action = Disposition::IGNORE;
-    for sig in [0, -1, 32, 33, 34, 65, 1000] {
+    for sig in [0, -1, 65, 1000] {
         assert_eq!(sigaction(&table, sig, Some(&action), None), Err(EINVAL_ERR));
     }
 }
@@ -43,15 +43,15 @@ fn old_reports_exactly_what_was_stored() {
 }
 
 #[test]
-fn sa_restorer_is_dropped_and_never_stored() {
+fn freebsd_flags_are_stored_unchanged() {
     let table = DispTable::new();
     let action = Disposition {
         handler: 0x9999,
         mask: 0,
-        flags: SA_RESTART | SA_RESTORER,
+        flags: SA_RESTART | SA_ONSTACK,
     };
     sigaction(&table, 15, Some(&action), None).unwrap();
-    assert_eq!(table.read(15).flags, SA_RESTART);
+    assert_eq!(table.read(15).flags, SA_RESTART | SA_ONSTACK);
 }
 
 #[test]

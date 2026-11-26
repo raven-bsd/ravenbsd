@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "fmd-fixture"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+
+[workspace]
+
+[dependencies]
+raven-proto-fm = { path = "../../../../crates/raven-proto-fm" }
+raven-fmd = { path = ".." }
+raven-rt = { path = "../../../../userland/rt", features = ["alloc"] }

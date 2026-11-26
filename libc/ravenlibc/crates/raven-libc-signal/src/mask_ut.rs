@@ -56,10 +56,14 @@ fn sa_nodefer_does_not_add_the_signal() {
 }
 
 #[test]
-fn internal_bits_never_survive_the_handler_mask() {
+fn every_supported_bit_survives_the_handler_mask() {
     let mask = handler_mask(u64::MAX, u64::MAX, 32, 0);
     assert_eq!(mask & APP_MASK, mask);
-    assert_eq!(mask & 0x8000_0000, 0);
+    assert_ne!(
+        mask & 0x8000_0000,
+        0,
+        "signal 32 is SIGTHR in the FreeBSD profile"
+    );
 }
 
 #[test]

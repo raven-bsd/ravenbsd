@@ -14,7 +14,8 @@ fn numbers_match_the_abi() {
 
 #[test]
 fn number_is_the_positive_c_value() {
-    assert_eq!(number(ENOSYS), 38);
+    // FreeBSD errno.h: ENOSYS is 78 (DR-69). Linux's 38 is ENOTSOCK.
+    assert_eq!(number(ENOSYS), 78);
     assert_eq!(number(EINVAL), 22);
     assert_eq!(NAME_MAX, 255);
 }

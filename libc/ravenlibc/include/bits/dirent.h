@@ -28,10 +28,18 @@
 #define _DIRENT_HAVE_D_OFF
 #define _DIRENT_HAVE_D_TYPE
 
+/* RavenBSD: public `struct dirent` is the FreeBSD 133344405 layout (DR-69, S733):
+ * d_fileno at 0, d_namlen at 20, d_name at 24. `d_ino` is the donor's compatibility
+ * spelling. */
 struct dirent {
-	ino_t d_ino;
+	ino_t d_fileno;
 	off_t d_off;
 	unsigned short d_reclen;
 	unsigned char d_type;
+	unsigned char d_pad0;
+	unsigned short d_namlen;
+	unsigned short d_pad1;
 	char d_name[256];
 };
+
+#define d_ino d_fileno

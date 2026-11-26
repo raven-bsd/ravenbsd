@@ -125,14 +125,19 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 8,
             },
             FieldLayout {
-                name: "st_mode",
-                offset: core::mem::offset_of!(Stat, st_mode),
-                size: 4,
-            },
-            FieldLayout {
                 name: "st_nlink",
                 offset: core::mem::offset_of!(Stat, st_nlink),
-                size: 4,
+                size: 8,
+            },
+            FieldLayout {
+                name: "st_mode",
+                offset: core::mem::offset_of!(Stat, st_mode),
+                size: 2,
+            },
+            FieldLayout {
+                name: "st_bsdflags",
+                offset: core::mem::offset_of!(Stat, st_bsdflags),
+                size: 2,
             },
             FieldLayout {
                 name: "st_uid",
@@ -145,33 +150,13 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 4,
             },
             FieldLayout {
+                name: "st_padding1",
+                offset: core::mem::offset_of!(Stat, st_padding1),
+                size: 4,
+            },
+            FieldLayout {
                 name: "st_rdev",
                 offset: core::mem::offset_of!(Stat, st_rdev),
-                size: 8,
-            },
-            FieldLayout {
-                name: "__pad1",
-                offset: core::mem::offset_of!(Stat, __pad1),
-                size: 8,
-            },
-            FieldLayout {
-                name: "st_size",
-                offset: core::mem::offset_of!(Stat, st_size),
-                size: 8,
-            },
-            FieldLayout {
-                name: "st_blksize",
-                offset: core::mem::offset_of!(Stat, st_blksize),
-                size: 4,
-            },
-            FieldLayout {
-                name: "__pad2",
-                offset: core::mem::offset_of!(Stat, __pad2),
-                size: 4,
-            },
-            FieldLayout {
-                name: "st_blocks",
-                offset: core::mem::offset_of!(Stat, st_blocks),
                 size: 8,
             },
             FieldLayout {
@@ -190,9 +175,44 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 16,
             },
             FieldLayout {
-                name: "__unused",
-                offset: core::mem::offset_of!(Stat, __unused),
+                name: "st_birthtim",
+                offset: core::mem::offset_of!(Stat, st_birthtim),
+                size: 16,
+            },
+            FieldLayout {
+                name: "st_size",
+                offset: core::mem::offset_of!(Stat, st_size),
                 size: 8,
+            },
+            FieldLayout {
+                name: "st_blocks",
+                offset: core::mem::offset_of!(Stat, st_blocks),
+                size: 8,
+            },
+            FieldLayout {
+                name: "st_blksize",
+                offset: core::mem::offset_of!(Stat, st_blksize),
+                size: 4,
+            },
+            FieldLayout {
+                name: "st_flags",
+                offset: core::mem::offset_of!(Stat, st_flags),
+                size: 4,
+            },
+            FieldLayout {
+                name: "st_gen",
+                offset: core::mem::offset_of!(Stat, st_gen),
+                size: 8,
+            },
+            FieldLayout {
+                name: "st_filerev",
+                offset: core::mem::offset_of!(Stat, st_filerev),
+                size: 8,
+            },
+            FieldLayout {
+                name: "st_spare",
+                offset: core::mem::offset_of!(Stat, st_spare),
+                size: 72,
             },
         ],
     },
@@ -203,8 +223,8 @@ pub const STRUCTS: &[StructLayout] = &[
         align: core::mem::align_of::<Dirent>(),
         fields: &[
             FieldLayout {
-                name: "d_ino",
-                offset: core::mem::offset_of!(Dirent, d_ino),
+                name: "d_fileno",
+                offset: core::mem::offset_of!(Dirent, d_fileno),
                 size: 8,
             },
             FieldLayout {
@@ -221,6 +241,21 @@ pub const STRUCTS: &[StructLayout] = &[
                 name: "d_type",
                 offset: core::mem::offset_of!(Dirent, d_type),
                 size: 1,
+            },
+            FieldLayout {
+                name: "d_pad0",
+                offset: core::mem::offset_of!(Dirent, d_pad0),
+                size: 1,
+            },
+            FieldLayout {
+                name: "d_namlen",
+                offset: core::mem::offset_of!(Dirent, d_namlen),
+                size: 2,
+            },
+            FieldLayout {
+                name: "d_pad1",
+                offset: core::mem::offset_of!(Dirent, d_pad1),
+                size: 2,
             },
             FieldLayout {
                 name: "d_name",
@@ -661,32 +696,27 @@ pub const STRUCTS: &[StructLayout] = &[
             FieldLayout {
                 name: "sysname",
                 offset: core::mem::offset_of!(Utsname, sysname),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "nodename",
                 offset: core::mem::offset_of!(Utsname, nodename),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "release",
                 offset: core::mem::offset_of!(Utsname, release),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "version",
                 offset: core::mem::offset_of!(Utsname, version),
-                size: 65,
+                size: 256,
             },
             FieldLayout {
                 name: "machine",
                 offset: core::mem::offset_of!(Utsname, machine),
-                size: 65,
-            },
-            FieldLayout {
-                name: "domainname",
-                offset: core::mem::offset_of!(Utsname, domainname),
-                size: 65,
+                size: 256,
             },
         ],
     },
@@ -829,18 +859,8 @@ pub const STRUCTS: &[StructLayout] = &[
         align: core::mem::align_of::<Statvfs>(),
         fields: &[
             FieldLayout {
-                name: "f_bsize",
-                offset: core::mem::offset_of!(Statvfs, f_bsize),
-                size: 8,
-            },
-            FieldLayout {
-                name: "f_frsize",
-                offset: core::mem::offset_of!(Statvfs, f_frsize),
-                size: 8,
-            },
-            FieldLayout {
-                name: "f_blocks",
-                offset: core::mem::offset_of!(Statvfs, f_blocks),
+                name: "f_bavail",
+                offset: core::mem::offset_of!(Statvfs, f_bavail),
                 size: 8,
             },
             FieldLayout {
@@ -849,18 +869,8 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 8,
             },
             FieldLayout {
-                name: "f_bavail",
-                offset: core::mem::offset_of!(Statvfs, f_bavail),
-                size: 8,
-            },
-            FieldLayout {
-                name: "f_files",
-                offset: core::mem::offset_of!(Statvfs, f_files),
-                size: 8,
-            },
-            FieldLayout {
-                name: "f_ffree",
-                offset: core::mem::offset_of!(Statvfs, f_ffree),
+                name: "f_blocks",
+                offset: core::mem::offset_of!(Statvfs, f_blocks),
                 size: 8,
             },
             FieldLayout {
@@ -869,8 +879,18 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 8,
             },
             FieldLayout {
-                name: "f_fsid",
-                offset: core::mem::offset_of!(Statvfs, f_fsid),
+                name: "f_ffree",
+                offset: core::mem::offset_of!(Statvfs, f_ffree),
+                size: 8,
+            },
+            FieldLayout {
+                name: "f_files",
+                offset: core::mem::offset_of!(Statvfs, f_files),
+                size: 8,
+            },
+            FieldLayout {
+                name: "f_bsize",
+                offset: core::mem::offset_of!(Statvfs, f_bsize),
                 size: 8,
             },
             FieldLayout {
@@ -879,19 +899,19 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 8,
             },
             FieldLayout {
-                name: "f_namemax",
-                offset: core::mem::offset_of!(Statvfs, f_namemax),
+                name: "f_frsize",
+                offset: core::mem::offset_of!(Statvfs, f_frsize),
                 size: 8,
             },
             FieldLayout {
-                name: "f_type",
-                offset: core::mem::offset_of!(Statvfs, f_type),
-                size: 4,
+                name: "f_fsid",
+                offset: core::mem::offset_of!(Statvfs, f_fsid),
+                size: 8,
             },
             FieldLayout {
-                name: "__reserved",
-                offset: core::mem::offset_of!(Statvfs, __reserved),
-                size: 20,
+                name: "f_namemax",
+                offset: core::mem::offset_of!(Statvfs, f_namemax),
+                size: 8,
             },
         ],
     },
@@ -922,6 +942,16 @@ pub const STRUCTS: &[StructLayout] = &[
                 size: 4,
             },
             FieldLayout {
+                name: "pw_change",
+                offset: core::mem::offset_of!(Passwd, pw_change),
+                size: 8,
+            },
+            FieldLayout {
+                name: "pw_class",
+                offset: core::mem::offset_of!(Passwd, pw_class),
+                size: 8,
+            },
+            FieldLayout {
                 name: "pw_gecos",
                 offset: core::mem::offset_of!(Passwd, pw_gecos),
                 size: 8,
@@ -935,6 +965,16 @@ pub const STRUCTS: &[StructLayout] = &[
                 name: "pw_shell",
                 offset: core::mem::offset_of!(Passwd, pw_shell),
                 size: 8,
+            },
+            FieldLayout {
+                name: "pw_expire",
+                offset: core::mem::offset_of!(Passwd, pw_expire),
+                size: 8,
+            },
+            FieldLayout {
+                name: "pw_fields",
+                offset: core::mem::offset_of!(Passwd, pw_fields),
+                size: 4,
             },
         ],
     },

@@ -84,7 +84,7 @@ fn error_response_matches_the_readme() {
     let length = Response::error(raven_abi::errno::Errno::EAGAIN)
         .encode(&mut buffer)
         .expect("encode");
-    assert_eq!(&buffer[..length], &[0x01, 0x00, 0x0b, 0x00, 0x06, 0x00]);
+    assert_eq!(&buffer[..length], &[0x01, 0x00, 0x23, 0x00, 0x06, 0x00]);
 }
 
 #[test]

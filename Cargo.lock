@@ -1730,6 +1730,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-fmd"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fm",
+]
+
+[[package]]
 name = "raven-frames"
 version = "0.1.0"
 
@@ -3166,6 +3173,10 @@ name = "raven-proto-dev"
 version = "0.1.0"
 
 [[package]]
+name = "raven-proto-fm"
+version = "0.1.0"
+
+[[package]]
 name = "raven-proto-fs"
 version = "0.1.0"
 dependencies = [
@@ -3490,6 +3501,13 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-s203-futex-requeue"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
 ]
 
 [[package]]

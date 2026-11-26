@@ -83,6 +83,10 @@ fn view() -> UfsView<VecDisk> {
         .expect("symlink");
     ufs.symlink(root, b"dangling", b"missing", 1000, 100)
         .expect("symlink");
+    ufs.symlink(root, b"dirlink", b"dir1", 1000, 100)
+        .expect("symlink");
+    ufs.symlink(root, b"abslink", b"/dir1/one.txt", 1000, 100)
+        .expect("symlink");
     ufs.mkdir(root, b"emptydir", 0o755, 1000, 100)
         .expect("mkdir");
     let disk = ufs.unmount().expect("unmount");
@@ -108,23 +112,49 @@ fn names(buffer: &[u8]) -> Vec<String> {
 #[test]
 fn resolves_files_and_symlinks() {
     let mut view = view();
-    let hello = view.resolve("/hello.txt").expect("hello");
-    let one = view.resolve("/dir1/one.txt").expect("one");
-    let link = view.resolve("/link").expect("link");
+    let hello = view.resolve(b"/hello.txt").expect("hello");
+    let one = view.resolve(b"/dir1/one.txt").expect("one");
+    let link = view.resolve(b"/link").expect("link");
     assert_eq!(link, one);
-    assert_ne!(view.resolve_nofollow("/link").expect("link inode"), one);
-    assert_eq!(view.resolve("/dir1/../hello.txt"), Ok(hello));
-    assert!(view.resolve("/").is_ok());
-    assert_eq!(view.resolve("/dangling"), Err(Errno::ENOENT));
-    assert_eq!(view.resolve("/../hello.txt"), Err(Errno::EINVAL));
-    assert_eq!(view.resolve("/missing"), Err(Errno::ENOENT));
-    assert_eq!(view.resolve("/hello.txt/child"), Err(Errno::ENOTDIR));
+    assert_ne!(view.resolve_nofollow(b"/link").expect("link inode"), one);
+    assert_eq!(view.resolve(b"/dir1/../hello.txt"), Ok(hello));
+    assert!(view.resolve(b"/").is_ok());
+    assert_eq!(view.resolve(b"/dangling"), Err(Errno::ENOENT));
+    assert_eq!(view.resolve(b"/../hello.txt"), Ok(hello));
+    assert_eq!(view.resolve(b"/missing"), Err(Errno::ENOENT));
+    assert_eq!(view.resolve(b"/hello.txt/child"), Err(Errno::ENOTDIR));
+}
+
+#[test]
+fn a_symlink_keeps_the_remaining_suffix() {
+    let mut view = view();
+    let one = view.resolve(b"/dir1/one.txt").expect("one");
+    assert_eq!(view.resolve(b"/dirlink/one.txt"), Ok(one));
+    assert_eq!(view.resolve(b"/abslink"), Ok(one));
+    assert_eq!(
+        view.resolve(b"/dirlink"),
+        Ok(view.resolve(b"/dir1").expect("dir1"))
+    );
+}
+
+#[test]
+fn non_utf8_names_round_trip_through_the_filesystem() {
+    let mut view = rw_view();
+    let path = b"/\xff\xfe";
+    let ino = view.create_file(path, 0o644, true).expect("create");
+    assert_eq!(view.resolve(path), Ok(ino));
+    let root = view.resolve(b"/").expect("root");
+    let mut buffer = [0u8; 4096];
+    let (read, _) = view.readdir(root, 0, &mut buffer).expect("readdir");
+    let found = DirEntryIter::new(&buffer[..read])
+        .any(|entry| entry.expect("entry").name == b"\xff\xfe".as_slice());
+    assert!(found, "non-UTF-8 name missing from readdir");
 }
 
 #[test]
 fn reads_file_data_at_explicit_offsets() {
     let mut view = view();
-    let ino = view.resolve("/hello.txt").expect("hello");
+    let ino = view.resolve(b"/hello.txt").expect("hello");
     let stat = view.stat(ino).expect("stat");
     assert_eq!(stat.mode & S_IFMT, S_IFREG);
     assert_eq!(stat.size, 6);
@@ -140,7 +170,7 @@ fn reads_file_data_at_explicit_offsets() {
 #[test]
 fn directory_cookie_walks_every_entry() {
     let mut view = view();
-    let root = view.resolve("/").expect("root");
+    let root = view.resolve(b"/").expect("root");
     let mut cookie = 0u64;
     let mut all = Vec::new();
     loop {
@@ -166,14 +196,14 @@ fn directory_cookie_walks_every_entry() {
 #[test]
 fn readlink_and_stat_keep_the_link_identity() {
     let mut view = view();
-    let link = view.resolve_nofollow("/link").expect("link inode");
+    let link = view.resolve_nofollow(b"/link").expect("link inode");
     let stat = view.stat(link).expect("stat");
     assert_eq!(stat.mode & S_IFMT, S_IFLNK);
     let mut target = [0u8; 64];
     let length = view.readlink(link, &mut target).expect("readlink");
     assert_eq!(&target[..length], b"dir1/one.txt");
 
-    let hello = view.resolve("/hello.txt").expect("hello");
+    let hello = view.resolve(b"/hello.txt").expect("hello");
     assert_eq!(view.readlink(hello, &mut target), Err(Errno::EINVAL));
     let hello = view.stat(hello).expect("stat");
     assert_eq!(hello.uid, 1000);
@@ -235,30 +265,43 @@ fn mount_rejects_a_corrupt_superblock() {
 #[test]
 fn hard_links_share_the_inode_and_link_count() {
     let mut view = rw_view();
-    let ino = view.create_file("/a", 0o644, true).expect("create");
+    let ino = view.create_file(b"/a", 0o644, 0, 0, true).expect("create");
     view.write(ino, 0, b"payload").expect("write");
-    view.link("/b", "/a").expect("link");
-    assert_eq!(view.resolve("/b"), Ok(ino));
+    view.link(b"/b", b"/a").expect("link");
+    assert_eq!(view.resolve(b"/b"), Ok(ino));
     assert_eq!(view.stat(ino).expect("stat").nlink, 2);
-    view.unlink("/a").expect("unlink a");
+    view.unlink(b"/a").expect("unlink a");
     assert_eq!(view.stat(ino).expect("stat").nlink, 1);
     let mut data = [0u8; 7];
     assert_eq!(view.read(ino, 0, &mut data), Ok(7));
     assert_eq!(&data, b"payload");
-    assert_eq!(view.link("/c", "/"), Err(Errno::EPERM));
+    assert_eq!(view.link(b"/c", b"/"), Err(Errno::EPERM));
+}
+
+#[test]
+fn create_records_the_requested_owner() {
+    let mut view = rw_view();
+    let ino = view
+        .create_file(b"/owned-file", 0o640, 1000, 100, true)
+        .expect("create");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!((stat.uid, stat.gid), (1000, 100));
+    assert_eq!(stat.mode & 0o7777, 0o640);
 }
 
 #[test]
 fn chown_follows_or_keeps_the_symlink_identity() {
     let mut view = rw_view();
-    let ino = view.create_file("/owned", 0o6755, true).expect("create");
-    view.chown("/owned", 1000, 100, true).expect("chown");
+    let ino = view
+        .create_file(b"/owned", 0o6755, 0, 0, true)
+        .expect("create");
+    view.chown(b"/owned", 1000, 100, true).expect("chown");
     let stat = view.stat(ino).expect("stat");
     assert_eq!((stat.uid, stat.gid), (1000, 100));
     assert_eq!(stat.mode & 0o7777, 0o755);
-    view.symlink("/link", b"owned").expect("symlink");
-    let link = view.resolve_nofollow("/link").expect("link");
-    view.chown("/link", 2000, 200, false).expect("lchown");
+    view.symlink(b"/link", b"owned", 0, 0).expect("symlink");
+    let link = view.resolve_nofollow(b"/link").expect("link");
+    view.chown(b"/link", 2000, 200, false).expect("lchown");
     assert_eq!(view.stat(link).expect("link stat").uid, 2000);
     assert_eq!(view.stat(ino).expect("target stat").uid, 1000);
     view.fchown(ino, u32::MAX, 300).expect("fchown");
@@ -268,12 +311,14 @@ fn chown_follows_or_keeps_the_symlink_identity() {
 #[test]
 fn utimens_sets_the_requested_timestamps() {
     let mut view = rw_view();
-    let ino = view.create_file("/times", 0o644, true).expect("create");
-    view.utimens("/times", Some(111), Some(222), true)
+    let ino = view
+        .create_file(b"/times", 0o644, 0, 0, true)
+        .expect("create");
+    view.utimens(b"/times", Some(111), Some(222), true)
         .expect("utimens");
     let stat = view.stat(ino).expect("stat");
     assert_eq!((stat.atime, stat.mtime), (111, 222));
-    view.utimens("/times", None, Some(333), true)
+    view.utimens(b"/times", None, Some(333), true)
         .expect("utimens omit atime");
     let stat = view.stat(ino).expect("stat");
     assert_eq!((stat.atime, stat.mtime), (111, 333));
@@ -282,7 +327,9 @@ fn utimens_sets_the_requested_timestamps() {
 #[test]
 fn sparse_extension_keeps_block_accounting_small() {
     let mut view = rw_view();
-    let ino = view.create_file("/sparse", 0o644, true).expect("create");
+    let ino = view
+        .create_file(b"/sparse", 0o644, 0, 0, true)
+        .expect("create");
     view.truncate(ino, 1024 * 1024).expect("truncate");
     let stat = view.stat(ino).expect("stat");
     assert_eq!(stat.size, 1024 * 1024);
@@ -303,11 +350,11 @@ fn sparse_extension_keeps_block_accounting_small() {
 #[test]
 fn mkfifo_and_mknod_create_special_inodes() {
     let mut view = rw_view();
-    view.mkfifo("/pipe", 0o640).expect("mkfifo");
-    let pipe = view.resolve("/pipe").expect("pipe");
+    view.mkfifo(b"/pipe", 0o640, 0, 0).expect("mkfifo");
+    let pipe = view.resolve(b"/pipe").expect("pipe");
     assert_eq!(view.stat(pipe).expect("stat").mode & S_IFMT, S_IFIFO);
-    view.mknod("/null", 0o020600, 0x1234).expect("mknod");
-    let node = view.resolve("/null").expect("node");
+    view.mknod(b"/null", 0o020600, 0x1234, 0, 0).expect("mknod");
+    let node = view.resolve(b"/null").expect("node");
     assert_eq!(view.stat(node).expect("stat").mode & S_IFMT, S_IFCHR);
-    assert_eq!(view.mknod("/bad", 0o100644, 0), Err(Errno::EINVAL));
+    assert_eq!(view.mknod(b"/bad", 0o100644, 0, 0, 0), Err(Errno::EINVAL));
 }

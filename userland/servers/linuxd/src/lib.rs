@@ -38,3 +38,15 @@ pub use table::{
     TRAMPOLINE_BASE, USER_BUFFER_MAX,
 };
 pub use trap::{TrapAction, TrapError, copy_in, decode, dispatch, encode_reply, lengths};
+
+/// Convert a native error into the Linux syscall return value (`-errno`).
+///
+/// `linuxd` is the Linux personality server: every value it replies with is observed by a Linux
+/// process. A native error number is translated through the donor conversion table; an error
+/// outside the native range fails closed to `-EIO` instead of leaking a native number.
+#[must_use]
+pub fn linux_error(error: raven_abi::errno::Errno) -> isize {
+    let linux = raven_linux_dispatch::xlat::linux_from_native(error.0)
+        .unwrap_or(raven_linux_abi::errno::EIO);
+    -(linux as isize)
+}

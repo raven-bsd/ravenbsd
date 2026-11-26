@@ -46,8 +46,18 @@ pub struct Tables {
 /// One evaluated constant.
 #[derive(Debug, Clone)]
 pub struct Value {
-    /// The evaluated integer.
+    /// The canonical integer (the x86_64 value when that architecture has one).
     pub value: i128,
+    /// The value on each architecture that defines it.
+    pub by_arch: BTreeMap<String, i128>,
+}
+
+impl Value {
+    /// The value for `arch`, or the canonical value when the row is arch-neutral.
+    #[must_use]
+    pub fn for_arch(&self, arch: &str) -> i128 {
+        self.by_arch.get(arch).copied().unwrap_or(self.value)
+    }
 }
 
 /// Evaluated constants of every group, keyed by name.
@@ -535,8 +545,8 @@ fn evaluate_groups(tables: &Tables, problems: &mut Vec<String>) -> Values {
     let mut result = Values::default();
     for group in &tables.groups {
         for constant in &group.def.consts {
-            let mut evaluated: Option<i128> = None;
-            let mut failed = false;
+            let ty = constant.ty.as_deref().unwrap_or(&group.def.rust_type);
+            let mut by_arch: BTreeMap<String, i128> = BTreeMap::new();
             for arch in ARCHES {
                 if !available(constant, arch) {
                     continue;
@@ -544,41 +554,41 @@ fn evaluate_groups(tables: &Tables, problems: &mut Vec<String>) -> Values {
                 let mut stack = Vec::new();
                 match resolve_one(constant, arch, &index, &mut stack) {
                     Ok(value) => {
-                        if let Some(previous) = evaluated
-                            && previous != value
-                        {
+                        if !values::fits(value, ty) {
                             problems.push(format!(
-                                "{}.toml: {} evaluates differently per architecture",
+                                "{}.toml: {} evaluates to {value} on {arch}, which does not fit {ty}",
                                 group.stem, constant.name
                             ));
-                            failed = true;
                         }
-                        evaluated = Some(value);
+                        if value < 0 && matches!(ty, "u8" | "u16" | "u32" | "u64" | "usize") {
+                            problems.push(format!(
+                                "{}.toml: {} is negative on {arch} but {ty} is unsigned",
+                                group.stem, constant.name
+                            ));
+                        }
+                        by_arch.insert((*arch).to_string(), value);
                     }
                     Err(error) => {
                         problems.push(format!("{}.toml: {}: {error}", group.stem, constant.name));
-                        failed = true;
                     }
                 }
             }
-            if let (Some(value), false) = (evaluated, failed) {
-                let ty = constant.ty.as_deref().unwrap_or(&group.def.rust_type);
-                if !values::fits(value, ty) {
-                    problems.push(format!(
-                        "{}.toml: {} evaluates to {value}, which does not fit {ty}",
-                        group.stem, constant.name
-                    ));
-                }
-                if value < 0 && matches!(ty, "u8" | "u16" | "u32" | "u64" | "usize") {
-                    problems.push(format!(
-                        "{}.toml: {} is negative but {ty} is unsigned",
-                        group.stem, constant.name
-                    ));
-                }
-                result
-                    .by_name
-                    .insert(constant.name.clone(), Value { value });
+            if by_arch.is_empty() {
+                continue;
             }
+            let entry = result
+                .by_name
+                .entry(constant.name.clone())
+                .or_insert_with(|| Value {
+                    value: *by_arch.values().next().unwrap_or(&0),
+                    by_arch: BTreeMap::new(),
+                });
+            // The canonical value is the x86_64 value when the row defines it; the renderers
+            // pick the per-architecture value for their `#if` block.
+            if let Some(value) = by_arch.get("x86_64") {
+                entry.value = *value;
+            }
+            entry.by_arch.extend(by_arch);
         }
     }
     result
@@ -593,7 +603,7 @@ fn validate_deviations(tables: &Tables, values: &Values, problems: &mut Vec<Stri
     }
     let kinds = type_kinds(tables);
     for row in &tables.deviations.deviation {
-        if !matches!(row.against.as_str(), "musl" | "linux-abi") {
+        if !matches!(row.against.as_str(), "musl" | "linux-abi" | "freebsd") {
             problems.push(format!(
                 "deviations.toml: {} has invalid against {:?}",
                 row.name, row.against

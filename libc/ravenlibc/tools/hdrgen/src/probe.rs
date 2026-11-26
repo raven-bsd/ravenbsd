@@ -165,6 +165,35 @@ pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Copy a tree without overwriting a file that already exists at the destination.
+///
+/// The FreeBSD include root has a public `include/<name>.h` and a kernel `sys/sys/<name>.h`
+/// with the same basename but a different public surface (`time.h`, `unistd.h`). The kernel
+/// header belongs under `sys/`, never over the public one.
+pub(crate) fn copy_tree_missing(from: &Path, to: &Path) -> Result<()> {
+    std::fs::create_dir_all(to).with_context(|| format!("cannot create {}", to.display()))?;
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(from)
+        .with_context(|| format!("cannot read {}", from.display()))?
+        .flatten()
+        .map(|entry| entry.path())
+        .collect();
+    entries.sort();
+    for entry in entries {
+        let name = entry
+            .file_name()
+            .with_context(|| format!("bad entry {}", entry.display()))?
+            .to_os_string();
+        let destination = to.join(name);
+        if entry.is_dir() {
+            copy_tree_missing(&entry, &destination)?;
+        } else if !destination.exists() {
+            std::fs::copy(&entry, &destination)
+                .with_context(|| format!("cannot copy {}", entry.display()))?;
+        }
+    }
+    Ok(())
+}
+
 /// Build the musl include tree of one architecture under `temp`.
 fn musl_tree(musl: &Path, sed: &str, arch: &str, temp: &Path) -> Result<PathBuf> {
     let tree = temp.join(arch);
@@ -825,6 +854,16 @@ pub fn verify(
         if group.def.source.is_empty() {
             continue;
         }
+        // The H1/H2/H3 probes measure musl. A table leased to another donor has donor-relative
+        // source paths and is verified by that donor's profile oracle, not against musl.
+        if group
+            .def
+            .donor
+            .as_ref()
+            .is_some_and(|spec| spec.name != "musl")
+        {
+            continue;
+        }
         let files = musl_source_files(&musl, &group.def.source);
         let define_set = DefineSet::from_files(&files)?;
         let arches: &[&str] = if group.stem == "fcntl" {
@@ -903,28 +942,39 @@ pub fn verify(
         }
     }
 
-    // H3: the aarch64 O_* difference set is exactly the five documented flags.
-    let expected: BTreeSet<&str> = [
-        "O_DIRECTORY",
-        "O_NOFOLLOW",
-        "O_DIRECT",
-        "O_LARGEFILE",
-        "O_TMPFILE",
-    ]
-    .into_iter()
-    .collect();
-    let actual: BTreeSet<&str> = constant_differences
-        .iter()
-        .filter(|(_, arch, _, _)| arch == "aarch64")
-        .map(|(name, _, _, _)| name.as_str())
+    // H3: the aarch64 O_* difference set is exactly the five documented flags. A fcntl
+    // table leased to another donor is measured by that donor's profile oracle instead.
+    let fcntl_is_musl = tables.groups.iter().any(|group| {
+        group.stem == "fcntl"
+            && group
+                .def
+                .donor
+                .as_ref()
+                .is_none_or(|spec| spec.name == "musl")
+    });
+    if fcntl_is_musl {
+        let expected: BTreeSet<&str> = [
+            "O_DIRECTORY",
+            "O_NOFOLLOW",
+            "O_DIRECT",
+            "O_LARGEFILE",
+            "O_TMPFILE",
+        ]
+        .into_iter()
         .collect();
-    if actual != expected {
-        report.fail(format!(
-            "H3: aarch64 fcntl difference set is {:?}, expected {:?}",
-            actual, expected
-        ));
-    } else {
-        report.line("\nH3: aarch64 fcntl difference set exactly {O_DIRECTORY, O_NOFOLLOW, O_DIRECT, O_LARGEFILE, O_TMPFILE}");
+        let actual: BTreeSet<&str> = constant_differences
+            .iter()
+            .filter(|(_, arch, _, _)| arch == "aarch64")
+            .map(|(name, _, _, _)| name.as_str())
+            .collect();
+        if actual != expected {
+            report.fail(format!(
+                "H3: aarch64 fcntl difference set is {:?}, expected {:?}",
+                actual, expected
+            ));
+        } else {
+            report.line("\nH3: aarch64 fcntl difference set exactly {O_DIRECTORY, O_NOFOLLOW, O_DIRECT, O_LARGEFILE, O_TMPFILE}");
+        }
     }
 
     // Compare the measured difference set with deviations.toml.
