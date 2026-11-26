@@ -1096,6 +1096,7 @@ fn row_target_vintr() {
         )
     };
     let elapsed = now_ms().saturating_sub(start);
+    let timed_errno = errno();
     timed_pair.close();
     if !timed || count != 0 || elapsed < 50 || elapsed > 500 {
         ok = false;
@@ -1113,7 +1114,7 @@ fn row_target_vintr() {
         fail(
             "target-vintr",
             format_args!(
-                "{detail} (target VINTR={TARGET_VINTR} raw={raw} distinctive={target:?} old={old:?})"
+                "{detail} (target VINTR={TARGET_VINTR} raw={raw} distinctive={target:?} old={old:?} vtime_count={count} vtime_ms={elapsed} vtime_errno={timed_errno})"
             ),
         );
     }
