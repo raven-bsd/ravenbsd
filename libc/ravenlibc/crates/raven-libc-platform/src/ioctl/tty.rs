@@ -29,10 +29,74 @@ pub const ECHO: u32 = 0o0010;
 pub const CS8: u32 = 0o0060;
 /// `CREAD` from `<bits/termios.h>`.
 pub const CREAD: u32 = 0o0200;
-/// Index of `VMIN` in `c_cc`.
-pub const VMIN: usize = 6;
-/// Index of `VTIME` in `c_cc`.
-pub const VTIME: usize = 5;
+/// Index of `VMIN` in the public `c_cc` (BSD order).
+pub const VMIN: usize = 16;
+/// Index of `VTIME` in the public `c_cc` (BSD order).
+pub const VTIME: usize = 17;
+/// Index of `VINTR` in the public `c_cc` (BSD order).
+pub const VINTR: usize = 8;
+/// Index of `VEOF` in the public `c_cc` (BSD order).
+pub const VEOF: usize = 0;
+
+/// Public `c_cc` index -> internal `raven-proto-tty` index.
+///
+/// The public ABI is the pinned BSD order; the wire record keeps the order the pty server
+/// already carries. Every named byte maps to its wire slot and the unnamed spare bytes keep
+/// their own position, so the conversion is a bijection over all 32 slots.
+const CC_PUBLIC_TO_WIRE: [(usize, usize); 20] = [
+    (0, 4),   // VEOF
+    (1, 11),  // VEOL
+    (2, 16),  // VEOL2
+    (3, 2),   // VERASE
+    (4, 14),  // VWERASE
+    (5, 3),   // VKILL
+    (6, 12),  // VREPRINT
+    (7, 7),   // VERASE2 / VSWTC
+    (8, 0),   // VINTR
+    (9, 1),   // VQUIT
+    (10, 10), // VSUSP
+    (11, 17), // VDSUSP (wire has no slot; keep the spare)
+    (12, 8),  // VSTART
+    (13, 9),  // VSTOP
+    (14, 15), // VLNEXT
+    (15, 13), // VDISCARD
+    (16, 6),  // VMIN
+    (17, 5),  // VTIME
+    (18, 18), // VSTATUS
+    (19, 19), // spare 2
+];
+
+fn cc_from_wire(wire: &[u8; 32]) -> [u8; 32] {
+    let mut cc = [0u8; 32];
+    let mut public = 20;
+    while public < cc.len() {
+        cc[public] = wire[public];
+        public += 1;
+    }
+    let mut index = 0;
+    while index < CC_PUBLIC_TO_WIRE.len() {
+        let (public, wire_index) = CC_PUBLIC_TO_WIRE[index];
+        cc[public] = wire[wire_index];
+        index += 1;
+    }
+    cc
+}
+
+fn cc_to_wire(cc: &[u8; 32]) -> [u8; 32] {
+    let mut wire = [0u8; 32];
+    let mut public = 20;
+    while public < wire.len() {
+        wire[public] = cc[public];
+        public += 1;
+    }
+    let mut index = 0;
+    while index < CC_PUBLIC_TO_WIRE.len() {
+        let (public, wire_index) = CC_PUBLIC_TO_WIRE[index];
+        wire[wire_index] = cc[public];
+        index += 1;
+    }
+    wire
+}
 /// The only line speed the current console reports.
 pub const B38400: u32 = 0o17;
 
@@ -430,7 +494,7 @@ fn termios_from_wire(wire: WireTermios) -> Termios {
     termios.c_cflag = wire.cflag;
     termios.c_lflag = wire.lflag;
     termios.c_line = wire.line;
-    termios.c_cc = wire.cc;
+    termios.c_cc = cc_from_wire(&wire.cc);
     termios.__c_ispeed = wire.ispeed;
     termios.__c_ospeed = wire.ospeed;
     termios
@@ -443,7 +507,7 @@ fn wire_from_termios(termios: &Termios) -> WireTermios {
         cflag: termios.c_cflag,
         lflag: termios.c_lflag,
         line: termios.c_line,
-        cc: termios.c_cc,
+        cc: cc_to_wire(&termios.c_cc),
         ispeed: termios.__c_ispeed,
         ospeed: termios.__c_ospeed,
     }

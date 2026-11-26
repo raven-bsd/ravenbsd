@@ -70,7 +70,9 @@ _Static_assert(offsetof(struct termios, c_cc) == 17, "c_cc offset");
 _Static_assert(offsetof(struct termios, __c_ispeed) == 52, "c_ispeed offset");
 _Static_assert(offsetof(struct termios, __c_ospeed) == 56, "c_ospeed offset");
 _Static_assert(NCCS == 32, "NCCS");
-_Static_assert(VINTR == 0 && VMIN == 6 && VTIME == 5, "control-character indexes");
+_Static_assert(
+    VEOF == 0 && VINTR == 8 && VMIN == 16 && VTIME == 17,
+    "BSD control-character indexes");
 _Static_assert(TIOCGETA == 0x403c7413UL, "TIOCGETA");
 _Static_assert(TIOCSETA == 0x803c7414UL, "TIOCSETA");
 _Static_assert(TIOCSETAW == 0x803c7415UL, "TIOCSETAW");

@@ -8,9 +8,9 @@ use raven_libc_abi::fcntl;
 
 use crate::backend::FakeSys;
 use crate::ioctl::tty::{
-    B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VMIN, VTIME, Winsize, cfgetispeed, cfgetospeed,
-    cfmakeraw, cfsetispeed, cfsetospeed, custom_arg0, custom_body, default_termios, tcdrain,
-    tcflush, tcgetattr, tcgetwinsize, tcsetattr, tcsetwinsize,
+    B38400, ECHO, ICANON, OP_GET_FG, OP_SET_FG, VEOF, VINTR, VMIN, VTIME, Winsize, cfgetispeed,
+    cfgetospeed, cfmakeraw, cfsetispeed, cfsetospeed, custom_arg0, custom_body, default_termios,
+    tcdrain, tcflush, tcgetattr, tcgetwinsize, tcsetattr, tcsetwinsize,
 };
 use crate::platform::Platform;
 
@@ -191,6 +191,16 @@ fn cfmakeraw_clears_the_input_flags() {
     assert_eq!(termios.c_lflag, 0);
     assert_eq!(termios.c_cc[VMIN], 1);
     assert_eq!(termios.c_cc[VTIME], 0);
+}
+
+#[test]
+fn public_bsd_indexes_read_the_wire_control_characters() {
+    let termios = default_termios();
+    assert_eq!(termios.c_cc[VINTR], 3, "public VINTR reads the wire ^C");
+    assert_eq!(termios.c_cc[VEOF], 4, "public VEOF reads the wire ^D");
+    assert_eq!(termios.c_cc[VMIN], 1, "public VMIN reads the wire VMIN");
+    assert_eq!(termios.c_cc[VTIME], 0, "public VTIME reads the wire VTIME");
+    assert_ne!(termios.c_cc[VINTR], termios.c_cc[VEOF]);
 }
 
 #[test]

@@ -37,13 +37,13 @@ const TCSADRAIN: c_int = 1;
 const TCSAFLUSH: c_int = 2;
 
 const NCCS: usize = 32;
-const VEOF: usize = 4;
-const VERASE: usize = 2;
-const VKILL: usize = 3;
-const VINTR: usize = 0;
-const VQUIT: usize = 1;
-const VMIN: usize = 6;
-const VTIME: usize = 5;
+const VEOF: usize = 0;
+const VERASE: usize = 3;
+const VKILL: usize = 5;
+const VINTR: usize = 8;
+const VQUIT: usize = 9;
+const VMIN: usize = 16;
+const VTIME: usize = 17;
 
 const ICRNL: u32 = 0o000400;
 const IXON: u32 = 0o002000;
