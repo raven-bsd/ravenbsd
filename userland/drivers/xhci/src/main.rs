@@ -63,6 +63,9 @@ mod program {
     /// Bounded diagnostics: completed EP1 events and timed-out waits.
     static EVENTS: AtomicU32 = AtomicU32::new(0);
     static TIMEOUTS: AtomicU32 = AtomicU32::new(0);
+    /// Bounded diagnostics: the first successful and the first failed `kbd:` push.
+    static PUSHED: AtomicU32 = AtomicU32::new(0);
+    static OPEN_FAILED: AtomicU32 = AtomicU32::new(0);
 
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
@@ -251,13 +254,27 @@ mod program {
             return;
         }
         let client = Client::new();
+        let mut error = None;
         for _ in 0..PUSH_ATTEMPTS {
-            if let Ok(handle) = client.open("kbd:console", OPEN_WRITE) {
-                let _ = client.write(handle, 0, bytes);
-                let _ = client.close(handle);
-                return;
+            match client.open("kbd:console", OPEN_WRITE) {
+                Ok(handle) => {
+                    let written = client.write(handle, 0, bytes);
+                    let _ = client.close(handle);
+                    if PUSHED.fetch_add(1, Ordering::Relaxed) == 0 {
+                        println!(
+                            "usb-keyboard: pushed len={} written={written:?}",
+                            bytes.len()
+                        );
+                    }
+                    return;
+                }
+                Err(open) => error = Some(open),
             }
             let _ = raven_rt::nanosleep(PUSH_RETRY_NS);
+        }
+        if OPEN_FAILED.fetch_add(1, Ordering::Relaxed) == 0 {
+            let text = error.map_or("none", |error| error.description());
+            println!("usb-keyboard: kbd open failed: {text}");
         }
     }
 
