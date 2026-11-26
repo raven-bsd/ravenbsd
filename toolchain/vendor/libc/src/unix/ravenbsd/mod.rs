@@ -25,6 +25,14 @@ pub type pthread_key_t = usize;
 pub type rlim_t = c_ulonglong;
 pub type sa_family_t = u16;
 pub type sem_t = *mut c_void;
+
+s! {
+    #[repr(C)]
+    pub struct sigset_t {
+        __val: [c_ulong; 16],
+    }
+}
+
 pub type socklen_t = u32;
 pub type speed_t = u32;
 pub type suseconds_t = c_longlong;
@@ -49,10 +57,6 @@ s! {
         pub version: [c_char; UTSLENGTH],
         pub machine: [c_char; UTSLENGTH],
         pub domainname: [c_char; UTSLENGTH],
-    }
-
-    pub struct sigset_t {
-        __val: [c_ulong; 16],
     }
 
     pub struct dirent {
@@ -329,6 +333,7 @@ s! {
         bytes: [u8; _PTHREAD_SPINLOCK_SIZE],
     }
 
+    #[allow(dead_code)] // std does not construct rlimit through this crate yet.
     pub struct rlimit {
         pub rlim_cur: crate::rlim_t,
         pub rlim_max: crate::rlim_t,
@@ -807,52 +812,56 @@ pub const PTHREAD_RWLOCK_INITIALIZER: crate::pthread_rwlock_t = crate::pthread_r
 pub const PTHREAD_STACK_MIN: size_t = 16384;
 
 // signal.h
-pub const SIG_BLOCK: c_int = 0;
-pub const SIG_UNBLOCK: c_int = 1;
-pub const SIG_SETMASK: c_int = 2;
+pub const SIG_BLOCK: c_int = 1;
+pub const SIG_UNBLOCK: c_int = 2;
+pub const SIG_SETMASK: c_int = 3;
 pub const SIGHUP: c_int = 1;
 pub const SIGINT: c_int = 2;
 pub const SIGQUIT: c_int = 3;
 pub const SIGILL: c_int = 4;
 pub const SIGTRAP: c_int = 5;
 pub const SIGABRT: c_int = 6;
-pub const SIGBUS: c_int = 7;
+#[allow(dead_code)] // FreeBSD alias of SIGABRT; kept for the donor surface.
+pub const SIGIOT: c_int = 6;
+pub const SIGEMT: c_int = 7;
 pub const SIGFPE: c_int = 8;
 pub const SIGKILL: c_int = 9;
-pub const SIGUSR1: c_int = 10;
+pub const SIGBUS: c_int = 10;
 pub const SIGSEGV: c_int = 11;
-pub const SIGUSR2: c_int = 12;
+pub const SIGSYS: c_int = 12;
 pub const SIGPIPE: c_int = 13;
 pub const SIGALRM: c_int = 14;
 pub const SIGTERM: c_int = 15;
-pub const SIGSTKFLT: c_int = 16;
-pub const SIGCHLD: c_int = 17;
-pub const SIGCONT: c_int = 18;
-pub const SIGSTOP: c_int = 19;
-pub const SIGTSTP: c_int = 20;
+pub const SIGURG: c_int = 16;
+pub const SIGSTOP: c_int = 17;
+pub const SIGTSTP: c_int = 18;
+pub const SIGCONT: c_int = 19;
+pub const SIGCHLD: c_int = 20;
 pub const SIGTTIN: c_int = 21;
 pub const SIGTTOU: c_int = 22;
-pub const SIGURG: c_int = 23;
+pub const SIGIO: c_int = 23;
 pub const SIGXCPU: c_int = 24;
 pub const SIGXFSZ: c_int = 25;
 pub const SIGVTALRM: c_int = 26;
 pub const SIGPROF: c_int = 27;
 pub const SIGWINCH: c_int = 28;
-pub const SIGIO: c_int = 29;
-pub const SIGPWR: c_int = 30;
-pub const SIGSYS: c_int = 31;
-pub const NSIG: c_int = 65;
+pub const SIGINFO: c_int = 29;
+pub const SIGUSR1: c_int = 30;
+pub const SIGUSR2: c_int = 31;
+pub const SIGTHR: c_int = 32;
+pub const SIGLWP: c_int = 32;
+pub const SIGLIBRT: c_int = 33;
+pub const SIGRTMIN: c_int = 35;
+pub const SIGRTMAX: c_int = 64;
+pub const NSIG: c_int = 32;
 
-pub const SA_NOCLDSTOP: c_int = 1;
-pub const SA_NOCLDWAIT: c_int = 2;
-pub const SA_SIGINFO: c_int = 4;
-pub const SA_RESTORER: c_int = 0x0400_0000;
-pub const SA_ONSTACK: c_int = 0x0800_0000;
-pub const SA_RESTART: c_int = 0x1000_0000;
-pub const SA_NODEFER: c_int = 0x4000_0000;
-pub const SA_RESETHAND: c_int = 0x8000_0000;
-pub const SA_NOMASK: c_int = SA_NODEFER;
-pub const SA_ONESHOT: c_int = SA_RESETHAND;
+pub const SA_ONSTACK: c_int = 0x0001;
+pub const SA_RESTART: c_int = 0x0002;
+pub const SA_RESETHAND: c_int = 0x0004;
+pub const SA_NOCLDSTOP: c_int = 0x0008;
+pub const SA_NODEFER: c_int = 0x0010;
+pub const SA_NOCLDWAIT: c_int = 0x0020;
+pub const SA_SIGINFO: c_int = 0x0040;
 
 // sys/file.h
 pub const LOCK_SH: c_int = 1;
@@ -1194,9 +1203,10 @@ pub const _POSIX_VDISABLE: crate::cc_t = 0;
 
 
 // signal.h sigevent values
-pub const SIGEV_SIGNAL: c_int = 0;
-pub const SIGEV_NONE: c_int = 1;
+pub const SIGEV_NONE: c_int = 0;
+pub const SIGEV_SIGNAL: c_int = 1;
 pub const SIGEV_THREAD: c_int = 2;
+pub const SIGEV_KEVENT: c_int = 3;
 pub const SIGEV_THREAD_ID: c_int = 4;
 
 // sys/wait.h
@@ -1208,9 +1218,9 @@ pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
 
 pub const WSTOPPED: c_int = 2;
-pub const WEXITED: c_int = 4;
-pub const WCONTINUED: c_int = 8;
-pub const WNOWAIT: c_int = 0x0100_0000;
+pub const WEXITED: c_int = 16;
+pub const WCONTINUED: c_int = 4;
+pub const WNOWAIT: c_int = 8;
 
 pub const CLD_EXITED: c_int = 1;
 pub const CLD_KILLED: c_int = 2;
@@ -1225,8 +1235,8 @@ pub const __WALL: c_int = 0x4000_0000;
 pub const __WCLONE: c_int = 0x8000_0000;
 
 // time.h
-pub const UTIME_NOW: c_long = 0x3fffffff;
-pub const UTIME_OMIT: c_long = 0x3ffffffe;
+pub const UTIME_NOW: c_long = -1;
+pub const UTIME_OMIT: c_long = -2;
 pub const PIPE_BUF: usize = 4096;
 pub const CLOCK_REALTIME: c_int = 0;
 pub const CLOCK_MONOTONIC: c_int = 1;
@@ -1596,6 +1606,7 @@ safe_f! {
     }
 }
 
+#[allow(dead_code)] // std does not call every declared entry point yet.
 extern "C" {
     // errno.h
     pub fn __errno_location() -> *mut c_int;
@@ -1919,6 +1930,7 @@ pub type termios2 = termios;
 s! {
 
 
+    #[allow(dead_code)] // declared for the donor surface; std has its own poll path.
     pub struct pollfd {
         pub fd: c_int,
         pub events: c_short,
@@ -2089,12 +2101,11 @@ pub const RWF_ATOMIC: c_int = 0x0000_0040;
 pub const RWF_DONTCACHE: c_int = 0x0000_0080;
 
 // bits/signum.h and sys/wait.h.
-pub const SIGRTMIN: c_int = 35;
-pub const SIGRTMAX: c_int = 64;
 pub const P_PIDFD: idtype_t = 3;
 pub const SYS_pidfd_open: c_long = 434;
 pub const PIDFD_NONBLOCK: c_int = 0o4_000;
 
+#[allow(dead_code)] // std does not call every declared entry point yet.
 extern "C" {
     // sys/socket.h
     pub fn accept4(
