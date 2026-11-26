@@ -20,6 +20,10 @@ PRODUCT = Path(__file__).resolve().parents[3]
 
 
 class ProfileResolution(unittest.TestCase):
+    def test_default_profiles_match_the_release_images(self):
+        self.assertEqual(audit.default_profile("x86_64"), "release")
+        self.assertEqual(audit.default_profile("aarch64"), "pi4-release")
+
     def test_every_profile_parses_with_the_release_reader(self):
         profiles = sorted((PRODUCT / "profiles").glob("*.toml"))
         profiles += sorted((PRODUCT / "profiles").glob("*.d/*.toml"))
@@ -113,13 +117,16 @@ class ManifestVerification(unittest.TestCase):
         (self.root / "userland/bin/app").mkdir(parents=True)
         (self.root / "addons/ssh/openssh").mkdir(parents=True)
         (self.root / "addons/ssh/openssh/LICENCE").write_text("ISC\n", encoding="utf-8")
+        (self.root / "NOTICE").write_text("RavenBSD notices\n", encoding="utf-8")
+        (self.root / "etc").mkdir(parents=True)
+        (self.root / "etc/motd").write_text("RavenBSD\n", encoding="utf-8")
         self.expected = [
             {
                 "kind": "program",
                 "stage_path": "/bin/app",
                 "source": "userland/bin/app",
                 "license": "BSD-3-Clause",
-                "notice": "-",
+                "notice": "NOTICE",
             },
             {
                 "kind": "addon",
@@ -127,6 +134,13 @@ class ManifestVerification(unittest.TestCase):
                 "source": "addons/ssh/openssh",
                 "license": "ISC",
                 "notice": "openssh-portable",
+            },
+            {
+                "kind": "file",
+                "stage_path": "/etc/motd",
+                "source": "etc/motd",
+                "license": "BSD-3-Clause",
+                "notice": "NOTICE",
             },
         ]
 
@@ -154,6 +168,14 @@ class ManifestVerification(unittest.TestCase):
         )
         self.assertTrue(any("/sbin/sshd" in line and "notice" in line for line in failures))
 
+    def test_removed_first_party_notice_is_named(self):
+        rows = [dict(row) for row in self.expected]
+        rows[2]["notice"] = "-"
+        failures = audit.verify_rows(
+            self.root, rows, self.expected, self.packages, self.imports
+        )
+        self.assertTrue(any("/etc/motd" in line and "notice" in line for line in failures))
+
     def test_unlicensed_program_is_named(self):
         rows = [dict(row) for row in self.expected]
         rows[0]["license"] = ""
@@ -161,6 +183,14 @@ class ManifestVerification(unittest.TestCase):
             self.root, rows, self.expected, self.packages, self.imports
         )
         self.assertTrue(any("/bin/app" in line and "licence" in line for line in failures))
+
+    def test_rewritten_file_licence_is_named(self):
+        rows = [dict(row) for row in self.expected]
+        rows[2]["license"] = "MIT"
+        failures = audit.verify_rows(
+            self.root, rows, self.expected, self.packages, self.imports
+        )
+        self.assertTrue(any("/etc/motd" in line and "license" in line for line in failures))
 
     def test_unregistered_addon_is_named(self):
         rows = [dict(row) for row in self.expected]

@@ -39,6 +39,7 @@ ALLOWED_LICENSES = frozenset(
     }
 )
 IMPLEMENTATION_EXTENSIONS = (".c", ".cc", ".cpp", ".cxx", ".c++")
+DEFAULT_PROFILES = {"x86_64": "release", "aarch64": "pi4-release"}
 SCAFFOLD_ROOTS = ("kernel", "boot", "crates", "libc", "userland", "xtask")
 VENDORED_PREFIXES = ("userland/brush/", "userland/uutils/")
 LICENSE_FILE_NAMES = (
@@ -400,6 +401,12 @@ def upstreams_under(imports: list[dict], source: str) -> str:
     return ",".join(names) if names else "-"
 
 
+def notice_for(imports: list[dict], source: str) -> str:
+    """Return the provenance upstream or the repository NOTICE for first-party files."""
+    upstream = upstreams_under(imports, source)
+    return upstream if upstream != "-" else "NOTICE"
+
+
 def licence_file(directory: Path) -> Path | None:
     for name in LICENSE_FILE_NAMES:
         candidate = directory / name
@@ -432,10 +439,9 @@ def generated_owner(root: Path, source: str, arch: str) -> tuple[str, str | None
 
 def build_rows(
     root: Path, arch: str, profile: str, packages: dict[str, dict], imports: list[dict]
-) -> tuple[list[dict], dict[str, str]]:
+) -> list[dict]:
     programs, files, _dynamic, _release = load_profile(root / "profiles", profile)
     rows: list[dict] = []
-    built: dict[str, str] = {}
     for program in programs:
         package = packages.get(program["package"])
         source = package["dir"] if package else ""
@@ -445,7 +451,7 @@ def build_rows(
                 "stage_path": program["path"],
                 "source": source,
                 "license": package["license"] if package else "",
-                "notice": upstreams_under(imports, source),
+                "notice": notice_for(imports, source),
             }
         )
     for entry in files:
@@ -470,10 +476,9 @@ def build_rows(
                         "stage_path": entry["path"],
                         "source": owner or "",
                         "license": PROJECT_LICENSE,
-                        "notice": upstreams_under(imports, owner) if owner else "-",
+                        "notice": notice_for(imports, owner) if owner else "",
                     }
                 )
-            built[entry["path"]] = source
         else:
             record = find_import(imports, source)
             rows.append(
@@ -482,11 +487,11 @@ def build_rows(
                     "stage_path": entry["path"],
                     "source": source,
                     "license": record["license"] if record else PROJECT_LICENSE,
-                    "notice": record["upstream"] if record else "-",
+                    "notice": record["upstream"] if record else notice_for(imports, source),
                 }
             )
     rows.sort(key=lambda row: (row["stage_path"], row["kind"]))
-    return rows, built
+    return rows
 
 
 # --------------------------------------------------------------------------
@@ -503,12 +508,29 @@ def verify_rows(
 ) -> list[str]:
     failures: list[str] = []
     by_source = {package["dir"]: package for package in packages.values()}
-    actual = {(row["kind"], row["stage_path"], row["source"]) for row in rows}
-    wanted = {(row["kind"], row["stage_path"], row["source"]) for row in expected}
-    for kind, stage, source in sorted(wanted - actual):
-        failures.append(f"missing artifact {stage}: {kind} {source}")
-    for kind, stage, source in sorted(actual - wanted):
-        failures.append(f"unexpected artifact {stage}: {kind} {source}")
+    expected_by_key = {(row["kind"], row["stage_path"]): row for row in expected}
+    actual_by_key = {(row["kind"], row["stage_path"]): row for row in rows}
+    for key in sorted(set(expected_by_key) | set(actual_by_key)):
+        kind, stage = key
+        expected_row = expected_by_key.get(key)
+        actual_row = actual_by_key.get(key)
+        if actual_row is None and expected_row is not None:
+            failures.append(
+                f"missing artifact {stage}: {kind} {expected_row['source']}"
+            )
+            continue
+        if expected_row is None and actual_row is not None:
+            failures.append(
+                f"unexpected artifact {stage}: {kind} {actual_row['source']}"
+            )
+            continue
+        for field in ("source", "license", "notice"):
+            if actual_row[field] != expected_row[field]:
+                failures.append(
+                    f"artifact {stage}: {field} {actual_row[field]!r} does not match "
+                    f"the resolved profile {expected_row[field]!r}"
+                )
+    repository_notice = root / "NOTICE"
     seen: set[str] = set()
     for row in rows:
         stage = row["stage_path"]
@@ -522,6 +544,8 @@ def verify_rows(
             failures.append(f"artifact {stage}: licence {license_id} is not allowed")
         if not row["notice"]:
             failures.append(f"artifact {stage}: notice entry is missing")
+        elif row["notice"] == "NOTICE" and not repository_notice.is_file():
+            failures.append(f"artifact {stage}: repository NOTICE is missing")
         if row["kind"] == "program":
             package = by_source.get(row["source"])
             if package is None:
@@ -532,7 +556,7 @@ def verify_rows(
                     f"artifact {stage}: licence {license_id} does not match "
                     f"Cargo.toml {package['license'] or 'missing'}"
                 )
-            notice = upstreams_under(imports, row["source"])
+            notice = notice_for(imports, row["source"])
             if notice != row["notice"]:
                 failures.append(
                     f"artifact {stage}: notice {row['notice']} does not match "
@@ -578,13 +602,12 @@ def verify_rows(
                 root / row["source"]
             ).exists():
                 failures.append(f"artifact {stage}: source {row['source']} is missing")
-            if row["notice"] != "-":
-                notice = upstreams_under(imports, row["source"])
-                if notice != row["notice"]:
-                    failures.append(
-                        f"artifact {stage}: notice {row['notice']} does not match "
-                        f"provenance {notice}"
-                    )
+            notice = notice_for(imports, row["source"])
+            if notice != row["notice"]:
+                failures.append(
+                    f"artifact {stage}: notice {row['notice']} does not match "
+                    f"provenance {notice}"
+                )
     return failures
 
 
@@ -643,12 +666,14 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def write_hashes(path: Path, root: Path, manifest: Path, built: dict[str, str]) -> None:
+def write_hashes(path: Path, root: Path, manifest: Path, rows: list[dict]) -> None:
     lines = [f"{sha256_file(manifest)}  {manifest.name}"]
-    for stage, source in sorted(built.items()):
-        candidate = root / source
+    for row in sorted(rows, key=lambda item: item["stage_path"]):
+        if row["kind"] != "file" or not row["source"]:
+            continue
+        candidate = root / row["source"]
         if candidate.is_file():
-            lines.append(f"{sha256_file(candidate)}  {stage.lstrip('/')}")
+            lines.append(f"{sha256_file(candidate)}  {row['stage_path'].lstrip('/')}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -723,7 +748,32 @@ def management_root(root: Path) -> Path:
     configured = os.environ.get("RAVEN_MGMT_ROOT")
     if configured:
         return Path(configured).expanduser().resolve()
-    return (root.parent / "ravenbsd-prjmgmt").resolve()
+    # The product clone is commonly reached through a symlinked workspace. Search both
+    # the logical PWD and the physical checkout so the durable evidence lands in the
+    # real ravenbsd-prjmgmt checkout, not a sibling stub beside a symlink.
+    bases = [os.environ.get("PWD", ""), str(Path.cwd()), str(root)]
+    seen: set[Path] = set()
+    for value in bases:
+        if not value:
+            continue
+        base = Path(value).absolute()
+        for ancestor in (base, *base.parents):
+            if ancestor in seen:
+                continue
+            seen.add(ancestor)
+            candidate = ancestor / "ravenbsd-prjmgmt"
+            if (candidate / "tickets/INDEX.md").is_file():
+                return candidate.resolve()
+    raise AuditError(
+        "management root not found: set RAVEN_MGMT_ROOT to the ravenbsd-prjmgmt checkout"
+    )
+
+
+def default_profile(arch: str) -> str:
+    try:
+        return DEFAULT_PROFILES[arch]
+    except KeyError:
+        raise AuditError(f"no default release profile for {arch}") from None
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -732,7 +782,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         description="Resolve and verify the RavenBSD release artifact manifest.",
     )
     parser.add_argument("--arch", required=True, choices=("x86_64", "aarch64"))
-    parser.add_argument("--profile", default="release")
+    parser.add_argument(
+        "--profile",
+        default=None,
+        help="profile name (default: release for x86_64, pi4-release for aarch64)",
+    )
     parser.add_argument("--repo", type=Path, default=None)
     parser.add_argument("--manifest", type=Path, default=None)
     parser.add_argument("--evidence-dir", type=Path, default=None)
@@ -744,6 +798,7 @@ def run(args: argparse.Namespace) -> int:
     root = (args.repo or Path(__file__).resolve().parents[3]).resolve()
     if not (root / "Cargo.toml").is_file():
         raise AuditError(f"{root} is not the product checkout")
+    profile = args.profile or default_profile(args.arch)
     evidence = (
         args.evidence_dir.resolve()
         if args.evidence_dir
@@ -753,14 +808,15 @@ def run(args: argparse.Namespace) -> int:
     tag = args.tag or args.arch
     packages = load_packages(root)
     imports = load_provenance(root / "PROVENANCE.toml")
-    expected, built = build_rows(root, args.arch, args.profile, packages, imports)
-    manifest = evidence / f"manifest-{args.arch}.tsv"
+    expected = build_rows(root, args.arch, profile, packages, imports)
     if args.manifest:
-        rows = read_manifest(args.manifest.resolve())
+        manifest = args.manifest.resolve()
+        rows = read_manifest(manifest)
     else:
+        manifest = evidence / f"manifest-{args.arch}.tsv"
         rows = expected
         write_manifest(manifest, rows, args.arch)
-        write_hashes(evidence / f"hashes-{args.arch}.txt", root, manifest, built)
+        write_hashes(evidence / f"hashes-{args.arch}.txt", root, manifest, rows)
     failures = verify_rows(root, rows, expected, packages, imports)
     paths = tracked_files(root)
     hits, headers = write_c_scan(evidence / "c-cpp-scan.txt", root, paths)
@@ -773,7 +829,7 @@ def run(args: argparse.Namespace) -> int:
     for failure in failures:
         print(f"artifact-audit: FAIL {failure}", file=sys.stderr)
     print(
-        f"artifact-audit: arch={args.arch} profile={args.profile} "
+        f"artifact-audit: arch={args.arch} profile={profile} "
         f"artifacts={len(rows)} headers_ignored={headers} failures={len(failures)}"
     )
     print(f"artifact-audit: manifest={manifest} failures={failures_path}")
