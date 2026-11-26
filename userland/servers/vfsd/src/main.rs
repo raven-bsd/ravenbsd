@@ -1082,14 +1082,6 @@ mod program {
         }
 
         fn read(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
-            if let Some(entry) = self.opens.get(file)
-                && entry.file.path == "/dev/urandom"
-            {
-                println!(
-                    "vfsd: read /dev/urandom offset={offset} len={}",
-                    buffer.len()
-                );
-            }
             if offset != 0 {
                 return Err(Errno::EINVAL.into());
             }
