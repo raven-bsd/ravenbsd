@@ -174,6 +174,13 @@ pub fn open(
         RequestBuffers::default(),
     );
     let result = submit(&request).and_then(|_| wait(caller, &request));
+    if path.contains("urandom") {
+        match &result {
+            Ok((0, _)) => crate::kprintln!("router-open: /dev/urandom ok"),
+            Ok((status, _)) => crate::kprintln!("router-open: /dev/urandom status={}", status),
+            Err(error) => crate::kprintln!("router-open: /dev/urandom error {:?}", error),
+        }
+    }
     match result {
         Ok((0, _)) => {
             let response = *request.response.lock();
