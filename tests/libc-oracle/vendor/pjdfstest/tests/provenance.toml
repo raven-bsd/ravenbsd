@@ -2,3 +2,69 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 import = []
+
+[[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/conf"
+upstream = "pjdfstest"
+upstream_path = "tests/conf"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored TAP body, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/misc.sh"
+upstream = "pjdfstest"
+upstream_path = "tests/misc.sh"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored TAP body, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/open/00.t"
+upstream = "pjdfstest"
+upstream_path = "tests/open/00.t"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored TAP body, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/mkdir/00.t"
+upstream = "pjdfstest"
+upstream_path = "tests/mkdir/00.t"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored TAP body, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/link/00.t"
+upstream = "pjdfstest"
+upstream_path = "tests/link/00.t"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored TAP body, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/unlink/00.t"
+upstream = "pjdfstest"
+upstream_path = "tests/unlink/00.t"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored TAP body, never linked into a shipped artifact"

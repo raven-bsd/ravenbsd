@@ -1,0 +1,218 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S750 fail-closed required matrix.
+#
+# These are the individually required kernel-facing donor bodies for the 0.1.0 application ABI.
+# The aggregate G1 thresholds in g1.toml remain progress metrics. This matrix is the acceptance
+# gate: a row passes only when its exact body (or every body matched by a wildcard) is `pass` on
+# the Raven target, and every declared prerequisite body also passed. A missing matrix, an empty
+# matrix, a missing body, `fail`, `skip`, `not-run`, `excluded` or `oracle-fail` fails the gate.
+#
+# `donor` is the exact pinned FreeBSD source path. `regression` names the Raven regression that
+# complements the donor body. `environment` is the architecture/run environment the row must pass
+# in before the release matrix is complete.
+
+schema = 1
+
+[[required]]
+id = "descriptors-dup-close"
+suite = "freebsd-libc-sys"
+program = "sys/t_dup"
+case = "dup2_basic"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_dup.c"
+expect = "dup2 returns a new descriptor onto the same open file description"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (session descriptor-table regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_dup"
+case = "dup_err"
+
+[[required]]
+id = "pipes"
+suite = "freebsd-libc-sys"
+program = "sys/t_pipe"
+case = "pipe_restart"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_pipe.c"
+expect = "write/read across a pipe survives a signal-interrupted wait and EOF is observed"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (pipe EOF/restart regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_dup"
+case = "dup2_basic"
+
+[[required]]
+id = "poll"
+suite = "freebsd-libc-sys"
+program = "sys/t_poll"
+case = "poll_basic"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_poll.c"
+expect = "poll reports readiness and timeout without losing events"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (poll timeout/readiness regression)"
+
+[[required]]
+id = "select"
+suite = "freebsd-libc-sys"
+program = "sys/t_select"
+case = "pselect_timeout"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_select.c"
+expect = "pselect times out with the requested timeval and restores the descriptor set"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (select timeout descriptor-set regression)"
+
+[[required]]
+id = "sockets-socketpair"
+suite = "freebsd-libc-sys"
+program = "sys/t_socketpair"
+case = "socketpair_basic"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_socketpair.c"
+expect = "socketpair creates two connected descriptors with the requested type"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (S741 descriptor ownership/ancillary regression)"
+
+[[required]]
+id = "signals-kill"
+suite = "freebsd-libc-sys"
+program = "sys/t_kill"
+case = "kill_basic"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_kill.c"
+expect = "kill delivers the signal to the child and the parent observes termination"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (signal delivery/wait status regression)"
+
+[[required]]
+id = "wait"
+suite = "freebsd-libc-sys"
+program = "sys/t_wait"
+case = "wait6_exited"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_wait.c"
+expect = "wait6/wait4 returns the exact exited status and does not reap an unrelated pid"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (wait6 exit-status regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_kill"
+case = "kill_basic"
+
+[[required]]
+id = "fork"
+suite = "freebsd-libc-sys"
+program = "sys/t_umask"
+case = "umask_fork"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_umask.c"
+expect = "fork gives the child an independent umask and process state"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (S712 fork/exec signal-lifecycle regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_wait"
+case = "wait6_exited"
+
+[[required]]
+id = "exec"
+suite = "freebsd-libc-sys"
+program = "gen/execve/t_execve"
+case = "t_execve_null"
+donor = "contrib/netbsd-tests/lib/libc/gen/execve/t_execve.c"
+expect = "execve with a null path fails with EFAULT and does not replace the image"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (S712 exec image replacement regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_umask"
+case = "umask_fork"
+
+[[required]]
+id = "mmap"
+suite = "freebsd-libc-sys"
+program = "sys/t_mmap"
+case = "mmap_err"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_mmap.c"
+expect = "mmap rejects invalid arguments and maps a file at the requested protection"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (mmap error-path regression)"
+
+[[required]]
+id = "mprotect"
+suite = "freebsd-libc-sys"
+program = "sys/t_mprotect"
+case = "mprotect_write"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_mprotect.c"
+expect = "mprotect changes protection and a write to a read-only page faults"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (mprotect write-protection regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_mmap"
+case = "mmap_err"
+
+[[required]]
+id = "credentials-getgroups"
+suite = "freebsd-libc-sys"
+program = "sys/t_getgroups"
+case = "getgroups_getgid"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_getgroups.c"
+expect = "getgroups returns the caller primary gid when no supplementary groups exist"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (credential query regression)"
+
+[[required]]
+id = "umask-create"
+suite = "freebsd-libc-sys"
+program = "sys/t_umask"
+case = "umask_open"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_umask.c"
+expect = "open O_CREAT applies the process umask to the created mode"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (S730/S731 authoritative umask regression)"
+
+[[required]]
+id = "namespace-mkdir"
+suite = "freebsd-libc-sys"
+program = "sys/t_mkdir"
+case = "mkdir_err"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_mkdir.c"
+expect = "mkdir creates a directory and reports the documented errors"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (namespace creation regression)"
+
+[[required]]
+id = "namespace-link"
+suite = "freebsd-libc-sys"
+program = "sys/t_link"
+case = "link_perm"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_link.c"
+expect = "link creates a hard link and enforces directory write permission"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (hard-link permission regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_mkdir"
+case = "mkdir_err"
+
+[[required]]
+id = "namespace-unlink"
+suite = "freebsd-libc-sys"
+program = "sys/t_unlink"
+case = "unlink_basic"
+donor = "contrib/netbsd-tests/lib/libc/sys/t_unlink.c"
+expect = "unlink removes a regular file and reports the documented errors"
+environment = "x86_64 qemu"
+regression = "tests/libc/atf (unlink of a regular file regression)"
+[[required.prerequisite]]
+suite = "freebsd-libc-sys"
+program = "sys/t_mkdir"
+case = "mkdir_err"
+
+[[required]]
+id = "pjdfstest-open-create"
+suite = "pjdfstest"
+program = "open/00"
+case = "*"
+donor = "tests/open/00.t"
+expect = "open creates files with the POSIX mode, umask, owner and flags behaviour"
+environment = "x86_64 qemu mounted UFS2"
+regression = "tests/libc/atf (pjdfstest TAP driver regression)"

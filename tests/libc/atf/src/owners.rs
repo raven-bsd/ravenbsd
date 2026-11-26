@@ -43,7 +43,9 @@ impl Owners {
     /// Validate ticket names and prefix shape.
     pub fn validate(&self) -> Result<()> {
         for owner in &self.entries {
-            if !owner.ticket.starts_with('C') || owner.ticket.len() < 2 {
+            if !(owner.ticket.starts_with('C') || owner.ticket.starts_with('S'))
+                || owner.ticket.len() < 2
+            {
                 bail!(
                     "owners.toml: prefix `{}` has ticket `{}`",
                     owner.prefix,

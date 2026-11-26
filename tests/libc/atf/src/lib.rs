@@ -23,6 +23,7 @@ pub mod gen_meson;
 pub mod owners;
 pub mod qemu;
 pub mod report;
+pub mod required;
 pub mod result;
 pub mod runner;
 pub mod suite;

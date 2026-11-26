@@ -1,0 +1,145 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# Hand-authored from the pinned FreeBSD contrib/netbsd-tests/lib/libc/sys files.
+
+schema = 1
+suite = "freebsd-libc-sys"
+donor = "freebsd"
+framework = "atf"
+root = "vendor/freebsd/libc-sys"
+srcdir_for_tests = true
+
+[[program]]
+name = "sys/t_dup"
+sources = ["sys/t_dup.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_pipe"
+sources = ["sys/t_pipe.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_poll"
+sources = ["sys/t_poll.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_select"
+sources = ["sys/t_select.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_socketpair"
+sources = ["sys/t_socketpair.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_kill"
+sources = ["sys/t_kill.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_wait"
+sources = ["sys/t_wait.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_mmap"
+sources = ["sys/t_mmap.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_mprotect"
+sources = ["sys/t_mprotect.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_umask"
+sources = ["sys/t_umask.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_getgroups"
+sources = ["sys/t_getgroups.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_mkdir"
+sources = ["sys/t_mkdir.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_link"
+sources = ["sys/t_link.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_unlink"
+sources = ["sys/t_unlink.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "gen/execve/t_execve"
+sources = ["gen/execve/t_execve.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []

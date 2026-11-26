@@ -1,0 +1,178 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/h_macros.h"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/h_macros.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_dup.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_dup.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_getgroups.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_getgroups.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_kill.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_kill.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_link.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_link.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_mkdir.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_mkdir.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_mmap.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_mmap.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_mprotect.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_mprotect.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_pipe.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_pipe.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_poll.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_poll.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_select.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_select.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_socketpair.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_socketpair.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_umask.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_umask.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_unlink.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_unlink.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_wait.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/sys/t_wait.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc-sys/gen/execve/t_execve.c"
+upstream = "freebsd"
+upstream_path = "contrib/netbsd-tests/lib/libc/gen/execve/t_execve.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-26"
+modified = false
+notes = "vendored kernel-facing test, never linked into a shipped artifact"

@@ -162,6 +162,7 @@ fn check_a_regression_is_exit_one_and_names_the_case() {
 fn gate_met_fixture_is_exit_zero() {
     let baseline = fixture("baseline-met.tsv");
     let config = fixture("g1-fixture.toml");
+    let required = fixture("required-fixture.toml");
     let output = run(&[
         "gate",
         "--g1",
@@ -169,15 +170,19 @@ fn gate_met_fixture_is_exit_zero() {
         baseline.to_str().expect("path"),
         "--config",
         config.to_str().expect("path"),
+        "--required",
+        required.to_str().expect("path"),
     ]);
     assert_eq!(output.status.code(), Some(0), "{}", stdout(&output));
     assert!(stdout(&output).contains("G1: MET"));
+    assert!(stdout(&output).contains("required: PASS (1 of 1 met)"));
 }
 
 #[test]
 fn gate_not_met_fixture_is_exit_three() {
     let baseline = fixture("run-regressed.tsv");
     let config = fixture("g1-fixture.toml");
+    let required = fixture("required-fixture.toml");
     let output = run(&[
         "gate",
         "--g1",
@@ -185,9 +190,87 @@ fn gate_not_met_fixture_is_exit_three() {
         baseline.to_str().expect("path"),
         "--config",
         config.to_str().expect("path"),
+        "--required",
+        required.to_str().expect("path"),
     ]);
     assert_eq!(output.status.code(), Some(3));
     assert!(stdout(&output).contains("NOT MET"));
+    assert!(stdout(&output).contains("REQUIRED fixture-strchr: NOT MET"));
+}
+
+#[test]
+fn gate_without_a_required_matrix_is_exit_three() {
+    let baseline = fixture("baseline-met.tsv");
+    let config = fixture("g1-fixture.toml");
+    let missing = fixture("no-such-required.toml");
+    let output = run(&[
+        "gate",
+        "--g1",
+        "--table",
+        baseline.to_str().expect("path"),
+        "--config",
+        config.to_str().expect("path"),
+        "--required",
+        missing.to_str().expect("path"),
+    ]);
+    assert_eq!(output.status.code(), Some(3), "{}", stdout(&output));
+    assert!(stdout(&output).contains("required matrix missing"));
+}
+
+fn gate_required(table: &str, required: &str) -> Output {
+    let config = fixture("g1-fixture.toml");
+    run(&[
+        "gate",
+        "--g1",
+        "--table",
+        fixture(table).to_str().expect("path"),
+        "--config",
+        config.to_str().expect("path"),
+        "--required",
+        fixture(required).to_str().expect("path"),
+    ])
+}
+
+#[test]
+fn gate_all_required_results_present_is_exit_zero() {
+    let output = gate_required("required-all-pass.tsv", "required-mutation.toml");
+    assert_eq!(output.status.code(), Some(0), "{}", stdout(&output));
+    assert!(stdout(&output).contains("required: PASS (2 of 2 met)"));
+}
+
+#[test]
+fn gate_omitted_required_result_is_exit_three() {
+    let output = gate_required("required-omit.tsv", "required-mutation.toml");
+    assert_eq!(output.status.code(), Some(3), "{}", stdout(&output));
+    assert!(stdout(&output).contains("REQUIRED mutation-b: NOT MET (missing"));
+}
+
+#[test]
+fn gate_skipped_required_result_is_exit_three() {
+    let output = gate_required("required-skip.tsv", "required-mutation.toml");
+    assert_eq!(output.status.code(), Some(3), "{}", stdout(&output));
+    assert!(stdout(&output).contains("REQUIRED mutation-b: NOT MET (not pass: skip"));
+}
+
+#[test]
+fn gate_failed_prerequisite_is_exit_three() {
+    let output = gate_required("required-prereq-fail.tsv", "required-mutation.toml");
+    assert_eq!(output.status.code(), Some(3), "{}", stdout(&output));
+    assert!(stdout(&output).contains("prerequisite not pass"));
+}
+
+#[test]
+fn gate_empty_required_matrix_is_exit_three() {
+    let output = gate_required("required-all-pass.tsv", "required-empty.toml");
+    assert_eq!(output.status.code(), Some(3), "{}", stdout(&output));
+    assert!(stdout(&output).contains("required: FAIL (0 of 0 met)"));
+}
+
+#[test]
+fn gate_an_old_table_without_required_rows_is_exit_three() {
+    let output = gate_required("baseline-met.tsv", "required-mutation.toml");
+    assert_eq!(output.status.code(), Some(3), "{}", stdout(&output));
+    assert!(stdout(&output).contains("REQUIRED mutation-a: NOT MET (missing"));
 }
 
 #[test]
