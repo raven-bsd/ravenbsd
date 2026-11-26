@@ -143,6 +143,8 @@ fn record_timer(timer: usize, jitter: u64) {
 
 fn proc_wait(process: Handle) -> Result<i32, Errno> {
     let mut code = -1i32;
+    // SAFETY: PROC_WAIT takes a scalar handle and a writable `i32` pointer owned by this frame;
+    // the kernel validates the handle and writes only on success.
     let raw = unsafe {
         sys::syscall2(
             Syscall::PROC_WAIT as usize,
