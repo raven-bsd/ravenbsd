@@ -413,10 +413,10 @@ pub const MAX_GROUPS: usize = 16;
 
 /// `si_code` of a child status change (`CLD_EXITED`).
 pub const CLD_EXITED_CODE: u32 = 1;
-/// `si_code` of a plain user signal (`SI_USER`).
-pub const SI_USER_CODE: u32 = 0;
-/// `si_code` of a queued signal (`SI_QUEUE`; the C value is `-1`).
-pub const SI_QUEUE_CODE: u32 = u32::MAX;
+/// `si_code` of a plain user signal (`SI_USER`, FreeBSD `0x10001`).
+pub const SI_USER_CODE: u32 = 0x0001_0001;
+/// `si_code` of a queued signal (`SI_QUEUE`, FreeBSD `0x10002`).
+pub const SI_QUEUE_CODE: u32 = 0x0001_0002;
 
 /// One queued process signal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -438,39 +438,44 @@ pub const SIG_DFL: u64 = 0;
 /// `sigaction` handler value: ignore the signal (`SIG_IGN`).
 pub const SIG_IGN: u64 = 1;
 
-/// `SA_NOCLDSTOP` (`bits/signum.h`, System V amd64).
-pub const SA_NOCLDSTOP: u32 = 1;
-/// `SA_NOCLDWAIT` (`bits/signum.h`).
-pub const SA_NOCLDWAIT: u32 = 2;
-/// `SA_SIGINFO` (`bits/signum.h`).
-pub const SA_SIGINFO: u32 = 4;
-/// `SA_ONSTACK` (`bits/signum.h`).
-pub const SA_ONSTACK: u32 = 0x0800_0000;
-/// `SA_RESTART` (`bits/signum.h`).
-pub const SA_RESTART: u32 = 0x1000_0000;
-/// `SA_NODEFER` (`bits/signum.h`).
-pub const SA_NODEFER: u32 = 0x4000_0000;
-/// `SA_RESETHAND` (`bits/signum.h`).
-pub const SA_RESETHAND: u32 = 0x8000_0000;
+/// `SA_NOCLDSTOP` (FreeBSD `sys/sys/signal.h`).
+pub const SA_NOCLDSTOP: u32 = 0x0008;
+/// `SA_NOCLDWAIT` (FreeBSD `sys/sys/signal.h`).
+pub const SA_NOCLDWAIT: u32 = 0x0020;
+/// `SA_SIGINFO` (FreeBSD `sys/sys/signal.h`).
+pub const SA_SIGINFO: u32 = 0x0040;
+/// `SA_ONSTACK` (FreeBSD `sys/sys/signal.h`).
+pub const SA_ONSTACK: u32 = 0x0001;
+/// `SA_RESTART` (FreeBSD `sys/sys/signal.h`).
+pub const SA_RESTART: u32 = 0x0002;
+/// `SA_NODEFER` (FreeBSD `sys/sys/signal.h`).
+pub const SA_NODEFER: u32 = 0x0010;
+/// `SA_RESETHAND` (FreeBSD `sys/sys/signal.h`).
+pub const SA_RESETHAND: u32 = 0x0004;
 /// The flags `sigaction` stores (the donor `kern_sigaction` accepted set).
 pub const SA_SUPPORTED: u32 =
     SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO | SA_ONSTACK | SA_RESTART | SA_NODEFER | SA_RESETHAND;
 
-/// `SIG_BLOCK` (`sigprocmask`).
-pub const SIG_BLOCK: i32 = 0;
-/// `SIG_UNBLOCK` (`sigprocmask`).
-pub const SIG_UNBLOCK: i32 = 1;
-/// `SIG_SETMASK` (`sigprocmask`).
-pub const SIG_SETMASK: i32 = 2;
+/// `SIG_BLOCK` (`sigprocmask`, FreeBSD value).
+pub const SIG_BLOCK: i32 = 1;
+/// `SIG_UNBLOCK` (`sigprocmask`, FreeBSD value).
+pub const SIG_UNBLOCK: i32 = 2;
+/// `SIG_SETMASK` (`sigprocmask`, FreeBSD value).
+pub const SIG_SETMASK: i32 = 3;
 
 /// `SS_ONSTACK`: the thread is currently on its alternate stack.
 pub const SS_ONSTACK: u32 = 1;
 /// `SS_DISABLE`: no alternate stack.
-pub const SS_DISABLE: u32 = 2;
-/// `SS_AUTODISARM`: accepted and stored as a plain flag.
-pub const SS_AUTODISARM: u32 = 0x8000_0000;
-/// Minimum alternate stack size (`MINSIGSTKSZ`, `bits/signum.h`).
-pub const MINSIGSTKSZ: u64 = 6144;
+pub const SS_DISABLE: u32 = 4;
+/// Minimum alternate stack size (FreeBSD `__MINSIGSTKSZ`).
+#[cfg(target_arch = "x86_64")]
+pub const MINSIGSTKSZ: u64 = 2048;
+/// Minimum alternate stack size (FreeBSD `__MINSIGSTKSZ`).
+#[cfg(target_arch = "aarch64")]
+pub const MINSIGSTKSZ: u64 = 4096;
+/// Minimum alternate stack size (FreeBSD `__MINSIGSTKSZ`).
+#[cfg(target_arch = "riscv64")]
+pub const MINSIGSTKSZ: u64 = 4096;
 
 /// One per-process signal disposition (the FreeBSD `struct sigacts` fields Raven models).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

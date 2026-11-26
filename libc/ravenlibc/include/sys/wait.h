@@ -4,6 +4,8 @@
  *
  * RavenBSD: derived from musl:include/sys/wait.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
  * (no per-file header upstream; covered by musl/COPYRIGHT; public header, notice kept under R-H6)
+ * The idtype values and W* selectors/status macros follow the FreeBSD profile
+ * (sys/sys/wait.h at 133344405f532bd54ff3629a77d4c4e062f01fdb, BSD-3-Clause).
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,10 +36,10 @@ __BEGIN_DECLS
 #include <bits/alltypes.h>
 
 typedef enum {
-	P_ALL = 0,
-	P_PID = 1,
+	/* FreeBSD sys/sys/wait.h keeps the Solaris-derived numbering. */
+	P_PID = 0,
 	P_PGID = 2,
-	P_PIDFD = 3
+	P_ALL = 7
 } idtype_t;
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
@@ -59,22 +61,20 @@ pid_t wait4 (pid_t, int *, int, struct rusage *);
 #define WUNTRACED  2
 
 #define WSTOPPED   2
-#define WEXITED    4
-#define WCONTINUED 8
-#define WNOWAIT    16777216
+#define WEXITED    16
+#define WCONTINUED 4
+#define WNOWAIT    8
 
-#define __WNOTHREAD 0x20000000
 #define __WALL      0x40000000
-#define __WCLONE    0x80000000
 
 #define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
 #define WTERMSIG(s) ((s) & 0x7f)
 #define WSTOPSIG(s) WEXITSTATUS(s)
 #define WCOREDUMP(s) ((s) & 0x80)
-#define WIFEXITED(s) (!WTERMSIG(s))
-#define WIFSTOPPED(s) ((short)((((s)&0xffff)*0x10001U)>>8) > 0x7f00)
-#define WIFSIGNALED(s) (((s)&0xffff)-1U < 0xffu)
-#define WIFCONTINUED(s) ((s) == 0xffff)
+#define WIFEXITED(s) (((s) & 0x7f) == 0)
+#define WIFSTOPPED(s) (((s) & 0x7f) == 0x7f)
+#define WIFSIGNALED(s) (((s) & 0x7f) != 0x7f && ((s) & 0x7f) != 0 && (s) != 0x13)
+#define WIFCONTINUED(s) ((s) == 0x13)
 
 #endif
 __END_DECLS

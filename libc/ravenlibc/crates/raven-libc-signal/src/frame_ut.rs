@@ -54,11 +54,11 @@ fn siginfo_fields_share_the_union_words() {
 
 #[test]
 fn user_and_queue_records_have_the_right_codes() {
-    let user = user_siginfo(15, 0);
+    let user = user_siginfo(15, 0x10001);
     assert_eq!(si_signo(&user), 15);
-    assert_eq!(si_code(&user), 0);
+    assert_eq!(si_code(&user), 0x10001);
     let queued = queue_siginfo(36, Sigval { bytes: [9] });
-    assert_eq!(si_code(&queued), -1);
+    assert_eq!(si_code(&queued), 0x10002);
     assert_eq!(si_value(&queued).bytes[0], 9);
 }
 

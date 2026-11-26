@@ -43,20 +43,14 @@ use crate::errors::EINVAL_ERR;
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::generated::signal;
 
-/// `_NSIG`: one past the highest signal number.
+/// `_NSIG`: one past the highest signal number (`SIGRTMAX + 1`).
 pub const NSIG: usize = 65;
-/// Signal 32: the POSIX timer helper (libc-internal).
-pub const SIGTIMER: i32 = 32;
-/// Signal 33: cancellation (libc-internal).
-pub const SIGCANCEL: i32 = 33;
-/// Signal 34: `synccall` (libc-internal).
-pub const SIGSYNCCALL: i32 = 34;
-/// The first application-visible real-time signal.
+/// The first application-visible real-time signal of the supported range.
 pub const SIGRTMIN: i32 = 35;
 /// The last real-time signal.
 pub const SIGRTMAX: i32 = 64;
-/// Application mask: signals 32-34 clear (`musl src/signal/block.c`).
-pub const APP_MASK: u64 = 0xffff_fffc_7fff_ffff;
+/// Application mask: every signal bit of the supported range.
+pub const APP_MASK: u64 = !0;
 /// Kernel mask word with every bit set.
 pub const ALL_MASK: u64 = !0;
 
@@ -78,14 +72,14 @@ impl SigSet {
         Self::empty()
     }
 
-    /// Set every application signal, leaving 32..34 clear.
+    /// Set every application signal of the supported range.
     pub fn fill(&mut self) {
         if let Some(word) = self.0.first_mut() {
             *word = APP_MASK;
         }
     }
 
-    /// Add `sig`. `EINVAL` for `sig < 1`, `sig > 64` and 32..=34.
+    /// Add `sig`. `EINVAL` for `sig < 1` or `sig > 64`.
     pub fn add(&mut self, sig: i32) -> Result<(), Errno> {
         let shift = signal_shift(sig)?;
         if let Some(word) = self.0.first_mut() {
@@ -177,16 +171,16 @@ impl Default for SigSet {
     }
 }
 
-/// The musl `s-1`/`sig-32U < 3` gate, returning the bit position.
+/// The FreeBSD gate: a signal must be in 1..=64.
 fn signal_shift(sig: i32) -> Result<u32, Errno> {
-    if !(1..=64).contains(&sig) || (32..=34).contains(&sig) {
+    if !(1..=64).contains(&sig) {
         return Err(EINVAL_ERR);
     }
     Ok((sig.wrapping_sub(1) & 63) as u32)
 }
 
 /// The `NSIG` value of the generated ABI must agree with this module.
-const _: () = assert!(NSIG == signal::_NSIG as usize);
+const _: () = assert!(NSIG == (signal::SIGRTMAX + 1) as usize);
 const _: () = assert!(core::mem::size_of::<SigSet>() == 128);
 
 #[cfg(test)]

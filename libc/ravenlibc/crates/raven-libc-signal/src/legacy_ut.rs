@@ -21,9 +21,9 @@ fn signal_installs_restart_and_never_resets() {
 }
 
 #[test]
-fn signal_rejects_internal_and_uncatchable() {
+fn signal_rejects_out_of_range_and_uncatchable() {
     let table = DispTable::new();
-    assert_eq!(signal(&table, 32, 0x1), Err(EINVAL_ERR));
+    assert_eq!(signal(&table, 0, 0x1), Err(EINVAL_ERR));
     assert_eq!(signal(&table, 9, 0x1), Err(EINVAL_ERR));
 }
 
@@ -76,7 +76,7 @@ fn number_calls_and_realtime_bounds() {
         pthread_sigmask_number(&kernel, signal::SIG_BLOCK, None, None),
         0
     );
-    assert_eq!(sigpause(&kernel, &table, 32), EINVAL_ERR);
+    assert_eq!(sigpause(&kernel, &table, 0), EINVAL_ERR);
     assert_eq!(sigrtmin(), 35);
     assert_eq!(sigrtmax(), 64);
 }

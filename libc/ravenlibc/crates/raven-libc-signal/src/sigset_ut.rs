@@ -14,21 +14,14 @@ fn empty_has_no_bits() {
 }
 
 #[test]
-fn fill_sets_app_mask_and_clears_internal_bits() {
+fn fill_sets_every_supported_bit() {
     let mut set = SigSet::empty();
     set.fill();
     assert_eq!(set.app_word(), APP_MASK);
-    assert_eq!(set.app_word(), 0xffff_fffc_7fff_ffff);
-    assert_eq!(set.0[0] & (1 << 31), 0, "signal 32 must stay clear");
-    assert_eq!(set.0[0] & (1 << 32), 0, "signal 33 must stay clear");
-    assert_eq!(set.0[0] & (1 << 33), 0, "signal 34 must stay clear");
-    assert!(set.is_member(1).unwrap());
-    assert!(set.is_member(31).unwrap());
-    assert!(set.is_member(35).unwrap());
-    assert!(set.is_member(64).unwrap());
-    assert!(!set.is_member(32).unwrap());
-    assert!(!set.is_member(33).unwrap());
-    assert!(!set.is_member(34).unwrap());
+    assert_eq!(set.app_word(), !0);
+    for sig in 1..=64 {
+        assert!(set.is_member(sig).unwrap(), "sig {sig}");
+    }
 }
 
 #[test]
@@ -46,20 +39,13 @@ fn words_one_to_fifteen_stay_zero() {
 }
 
 #[test]
-fn add_and_del_reject_internal_and_out_of_range() {
+fn add_and_del_reject_out_of_range() {
     let mut set = SigSet::empty();
     for sig in [0, -1, 65, 100, i32::MIN, i32::MAX] {
         assert_eq!(set.add(sig), Err(EINVAL_ERR));
         assert_eq!(set.del(sig), Err(EINVAL_ERR));
     }
-    for sig in [32, 33, 34] {
-        assert_eq!(set.add(sig), Err(EINVAL_ERR), "sigaddset({sig})");
-        assert_eq!(set.del(sig), Err(EINVAL_ERR), "sigdelset({sig}) is EINVAL");
-    }
     for sig in 1..=64 {
-        if (32..=34).contains(&sig) {
-            continue;
-        }
         set.add(sig).unwrap();
         assert!(set.is_member(sig).unwrap());
         set.del(sig).unwrap();
@@ -117,8 +103,5 @@ fn abi_view_is_the_same_bytes() {
 fn rtmin_is_thirty_five_and_rtmax_sixty_four() {
     assert_eq!(SIGRTMIN, 35);
     assert_eq!(SIGRTMAX, 64);
-    assert_eq!(SIGTIMER, 32);
-    assert_eq!(SIGCANCEL, 33);
-    assert_eq!(SIGSYNCCALL, 34);
     assert_eq!(NSIG, 65);
 }

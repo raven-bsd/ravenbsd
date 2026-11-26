@@ -35,7 +35,7 @@
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use crate::dispositions::{DispTable, Disposition, SA_RESTART, SA_RESTORER};
+use crate::dispositions::{DispTable, Disposition, SA_RESTART};
 use crate::errors::EINVAL_ERR;
 use crate::sigset::APP_MASK;
 use raven_libc_abi::errno::Errno;
@@ -61,7 +61,7 @@ pub fn sigaction(
     new: Option<&Disposition>,
     old: Option<&mut Disposition>,
 ) -> Result<(), Errno> {
-    if !(1..=64).contains(&sig) || (32..=34).contains(&sig) {
+    if !(1..=64).contains(&sig) {
         return Err(EINVAL_ERR);
     }
     if new.is_some()
@@ -71,7 +71,7 @@ pub fn sigaction(
         return Err(EINVAL_ERR);
     }
     if let Some(requested) = new {
-        let flags = requested.flags & !SA_RESTORER;
+        let flags = requested.flags;
         let disposition = Disposition {
             handler: requested.handler,
             mask: requested.mask & APP_MASK,

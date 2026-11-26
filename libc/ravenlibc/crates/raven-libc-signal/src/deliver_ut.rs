@@ -54,9 +54,9 @@ fn fault_mapping_matches_ticket_4_6_2() {
     let cases = [
         (FaultKind::PageNomap, 11, 1),
         (FaultKind::PagePerm, 11, 2),
-        (FaultKind::Divide, 8, 1),
+        (FaultKind::Divide, 8, 2),
         (FaultKind::Illegal, 4, 1),
-        (FaultKind::Misalign, 7, 1),
+        (FaultKind::Misalign, 10, 1),
         (FaultKind::Breakpoint, 5, 1),
     ];
     for (kind, signal, code) in cases {
