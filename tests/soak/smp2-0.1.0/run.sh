@@ -100,7 +100,7 @@ if [ -z "$out_root" ]; then
 fi
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-label=$(printf '%s-%s-%s-smp%s' "$stamp" "$arch" "$accel" "$smp" | tr -c 'A-Za-z0-9._-' '_')
+label=$(printf '%s-%s-%s-smp%s' "$stamp" "$arch" "$accel" "$smp" | tr -c '[:alnum:]_.-' '_')
 out=$out_root/$label
 mkdir -p "$out/serials"
 
