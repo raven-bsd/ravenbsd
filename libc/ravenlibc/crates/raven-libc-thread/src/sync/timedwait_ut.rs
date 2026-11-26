@@ -126,7 +126,7 @@ fn eintr_is_spurious_without_caps_eintr() {
 #[test]
 fn etimedout_passes_through() {
     let kernel = kernel_with(KernelCaps::full());
-    kernel.set_wait_result(110);
+    kernel.set_wait_result(i32::from(ETIMEDOUT.0));
     let word = AtomicI32::new(1);
     assert_eq!(
         timedwait_cp(&kernel, &word, 1, CLOCK_MONOTONIC, None),
@@ -137,7 +137,7 @@ fn etimedout_passes_through() {
 #[test]
 fn ecanceled_passes_through() {
     let kernel = kernel_with(KernelCaps::full());
-    kernel.set_wait_result(125);
+    kernel.set_wait_result(i32::from(ECANCELED.0));
     let word = AtomicI32::new(1);
     assert_eq!(
         timedwait_cp(&kernel, &word, 1, CLOCK_MONOTONIC, None),

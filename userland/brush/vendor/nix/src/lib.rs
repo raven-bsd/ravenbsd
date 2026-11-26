@@ -201,6 +201,8 @@ pub mod unistd;
 
 #[cfg(any(feature = "poll", feature = "event"))]
 mod poll_timeout;
+#[cfg(ravenbsd)]
+mod ravenbsd_abi;
 
 #[cfg(any(
     target_os = "freebsd",

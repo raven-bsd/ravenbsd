@@ -252,10 +252,11 @@ signed = false
 
 [[type]]
 name = "pthread_key_t"
-rust = "u32"
-c = "unsigned"
+rust = "i32"
+c = "int"
 bits = 32
-signed = false
+signed = true
+doc = "S746: FreeBSD sys/sys/_pthreadtypes.h typedef int pthread_key_t; musl spells it unsigned (same width)"
 
 [[type]]
 name = "blksize_t"
@@ -304,10 +305,11 @@ signed = true
 
 [[type]]
 name = "pthread_spinlock_t"
-rust = "i32"
-c = "int"
-bits = 32
-signed = true
+rust = "*mut core::ffi::c_void"
+c = "struct pthread_spinlock *"
+bits = 64
+signed = false
+doc = "S746: FreeBSD sys/sys/_pthreadtypes.h pthread_spinlock_t is a pointer to the opaque struct; musl spells it int"
 
 [[type]]
 name = "pthread_t"

@@ -11,9 +11,9 @@ use crate::backend::SysBackend;
 use crate::lock::Lock;
 use crate::platform::Platform;
 
-fn copy_field(source: &[u8; 65], target: &mut [core::ffi::c_char; 65]) {
+fn copy_field(source: &[u8; 65], target: &mut [core::ffi::c_char; 256]) {
     let mut index = 0usize;
-    while index < 65 {
+    while index < source.len() {
         if let (Some(value), Some(slot)) = (source.get(index), target.get_mut(index)) {
             *slot = *value as core::ffi::c_char;
         }
@@ -29,7 +29,8 @@ pub fn field_bytes(field: &[u8; 65]) -> &[u8] {
     }
 }
 
-/// `uname`: one syscall, five fields, plus the libc `domainname` field left empty.
+/// `uname`: one syscall, five FreeBSD `SYS_NMLN` (256-byte) fields; the tail of each
+/// destination field stays zero past the kernel's 65-byte text.
 pub fn uname<B: SysBackend, L: Lock>(platform: &Platform<B, L>) -> Result<Utsname, Errno> {
     let raw = platform.backend().uname()?;
     let mut out = Utsname::ZERO;

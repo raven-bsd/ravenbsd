@@ -195,9 +195,13 @@ pub(crate) fn fill_passwd(
         target.pw_passwd = base.add(packed.passwd).cast();
         target.pw_uid = entry.uid;
         target.pw_gid = entry.gid;
+        target.pw_change = 0;
+        target.pw_class = core::ptr::null_mut();
         target.pw_gecos = base.add(packed.gecos).cast();
         target.pw_dir = base.add(packed.dir).cast();
         target.pw_shell = base.add(packed.shell).cast();
+        target.pw_expire = 0;
+        target.pw_fields = raven_libc_pwd::PWF_PLAIN;
     }
     Ok(())
 }

@@ -92,7 +92,7 @@ fn every_errno_and_length() {
     for e in -3i32..=200 {
         for len in [0usize, 1, 2, 26, 63, 64, 65] {
             let (result, buffer) = run(e, len);
-            if (0..=133).contains(&e) {
+            if (0..=97).contains(&e) {
                 assert_ne!(result, Xsi::Einval, "known e {e}");
             } else if len != 0 {
                 assert_eq!(result, Xsi::Einval, "unknown e {e}");
