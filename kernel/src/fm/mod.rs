@@ -13,7 +13,7 @@
 #[path = "../../../crates/raven-proto-fm/src/wire.rs"]
 mod wire;
 
-pub use wire::{Ereport, EreportRing, FmError, Severity, EREPORT_LEN};
+pub use wire::{EREPORT_LEN, Ereport, EreportRing, FmError, Severity};
 
 /// The kernel producer queue capacity (fixed, no allocation).
 pub const KERNEL_EREPORT_DEPTH: usize = 16;
