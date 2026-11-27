@@ -137,7 +137,7 @@ fn unsupported_format_response_matches_the_readme() {
         encode_response(StreamResponse::error(format::ENOTSUP)),
         [
             0x01, 0x00, // version
-            0x5f, 0x00, // status ENOTSUP (95)
+            0x2d, 0x00, // status ENOTSUP (FreeBSD 45)
             0x04, 0x00, // ERR
         ]
     );

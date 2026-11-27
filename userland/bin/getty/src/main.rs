@@ -91,7 +91,7 @@ mod program {
             }
             // A profile without the pty service keeps the pre-S211 direct console session
             // instead of failing to start the shell; say so on the console.
-            let _ = raven_rt::eprintln!("getty: pty unavailable; console stdin is the session");
+            raven_rt::eprintln!("getty: pty unavailable; console stdin is the session");
             spawn_wait(&self.initfs, shell, &options)
         }
 

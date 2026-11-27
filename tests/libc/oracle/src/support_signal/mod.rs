@@ -10,7 +10,7 @@
 use serde::Deserialize;
 
 use raven_libc_signal::dispositions::{
-    DispTable, Disposition, SA_NODEFER, SA_RESTART, SA_RESTORER,
+    DispTable, Disposition, SA_NODEFER, SA_RESETHAND, SA_RESTART,
 };
 use raven_libc_signal::sigset::APP_MASK;
 
@@ -62,7 +62,8 @@ impl DispositionModel {
         let index = sig as usize;
         let old = (self.handler[index], self.mask[index], self.flags[index]);
         if let Some((handler, mask, flags)) = request {
-            let flags = flags & !SA_RESTORER;
+            // FreeBSD `kern_sigaction` stores the application flags as given; it has no
+            // `SA_RESTORER` bit and the kernel owns the return path (`sys/kern/kern_sig.c:801`).
             self.handler[index] = handler;
             self.mask[index] = mask & APP_MASK;
             self.flags[index] = flags;
@@ -170,7 +171,7 @@ impl DispositionCase {
                 0 => 0,
                 1 => SA_RESTART,
                 2 => SA_NODEFER,
-                3 => SA_RESTORER,
+                3 => SA_RESETHAND,
                 4 => SA_RESTART | SA_NODEFER,
                 _ => rng.next_u64() as u32,
             };
@@ -216,7 +217,7 @@ impl DispositionCase {
         let mut cases = Vec::new();
         for sig in [-1, 0, 1, 9, 19, 32, 33, 34, 64, 65] {
             for write in [false, true] {
-                for flags in [0, SA_RESTART, SA_NODEFER, SA_RESTORER] {
+                for flags in [0, SA_RESTART, SA_NODEFER, SA_RESETHAND] {
                     cases.push(Self {
                         steps: vec![ActionStep {
                             sig,

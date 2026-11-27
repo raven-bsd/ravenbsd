@@ -193,15 +193,21 @@ fn monitor() {
 ///
 /// A dropped runnable thread shows up here as a missing completion; the monitor fails with the
 /// lost count instead of exiting success.
+#[cfg(target_arch = "x86_64")]
 const SATURATION_WORKERS: u32 = 80;
 /// Schedules per worker; 128 workers x 100 yields is a 12,800-schedule stress.
+#[cfg(target_arch = "x86_64")]
 const SATURATION_YIELDS: u32 = 256;
 /// Saturation monitor timeout.
+#[cfg(target_arch = "x86_64")]
 const SATURATION_TIMEOUT_NS: u64 = 30_000_000_000;
 /// Minimum schedules the monitor expects (the 10k stress).
+#[cfg(target_arch = "x86_64")]
 const SATURATION_MIN_SWITCHES: u64 = 10_000;
 
+#[cfg(target_arch = "x86_64")]
 static SATURATION_INDEX: AtomicU32 = AtomicU32::new(0);
+#[cfg(target_arch = "x86_64")]
 static SATURATION_DONE: AtomicU32 = AtomicU32::new(0);
 
 /// Run the K527 saturation self-test; on success this never returns.
@@ -210,6 +216,7 @@ static SATURATION_DONE: AtomicU32 = AtomicU32::new(0);
 /// the scheduler starts, then sleeps for the first few iterations (the wake boundary) and yields
 /// through 100 schedules. The monitor requires every worker to complete and the switch counter to
 /// pass the 10k stress bound.
+#[cfg(target_arch = "x86_64")]
 pub fn run_saturation() -> ! {
     if let Err(error) = crate::sched::init() {
         kprintln!("sched-saturation: setup failed: {error:?}");
@@ -237,6 +244,7 @@ pub fn run_saturation() -> ! {
     crate::sched::start()
 }
 
+#[cfg(target_arch = "x86_64")]
 fn saturation_worker() {
     let index = SATURATION_INDEX.fetch_add(1, Ordering::SeqCst);
     let mut iteration = 0u32;
@@ -257,6 +265,7 @@ fn saturation_worker() {
     crate::sched::exit_thread(0)
 }
 
+#[cfg(target_arch = "x86_64")]
 fn saturation_monitor() {
     let start = sleep::now_ns();
     loop {

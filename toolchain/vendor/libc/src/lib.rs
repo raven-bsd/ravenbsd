@@ -7,6 +7,7 @@
 #![allow(
     renamed_and_removed_lints, // Keep this order.
     unknown_lints, // Keep this order.
+    unexpected_cfgs, // `ravenbsd` is a custom target outside the host check-cfg list.
     nonstandard_style,
     overflowing_literals,
     unused_macros,

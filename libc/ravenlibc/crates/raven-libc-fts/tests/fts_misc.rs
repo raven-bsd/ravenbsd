@@ -143,7 +143,7 @@ fn ftsent_fields() {
             let stat = fs.fstatat(AT_FDCWD, &node.path, true).unwrap();
             assert_eq!(node.dev, stat.st_dev);
             assert_eq!(node.ino, stat.st_ino);
-            assert_eq!(node.nlink, u64::from(stat.st_nlink));
+            assert_eq!(node.nlink, stat.st_nlink);
         }
     }
     fts.close(&mut fs).unwrap();

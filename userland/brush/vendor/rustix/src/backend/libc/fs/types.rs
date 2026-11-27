@@ -981,8 +981,8 @@ pub enum FlockOperation {
 ///
 /// [`statat`]: crate::fs::statat
 /// [`fstat`]: crate::fs::fstat
-// `linux_kernel` is true for ravenbsd while `linux_like` is not; without it this arm and the
-// `stat64` arm below both define `Stat`. ravenbsd uses the Linux `stat64` layout.
+// `ravenbsd` selects `freebsdlike`/`bsd`, so this arm gives it the same
+// `c::stat` record as the other BSDs instead of the Linux `stat64` arm below.
 #[cfg(not(any(
     linux_like,
     linux_kernel,

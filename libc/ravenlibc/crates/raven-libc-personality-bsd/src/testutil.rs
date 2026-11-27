@@ -545,7 +545,7 @@ impl MountList for FakeMounts {
 }
 
 /// Copy a text field into a C `utsname` field.
-fn set_field(field: &mut [core::ffi::c_char; 65], text: &[u8]) {
+fn set_field(field: &mut [core::ffi::c_char; 256], text: &[u8]) {
     for (dst, src) in field.iter_mut().zip(text.iter()) {
         *dst = *src as core::ffi::c_char;
     }

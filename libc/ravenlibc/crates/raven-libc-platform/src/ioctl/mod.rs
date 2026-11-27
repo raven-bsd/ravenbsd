@@ -13,6 +13,7 @@ pub use tty::{
 };
 
 use raven_abi::errno::Errno;
+use raven_libc_abi::fcntl;
 use raven_libc_abi::structs::Termios;
 
 use crate::backend::SysBackend;
@@ -31,10 +32,11 @@ pub fn ioctl<B: SysBackend, L: Lock>(
         IoctlAction::FionBio => {
             let reference = platform.get(fd)?;
             let status = reference.status();
+            let bit = fcntl::O_NONBLOCK as u32;
             let updated = if value != 0 {
-                status | 0o4000
+                status | bit
             } else {
-                status & !0o4000
+                status & !bit
             };
             reference.set_status(updated);
             Ok(0)
@@ -47,9 +49,12 @@ pub fn ioctl<B: SysBackend, L: Lock>(
             platform.set_cloexec(fd, false)?;
             Ok(0)
         }
-        IoctlAction::TiocGWinsz | IoctlAction::TiocSWinsz | IoctlAction::FionRead => {
-            Err(Errno::ENOTTY)
-        }
+        IoctlAction::TiocGWinsz
+        | IoctlAction::TiocSWinsz
+        | IoctlAction::FionRead
+        | IoctlAction::TiocSctty
+        | IoctlAction::TiocGPgrp
+        | IoctlAction::TiocSPgrp => Err(Errno::ENOTTY),
         IoctlAction::Unknown => Err(Errno::ENOTTY),
         // Pointer-bearing requests need `&mut Termios`; the shell calls `tcgetattr`.
         IoctlAction::TcGets | IoctlAction::TcSets | IoctlAction::TcSetSw | IoctlAction::TcSetSf => {

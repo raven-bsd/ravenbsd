@@ -27,6 +27,7 @@ use std::vec::Vec;
 
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::generated::errno::{EBADF, EINVAL, EIO, EISDIR, ENOENT, ENOSPC, ESPIPE};
+use raven_libc_abi::generated::fcntl::{O_ACCMODE, O_APPEND, O_CREAT, O_TRUNC};
 
 use crate::traits::{Lock, StatLite, SysFile};
 
@@ -394,7 +395,7 @@ impl SysFile for FakeEnv {
         let limit = inner.max_write.unwrap_or(usize::MAX);
         let want = buf.len().min(limit);
         let file = inner.get_mut(fd)?;
-        if file.fl & 0o2000 != 0 {
+        if file.fl & O_APPEND != 0 {
             file.pos = file.data.len();
         }
         let count = match file.kind {
@@ -524,8 +525,8 @@ impl SysFile for FakeEnv {
             inner.fail_open = false;
             return Err(Errno(ENOSPC as u16));
         }
-        let create = flags & 0o100 != 0;
-        let truncate = flags & 0o1000 != 0;
+        let create = flags & O_CREAT != 0;
+        let truncate = flags & O_TRUNC != 0;
         let existing = inner.contents.get(path).cloned();
         let data = match existing {
             Some(data) => {
@@ -542,7 +543,7 @@ impl SysFile for FakeEnv {
             inner.contents.insert(path.to_vec(), data.clone());
         }
         let fd = inner.fd();
-        let access = (flags & 3) | (flags & 0o2000);
+        let access = (flags & O_ACCMODE) | (flags & O_APPEND);
         let blksize = inner.block_sizes.get(path).copied().unwrap_or(1024);
         inner.files.insert(
             fd,

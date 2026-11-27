@@ -681,7 +681,7 @@ fn map_plan<S: Sys>(
 fn child_identity(child: Handle) -> Result<ProcessIdentity, SpawnError> {
     #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
     {
-        return crate::sys::child_ids(child).map_err(SpawnError::Sys);
+        crate::sys::child_ids(child).map_err(SpawnError::Sys)
     }
     #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
     {
@@ -700,7 +700,7 @@ fn file_secure(file: Handle, nosuid: bool) -> Result<bool, SpawnError> {
         const S_ISUID: u32 = 0o4000;
         const S_ISGID: u32 = 0o2000;
         let stat = Client::new().fstat(file).map_err(SpawnError::Sys)?;
-        return Ok(!nosuid && stat.mode & (S_ISUID | S_ISGID) != 0);
+        Ok(!nosuid && stat.mode & (S_ISUID | S_ISGID) != 0)
     }
     #[cfg(not(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")))]
     {
@@ -714,7 +714,7 @@ fn file_secure(file: Handle, nosuid: bool) -> Result<bool, SpawnError> {
 fn caller_identity() -> Result<ProcessIdentity, SpawnError> {
     #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
     {
-        return crate::sys::self_ids().map_err(SpawnError::Sys);
+        crate::sys::self_ids().map_err(SpawnError::Sys)
     }
     #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
     {
