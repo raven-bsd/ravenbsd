@@ -240,6 +240,7 @@ ATF_TC_BODY(poll_err, tc)
  * FreeBSD's own port of this test compiles these bodies out; this port runs them so the mask
  * behaviour is exercised.
  */
+#ifndef __FreeBSD__
 ATF_TC(pollts_basic);
 ATF_TC_HEAD(pollts_basic, tc)
 {
