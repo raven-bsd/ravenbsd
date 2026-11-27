@@ -82,6 +82,20 @@ fn remember_thread(thread: &Arc<Thread>) {
     registry.push(Arc::downgrade(thread));
 }
 
+/// Count live threads that still reference `process` (`s36-holders`).
+pub fn process_thread_refs(process: &alloc::sync::Arc<crate::process::Process>) -> u64 {
+    let mut refs = 0u64;
+    for weak in ALL_THREADS.lock().iter() {
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        if Arc::ptr_eq(&thread.process, process) {
+            refs = refs.saturating_add(1);
+        }
+    }
+    refs
+}
+
 /// Count `target` words on every live thread's kernel stack (`s36-holders`).
 ///
 /// A `Process` reference held by a blocked syscall sits in a kernel-stack local, outside every

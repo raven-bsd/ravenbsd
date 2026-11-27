@@ -403,8 +403,9 @@ fn print_leaked_process_holders() {
             ProcessState::Exited => "exited",
         };
         let stack = crate::sched::thread::stack_holders(Arc::as_ptr(process) as usize);
+        let thread_objects = crate::sched::thread::process_thread_refs(process);
         kprintln!(
-            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped} stacks={} stack_refs={}",
+            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped} thread_objects={thread_objects} stacks={} stack_refs={}",
             process.id,
             ppid,
             process.command.lock(),
@@ -528,8 +529,10 @@ pub fn report_process_refs(target: &Arc<Process>) {
         );
     }
     stats[7] = Arc::strong_count(target) as u64;
+    let thread_refs = crate::sched::thread::process_thread_refs(target);
+    let stack = crate::sched::thread::stack_holders(Arc::as_ptr(target) as usize);
     kprintln!(
-        "s170: refs pid={} total={} handle={} thread={} file={} req-client={} req-server={} req-file={} client-queue={}",
+        "s170: refs pid={} total={} handle={} thread={} file={} req-client={} req-server={} req-file={} client-queue={} thread-objects={thread_refs} stacks={} stack_refs={}",
         target.id,
         stats[7],
         stats[0],
@@ -538,7 +541,9 @@ pub fn report_process_refs(target: &Arc<Process>) {
         stats[3],
         stats[4],
         stats[5],
-        stats[6]
+        stats[6],
+        stack[0],
+        stack[1]
     );
 }
 
