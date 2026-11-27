@@ -4,10 +4,16 @@
 //! `ppoll`.
 
 use super::*;
+use core::mem::size_of;
 #[cfg(target_os = "none")]
 use raven_libc_signal::kernel::{KICK_CHECK, SysKernel};
 #[cfg(target_os = "none")]
 use raven_libc_signal::{APP_MASK, SigKernel, SigSet, raw, run_direct};
+
+/// True when `[address, address + length)` is inside the user address window.
+fn user_range(address: usize, length: usize) -> bool {
+    raven_libc_platform::poll::validate_user_range(address as u64, length as u64).is_ok()
+}
 
 /// Poll with the caller's signal mask for the duration of the wait.
 ///
@@ -57,9 +63,18 @@ pub unsafe extern "C" fn ppoll(
     sigmask: *const SigsetT,
 ) -> c_int {
     let count = usize::try_from(nfds).unwrap_or(usize::MAX);
-    if fds.is_null() && count != 0 {
-        // FreeBSD `kern_poll` copyin of a nonzero record array fails with EFAULT; `poll` in this
-        // shell makes the same check before it forms a slice.
+    // FreeBSD `kern_poll`/`kern_poll_kfds` copies the record array and the timespec in, and the
+    // sigmask through `kern_sigprocmask`; each bad pointer is EFAULT. This shell reads them in
+    // user mode, so every pointer outside the user window is rejected before it forms a slice or
+    // dereferences the timespec/sigmask (the donor `(struct pollfd *)-1` case).
+    let records_valid = count == 0
+        || count
+            .checked_mul(size_of::<Pollfd>())
+            .is_some_and(|bytes| user_range(fds as usize, bytes));
+    if !records_valid
+        || (!timeout.is_null() && !user_range(timeout as usize, size_of::<Timespec>()))
+        || (!sigmask.is_null() && !user_range(sigmask as usize, size_of::<SigsetT>()))
+    {
         return ret::int(Err(raven_libc_abi::errno::Errno(
             raven_libc_abi::errno::EFAULT as u16,
         )));
@@ -67,10 +82,12 @@ pub unsafe extern "C" fn ppoll(
     let records = if count == 0 {
         &mut []
     } else {
-        // SAFETY: the caller supplied `count` writable pollfd records.
+        // SAFETY: `count` records at `fds` lie inside the user window (checked above) and the
+        // caller supplied them as writable pollfd values; an unmapped page inside the window is
+        // the kernel copyin gap, not something user mode can probe without faulting.
         unsafe { core::slice::from_raw_parts_mut(fds, count) }
     };
-    // SAFETY: NULL is `None`; otherwise the caller supplied a valid Timespec/SigsetT.
+    // SAFETY: NULL is `None`; otherwise the timespec address passed the user-window check above.
     let timeout = unsafe { timeout.as_ref() };
     // SAFETY: same contract as `timeout`.
     let mask = unsafe { sigmask.as_ref() }.copied();

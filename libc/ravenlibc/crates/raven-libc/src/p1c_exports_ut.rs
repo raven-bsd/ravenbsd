@@ -21,7 +21,7 @@ use crate::ffi::{TestLock, errno};
 use core::ffi::{c_char, c_void};
 use raven_libc_abi::errno::{EBADF, EFAULT, EINVAL, ENOSYS};
 use raven_libc_abi::mman::MADV_NORMAL;
-use raven_libc_abi::structs::Pollfd;
+use raven_libc_abi::structs::{Pollfd, SigsetT, Timespec};
 
 fn assert_efault(result: c_int) {
     assert_eq!(result, -1);
@@ -191,6 +191,68 @@ fn ppoll_rejects_the_donor_invalid_record_pointer_with_efault() {
     assert_eq!(
         code, 0,
         "ppoll((struct pollfd *)-1): 0 = -1/EFAULT, 1 = wrong errno, 2 = non-negative return"
+    );
+}
+
+/// The `timespec *` and `sigset_t *` arguments are dereferenced too, so both take the same
+/// invalid-pointer contract (`kern_poll_kfds` copyin / `kern_sigprocmask` EFAULT). An empty
+/// record array keeps each case separated from the record-pointer check.
+#[test]
+fn ppoll_rejects_invalid_timeout_and_sigmask_pointers_with_efault() {
+    // SAFETY: plain host libc declarations with the C signatures.
+    unsafe extern "C" {
+        fn fork() -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        fn _exit(status: i32) -> !;
+    }
+
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    // SAFETY: fork takes no pointers; the child only calls `ppoll` and `_exit`.
+    let pid = unsafe { fork() };
+    assert!(pid >= 0, "fork failed: {pid}");
+    if pid == 0 {
+        // SAFETY: each `-1` pointer is the documented EFAULT path and must be rejected before
+        // the wrapper dereferences it.
+        let (timeout_ok, sigmask_ok) = unsafe {
+            let timeout = ppoll(
+                core::ptr::null_mut(),
+                0,
+                usize::MAX as *const Timespec,
+                core::ptr::null(),
+            );
+            let timeout_ok = timeout == -1 && errno::get() == EFAULT;
+            errno::set_raw(0);
+            let sigmask = ppoll(
+                core::ptr::null_mut(),
+                0,
+                core::ptr::null(),
+                usize::MAX as *const SigsetT,
+            );
+            (timeout_ok, sigmask == -1 && errno::get() == EFAULT)
+        };
+        let code = match (timeout_ok, sigmask_ok) {
+            (true, true) => 0,
+            (false, true) => 1,
+            (true, false) => 2,
+            (false, false) => 3,
+        };
+        // SAFETY: ends the forked child without running the parent's test harness.
+        unsafe { _exit(code) };
+    }
+    let mut status = 0;
+    // SAFETY: `pid` is the child forked above and `status` is a live out pointer.
+    let reaped = unsafe { waitpid(pid, &mut status, 0) };
+    assert_eq!(reaped, pid, "waitpid did not reap the ppoll child");
+    let signal = status & 0x7f;
+    assert_eq!(
+        signal, 0,
+        "ppoll invalid timespec/sigmask pointer died from signal {signal}"
+    );
+    let code = (status >> 8) & 0xff;
+    assert_eq!(
+        code, 0,
+        "ppoll pointer check: 0 = both -1/EFAULT, 1 = timespec wrong, 2 = sigmask wrong, 3 = both wrong"
     );
 }
 

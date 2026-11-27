@@ -14,7 +14,12 @@ use raven_libc_abi::structs::Pollfd;
 use crate::backend::{FakeSys, SysBackend};
 use crate::fd::OfdKind;
 use crate::platform::Platform;
-use crate::poll::{EV_SIGNALED, MAX_POLL_FDS, poll, ppoll};
+use crate::poll::{EV_SIGNALED, MAX_POLL_FDS, poll, ppoll, validate_user_range};
+
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(target_arch = "x86_64")]
+use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 
 fn regular_file_platform() -> Platform<FakeSys> {
     let fake = FakeSys::new();
@@ -502,4 +507,43 @@ fn timerfd_signaled_level_is_readable() {
     }];
     assert_eq!(poll(&platform, &mut fds, 100), Ok(1));
     assert_eq!(fds[0].revents as i32, POLLIN);
+}
+
+#[test]
+fn user_range_accepts_a_window_inside_the_user_space() {
+    assert_eq!(validate_user_range(USER_MIN, 8), Ok(()));
+    assert_eq!(validate_user_range(USER_END - 8, 8), Ok(()));
+}
+
+#[test]
+fn user_range_rejects_the_donor_minus_one_pointer() {
+    assert_eq!(validate_user_range(u64::MAX, 8), Err(Errno::EFAULT));
+}
+
+#[test]
+fn user_range_rejects_a_null_pointer() {
+    assert_eq!(validate_user_range(0, 8), Err(Errno::EFAULT));
+}
+
+#[test]
+fn user_range_rejects_a_kernel_half_pointer() {
+    assert_eq!(
+        validate_user_range(0xFFFF_8000_0000_0000, 8),
+        Err(Errno::EFAULT)
+    );
+}
+
+#[test]
+fn user_range_rejects_a_length_past_the_user_end() {
+    assert_eq!(validate_user_range(USER_END - 1, 2), Err(Errno::EFAULT));
+}
+
+#[test]
+fn user_range_rejects_an_address_that_overflows() {
+    assert_eq!(validate_user_range(USER_END, u64::MAX), Err(Errno::EFAULT));
+}
+
+#[test]
+fn user_range_allows_an_empty_range_at_the_end() {
+    assert_eq!(validate_user_range(USER_END, 0), Ok(()));
 }
