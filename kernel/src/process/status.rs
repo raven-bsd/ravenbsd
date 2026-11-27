@@ -277,6 +277,40 @@ pub const fn exit_code_fits(code: i32) -> bool {
     code >= 0 && code <= 0xff
 }
 
+/// `wait6` reports an exited child (FreeBSD `WEXITED`).
+pub const WEXITED: u32 = 16;
+/// `wait6` reports an event without reaping it (FreeBSD `WNOWAIT`).
+pub const WNOWAIT: u32 = 8;
+/// Every option bit accepted by `PROC_WAIT6`.
+pub const WAIT6_OPTIONS: u32 = WNOHANG | WUNTRACED | WCONTINUED | WNOWAIT | WEXITED;
+/// Size of the product `siginfo_t` record.
+pub const SIGINFO_SIZE: usize = 128;
+/// Size of the zeroed `struct __wrusage` output of `wait6`.
+pub const WAIT6_WRUSAGE_SIZE: usize = 288;
+
+/// `si_code` of a child that exited normally.
+pub const CLD_EXITED: i32 = 1;
+/// `si_code` of a child killed by a signal.
+pub const CLD_KILLED: i32 = 2;
+/// `si_code` of a child killed by a signal that dumped core.
+pub const CLD_DUMPED: i32 = 3;
+/// `si_code` of a stopped child.
+pub const CLD_STOPPED: i32 = 5;
+/// `si_code` of a continued child.
+pub const CLD_CONTINUED: i32 = 6;
+
+/// True when a `PROC_WAIT6` option word is acceptable (FreeBSD `wait6_checkopt`).
+#[must_use]
+pub const fn wait6_options_valid(options: u32) -> bool {
+    options & !WAIT6_OPTIONS == 0
+}
+
+/// Build the product `siginfo_t` bytes for one child event.
+#[must_use]
+pub fn wait6_siginfo(_event: WaitEvent, _pid: i32, _uid: u32) -> [u8; SIGINFO_SIZE] {
+    [0u8; SIGINFO_SIZE]
+}
+
 /// What the kernel does with one generated signal for a target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SignalDisposition {
