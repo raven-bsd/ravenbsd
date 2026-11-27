@@ -584,6 +584,21 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
         .arg("--strip-all")
         .arg(destination)
         .status();
+    // `raven-spawn` maps the image file tail and requires it to end on a page boundary; the
+    // kernel `PROC_EXEC` path does not. Pad the staged copy so a `posix_spawn` wrapper can start
+    // the same program from the initfs. Trailing zeros are outside every ELF segment.
+    let length = fs::metadata(destination)
+        .with_context(|| format!("cannot stat {}", destination.display()))?
+        .len();
+    let padded = length.saturating_add(4095) & !4095;
+    if padded > length {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(destination)
+            .with_context(|| format!("cannot open {}", destination.display()))?;
+        file.set_len(padded)
+            .with_context(|| format!("cannot pad {}", destination.display()))?;
+    }
     Ok(())
 }
 

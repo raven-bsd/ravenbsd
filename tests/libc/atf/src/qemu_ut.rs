@@ -198,6 +198,18 @@ fn the_batch_manifest_runs_through_the_workdir_wrapper() {
 }
 
 #[test]
+fn the_staged_image_ends_on_a_page_boundary() {
+    let workdir = temp("page");
+    let source = workdir.join("program");
+    let destination = workdir.join("staged");
+    fs::write(&source, vec![0u8; 4097]).expect("write");
+    strip_to(&source, &destination).expect("strip");
+    let length = fs::metadata(&destination).expect("stat").len();
+    assert_eq!(length % 4096, 0);
+    assert!(length >= 4097);
+}
+
+#[test]
 fn the_guest_credentials_stage_passwd_and_group() {
     let workdir = temp("credentials");
     let specs = guest_credentials(&workdir).expect("credentials");
