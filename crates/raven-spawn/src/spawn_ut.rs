@@ -1450,3 +1450,87 @@ fn a_short_read_is_an_io_error() {
     assert!(matches!(result, Err(SpawnError::Sys(Errno::EIO))));
     assert_eq!(calls, 2);
 }
+
+/// CONTRACTS C8: `_start` receives `sp0` in `rdi` (x86-64), `x0` (aarch64) or `a0` (riscv64).
+///
+/// The trampoline may align the stack register before the Rust entry, but it must not write the
+/// argument register, or the C8 carrier is lost before `__raven_start` reads it. This asserts the
+/// real trampoline source, the same way the C4 kernel-entry conformance test pins its `rdi`.
+#[test]
+fn c8_start_keeps_the_argument_register() {
+    let source = include_str!("../../../userland/rt/src/entry.rs");
+    for (arch, branch, register) in [
+        ("x86_64", "call __raven_start", "rdi"),
+        ("aarch64", "bl __raven_start", "x0"),
+        ("riscv64", "call __raven_start", "a0"),
+    ] {
+        let trampoline = start_trampoline(source, arch, branch);
+        assert!(
+            !trampoline.contains(register),
+            "C8: the {arch} `_start` must pass {register} through to __raven_start, but the \
+             trampoline writes it: {trampoline}"
+        );
+    }
+}
+
+fn start_trampoline<'a>(source: &'a str, arch: &str, branch: &str) -> &'a str {
+    let marker = format!("target_arch = \"{arch}\"");
+    let guard = source.find(&marker).expect("architecture asm block");
+    let start = source[guard..]
+        .find("\"_start:\"")
+        .map(|at| guard + at)
+        .expect("`_start` label");
+    let end = source[start..]
+        .find(branch)
+        .map(|at| start + at)
+        .expect("__raven_start call");
+    &source[start..end]
+}
+
+/// CONTRACTS C8: the exact `argc`, `argv[argc]`, `NULL`, `envp[...]`, `NULL`, auxv pairs,
+/// `(0, 0)` block at `sp0`, including the strings the pointers name and `AT_RANDOM`.
+#[test]
+fn c8_block_pins_the_full_layout() {
+    let auxv = [(3, 0x40_0000usize), (6, 4096), (9, 0x40_1000), (25, 0)];
+    let (buffer, _, sp0) = build("/child", &["/child", "arg"], &["A=1", "B=2"], &auxv);
+    assert_eq!(sp0 % 16, 0, "sp0 is 16-byte aligned");
+
+    assert_eq!(word(&buffer, sp0), 2, "argc");
+    assert_eq!(
+        bytes_at(&buffer, word(&buffer, sp0 + WORD as u64)),
+        b"/child"
+    );
+    assert_eq!(
+        bytes_at(&buffer, word(&buffer, sp0 + 2 * WORD as u64)),
+        b"arg"
+    );
+    let argv_null = sp0 + 3 * WORD as u64;
+    assert_eq!(word(&buffer, argv_null), 0, "argv NULL");
+    let env0 = argv_null + WORD as u64;
+    assert_eq!(bytes_at(&buffer, word(&buffer, env0)), b"A=1");
+    let env1 = env0 + WORD as u64;
+    assert_eq!(bytes_at(&buffer, word(&buffer, env1)), b"B=2");
+    let env_null = env1 + WORD as u64;
+    assert_eq!(word(&buffer, env_null), 0, "envp NULL");
+
+    let auxv0 = env_null + WORD as u64;
+    for (index, (key, value)) in auxv.iter().enumerate() {
+        let key_address = auxv0 + 2 * WORD as u64 * index as u64;
+        assert_eq!(word(&buffer, key_address), *key, "auxv key {index}");
+        let value_address = key_address + WORD as u64;
+        if *key == 25 {
+            let pointer = word(&buffer, value_address);
+            let offset = usize::try_from(pointer as u64 - base()).expect("random offset");
+            assert_eq!(buffer[offset..offset + RANDOM_LEN], [0xAB; RANDOM_LEN]);
+        } else {
+            assert_eq!(word(&buffer, value_address), *value, "auxv value {index}");
+        }
+    }
+    let terminator = auxv0 + 2 * WORD as u64 * auxv.len() as u64;
+    assert_eq!(word(&buffer, terminator), 0, "auxv terminator key");
+    assert_eq!(
+        word(&buffer, terminator + WORD as u64),
+        0,
+        "auxv terminator value"
+    );
+}
