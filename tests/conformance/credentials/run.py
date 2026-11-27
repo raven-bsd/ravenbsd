@@ -64,13 +64,20 @@ KV_RE = re.compile(r"([A-Za-z0-9_-]+)=([^\s]+)")
 
 
 def parse_rows(text: str) -> dict[str, dict[str, str]]:
-    """Parse the probe's `cred: <row> key=value ...` lines."""
+    """Parse the probe's `cred: <row> key=value ...` lines.
+
+    The one-shot service shares the serial console with getty, whose `login: ` prompt is
+    printed without a newline and can therefore land in front of a probe row. Locate the
+    marker on the line instead of requiring it at column zero; the row body is unchanged.
+    """
     rows: dict[str, dict[str, str]] = {}
+    marker = "cred: "
     for line in text.splitlines():
         line = line.strip()
-        if not line.startswith("cred: "):
+        index = line.find(marker)
+        if index < 0:
             continue
-        body = line[len("cred: ") :]
+        body = line[index + len(marker) :]
         if not body:
             continue
         head, _, rest = body.partition(" ")
@@ -471,6 +478,11 @@ def selftest() -> int:
             failures.append(f"{name}: got {got!r}, want {want!r}")
 
     check("clean", check_rows(clean, passwd, groups, umask_exec), [])
+    prefixed = clean.replace(
+        "cred: nofile soft=256 base=3 open-ok=253 errno=0",
+        "login: cred: nofile soft=256 base=3 open-ok=253 errno=0",
+    )
+    check("prefixed-login", check_rows(prefixed, passwd, groups, umask_exec), [])
     dirty = clean.replace("cred: kernel-rlimit-hard-raise errno=1",
                           "cred: kernel-rlimit-hard-raise errno=0")
     check(
