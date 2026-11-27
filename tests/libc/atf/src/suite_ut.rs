@@ -236,9 +236,14 @@ fn case(ident: &str) -> TpCase {
 
 #[test]
 fn the_batch_chunk_stays_below_the_service_graph_cap() {
-    assert!(BATCH_CHUNK > 0);
-    assert!(BATCH_CHUNK * 2 + 8 <= 256);
-    assert!(BATCH_CHUNK < 58, "a 58-body suite must span more than one boot");
+    const { assert!(BATCH_CHUNK > 0) };
+    const { assert!(BATCH_CHUNK * 2 + 8 <= 256) };
+    const {
+        assert!(
+            BATCH_CHUNK < 58,
+            "a 58-body suite must span more than one boot"
+        )
+    };
 }
 
 #[test]
@@ -260,7 +265,10 @@ fn a_missing_oracle_cache_is_replaced_by_the_target_listing() {
     })
     .expect("cases");
     assert_eq!(
-        cases.iter().map(|case| case.ident.as_str()).collect::<Vec<_>>(),
+        cases
+            .iter()
+            .map(|case| case.ident.as_str())
+            .collect::<Vec<_>>(),
         ["body-a", "body-b"]
     );
 }

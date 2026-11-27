@@ -808,7 +808,8 @@ fn guest_initfs_specs(
     service: &Path,
     reader: Option<&Path>,
     svcd: &Path,
-) -> Vec<String> {    let mut specs = service_specs(config, guest);
+) -> Vec<String> {
+    let mut specs = service_specs(config, guest);
     specs.push(format!("/tests/program={}:0755", program.display()));
     specs.push(format!("/g1/manifest={}", manifest.display()));
     specs.push(format!("/etc/services.d/g1.toml={}", service.display()));

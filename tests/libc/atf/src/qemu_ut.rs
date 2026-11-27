@@ -221,7 +221,8 @@ fn the_guest_credentials_stage_passwd_and_group() {
     assert!(
         specs
             .iter()
-            .any(|spec| spec == &format!("/etc/passwd={}:0644", workdir.join("etc/passwd").display()))
+            .any(|spec| spec
+                == &format!("/etc/passwd={}:0644", workdir.join("etc/passwd").display()))
     );
     assert!(
         specs
