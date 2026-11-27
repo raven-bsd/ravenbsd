@@ -361,6 +361,14 @@ pub fn current_process() -> Option<Arc<Process>> {
     current_thread().map(|thread| Arc::clone(&thread.process))
 }
 
+/// True when the calling thread belongs to a terminal process.
+///
+/// The syscall-return boundary uses this to exit the thread after a blocking syscall of a
+/// terminal process has unwound; the temporary `Arc<Thread>` never escapes.
+pub fn current_process_exiting() -> bool {
+    current_thread().is_some_and(|thread| thread.process.exiting.load(Ordering::Acquire))
+}
+
 /// True once [`init`] published the scheduler.
 #[cfg_attr(target_arch = "x86_64", allow(dead_code))] // The aarch64 IRQ path checks it directly.
 pub fn initialized() -> bool {
@@ -881,14 +889,16 @@ pub fn sleep_until(deadline: u64) -> isize {
     let Some(current) = current_thread() else {
         return 0;
     };
-    // A woken thread of a terminal process must not return to user mode: exit at the next
-    // scheduling point instead (its stack is reaped by the next schedule on another thread).
+    // A woken thread of a terminal process must not return to user mode and must not exit on
+    // this abandoned frame either: the syscall handler above still owns its `Arc<Process>`
+    // caller, and a dead stack is freed without running destructors (S170: one surviving
+    // `caller` per terminated blocked thread, `refs=2`). Return an interruption so the handler
+    // unwinds to the syscall-return boundary, which drops those references and exits the thread
+    // there (FreeBSD `exit1`/`thread_single(SINGLE_EXIT)` stops siblings through their syscall
+    // return, never by abandoning the frame).
     if current.process.exiting.load(Ordering::Acquire) {
-        // Drop the frame's strong reference before diverging: the dead stack is freed without
-        // running destructors, so a live `Arc<Thread>` here would keep the Thread and its
-        // Process alive forever.
         drop(current);
-        exit_thread(0);
+        return Errno::EINTR.to_ret();
     }
     note_unblock(&current);
     current.interruptible.store(false, Ordering::SeqCst);
@@ -941,11 +951,11 @@ pub fn cancel_process_sleepers(process_id: u64) {
 /// Remove an exiting thread from every per-CPU timeout sleeper list.
 ///
 /// The donor removes a woken sleeper before the thread runs (NetBSD `sleepq_remove`,
-/// FreeBSD `sleepq_abort`/`thread_unlink`). Raven defers that cleanup to the blocked caller's
-/// `end_block`, but `block_current` and `sleep_until` exit a terminal-process thread before the
-/// caller can run it, so the entry (which owns an `Arc<Thread>`) would stay until its deadline
-/// and keep the dead Thread and its Process alive. Exit removes it explicitly; the scan is
-/// bounded by the online CPU count and the queued sleeper count.
+/// FreeBSD `sleepq_abort`/`thread_unlink`). Raven removes the entry in the blocked caller's
+/// `end_block`; a terminal process leaves through the syscall boundary instead, so a woken
+/// handler that never reaches `end_block` would keep the entry (and its `Arc<Thread>`) until
+/// its deadline and keep the dead Thread and its Process alive. Exit removes it explicitly; the
+/// scan is bounded by the online CPU count and the queued sleeper count.
 fn cancel_thread_sleepers(thread_id: u64) {
     let _guard = sync::critical();
     for cpu in 0..smp::online_cpus() {
@@ -1006,6 +1016,13 @@ fn begin_block_inner(interruptible: bool) -> Result<u64, Errno> {
         return Err(Errno::ESRCH);
     };
     let current = state.current.clone().ok_or(Errno::ESRCH)?;
+    // A terminal process must not start another blocking operation. A woken handler is
+    // unwinding to the syscall boundary so its frame references are dropped and the address
+    // space is released only after this thread leaves the CPU; re-blocking would strand it
+    // off-CPU on freed state. Report the block as interrupted so the handler returns.
+    if current.process.exiting.load(Ordering::Acquire) {
+        return Err(Errno::EINTR);
+    }
     let token = state.next_token;
     state.next_token = token.wrapping_add(1);
     if token == 0 {
@@ -1123,14 +1140,16 @@ pub fn block_current() -> isize {
     let Some(current) = current_thread() else {
         return 0;
     };
-    // A woken thread of a terminal process must not return to user mode: exit at the next
-    // scheduling point instead (its stack is reaped by the next schedule on another thread).
+    // A woken thread of a terminal process must not return to user mode and must not exit on
+    // this abandoned frame either: the syscall handler above still owns its `Arc<Process>`
+    // caller, and a dead stack is freed without running destructors (S170: one surviving
+    // `caller` per terminated blocked thread, `refs=2`). Return an interruption so the handler
+    // unwinds to the syscall-return boundary, which drops those references and exits the thread
+    // there (FreeBSD `exit1`/`thread_single(SINGLE_EXIT)` stops siblings through their syscall
+    // return, never by abandoning the frame).
     if current.process.exiting.load(Ordering::Acquire) {
-        // Drop the frame's strong reference before diverging: the dead stack is freed without
-        // running destructors, so a live `Arc<Thread>` here would keep the Thread and its
-        // Process alive forever.
         drop(current);
-        exit_thread(0);
+        return Errno::EINTR.to_ret();
     }
     note_unblock(&current);
     current.interruptible.store(false, Ordering::SeqCst);

@@ -394,6 +394,19 @@ fn result_value(result: Result<usize, Errno>) -> u64 {
     }
 }
 
+/// Exit the calling thread at the syscall-return boundary when its process is terminal.
+///
+/// A blocking syscall of a terminal process returns `EINTR` from `sched::block_current` so the
+/// handler frames unwind and drop every `Arc<Process>` they hold. Doing the exit here, on the
+/// last frame, frees those references through normal destructors; exiting inside the blocking
+/// frame abandoned them on a dead stack (S170: `refs=2` per terminated `sshd-session`). The
+/// process still never returns to user mode.
+fn exit_if_terminal() {
+    if crate::sched::current_process_exiting() {
+        crate::sched::exit_thread(0);
+    }
+}
+
 /// Install a successful exec's entry and stack on the saved user frame.
 ///
 /// The old image is already gone; every general register except the C8 argument register is
@@ -460,6 +473,7 @@ pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::T
             Ok(value) => frame.rax = value as u64,
             Err(error) => process::exit_process(error.to_ret() as i32),
         }
+        exit_if_terminal();
         crate::arch::x86_64::syscall::deliver_signal(frame);
         crate::sched::syscall_return();
         return;
@@ -478,13 +492,18 @@ pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::T
             Ok(()) => crate::arch::x86_64::syscall::deliver_signal(frame),
             Err(error) => frame.rax = error.to_ret() as u64,
         }
+        exit_if_terminal();
+        crate::sched::syscall_return();
+        return;
+    }
+    frame.rax = result_value(dispatch(&registers));
+    // A blocking syscall of a terminal process unwound with `EINTR`: leave here, before a
+    // signal frame or a fresh exec image is installed, so no handler frame is abandoned.
+    exit_if_terminal();
+    if let Some(context) = process::exec::take_pending() {
+        apply_exec_context(frame, context);
     } else {
-        frame.rax = result_value(dispatch(&registers));
-        if let Some(context) = process::exec::take_pending() {
-            apply_exec_context(frame, context);
-        } else {
-            crate::arch::x86_64::syscall::deliver_signal(frame);
-        }
+        crate::arch::x86_64::syscall::deliver_signal(frame);
     }
     crate::sched::syscall_return();
 }
@@ -515,16 +534,21 @@ pub fn svc_dispatch(frame: &mut crate::arch::aarch64::vectors::TrapFrame) {
                 }
             }
         }
+        exit_if_terminal();
+        crate::sched::syscall_return();
+        return;
+    }
+    let value = result_value(dispatch(&registers));
+    if let Some(slot) = frame.x.get_mut(0) {
+        *slot = value;
+    }
+    // The terminal-process exit runs on the syscall-boundary frame, after the handler has
+    // unwound and released its process references (S778).
+    exit_if_terminal();
+    if let Some(context) = process::exec::take_pending() {
+        apply_exec_context(frame, context);
     } else {
-        let value = result_value(dispatch(&registers));
-        if let Some(slot) = frame.x.get_mut(0) {
-            *slot = value;
-        }
-        if let Some(context) = process::exec::take_pending() {
-            apply_exec_context(frame, context);
-        } else {
-            crate::arch::aarch64::vectors::deliver_signal(frame);
-        }
+        crate::arch::aarch64::vectors::deliver_signal(frame);
     }
     crate::sched::syscall_return();
 }
