@@ -186,7 +186,7 @@ configure() {
         cd "$build"
         CC=clang \
         ac_cv_func_getline=yes ac_cv_func_getdelim=yes ac_cv_func_setsid=yes ac_cv_func_getcwd=yes \
-        ac_cv_func_setresuid=yes ac_cv_func_setresgid=yes \
+        ac_cv_func_setresuid=yes ac_cv_func_setresgid=yes ac_cv_func_tcgetpgrp=yes \
         ac_cv_func_snprintf=yes ac_cv_func_vsnprintf=yes ac_cv_func_arc4random_buf=yes \
         CFLAGS="--target=$target --sysroot=$sysroot -D__ravenbsd__=1 -D__unix__=1 -fno-stack-protector $fp_flags -I$t1_stage/include -include $compat/ssh_compat.h" \
         LDFLAGS="--target=$target --sysroot=$sysroot -fuse-ld=lld $linker_flavor -nostdlib -nostartfiles -static -T$ld_script -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 $sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o -L$sysroot/usr/lib -L$t1_stage/lib" \

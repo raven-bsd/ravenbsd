@@ -3233,7 +3233,7 @@ source = "doc 14 3.A.6"
 
 [[constant]]
 name = "NCCS"
-value = "32"
+value = "20"
 headers = ["termios.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"
@@ -3261,35 +3261,35 @@ source = "doc 14 3.A.6"
 
 [[constant]]
 name = "B9600"
-value = "0000015"
+value = "9600"
 headers = ["termios.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"
 
 [[constant]]
 name = "ECHO"
-value = "0000010"
+value = "8"
 headers = ["termios.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"
 
 [[constant]]
 name = "ICANON"
-value = "0000002"
+value = "256"
 headers = ["termios.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"
 
 [[constant]]
 name = "NOFLSH"
-value = "0000200"
+value = "2147483648"
 headers = ["termios.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"
 
 [[constant]]
 name = "TOSTOP"
-value = "0000400"
+value = "4194304"
 headers = ["termios.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"

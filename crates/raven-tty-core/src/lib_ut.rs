@@ -291,6 +291,9 @@ fn raw_mode_does_not_echo() {
 #[test]
 fn raw_mode_does_not_edit() {
     let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     discipline.set_settings(Settings {
         mode: Mode::Raw,
         echo: false,
@@ -303,6 +306,9 @@ fn raw_mode_does_not_edit() {
 #[test]
 fn raw_mode_has_no_events() {
     let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
     discipline.set_settings(Settings {
         mode: Mode::Raw,
         echo: false,
@@ -310,6 +316,43 @@ fn raw_mode_has_no_events() {
     let output = feed(&mut discipline, b"\x03\x04");
     assert!(output.events.is_empty());
     assert_eq!(output.data, b"\x03\x04");
+}
+
+#[test]
+fn raw_mode_with_isig_still_interrupts() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.lflag = ISIG;
+    assert_eq!(discipline.set_termios(termios), 0);
+    let output = feed(&mut discipline, b"\x03");
+    assert_eq!(output.events, vec![Event::Interrupt]);
+    assert!(output.data.is_empty());
+}
+
+#[test]
+fn unsupported_control_slots_have_no_effect() {
+    // Wire slots with no tty-core consumer: VERASE2, VEOL2, VREPRINT, VDISCARD, VLNEXT,
+    // VDSUSP, VSTATUS and the spare. A byte equal to their value must still be ordinary input.
+    for slot in [7usize, 12, 13, 15, 16, 17, 18, 19] {
+        let mut discipline = Discipline::new();
+        let mut termios = Termios::sane();
+        termios.cc[slot] = 0x07;
+        assert_eq!(discipline.set_termios(termios), 0);
+        let output = feed(&mut discipline, b"\x07\n");
+        assert!(output.events.is_empty(), "slot {slot} produced an event");
+        assert_eq!(lines(&output), vec![&b"\x07\n"[..]], "slot {slot}");
+    }
+}
+
+#[test]
+fn raw_mode_without_isig_passes_ctrl_c() {
+    let mut discipline = Discipline::new();
+    let mut termios = Termios::sane();
+    termios.lflag = 0;
+    assert_eq!(discipline.set_termios(termios), 0);
+    let output = feed(&mut discipline, b"\x03");
+    assert!(output.events.is_empty());
+    assert_eq!(output.data, b"\x03");
 }
 
 #[test]

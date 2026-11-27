@@ -13,6 +13,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::getmntinfo::StatfsLinux;
+use crate::kqueue::{EV_EDGE, EV_HUP, EV_READABLE, EV_SIGNALED, EV_WRITABLE};
 use crate::seams::{
     Errno, EvqCtl, EvqEvent, EvqOps, FdKind, FdTable, Handle, MountList, PledgeBackend, ProcCtl,
     RavenSysInfo, SrcOps, SysInfoSrc, Uname,
@@ -166,12 +167,14 @@ impl FdTable for FakeFdTable {
     }
 }
 
-/// A scripted event queue.
+/// A scripted event queue that enforces the kernel `raven-evq-core` registration contract.
 #[derive(Clone, Debug)]
 pub struct FakeEvq {
     pub queue: Handle,
     pub events: Vec<EvqEvent>,
     pub ops: Vec<(EvqCtl, Handle, u32, u64)>,
+    /// Registered handle -> `(events, cookie)`, as the kernel queue stores it.
+    pub regs: BTreeMap<u32, (u32, u64)>,
     pub last_timeout_ns: Option<u64>,
     pub wait_error: Option<Errno>,
 }
@@ -184,6 +187,7 @@ impl FakeEvq {
             queue: Handle(100),
             events: Vec::new(),
             ops: Vec::new(),
+            regs: BTreeMap::new(),
             last_timeout_ns: None,
             wait_error: None,
         }
@@ -196,6 +200,12 @@ impl FakeEvq {
             events,
             pad: 0,
         });
+    }
+
+    /// The cookie currently registered for `handle`, if any.
+    #[must_use]
+    pub fn cookie_of(&self, handle: Handle) -> Option<u64> {
+        self.regs.get(&handle.0).map(|(_, cookie)| *cookie)
     }
 
     /// The last add/modify mask for `cookie`.
@@ -230,8 +240,30 @@ impl EvqOps for FakeEvq {
         events: u32,
         cookie: u64,
     ) -> Result<(), Errno> {
+        const EVENT_MASK: u32 = EV_READABLE | EV_WRITABLE | EV_HUP | EV_SIGNALED;
         if q != self.queue {
             return Err(Errno::EBADF);
+        }
+        if op != EvqCtl::Del {
+            let mask = events & !EV_EDGE;
+            if mask == 0 || mask & !EVENT_MASK != 0 {
+                return Err(Errno::EINVAL);
+            }
+        }
+        match op {
+            EvqCtl::Add => {
+                if self.regs.contains_key(&h.0) {
+                    return Err(Errno::EEXIST);
+                }
+                self.regs.insert(h.0, (events, cookie));
+            }
+            EvqCtl::Mod => {
+                let slot = self.regs.get_mut(&h.0).ok_or(Errno::ENOENT)?;
+                *slot = (events, cookie);
+            }
+            EvqCtl::Del => {
+                self.regs.remove(&h.0).ok_or(Errno::ENOENT)?;
+            }
         }
         self.ops.push((op, h, events, cookie));
         Ok(())
@@ -261,6 +293,7 @@ pub struct FakeSrc {
     pub events: usize,
     pub signals: Vec<(Handle, u64)>,
     pub timer_sets: Vec<(Handle, u64, u64)>,
+    pub closed: Vec<Handle>,
     pub process_available: bool,
 }
 
@@ -273,6 +306,7 @@ impl FakeSrc {
             events: 0,
             signals: Vec::new(),
             timer_sets: Vec::new(),
+            closed: Vec::new(),
             process_available: false,
         }
     }
@@ -307,6 +341,11 @@ impl SrcOps for FakeSrc {
 
     fn event_signal(&mut self, handle: Handle, value: u64) -> Result<(), Errno> {
         self.signals.push((handle, value));
+        Ok(())
+    }
+
+    fn close_source(&mut self, handle: Handle) -> Result<(), Errno> {
+        self.closed.push(handle);
         Ok(())
     }
 
@@ -506,7 +545,7 @@ impl MountList for FakeMounts {
 }
 
 /// Copy a text field into a C `utsname` field.
-fn set_field(field: &mut [core::ffi::c_char; 65], text: &[u8]) {
+fn set_field(field: &mut [core::ffi::c_char; 256], text: &[u8]) {
     for (dst, src) in field.iter_mut().zip(text.iter()) {
         *dst = *src as core::ffi::c_char;
     }

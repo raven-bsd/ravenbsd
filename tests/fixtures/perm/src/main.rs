@@ -127,9 +127,12 @@ fn create(path: &str, data: &[u8], mode: u32) -> Result<(), Errno> {
 
 fn mkdir(path: &str, mode: u32) -> Result<(), Errno> {
     match fs::mkdir(path, mode) {
-        Ok(()) | Err(Errno::EEXIST) => Ok(()),
-        Err(error) => Err(error),
+        Ok(()) | Err(Errno::EEXIST) => {}
+        Err(error) => return Err(error),
     }
+    // `mkdir` honours the process mask (FreeBSD sys_mkdirat), so this fixture asks for the exact
+    // mode its sticky/setgid rows need after the create.
+    fs::chmod(path, mode)
 }
 
 fn main(_args: raven_rt::Args) -> i32 {

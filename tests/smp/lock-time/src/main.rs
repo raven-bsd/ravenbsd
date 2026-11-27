@@ -24,8 +24,10 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering
 use raven_abi::errno::Errno;
 use raven_abi::syscall::{Syscall, THREAD_SELF};
 use raven_abi::types::{Handle, clock, prot};
+use raven_initfs::Initfs;
 use raven_rt::entry;
 use raven_rt::println;
+use raven_rt::spawn::{SpawnOptions, spawn};
 use raven_rt::sys;
 
 entry!(main);
@@ -42,6 +44,13 @@ const DEFAULT_CPUS: usize = 4;
 const DEFAULT_TIMERS: usize = 4;
 const DEFAULT_MEM_PERIOD: u64 = 16;
 const YIELD_PERIOD: u64 = 64;
+/// Marker exit codes the kernel's `s36-lockcheck` diagnostic samples frame statistics at.
+const LEAK_BASE_EXIT: i32 = 90;
+const LEAK_SAMPLE_EXIT: i32 = 91;
+const LEAK_WAKES: usize = 5_000;
+const LEAK_TIMEOUTS: usize = 1_000;
+const LEAK_DELAY_NS: u64 = 1_000_000;
+const LEAK_TIMEOUT_NS: u64 = 1_000_000;
 /// A wake-to-run latency above this is a lost wake or a stuck CPU.
 const STALL_NS: u64 = 2_000_000_000;
 /// A timer jitter above this is a lost or badly delayed per-CPU timer.
@@ -63,6 +72,11 @@ static STOP: AtomicBool = AtomicBool::new(false);
 static MEM_PERIOD: AtomicU64 = AtomicU64::new(DEFAULT_MEM_PERIOD);
 static PIPE_R: AtomicU32 = AtomicU32::new(u32::MAX);
 static PIPE_W: AtomicU32 = AtomicU32::new(u32::MAX);
+static LEAK_FUTEX: AtomicU32 = AtomicU32::new(0);
+static LEAK_TIMEOUT: AtomicU32 = AtomicU32::new(0);
+static LEAK_READY: AtomicU32 = AtomicU32::new(0);
+static LEAK_DONE: AtomicU32 = AtomicU32::new(0);
+static LEAK_STOP: AtomicBool = AtomicBool::new(false);
 
 #[repr(align(16))]
 struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);
@@ -125,6 +139,131 @@ fn record_timer(timer: usize, jitter: u64) {
             slot.store(jitter, Ordering::Release);
         }
     }
+}
+
+fn proc_wait(process: Handle) -> Result<i32, Errno> {
+    let mut code = -1i32;
+    // SAFETY: PROC_WAIT takes a scalar handle and a writable `i32` pointer owned by this frame;
+    // the kernel validates the handle and writes only on success.
+    let raw = unsafe {
+        sys::syscall2(
+            Syscall::PROC_WAIT as usize,
+            process.0 as usize,
+            &mut code as *mut i32 as usize,
+        )
+    };
+    Errno::from_ret(raw)?;
+    Ok(code)
+}
+
+fn leak_marker(initfs: &Initfs<'_>, code: i32) -> Result<i32, Errno> {
+    let text = if code == LEAK_BASE_EXIT { "90" } else { "91" };
+    let args = [text];
+    let options = SpawnOptions {
+        args: &args,
+        env: &[],
+    };
+    // The isolated case installs the fixture as `/init`; the boot-service case installs the same
+    // binary as `/bin/smp-lock-time` and leaves `/init` to the system init.
+    let path = if initfs.get("/bin/smp-lock-time").is_some() {
+        "/bin/smp-lock-time"
+    } else {
+        "/init"
+    };
+    let child = spawn(initfs, path, &options).map_err(|_| Errno::EINVAL)?;
+    let status = proc_wait(child)?;
+    let _ = sys::handle_close(child);
+    Ok(status)
+}
+
+extern "C" fn leak_waiter(_: usize) -> ! {
+    let mut seq = 0u32;
+    while !LEAK_STOP.load(Ordering::Acquire) {
+        seq = seq.wrapping_add(1);
+        LEAK_READY.store(seq, Ordering::Release);
+        let value = LEAK_FUTEX.load(Ordering::Acquire);
+        let _ = sys::futex_wait(&LEAK_FUTEX, value, None);
+        LEAK_DONE.store(seq, Ordering::Release);
+    }
+    sys::thread_exit(0)
+}
+
+fn leak_churn() -> Result<(), &'static str> {
+    let worker = sys::thread_create(
+        Handle::SELF_PROC,
+        leak_waiter as *const () as usize,
+        stack_top(0),
+        0,
+    )
+    .map_err(|_| "leak worker")?;
+    let mut cycle = 0u32;
+    while (cycle as usize) < LEAK_WAKES {
+        cycle = cycle.wrapping_add(1);
+        let deadline = now_ns().saturating_add(1_000_000_000);
+        while LEAK_READY.load(Ordering::Acquire) < cycle {
+            if now_ns() > deadline {
+                return Err("leak ready");
+            }
+            sys::yield_now();
+        }
+        let _ = sys::nanosleep(LEAK_DELAY_NS);
+        LEAK_FUTEX.fetch_add(1, Ordering::AcqRel);
+        let _ = sys::futex_wake(&LEAK_FUTEX, 1);
+        let deadline = now_ns().saturating_add(1_000_000_000);
+        while LEAK_DONE.load(Ordering::Acquire) < cycle {
+            if now_ns() > deadline {
+                return Err("leak done");
+            }
+            sys::yield_now();
+        }
+    }
+    LEAK_STOP.store(true, Ordering::Release);
+    LEAK_FUTEX.fetch_add(1, Ordering::AcqRel);
+    let _ = sys::futex_wake(&LEAK_FUTEX, 1);
+    let _ = sys::nanosleep(LEAK_DELAY_NS);
+    let _ = sys::handle_close(worker);
+
+    for _ in 0..LEAK_TIMEOUTS {
+        match sys::futex_wait(&LEAK_TIMEOUT, 0, Some(LEAK_TIMEOUT_NS)) {
+            Err(Errno::ETIMEDOUT) | Err(Errno::EAGAIN) => {}
+            Err(_) => return Err("leak timeout errno"),
+            Ok(()) => return Err("leak timeout wake"),
+        }
+    }
+    Ok(())
+}
+
+fn leak_mode() -> i32 {
+    let image = match sys::map_initfs() {
+        Ok(image) => image,
+        Err(_) => return fail_code("leak initfs"),
+    };
+    let initfs = match Initfs::parse(image) {
+        Ok(initfs) => initfs,
+        Err(_) => return fail_code("leak initfs parse"),
+    };
+    if leak_marker(&initfs, LEAK_BASE_EXIT) != Ok(LEAK_BASE_EXIT) {
+        return fail_code("leak base marker");
+    }
+    if let Err(message) = leak_churn() {
+        return fail_code(message);
+    }
+    println!(
+        "lock-time: leak churn wake={} timeout={}",
+        LEAK_WAKES, LEAK_TIMEOUTS
+    );
+    if leak_marker(&initfs, LEAK_SAMPLE_EXIT) != Ok(LEAK_SAMPLE_EXIT) {
+        return fail_code("leak sample marker");
+    }
+    // Let the marker's exit diagnostic reach the serial line before the final row.
+    let _ = sys::nanosleep(100_000_000);
+    println!("lock-time: leak done");
+    0
+}
+
+fn fail_code(message: &str) -> i32 {
+    println!("lock-time: failed {message}");
+    1
 }
 
 fn memory_pressure(seed: usize) {
@@ -222,7 +361,7 @@ fn thread_create(
     Ok(())
 }
 
-fn read_config() -> (usize, usize, bool, u64, usize) {
+fn read_config() -> (usize, usize, bool, u64, usize, bool) {
     let mut line = [0u8; 64];
     let mut length = 0usize;
     let deadline = now_ns().saturating_add(2_000_000_000);
@@ -249,10 +388,15 @@ fn read_config() -> (usize, usize, bool, u64, usize) {
         .and_then(|bytes| core::str::from_utf8(bytes).ok())
         .unwrap_or("");
     let mut words = text.split_ascii_whitespace();
-    let iterations = words
-        .next()
-        .and_then(|word| word.parse::<usize>().ok())
-        .unwrap_or(DEFAULT_ITERATIONS);
+    let first = words.next();
+    let leak = first == Some("leak");
+    let iterations = if leak {
+        DEFAULT_ITERATIONS
+    } else {
+        first
+            .and_then(|word| word.parse::<usize>().ok())
+            .unwrap_or(DEFAULT_ITERATIONS)
+    };
     let cpus = words
         .next()
         .and_then(|word| word.parse::<usize>().ok())
@@ -273,6 +417,7 @@ fn read_config() -> (usize, usize, bool, u64, usize) {
         mode != "off",
         mem_period,
         timers,
+        leak,
     )
 }
 
@@ -340,9 +485,29 @@ fn fail(message: &str) -> ! {
     sys::exit(1)
 }
 
-fn main(_args: raven_rt::Args) -> i32 {
+fn marker_exit_code(args: &raven_rt::Args) -> Option<i32> {
+    let code = args.get(0)?.parse::<i32>().ok()?;
+    (code == LEAK_BASE_EXIT || code == LEAK_SAMPLE_EXIT).then_some(code)
+}
+
+fn main(args: raven_rt::Args) -> i32 {
+    if let Some(code) = marker_exit_code(&args) {
+        sys::exit(code);
+    }
+    // Boot-service mode: svcd starts the fixture with `leak` as the first argument, so the frame
+    // churn runs without a console step. `noop` parks a base-image service that would otherwise
+    // run a CPU-heavy thread suite inside the measurement window.
+    if args.get(1) == Some("leak") {
+        return leak_mode();
+    }
+    if args.get(1) == Some("noop") {
+        return 0;
+    }
     println!("lock-time: ready");
-    let (iterations, cpus, on, mem_period, timers) = read_config();
+    let (iterations, cpus, on, mem_period, timers, leak) = read_config();
+    if leak {
+        return leak_mode();
+    }
     MEM_PERIOD.store(mem_period, Ordering::Release);
     println!(
         "lock-time: workers={} timers={} iterations={} cpus={} mode={} mem_period={}",

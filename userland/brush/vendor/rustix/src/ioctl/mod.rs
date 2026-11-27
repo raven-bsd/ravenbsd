@@ -295,13 +295,8 @@ type _Opcode = c::c_uint;
 // On libc Linux with GNU libc or uclibc, this is an `unsigned long`.
 #[cfg(all(
     not(linux_raw),
-    any(
-        target_os = "ravenbsd",
-        all(
-            target_os = "linux",
-            any(target_env = "gnu", target_env = "uclibc")
-        )
-    ),
+    target_os = "linux",
+    any(target_env = "gnu", target_env = "uclibc")
 ))]
 type _Opcode = c::c_ulong;
 

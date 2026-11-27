@@ -24,7 +24,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use common::fake::HostSigKernel;
 use raven_libc_abi::generated::signal;
 use raven_libc_abi::structs::{SiginfoT, Sigval, StackT, UcontextT};
-use raven_libc_signal::dispositions::{DispTable, Disposition};
+use raven_libc_signal::dispositions::{DispTable, Disposition, SA_ONSTACK, SA_RESTART, SA_SIGINFO};
 use raven_libc_signal::kernel::{FaultRecord, SigCaps};
 use raven_libc_signal::{
     EAGAIN_ERR, EINTR_ERR, EINVAL_ERR, ENOMEM_ERR, ENOSYS_ERR, SigSet, altstack, frame, kill, mask,
@@ -65,19 +65,30 @@ fn t_sigaction_rejects_kill_and_stop() {
 }
 
 #[test]
-fn t_sigaction_old_round_trip_and_restorer_bit() {
+fn t_sigaction_old_round_trip_and_freebsd_flags() {
     let _guard = LOCK.lock().unwrap();
     let table = DispTable::new();
     let action = Disposition {
         handler: 0x1234,
         mask: 0x10,
-        flags: 0x0400_0000 | 0x1000_0000,
+        flags: SA_RESTART | SA_SIGINFO | SA_ONSTACK,
     };
     sigaction(&table, signal::SIGUSR1, Some(&action), None).unwrap();
     let mut old = Disposition::DEFAULT;
     sigaction(&table, signal::SIGUSR1, None, Some(&mut old)).unwrap();
     assert_eq!(old.handler, 0x1234);
-    assert_eq!(old.flags, 0x1000_0000, "SA_RESTORER must not be stored");
+    assert_eq!(old.flags, SA_RESTART | SA_SIGINFO | SA_ONSTACK);
+    // FreeBSD `kern_sigaction`: an unknown flag with a handler is EINVAL. 0x0400_0000 was the
+    // musl SA_RESTORER bit and has no meaning in the FreeBSD profile.
+    let unknown = Disposition {
+        handler: 0x1234,
+        mask: 0,
+        flags: 0x0400_0000,
+    };
+    assert_eq!(
+        sigaction(&table, signal::SIGUSR1, Some(&unknown), None),
+        Err(EINVAL_ERR)
+    );
 }
 
 #[test]

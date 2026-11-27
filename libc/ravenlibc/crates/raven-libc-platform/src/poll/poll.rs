@@ -6,10 +6,13 @@
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(target_arch = "x86_64")]
+use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::Handle;
 use raven_libc_abi::poll::{POLLERR, POLLHUP, POLLIN, POLLNVAL, POLLOUT, POLLPRI};
 use raven_libc_abi::structs::Pollfd;
-use raven_libc_abi::time::CLOCK_MONOTONIC;
 use raven_libc_sys::sys::EvqEvent;
 use raven_proto_net::socket::{READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE};
 use raven_proto_net::{Call, Response, SocketRequest};
@@ -22,6 +25,26 @@ use crate::poll::{EV_HUP, EV_READABLE, EV_SIGNALED, EV_WRITABLE, MAX_POLL_FDS};
 
 const EVQ_ADD: u32 = 1;
 const EVQ_DEL: u32 = 3;
+
+/// Check a caller byte range before the shell turns a user pointer into a slice.
+///
+/// The shell runs in user mode and has no page-fault fixup, so it cannot copy in a bad pointer the
+/// way the kernel's `copy_from_user` does. This applies the predicate the kernel's `UserSlice::new`
+/// uses before it copies: the range starts inside the user window, does not overflow, and a
+/// non-empty range ends before `USER_END`. A pointer outside the window can never be a valid
+/// `poll`/`ppoll` argument, so it fails with `EFAULT` instead of faulting.
+pub fn validate_user_range(address: u64, length: u64) -> Result<(), Errno> {
+    if !(USER_MIN..=USER_END).contains(&address) {
+        return Err(Errno::EFAULT);
+    }
+    let Some(end) = address.checked_add(length) else {
+        return Err(Errno::EFAULT);
+    };
+    if end > USER_END || (length != 0 && address >= USER_END) {
+        return Err(Errno::EFAULT);
+    }
+    Ok(())
+}
 
 /// One event-queue registration and every `pollfd` entry that names the same source.
 struct Registration<'a, B: SysBackend, L: Lock> {
@@ -302,7 +325,9 @@ fn live_readiness<B: SysBackend>(backend: &B, handle: Handle) -> Option<i32> {
 
 /// Monotonic nanoseconds, used for the remaining poll deadline.
 fn monotonic_ns<B: SysBackend>(backend: &B) -> u64 {
-    let Ok(time) = backend.clock_get(CLOCK_MONOTONIC as u32) else {
+    // The public CLOCK_MONOTONIC is 4; the kernel seam keeps its private 0/1 encoding.
+    const KERNEL_CLOCK_MONOTONIC: u32 = 1;
+    let Ok(time) = backend.clock_get(KERNEL_CLOCK_MONOTONIC) else {
         return 0;
     };
     let sec = u64::try_from(time.tv_sec).unwrap_or(0);

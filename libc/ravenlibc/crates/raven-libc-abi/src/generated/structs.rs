@@ -84,26 +84,30 @@ const _: () = assert!(core::mem::size_of::<Iovec>() == 16 && core::mem::align_of
 const _: () = assert!(core::mem::offset_of!(Iovec, iov_base) == 0);
 const _: () = assert!(core::mem::offset_of!(Iovec, iov_len) == 8);
 
-/// H-15/DV5: 128 bytes on every architecture; st_blocks is in 512-byte units
+/// H-15/DV5: FreeBSD 133344405 struct stat, 224 bytes on every architecture; st_blocks is in 512-byte units; st_birthtim is zero when the wire has no birth time
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Stat {
     pub st_dev: u64,
     pub st_ino: u64,
-    pub st_mode: u32,
-    pub st_nlink: u32,
+    pub st_nlink: u64,
+    pub st_mode: u16,
+    pub st_bsdflags: i16,
     pub st_uid: u32,
     pub st_gid: u32,
+    pub st_padding1: i32,
     pub st_rdev: u64,
-    pub __pad1: u64,
-    pub st_size: i64,
-    pub st_blksize: i32,
-    pub __pad2: i32,
-    pub st_blocks: i64,
     pub st_atim: Timespec,
     pub st_mtim: Timespec,
     pub st_ctim: Timespec,
-    pub __unused: [u32; 2],
+    pub st_birthtim: Timespec,
+    pub st_size: i64,
+    pub st_blocks: i64,
+    pub st_blksize: i32,
+    pub st_flags: u32,
+    pub st_gen: u64,
+    pub st_filerev: u64,
+    pub st_spare: [u64; 9],
 }
 
 impl Stat {
@@ -111,69 +115,87 @@ impl Stat {
     pub const ZERO: Self = Self {
         st_dev: 0,
         st_ino: 0,
-        st_mode: 0,
         st_nlink: 0,
+        st_mode: 0,
+        st_bsdflags: 0,
         st_uid: 0,
         st_gid: 0,
+        st_padding1: 0,
         st_rdev: 0,
-        __pad1: 0,
-        st_size: 0,
-        st_blksize: 0,
-        __pad2: 0,
-        st_blocks: 0,
         st_atim: Timespec::ZERO,
         st_mtim: Timespec::ZERO,
         st_ctim: Timespec::ZERO,
-        __unused: [0; 2],
+        st_birthtim: Timespec::ZERO,
+        st_size: 0,
+        st_blocks: 0,
+        st_blksize: 0,
+        st_flags: 0,
+        st_gen: 0,
+        st_filerev: 0,
+        st_spare: [0; 9],
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Stat>() == 128 && core::mem::align_of::<Stat>() == 8);
+const _: () = assert!(core::mem::size_of::<Stat>() == 224 && core::mem::align_of::<Stat>() == 8);
 const _: () = assert!(core::mem::offset_of!(Stat, st_dev) == 0);
 const _: () = assert!(core::mem::offset_of!(Stat, st_ino) == 8);
-const _: () = assert!(core::mem::offset_of!(Stat, st_mode) == 16);
-const _: () = assert!(core::mem::offset_of!(Stat, st_nlink) == 20);
-const _: () = assert!(core::mem::offset_of!(Stat, st_uid) == 24);
-const _: () = assert!(core::mem::offset_of!(Stat, st_gid) == 28);
-const _: () = assert!(core::mem::offset_of!(Stat, st_rdev) == 32);
-const _: () = assert!(core::mem::offset_of!(Stat, __pad1) == 40);
-const _: () = assert!(core::mem::offset_of!(Stat, st_size) == 48);
-const _: () = assert!(core::mem::offset_of!(Stat, st_blksize) == 56);
-const _: () = assert!(core::mem::offset_of!(Stat, __pad2) == 60);
-const _: () = assert!(core::mem::offset_of!(Stat, st_blocks) == 64);
-const _: () = assert!(core::mem::offset_of!(Stat, st_atim) == 72);
-const _: () = assert!(core::mem::offset_of!(Stat, st_mtim) == 88);
-const _: () = assert!(core::mem::offset_of!(Stat, st_ctim) == 104);
-const _: () = assert!(core::mem::offset_of!(Stat, __unused) == 120);
+const _: () = assert!(core::mem::offset_of!(Stat, st_nlink) == 16);
+const _: () = assert!(core::mem::offset_of!(Stat, st_mode) == 24);
+const _: () = assert!(core::mem::offset_of!(Stat, st_bsdflags) == 26);
+const _: () = assert!(core::mem::offset_of!(Stat, st_uid) == 28);
+const _: () = assert!(core::mem::offset_of!(Stat, st_gid) == 32);
+const _: () = assert!(core::mem::offset_of!(Stat, st_padding1) == 36);
+const _: () = assert!(core::mem::offset_of!(Stat, st_rdev) == 40);
+const _: () = assert!(core::mem::offset_of!(Stat, st_atim) == 48);
+const _: () = assert!(core::mem::offset_of!(Stat, st_mtim) == 64);
+const _: () = assert!(core::mem::offset_of!(Stat, st_ctim) == 80);
+const _: () = assert!(core::mem::offset_of!(Stat, st_birthtim) == 96);
+const _: () = assert!(core::mem::offset_of!(Stat, st_size) == 112);
+const _: () = assert!(core::mem::offset_of!(Stat, st_blocks) == 120);
+const _: () = assert!(core::mem::offset_of!(Stat, st_blksize) == 128);
+const _: () = assert!(core::mem::offset_of!(Stat, st_flags) == 132);
+const _: () = assert!(core::mem::offset_of!(Stat, st_gen) == 136);
+const _: () = assert!(core::mem::offset_of!(Stat, st_filerev) == 144);
+const _: () = assert!(core::mem::offset_of!(Stat, st_spare) == 152);
 
+/// FreeBSD 133344405 struct dirent: d_fileno at 0, d_namlen at 20, d_name at 24
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dirent {
-    pub d_ino: u64,
+    pub d_fileno: u64,
     pub d_off: i64,
     pub d_reclen: u16,
     pub d_type: u8,
+    pub d_pad0: u8,
+    pub d_namlen: u16,
+    pub d_pad1: u16,
     pub d_name: [core::ffi::c_char; 256],
 }
 
 impl Dirent {
     /// All-zero value.
     pub const ZERO: Self = Self {
-        d_ino: 0,
+        d_fileno: 0,
         d_off: 0,
         d_reclen: 0,
         d_type: 0,
+        d_pad0: 0,
+        d_namlen: 0,
+        d_pad1: 0,
         d_name: [0; 256],
     };
 }
 
 const _: () =
     assert!(core::mem::size_of::<Dirent>() == 280 && core::mem::align_of::<Dirent>() == 8);
-const _: () = assert!(core::mem::offset_of!(Dirent, d_ino) == 0);
+const _: () = assert!(core::mem::offset_of!(Dirent, d_fileno) == 0);
 const _: () = assert!(core::mem::offset_of!(Dirent, d_off) == 8);
 const _: () = assert!(core::mem::offset_of!(Dirent, d_reclen) == 16);
 const _: () = assert!(core::mem::offset_of!(Dirent, d_type) == 18);
-const _: () = assert!(core::mem::offset_of!(Dirent, d_name) == 19);
+const _: () = assert!(core::mem::offset_of!(Dirent, d_pad0) == 19);
+const _: () = assert!(core::mem::offset_of!(Dirent, d_namlen) == 20);
+const _: () = assert!(core::mem::offset_of!(Dirent, d_pad1) == 22);
+const _: () = assert!(core::mem::offset_of!(Dirent, d_name) == 24);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -526,37 +548,35 @@ const _: () = assert!(core::mem::offset_of!(Rusage, ru_nvcsw) == 128);
 const _: () = assert!(core::mem::offset_of!(Rusage, ru_nivcsw) == 136);
 const _: () = assert!(core::mem::offset_of!(Rusage, __reserved) == 144);
 
+/// S746: FreeBSD 133344405 struct utsname, SYS_NMLN 256, five fields; musl's domainname field is not part of the FreeBSD record
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Utsname {
-    pub sysname: [core::ffi::c_char; 65],
-    pub nodename: [core::ffi::c_char; 65],
-    pub release: [core::ffi::c_char; 65],
-    pub version: [core::ffi::c_char; 65],
-    pub machine: [core::ffi::c_char; 65],
-    pub domainname: [core::ffi::c_char; 65],
+    pub sysname: [core::ffi::c_char; 256],
+    pub nodename: [core::ffi::c_char; 256],
+    pub release: [core::ffi::c_char; 256],
+    pub version: [core::ffi::c_char; 256],
+    pub machine: [core::ffi::c_char; 256],
 }
 
 impl Utsname {
     /// All-zero value.
     pub const ZERO: Self = Self {
-        sysname: [0; 65],
-        nodename: [0; 65],
-        release: [0; 65],
-        version: [0; 65],
-        machine: [0; 65],
-        domainname: [0; 65],
+        sysname: [0; 256],
+        nodename: [0; 256],
+        release: [0; 256],
+        version: [0; 256],
+        machine: [0; 256],
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Utsname>() == 390 && core::mem::align_of::<Utsname>() == 1);
+    assert!(core::mem::size_of::<Utsname>() == 1280 && core::mem::align_of::<Utsname>() == 1);
 const _: () = assert!(core::mem::offset_of!(Utsname, sysname) == 0);
-const _: () = assert!(core::mem::offset_of!(Utsname, nodename) == 65);
-const _: () = assert!(core::mem::offset_of!(Utsname, release) == 130);
-const _: () = assert!(core::mem::offset_of!(Utsname, version) == 195);
-const _: () = assert!(core::mem::offset_of!(Utsname, machine) == 260);
-const _: () = assert!(core::mem::offset_of!(Utsname, domainname) == 325);
+const _: () = assert!(core::mem::offset_of!(Utsname, nodename) == 256);
+const _: () = assert!(core::mem::offset_of!(Utsname, release) == 512);
+const _: () = assert!(core::mem::offset_of!(Utsname, version) == 768);
+const _: () = assert!(core::mem::offset_of!(Utsname, machine) == 1024);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -635,6 +655,7 @@ const _: () = assert!(core::mem::offset_of!(SiginfoT, si_code) == 8);
 const _: () = assert!(core::mem::offset_of!(SiginfoT, __pad) == 12);
 const _: () = assert!(core::mem::offset_of!(SiginfoT, __si_fields) == 16);
 
+/// DR-71: FreeBSD 133344405f53 struct termios, NCCS=20, no c_line, c_cc[20] at 16, c_ispeed/c_ospeed at 36/40
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Termios {
@@ -642,10 +663,9 @@ pub struct Termios {
     pub c_oflag: u32,
     pub c_cflag: u32,
     pub c_lflag: u32,
-    pub c_line: u8,
-    pub c_cc: [u8; 32],
-    pub __c_ispeed: u32,
-    pub __c_ospeed: u32,
+    pub c_cc: [u8; 20],
+    pub c_ispeed: u32,
+    pub c_ospeed: u32,
 }
 
 impl Termios {
@@ -655,77 +675,71 @@ impl Termios {
         c_oflag: 0,
         c_cflag: 0,
         c_lflag: 0,
-        c_line: 0,
-        c_cc: [0; 32],
-        __c_ispeed: 0,
-        __c_ospeed: 0,
+        c_cc: [0; 20],
+        c_ispeed: 0,
+        c_ospeed: 0,
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Termios>() == 60 && core::mem::align_of::<Termios>() == 4);
+    assert!(core::mem::size_of::<Termios>() == 44 && core::mem::align_of::<Termios>() == 4);
 const _: () = assert!(core::mem::offset_of!(Termios, c_iflag) == 0);
 const _: () = assert!(core::mem::offset_of!(Termios, c_oflag) == 4);
 const _: () = assert!(core::mem::offset_of!(Termios, c_cflag) == 8);
 const _: () = assert!(core::mem::offset_of!(Termios, c_lflag) == 12);
-const _: () = assert!(core::mem::offset_of!(Termios, c_line) == 16);
-const _: () = assert!(core::mem::offset_of!(Termios, c_cc) == 17);
-const _: () = assert!(core::mem::offset_of!(Termios, __c_ispeed) == 52);
-const _: () = assert!(core::mem::offset_of!(Termios, __c_ospeed) == 56);
+const _: () = assert!(core::mem::offset_of!(Termios, c_cc) == 16);
+const _: () = assert!(core::mem::offset_of!(Termios, c_ispeed) == 36);
+const _: () = assert!(core::mem::offset_of!(Termios, c_ospeed) == 40);
 
+/// FreeBSD 133344405 struct statvfs: counters first, then the block and flag words
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Statvfs {
-    pub f_bsize: u64,
-    pub f_frsize: u64,
-    pub f_blocks: u64,
-    pub f_bfree: u64,
     pub f_bavail: u64,
-    pub f_files: u64,
-    pub f_ffree: u64,
+    pub f_bfree: u64,
+    pub f_blocks: u64,
     pub f_favail: u64,
-    pub f_fsid: u64,
+    pub f_ffree: u64,
+    pub f_files: u64,
+    pub f_bsize: u64,
     pub f_flag: u64,
+    pub f_frsize: u64,
+    pub f_fsid: u64,
     pub f_namemax: u64,
-    pub f_type: u32,
-    pub __reserved: [i32; 5],
 }
 
 impl Statvfs {
     /// All-zero value.
     pub const ZERO: Self = Self {
-        f_bsize: 0,
-        f_frsize: 0,
-        f_blocks: 0,
-        f_bfree: 0,
         f_bavail: 0,
-        f_files: 0,
-        f_ffree: 0,
+        f_bfree: 0,
+        f_blocks: 0,
         f_favail: 0,
-        f_fsid: 0,
+        f_ffree: 0,
+        f_files: 0,
+        f_bsize: 0,
         f_flag: 0,
+        f_frsize: 0,
+        f_fsid: 0,
         f_namemax: 0,
-        f_type: 0,
-        __reserved: [0; 5],
     };
 }
 
 const _: () =
-    assert!(core::mem::size_of::<Statvfs>() == 112 && core::mem::align_of::<Statvfs>() == 8);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_bsize) == 0);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_frsize) == 8);
+    assert!(core::mem::size_of::<Statvfs>() == 88 && core::mem::align_of::<Statvfs>() == 8);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_bavail) == 0);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_bfree) == 8);
 const _: () = assert!(core::mem::offset_of!(Statvfs, f_blocks) == 16);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_bfree) == 24);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_bavail) == 32);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_favail) == 24);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_ffree) == 32);
 const _: () = assert!(core::mem::offset_of!(Statvfs, f_files) == 40);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_ffree) == 48);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_favail) == 56);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_fsid) == 64);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_flag) == 72);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_bsize) == 48);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_flag) == 56);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_frsize) == 64);
+const _: () = assert!(core::mem::offset_of!(Statvfs, f_fsid) == 72);
 const _: () = assert!(core::mem::offset_of!(Statvfs, f_namemax) == 80);
-const _: () = assert!(core::mem::offset_of!(Statvfs, f_type) == 88);
-const _: () = assert!(core::mem::offset_of!(Statvfs, __reserved) == 92);
 
+/// S746: FreeBSD 133344405 struct passwd, eleven fields; musl has only the seven 7-field /etc/passwd members
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Passwd {
@@ -733,9 +747,13 @@ pub struct Passwd {
     pub pw_passwd: *mut core::ffi::c_void,
     pub pw_uid: u32,
     pub pw_gid: u32,
+    pub pw_change: i64,
+    pub pw_class: *mut core::ffi::c_void,
     pub pw_gecos: *mut core::ffi::c_void,
     pub pw_dir: *mut core::ffi::c_void,
     pub pw_shell: *mut core::ffi::c_void,
+    pub pw_expire: i64,
+    pub pw_fields: i32,
 }
 
 impl Passwd {
@@ -745,20 +763,28 @@ impl Passwd {
         pw_passwd: core::ptr::null_mut(),
         pw_uid: 0,
         pw_gid: 0,
+        pw_change: 0,
+        pw_class: core::ptr::null_mut(),
         pw_gecos: core::ptr::null_mut(),
         pw_dir: core::ptr::null_mut(),
         pw_shell: core::ptr::null_mut(),
+        pw_expire: 0,
+        pw_fields: 0,
     };
 }
 
-const _: () = assert!(core::mem::size_of::<Passwd>() == 48 && core::mem::align_of::<Passwd>() == 8);
+const _: () = assert!(core::mem::size_of::<Passwd>() == 80 && core::mem::align_of::<Passwd>() == 8);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_name) == 0);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_passwd) == 8);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_uid) == 16);
 const _: () = assert!(core::mem::offset_of!(Passwd, pw_gid) == 20);
-const _: () = assert!(core::mem::offset_of!(Passwd, pw_gecos) == 24);
-const _: () = assert!(core::mem::offset_of!(Passwd, pw_dir) == 32);
-const _: () = assert!(core::mem::offset_of!(Passwd, pw_shell) == 40);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_change) == 24);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_class) == 32);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_gecos) == 40);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_dir) == 48);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_shell) == 56);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_expire) == 64);
+const _: () = assert!(core::mem::offset_of!(Passwd, pw_fields) == 72);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

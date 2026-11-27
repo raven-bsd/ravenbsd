@@ -456,7 +456,7 @@ impl Fts {
                 Ok(stat) => {
                     sb = stat;
                     first_ok = true;
-                    if follow < 0 && !is_dir(sb.st_mode) {
+                    if follow < 0 && !is_dir(u32::from(sb.st_mode)) {
                         need_lstat = true;
                     }
                 }
@@ -469,7 +469,7 @@ impl Fts {
                 match sys.fstatat(at_fd, &path, true) {
                     Ok(stat) => {
                         sb = stat;
-                        if !first_ok && is_link(stat.st_mode) {
+                        if !first_ok && is_link(u32::from(stat.st_mode)) {
                             return self.finish_stat(id, FTS_SLNONE, sb);
                         }
                     }
@@ -489,12 +489,12 @@ impl Fts {
             }
         }
 
-        if is_dir(sb.st_mode) {
+        if is_dir(u32::from(sb.st_mode)) {
             {
                 let ent = self.ent_mut(id);
                 ent.dev = sb.st_dev;
                 ent.ino = sb.st_ino;
-                ent.nlink = u64::from(sb.st_nlink);
+                ent.nlink = sb.st_nlink;
             }
             if is_dot(&self.ent(id).name) {
                 return self.finish_stat(id, FTS_DOT, sb);
@@ -512,10 +512,10 @@ impl Fts {
             }
             return self.finish_stat(id, FTS_D, sb);
         }
-        if is_link(sb.st_mode) {
+        if is_link(u32::from(sb.st_mode)) {
             return self.finish_stat(id, FTS_SL, sb);
         }
-        if is_reg(sb.st_mode) {
+        if is_reg(u32::from(sb.st_mode)) {
             return self.finish_stat(id, FTS_F, sb);
         }
         self.finish_stat(id, FTS_DEFAULT, sb)

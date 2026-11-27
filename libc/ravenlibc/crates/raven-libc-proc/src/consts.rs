@@ -46,30 +46,25 @@ pub const WNOHANG: u32 = 1;
 pub const WUNTRACED: u32 = 2;
 /// `WSTOPPED` alias.
 pub const WSTOPPED: u32 = 2;
-/// Report exited children.
-pub const WEXITED: u32 = 4;
-/// Report continued children (`sys/wait.h` / musl public value).
-pub const WCONTINUED: u32 = 8;
-/// Raw `PROC_WAIT_EX` continued bit.
-///
-/// The kernel wait ABI uses 4, while the public `sys/wait.h` keeps the musl/Linux value 8.
-/// [`crate::wait_status::kernel_wait_options`] translates one to the other.
+/// Report exited children (`waitid`, FreeBSD value).
+pub const WEXITED: u32 = 16;
+/// Report continued children (FreeBSD value).
+pub const WCONTINUED: u32 = 4;
+/// Raw `PROC_WAIT_EX` continued bit; the FreeBSD public value is the same bit.
 pub const KERNEL_WCONTINUED: u32 = 4;
-/// Leave the child waitable.
-pub const WNOWAIT: u32 = 0x0100_0000;
+/// Leave the child waitable (FreeBSD value).
+pub const WNOWAIT: u32 = 8;
 /// BSD compatibility bit, accepted and ignored.
 pub const __WALL: u32 = 0x4000_0000;
 /// Every option bit accepted by `wait*`.
 pub const WAIT_OPTION_MASK: u32 = WNOHANG | WUNTRACED | WEXITED | WCONTINUED | WNOWAIT | __WALL;
 
-/// Wait for any child.
-pub const P_ALL: u32 = 0;
-/// Wait for one pid.
-pub const P_PID: u32 = 1;
-/// Wait for one process group.
+/// Wait for any child (FreeBSD `P_ALL`).
+pub const P_ALL: u32 = 7;
+/// Wait for one pid (FreeBSD `P_PID`).
+pub const P_PID: u32 = 0;
+/// Wait for one process group (FreeBSD `P_PGID`).
 pub const P_PGID: u32 = 2;
-/// Wait for one pidfd.
-pub const P_PIDFD: u32 = 3;
 
 /// `RLIMIT_CPU`.
 pub const RLIMIT_CPU: u32 = 0;
@@ -83,30 +78,46 @@ pub const RLIMIT_STACK: u32 = 3;
 pub const RLIMIT_CORE: u32 = 4;
 /// `RLIMIT_RSS`.
 pub const RLIMIT_RSS: u32 = 5;
-/// `RLIMIT_NPROC`.
-pub const RLIMIT_NPROC: u32 = 6;
-/// `RLIMIT_NOFILE`.
-pub const RLIMIT_NOFILE: u32 = 7;
 /// `RLIMIT_MEMLOCK`.
-pub const RLIMIT_MEMLOCK: u32 = 8;
+pub const RLIMIT_MEMLOCK: u32 = 6;
+/// `RLIMIT_NPROC`.
+pub const RLIMIT_NPROC: u32 = 7;
+/// `RLIMIT_NOFILE`.
+pub const RLIMIT_NOFILE: u32 = 8;
+/// `RLIMIT_SBSIZE`.
+pub const RLIMIT_SBSIZE: u32 = 9;
+/// `RLIMIT_VMEM` (the FreeBSD name for `RLIMIT_AS`).
+pub const RLIMIT_VMEM: u32 = 10;
 /// `RLIMIT_AS`.
-pub const RLIMIT_AS: u32 = 9;
-/// `RLIMIT_LOCKS`.
-pub const RLIMIT_LOCKS: u32 = 10;
-/// `RLIMIT_SIGPENDING`.
-pub const RLIMIT_SIGPENDING: u32 = 11;
-/// `RLIMIT_MSGQUEUE`.
-pub const RLIMIT_MSGQUEUE: u32 = 12;
-/// `RLIMIT_NICE`.
-pub const RLIMIT_NICE: u32 = 13;
-/// `RLIMIT_RTPRIO`.
-pub const RLIMIT_RTPRIO: u32 = 14;
-/// `RLIMIT_RTTIME`.
-pub const RLIMIT_RTTIME: u32 = 15;
+pub const RLIMIT_AS: u32 = RLIMIT_VMEM;
+/// `RLIMIT_NPTS`.
+pub const RLIMIT_NPTS: u32 = 11;
+/// `RLIMIT_SWAP`.
+pub const RLIMIT_SWAP: u32 = 12;
+/// `RLIMIT_KQUEUES`.
+pub const RLIMIT_KQUEUES: u32 = 13;
+/// `RLIMIT_UMTXP`.
+pub const RLIMIT_UMTXP: u32 = 14;
+/// `RLIMIT_PIPEBUF`.
+pub const RLIMIT_PIPEBUF: u32 = 15;
+/// `RLIMIT_VMM`.
+pub const RLIMIT_VMM: u32 = 16;
+/// `RLIMIT_LOCKS` (Raven extension).
+pub const RLIMIT_LOCKS: u32 = 18;
+/// `RLIMIT_SIGPENDING` (Raven extension).
+pub const RLIMIT_SIGPENDING: u32 = 19;
+/// `RLIMIT_MSGQUEUE` (Raven extension).
+pub const RLIMIT_MSGQUEUE: u32 = 20;
+/// `RLIMIT_NICE` (Raven extension).
+pub const RLIMIT_NICE: u32 = 21;
+/// `RLIMIT_RTPRIO` (Raven extension).
+pub const RLIMIT_RTPRIO: u32 = 22;
+/// `RLIMIT_RTTIME` (Raven extension).
+pub const RLIMIT_RTTIME: u32 = 23;
 /// Number of resource limits.
-pub const RLIMIT_NLIMITS: u32 = 16;
+pub const RLIMIT_NLIMITS: u32 = 17;
 /// The unlimited resource value.
-pub const RLIM_INFINITY: u64 = u64::MAX;
+pub const RLIM_INFINITY: u64 = 0x7fff_ffff_ffff_ffff;
 
 /// `PRIO_PROCESS`.
 pub const PRIO_PROCESS: u32 = 0;

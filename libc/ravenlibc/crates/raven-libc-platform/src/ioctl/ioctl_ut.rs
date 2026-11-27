@@ -72,8 +72,22 @@ fn tcsets_needs_a_tty() {
 
 #[test]
 fn net_ioctl_classification() {
-    assert!(crate::ioctl::net::classify(0x8913).is_some());
-    assert!(crate::ioctl::net::classify(0x1234).is_none());
-    assert_eq!(crate::ioctl::net::net_ioctl(0x8913), Errno::ENOSYS);
-    assert_eq!(crate::ioctl::net::net_ioctl(0x1234), Errno::ENOTTY);
+    use crate::ioctl::net::{NetIoctl, classify, net_ioctl};
+    // FreeBSD sys/sys/sockio.h at 133344405: _IOW/_IOWR('i', n, struct ifreq) with
+    // sizeof(struct ifreq) == 32, and SIOCGIFCONF over the 16-byte struct ifconf.
+    assert_eq!(classify(0xc010_6924), Some(NetIoctl::GetIfConf));
+    assert_eq!(classify(0xc020_6911), Some(NetIoctl::GetIfFlags));
+    assert_eq!(classify(0x8020_6910), Some(NetIoctl::SetIfFlags));
+    assert_eq!(classify(0xc020_6921), Some(NetIoctl::GetIfAddr));
+    assert_eq!(classify(0x8020_690c), Some(NetIoctl::SetIfAddr));
+    assert_eq!(classify(0xc020_6925), Some(NetIoctl::GetIfNetmask));
+    assert_eq!(classify(0xc020_6933), Some(NetIoctl::GetIfMtu));
+    // Any other request in the interface command group stays a network request.
+    assert_eq!(classify(0xc020_6915), Some(NetIoctl::Other));
+    // The old Linux encodings are not the native requests.
+    assert_eq!(classify(0x8913), None);
+    assert_eq!(classify(0x1234), None);
+    assert_eq!(net_ioctl(0xc020_6911), Errno::ENOSYS);
+    assert_eq!(net_ioctl(0x8913), Errno::ENOTTY);
+    assert_eq!(net_ioctl(0x1234), Errno::ENOTTY);
 }

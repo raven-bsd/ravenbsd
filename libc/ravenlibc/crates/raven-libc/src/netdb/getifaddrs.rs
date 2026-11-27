@@ -31,21 +31,25 @@ pub(crate) struct IfAddrs {
     ifa_data: *mut c_void,
 }
 
-fn sockaddr_in(ip: [u8; 4]) -> Option<*mut c_void> {
+fn sockaddr_in(ip: [u8; 4]) -> *mut c_void {
     let mut bytes = Box::new([0u8; 16]);
     let net = NetSockAddr::In { ip, port: 0 };
-    if addr::write_sockaddr(&net, bytes.as_mut_slice()) == 0 {
-        return None;
-    }
-    Some(Box::into_raw(bytes).cast())
+    let written = addr::write_sockaddr(&net, bytes.as_mut_slice());
+    debug_assert_eq!(
+        written, 16,
+        "sockaddr_in writer must fill the 16-byte record"
+    );
+    Box::into_raw(bytes).cast()
 }
 
 fn build_one(item: &IfAddr) -> Option<*mut IfAddrs> {
+    // The name is the only fallible allocation. It is created before any sockaddr, so a
+    // rejected name cannot leave a partially built node behind.
     let name = CString::new(item.name.as_slice()).ok()?;
-    let address = sockaddr_in(item.addr)?;
-    let netmask = sockaddr_in(item.netmask)?;
+    let address = sockaddr_in(item.addr);
+    let netmask = sockaddr_in(item.netmask);
     let broadaddr = match item.broadaddr {
-        Some(ip) => sockaddr_in(ip)?,
+        Some(ip) => sockaddr_in(ip),
         None => ptr::null_mut(),
     };
     let node = Box::new(IfAddrs {

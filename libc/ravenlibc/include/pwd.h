@@ -33,6 +33,7 @@ __BEGIN_DECLS
 #define __NEED_size_t
 #define __NEED_uid_t
 #define __NEED_gid_t
+#define __NEED_time_t
 
 #if __BSD_VISIBLE || __XSI_VISIBLE
 #define __NEED_FILE
@@ -40,15 +41,34 @@ __BEGIN_DECLS
 
 #include <bits/alltypes.h>
 
+/* S746: the public record is the FreeBSD 133344405 include/pwd.h struct passwd:
+ * eleven fields including the change/class/expire words and pw_fields. */
 struct passwd {
 	char *pw_name;
 	char *pw_passwd;
 	uid_t pw_uid;
 	gid_t pw_gid;
+	time_t pw_change;
+	char *pw_class;
 	char *pw_gecos;
 	char *pw_dir;
 	char *pw_shell;
+	time_t pw_expire;
+	int pw_fields;
 };
+
+/* S746: the FreeBSD pw_fields bit map. */
+#define _PWF(x)		(1 << (x))
+#define _PWF_NAME	_PWF(0)
+#define _PWF_PASSWD	_PWF(1)
+#define _PWF_UID	_PWF(2)
+#define _PWF_GID	_PWF(3)
+#define _PWF_CHANGE	_PWF(4)
+#define _PWF_CLASS	_PWF(5)
+#define _PWF_GECOS	_PWF(6)
+#define _PWF_DIR	_PWF(7)
+#define _PWF_SHELL	_PWF(8)
+#define _PWF_EXPIRE	_PWF(9)
 
 #if __XSI_VISIBLE || __BSD_VISIBLE
 void setpwent (void);

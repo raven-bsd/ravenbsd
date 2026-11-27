@@ -44,12 +44,8 @@ use crate::arch::aarch64::ipc::{
 };
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::syscall as arch_syscall;
-#[cfg(target_arch = "aarch64")]
-use crate::arch::aarch64::timer;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::syscall as arch_syscall;
-#[cfg(target_arch = "x86_64")]
-use crate::arch::x86_64::tsc;
 use crate::cmdline::CmdLine;
 use crate::initfs;
 #[cfg(target_arch = "x86_64")]
@@ -256,8 +252,9 @@ pub fn leaked_process_stats() -> [u64; 15] {
         .collect();
     stats[10] = processes.len() as u64;
     for (index, process) in processes.iter().enumerate() {
-        if !processes[..index]
+        if !processes
             .iter()
+            .take(index)
             .any(|previous| Arc::ptr_eq(previous, process))
         {
             stats[11] = stats[11].saturating_add(1);
@@ -356,6 +353,12 @@ static S36_TIMEOUT_SLEEPERS: AtomicU64 = AtomicU64::new(0);
 static S36_TIMEOUTCHECK: AtomicBool = AtomicBool::new(false);
 
 /// Record the boot-time S36 gate flags before any process can exit.
+///
+/// Only the x86_64 boot path calls this today; the shared exit path still reads the flags.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(dead_code, reason = "aarch64 boot does not call the S36 gate parser")
+)]
 pub fn configure_gates(cmdline: &CmdLine) {
     S36_TIMEOUTCHECK.store(cmdline.get("s36-timeoutcheck").is_some(), Ordering::Release);
 }
@@ -413,10 +416,10 @@ pub const MAX_GROUPS: usize = 16;
 
 /// `si_code` of a child status change (`CLD_EXITED`).
 pub const CLD_EXITED_CODE: u32 = 1;
-/// `si_code` of a plain user signal (`SI_USER`).
-pub const SI_USER_CODE: u32 = 0;
-/// `si_code` of a queued signal (`SI_QUEUE`; the C value is `-1`).
-pub const SI_QUEUE_CODE: u32 = u32::MAX;
+/// `si_code` of a plain user signal (`SI_USER`, FreeBSD `0x10001`).
+pub const SI_USER_CODE: u32 = 0x0001_0001;
+/// `si_code` of a queued signal (`SI_QUEUE`, FreeBSD `0x10002`).
+pub const SI_QUEUE_CODE: u32 = 0x0001_0002;
 
 /// One queued process signal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -438,39 +441,44 @@ pub const SIG_DFL: u64 = 0;
 /// `sigaction` handler value: ignore the signal (`SIG_IGN`).
 pub const SIG_IGN: u64 = 1;
 
-/// `SA_NOCLDSTOP` (`bits/signum.h`, System V amd64).
-pub const SA_NOCLDSTOP: u32 = 1;
-/// `SA_NOCLDWAIT` (`bits/signum.h`).
-pub const SA_NOCLDWAIT: u32 = 2;
-/// `SA_SIGINFO` (`bits/signum.h`).
-pub const SA_SIGINFO: u32 = 4;
-/// `SA_ONSTACK` (`bits/signum.h`).
-pub const SA_ONSTACK: u32 = 0x0800_0000;
-/// `SA_RESTART` (`bits/signum.h`).
-pub const SA_RESTART: u32 = 0x1000_0000;
-/// `SA_NODEFER` (`bits/signum.h`).
-pub const SA_NODEFER: u32 = 0x4000_0000;
-/// `SA_RESETHAND` (`bits/signum.h`).
-pub const SA_RESETHAND: u32 = 0x8000_0000;
+/// `SA_NOCLDSTOP` (FreeBSD `sys/sys/signal.h`).
+pub const SA_NOCLDSTOP: u32 = 0x0008;
+/// `SA_NOCLDWAIT` (FreeBSD `sys/sys/signal.h`).
+pub const SA_NOCLDWAIT: u32 = 0x0020;
+/// `SA_SIGINFO` (FreeBSD `sys/sys/signal.h`).
+pub const SA_SIGINFO: u32 = 0x0040;
+/// `SA_ONSTACK` (FreeBSD `sys/sys/signal.h`).
+pub const SA_ONSTACK: u32 = 0x0001;
+/// `SA_RESTART` (FreeBSD `sys/sys/signal.h`).
+pub const SA_RESTART: u32 = 0x0002;
+/// `SA_NODEFER` (FreeBSD `sys/sys/signal.h`).
+pub const SA_NODEFER: u32 = 0x0010;
+/// `SA_RESETHAND` (FreeBSD `sys/sys/signal.h`).
+pub const SA_RESETHAND: u32 = 0x0004;
 /// The flags `sigaction` stores (the donor `kern_sigaction` accepted set).
 pub const SA_SUPPORTED: u32 =
     SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO | SA_ONSTACK | SA_RESTART | SA_NODEFER | SA_RESETHAND;
 
-/// `SIG_BLOCK` (`sigprocmask`).
-pub const SIG_BLOCK: i32 = 0;
-/// `SIG_UNBLOCK` (`sigprocmask`).
-pub const SIG_UNBLOCK: i32 = 1;
-/// `SIG_SETMASK` (`sigprocmask`).
-pub const SIG_SETMASK: i32 = 2;
+/// `SIG_BLOCK` (`sigprocmask`, FreeBSD value).
+pub const SIG_BLOCK: i32 = 1;
+/// `SIG_UNBLOCK` (`sigprocmask`, FreeBSD value).
+pub const SIG_UNBLOCK: i32 = 2;
+/// `SIG_SETMASK` (`sigprocmask`, FreeBSD value).
+pub const SIG_SETMASK: i32 = 3;
 
 /// `SS_ONSTACK`: the thread is currently on its alternate stack.
 pub const SS_ONSTACK: u32 = 1;
 /// `SS_DISABLE`: no alternate stack.
-pub const SS_DISABLE: u32 = 2;
-/// `SS_AUTODISARM`: accepted and stored as a plain flag.
-pub const SS_AUTODISARM: u32 = 0x8000_0000;
-/// Minimum alternate stack size (`MINSIGSTKSZ`, `bits/signum.h`).
-pub const MINSIGSTKSZ: u64 = 6144;
+pub const SS_DISABLE: u32 = 4;
+/// Minimum alternate stack size (FreeBSD `__MINSIGSTKSZ`).
+#[cfg(target_arch = "x86_64")]
+pub const MINSIGSTKSZ: u64 = 2048;
+/// Minimum alternate stack size (FreeBSD `__MINSIGSTKSZ`).
+#[cfg(target_arch = "aarch64")]
+pub const MINSIGSTKSZ: u64 = 4096;
+/// Minimum alternate stack size (FreeBSD `__MINSIGSTKSZ`).
+#[cfg(target_arch = "riscv64")]
+pub const MINSIGSTKSZ: u64 = 4096;
 
 /// One per-process signal disposition (the FreeBSD `struct sigacts` fields Raven models).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -504,7 +512,7 @@ pub const fn signal_bit(signo: u32) -> u64 {
     if signo == 0 || signo > status::SIG_MAX {
         0
     } else {
-        1u64 << (signo - 1)
+        1u64 << signo.saturating_sub(1)
     }
 }
 
@@ -526,7 +534,10 @@ impl SigActs {
     /// `signal-fault` child teardown.
     pub fn new() -> Self {
         Self {
-            actions: vec![SigAction::default_action(); status::SIG_MAX as usize + 1],
+            actions: vec![
+                SigAction::default_action();
+                (status::SIG_MAX as usize).saturating_add(1)
+            ],
         }
     }
 
@@ -671,6 +682,12 @@ pub struct Process {
     pub id: u64,
     /// Parent, group, session and credentials.
     pub ids: Mutex<ProcessIds>,
+    /// File-creation mask (FreeBSD `p_pd->pd_cmask`).
+    ///
+    /// Kernel state, not a libc cell: `PROC_UMASK` swaps it atomically, `PROC_CREATE` and
+    /// `PROC_FORK` inherit it, and `PROC_EXEC` preserves it. Only [`raven_abi::types::umask`]
+    /// permission bits are ever stored.
+    pub umask: AtomicU32,
     /// Path used to start the process.
     pub path: String,
     /// Command name shown to `ps` (argv[0], replaced by exec and copied by fork).
@@ -788,6 +805,20 @@ pub struct Process {
 }
 
 impl Process {
+    /// The process file-creation mask (`p_pd->pd_cmask`).
+    pub fn umask(&self) -> u32 {
+        self.umask.load(Ordering::Acquire)
+    }
+
+    /// Swap the mask and return the previous value, limited to `ALLPERMS`.
+    ///
+    /// FreeBSD `sys_umask` takes the exclusive `PWDDESC` lock for the read-and-write pair; a
+    /// single atomic exchange gives the same result without a second lock on the syscall path.
+    pub fn swap_umask(&self, mask: u32) -> u32 {
+        self.umask
+            .swap(raven_abi::types::umask::normalize(mask), Ordering::AcqRel)
+    }
+
     /// Resident user pages for this process, in bytes, from the page tables.
     ///
     /// `UserAddressSpace::mapped_pages` walks the VMA tree and counts present 4 KiB leaves; it
@@ -911,26 +942,19 @@ pub fn processes_try() -> Option<alloc::vec::Vec<Arc<Process>>> {
 }
 
 /// Count live processes and their live threads without allocating or taking process locks.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(
+        dead_code,
+        reason = "the K449 metrics sampler is started only on x86_64"
+    )
+)]
 pub fn live_totals() -> (usize, u32) {
     let registry = PID_REGISTRY.lock();
     let mut procs = 0usize;
     let mut threads = 0u32;
     for weak in registry.values() {
         if let Some(process) = weak.upgrade() {
-            procs += 1;
-            threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
-        }
-    }
-    (procs, threads)
-}
-
-/// Live sshd/sshd-session processes and their thread count (K449 frame-cliff diagnostic).
-pub fn sshd_totals() -> (usize, u32) {
-    let mut procs = 0usize;
-    let mut threads = 0u32;
-    for process in processes() {
-        let command = process.command.lock().clone();
-        if process.path.contains("sshd") || command.contains("sshd") {
             procs = procs.saturating_add(1);
             threads = threads.saturating_add(process.threads.load(Ordering::Relaxed));
         }
@@ -939,6 +963,13 @@ pub fn sshd_totals() -> (usize, u32) {
 }
 
 /// K449 diagnostic: exited processes still retained for `PROC_WAIT`.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(
+        dead_code,
+        reason = "the K449 metrics sampler is started only on x86_64"
+    )
+)]
 pub fn zombie_count() -> usize {
     ZOMBIES.lock().len()
 }
@@ -961,10 +992,10 @@ pub fn dead_live_threads() -> usize {
     for process in processes() {
         let threads = process.threads_live.lock();
         for weak in threads.iter() {
-            if let Some(thread) = weak.upgrade() {
-                if thread.state() == crate::sched::thread::ThreadState::Dead {
-                    total = total.saturating_add(1);
-                }
+            if let Some(thread) = weak.upgrade()
+                && thread.state() == crate::sched::thread::ThreadState::Dead
+            {
+                total = total.saturating_add(1);
             }
         }
     }
@@ -986,6 +1017,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
     Ok(Arc::new(Process {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
+        umask: AtomicU32::new(raven_abi::types::umask::CMASK),
         path: String::from("/kernel"),
         command: Mutex::new(String::from("/kernel")),
         nice: AtomicI32::new(0),
@@ -1046,15 +1078,19 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, root, ids, limits) = if let Some(parent) = current() {
+    let (namespace, root, ids, umask, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         let root = parent.root.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
+        // FreeBSD `pdcopy` (`sys/kern/kern_descrip.c`): a new descriptor set starts at `CMASK`
+        // and then takes the parent's `pd_cmask`, so both `PROC_CREATE` and `PROC_FORK` inherit.
+        let umask = parent.umask();
         let limits = *parent.limits.lock();
         (
             snapshot.child_snapshot(&ipc::registry::names()),
             root,
             ids,
+            umask,
             limits,
         )
     } else {
@@ -1062,6 +1098,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
             Namespace::root(),
             String::from("/"),
             ProcessIds::kernel(),
+            raven_abi::types::umask::CMASK,
             default_limits(),
         )
     };
@@ -1076,6 +1113,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
+        umask: AtomicU32::new(umask),
         path: String::from("child"),
         command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
@@ -1152,6 +1190,7 @@ fn build_forked_process(source: &Arc<Process>, address_space: AddressSpace) -> A
     Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
+        umask: AtomicU32::new(source.umask()),
         path: source.path.clone(),
         command: Mutex::new(source.command.lock().clone()),
         nice: AtomicI32::new(source.nice()),
@@ -1608,10 +1647,10 @@ impl Process {
             match status::default_action(record.signo) {
                 None | Some(DefaultAction::Ignore) => continue,
                 Some(DefaultAction::Terminate) => {
-                    exit_process(-status::signal_status(record.signo, false))
+                    exit_process(status::signal_status(record.signo, false).wrapping_neg())
                 }
                 Some(DefaultAction::Core) => {
-                    exit_process(-status::signal_status(record.signo, true))
+                    exit_process(status::signal_status(record.signo, true).wrapping_neg())
                 }
                 Some(DefaultAction::Stop) => {
                     self.apply_stop_default(record.signo);
@@ -1660,10 +1699,10 @@ impl Process {
             match status::default_action(record.signo) {
                 None | Some(DefaultAction::Ignore) => {}
                 Some(DefaultAction::Terminate) => {
-                    exit_process(-status::signal_status(record.signo, false))
+                    exit_process(status::signal_status(record.signo, false).wrapping_neg())
                 }
                 Some(DefaultAction::Core) => {
-                    exit_process(-status::signal_status(record.signo, true))
+                    exit_process(status::signal_status(record.signo, true).wrapping_neg())
                 }
                 Some(DefaultAction::Stop) => self.apply_stop_default(record.signo),
                 Some(DefaultAction::Continue) => self.apply_continue_default(),
@@ -1684,10 +1723,10 @@ impl Process {
     /// FreeBSD `sigtd`, NetBSD `sigismasked`). No pop/requeue window exists.
     pub fn pop_signal_where(
         &self,
-        mut predicate: impl FnMut(&PendingSignal) -> bool,
+        predicate: impl FnMut(&PendingSignal) -> bool,
     ) -> Option<PendingSignal> {
         let mut pending = self.pending_signals.lock();
-        let index = pending.iter().position(|signal| predicate(signal))?;
+        let index = pending.iter().position(predicate)?;
         pending.remove(index)
     }
 
@@ -1738,14 +1777,8 @@ impl Process {
     }
 
     /// True when at least one queued signal matches `predicate`.
-    pub fn has_pending_signal_where(
-        &self,
-        mut predicate: impl FnMut(&PendingSignal) -> bool,
-    ) -> bool {
-        self.pending_signals
-            .lock()
-            .iter()
-            .any(|signal| predicate(signal))
+    pub fn has_pending_signal_where(&self, predicate: impl FnMut(&PendingSignal) -> bool) -> bool {
+        self.pending_signals.lock().iter().any(predicate)
     }
 }
 
@@ -1958,6 +1991,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     let process = Arc::new(Process {
         id,
         ids: Mutex::new(ids),
+        umask: AtomicU32::new(raven_abi::types::umask::CMASK),
         path: String::from(path),
         command: Mutex::new(String::from(path)),
         nice: AtomicI32::new(0),

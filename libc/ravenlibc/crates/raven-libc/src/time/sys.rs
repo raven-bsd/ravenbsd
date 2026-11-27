@@ -13,6 +13,11 @@ use crate::ffi::platform;
 #[derive(Clone, Copy, Default)]
 pub(crate) struct ShellTime;
 
+/// The monotonic clock through the public-to-wire translation above.
+pub(crate) fn monotonic_now() -> Option<Timespec> {
+    ShellTime.clock_get(ClockId::Monotonic).ok()
+}
+
 fn error(value: raven_libc_platform::Errno) -> Errno {
     Errno(value.0)
 }

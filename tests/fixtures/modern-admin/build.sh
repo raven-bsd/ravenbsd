@@ -17,7 +17,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
-arch=${1:-x86_64}
+arch=${RAVEN_QT_ARCH:-${1:-x86_64}}
 case "$arch" in
     x86_64)
         target=x86_64-unknown-ravenbsd
@@ -99,7 +99,7 @@ if [ ! -f "$binary" ]; then
     exit 1
 fi
 cp "$binary" "$out/raven"
-# The UFS/admin-test profiles still stage the arch-less path; keep x86_64 working there.
+# The admin-test and qemu-ufs profiles still stage the arch-less path; keep x86_64 working there.
 if [ "$arch" = x86_64 ]; then
     cp "$binary" "$root/build/fixtures/modern-admin/raven"
 fi

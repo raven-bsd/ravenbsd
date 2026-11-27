@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S168b aarch64: the same exec frame probe. The child's custom `_start` reads `x0` before the
+# stack pointer is aligned for Rust.
+
+name = "proc-exec-arg-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/proc-exec-arg/build.sh"]
+initfs = "build/fixtures/proc-exec-arg/aarch64/arg.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-exec-arg: init$'
+
+[[expect]]
+regex = '^proc-exec-arg: child arg=0x[0-9a-f]+ sp=0x[0-9a-f]+ match=1 aligned=1 argc=1$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-exec-arg: FAIL'

@@ -301,7 +301,6 @@ impl Entry {
                          target_os = "cygwin",
                          solarish,
                          linux_android,
-                         target_os = "ravenbsd",
                          apple_targets))] {
                 let ino = de.d_ino as u64;
             } else {

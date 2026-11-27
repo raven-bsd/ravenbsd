@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S714: the fresh-image spawn, fork resume and same-PID exec startup paths at four vCPUs. The
+# probe owns the image lifetime; init must exit with its status.
+
+name = "process-start-smp4"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 120
+pre = ["sh tests/conformance/process-start/build.sh"]
+initfs = "build/conformance/process-start/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^S714 spawn-child pid=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^S714-R01 fresh-spawn pid=[0-9]+ status=0 ok=1$'
+
+[[expect]]
+regex = '^S714-R02 fork-resume parent=[0-9]+ child=[0-9]+ canary=1 ppid=1 parent-copy=1 status=0 ok=1$'
+
+[[expect]]
+regex = '^S714-R03 parent-exit parent=[0-9]+ child=[0-9]+ canary=1 reparented=1 ok=1$'
+
+[[expect]]
+regex = '^S714 exec-child pid=[0-9]+ expect=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^S714-R04 fork-exec parent=[0-9]+ child=[0-9]+ status=0 ok=1$'
+
+[[expect]]
+regex = '^S714-R05 fork-signal parent=[0-9]+ child=[0-9]+ handler=1 canary=1 status=0 ok=1$'
+
+[[expect]]
+regex = '^S714-R06 repeat count=16 ok=1$'
+
+[[expect]]
+regex = '^S714-R07 failed-spawn rc=[0-9]+ recovered=1 ok=1$'
+
+[[expect]]
+regex = '^S714-PROCESS-START ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)page fault|panic|EXCEPTION|AccessError|S714-PROCESS-START failed|killed by'

@@ -27,6 +27,9 @@
 #ifndef	_SYS_MMAN_H
 #define	_SYS_MMAN_H
 #include <sys/cdefs.h>
+/* The architecture overlay carries only the arch-selected default; the generated ABI table
+ * owns the final value and must be included after it. */
+#include <bits/mman.h>
 #include <bits/abi_mman.h>
 __BEGIN_DECLS
 
@@ -50,8 +53,6 @@ __BEGIN_DECLS
 #define MLOCK_ONFAULT 0x01
 
 #endif
-
-#include <bits/mman.h>
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
 void *mmap (void *, size_t, int, int, int, off_t);

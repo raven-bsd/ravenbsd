@@ -30,13 +30,50 @@
 
 __BEGIN_DECLS
 
-#include <sys/statvfs.h>
+#define __NEED_fsblkcnt_t
+#define __NEED_fsfilcnt_t
+#define __NEED_uint32_t
+#define __NEED_uint64_t
+#define __NEED_int64_t
+#define __NEED_uid_t
+#include <bits/alltypes.h>
 
 typedef struct __fsid_t {
 	int __val[2];
 } fsid_t;
 
-#include <bits/statfs.h>
+#define MFSNAMELEN 16
+#define MNAMELEN 1024
+
+/* RavenBSD: public `struct statfs` is the FreeBSD 133344405 layout (DR-69, S733),
+ * 2344 bytes. The donor defines it in sys/mount.h; Raven exposes the same record from
+ * <sys/statfs.h>. Only numeric layout facts are used. */
+struct statfs {
+	uint32_t f_version;
+	uint32_t f_type;
+	uint64_t f_flags;
+	uint64_t f_bsize;
+	uint64_t f_iosize;
+	uint64_t f_blocks;
+	uint64_t f_bfree;
+	int64_t f_bavail;
+	uint64_t f_files;
+	int64_t f_ffree;
+	uint64_t f_syncwrites;
+	uint64_t f_asyncwrites;
+	uint64_t f_syncreads;
+	uint64_t f_asyncreads;
+	uint32_t f_nvnodelistsize;
+	uint32_t f_spare0;
+	uint64_t f_spare[9];
+	uint32_t f_namemax;
+	uid_t f_owner;
+	fsid_t f_fsid;
+	char f_charspare[80];
+	char f_fstypename[MFSNAMELEN];
+	char f_mntfromname[MNAMELEN];
+	char f_mntonname[MNAMELEN];
+};
 
 int statfs (const char *, struct statfs *);
 int fstatfs (int, struct statfs *);

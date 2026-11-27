@@ -15,7 +15,7 @@ pub mod poll;
 pub mod select;
 
 pub use epoll::{EpollEvent, epoll_create1, epoll_ctl, epoll_pwait, epoll_pwait2, epoll_wait};
-pub use poll::{poll, ppoll, wait_readable, wait_writable};
+pub use poll::{poll, ppoll, validate_user_range, wait_readable, wait_writable};
 pub use select::{pselect, select};
 
 /// Maximum registrations in one event queue (`raven-evq-core MAX_REGISTRATIONS`).

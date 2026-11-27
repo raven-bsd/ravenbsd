@@ -46,7 +46,8 @@ pub type id_t = u32;
 pub type nlink_t = u32;
 pub type useconds_t = u32;
 pub type socklen_t = u32;
-pub type pthread_key_t = u32;
+/// S746: FreeBSD sys/sys/_pthreadtypes.h typedef int pthread_key_t; musl spells it unsigned (same width)
+pub type pthread_key_t = i32;
 /// DV1: 32 bits everywhere; musl x86_64 is 64 bits
 pub type blksize_t = i32;
 pub type sa_family_t = u16;
@@ -54,7 +55,8 @@ pub type in_port_t = u16;
 pub type reclen_t = u16;
 pub type in_addr_t = u32;
 pub type pthread_once_t = i32;
-pub type pthread_spinlock_t = i32;
+/// S746: FreeBSD sys/sys/_pthreadtypes.h pthread_spinlock_t is a pointer to the opaque struct; musl spells it int
+pub type pthread_spinlock_t = *mut core::ffi::c_void;
 /// H-19: the TCB pointer
 pub type pthread_t = usize;
 pub type timer_t = *mut core::ffi::c_void;

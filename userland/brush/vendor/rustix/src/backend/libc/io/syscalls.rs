@@ -151,27 +151,6 @@ pub(crate) fn pwritev(fd: BorrowedFd<'_>, bufs: &[IoSlice<'_>], offset: u64) -> 
     }
 }
 
-#[cfg(target_os = "ravenbsd")]
-pub(crate) fn preadv2(
-    _fd: BorrowedFd<'_>,
-    _bufs: &mut [IoSliceMut<'_>],
-    _offset: u64,
-    _flags: ReadWriteFlags,
-) -> io::Result<usize> {
-    // ravenlibc has no preadv2/pwritev2 syscall wrapper yet.
-    Err(io::Errno::NOSYS)
-}
-
-#[cfg(target_os = "ravenbsd")]
-pub(crate) fn pwritev2(
-    _fd: BorrowedFd<'_>,
-    _bufs: &[IoSlice<'_>],
-    _offset: u64,
-    _flags: ReadWriteFlags,
-) -> io::Result<usize> {
-    Err(io::Errno::NOSYS)
-}
-
 #[cfg(all(
     linux_kernel,
     not(any(target_os = "android", target_os = "ravenbsd"))

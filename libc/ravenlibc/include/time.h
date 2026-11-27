@@ -60,6 +60,8 @@
 #define _TIME_H
 
 #include <sys/cdefs.h>
+/* FreeBSD exposes CLK_TCK from <time.h>; the Raven limit lives in the generated bits header. */
+#include <bits/abi_limits.h>
 
 __BEGIN_DECLS
 

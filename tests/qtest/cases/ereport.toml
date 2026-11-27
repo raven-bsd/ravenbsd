@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# FMA1: bounded ereport bus + diagnose/retire baseline. The fixture injects bad-MMIO and ECC
+# ereports, diagnoses them through the declared data policy, proves the ring is restartable and
+# rejects a malformed payload without a panic.
+
+name = "ereport"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh userland/servers/fmd/build.sh"]
+initfs = "build/fixtures/fmd/ereport.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^fma: ereport class=ereport\.io\.mmio\.bad resource=pci0:1:0 severity=major$'
+
+[[expect]]
+regex = '^fma: policy entries=2 source=policy\.conf$'
+
+[[expect]]
+regex = '^fma: diagnosis case=1 action=retire resource=pci0:1:0$'
+
+[[expect]]
+regex = '^fma: diagnosis case=2 action=degrade resource=dimm0$'
+
+[[expect]]
+regex = '^fma: ring full=rejected depth=2 restarted=yes$'
+
+[[expect]]
+regex = '^fma: malformed rejected count=6$'
+
+[[expect]]
+regex = '^fma: restart action=retire case=1 audits=1$'
+
+[[expect]]
+regex = '^fma: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fma: fail'

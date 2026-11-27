@@ -159,6 +159,12 @@ pub mod futex {
     pub const WAIT: u32 = 0;
     /// Wake up to `val` waiters.
     pub const WAKE: u32 = 1;
+    /// Move waiters from the source address to a destination address (PG-3).
+    ///
+    /// `val` is the number to wake at the source, the fourth `FUTEX` argument is the maximum
+    /// number to move, and the fifth is the destination address. Returns the number of waiters
+    /// woken plus requeued; see [`crate::syscall::Syscall::FUTEX`].
+    pub const REQUEUE: u32 = 3;
     /// Operate on the private `(pid, virtual address)` key (PG-3).
     ///
     /// With this bit clear the address is resolved through its VMA and, for a
@@ -285,6 +291,99 @@ pub mod fcntl {
     const _: () = assert!(core::mem::offset_of!(RecordLock, l_start) == 8);
     const _: () = assert!(core::mem::offset_of!(RecordLock, l_len) == 16);
     const _: () = assert!(core::mem::offset_of!(RecordLock, l_pid) == 24);
+}
+
+/// POSIX file-creation-mask semantics (FreeBSD `p_pd->pd_cmask`).
+///
+/// FreeBSD stores the mask with [`ALLPERMS`] (`sys/sys/stat.h`) in `sys_umask`, and applies it as
+/// `(mode & ~mask) & ALLPERMS` on create paths. The open path additionally strips the sticky bit
+/// (`sys/kern/vfs_syscalls.c` `sys_open`), which [`open_create_mode`] mirrors.
+pub mod umask {
+    /// FreeBSD `CMASK` (`sys/sys/param.h`): the default mask of a fresh process.
+    pub const CMASK: u32 = 0o022;
+    /// FreeBSD `ALLPERMS` (`sys/sys/stat.h`): the bits `sys_umask` keeps from a new mask.
+    pub const ALLPERMS: u32 = 0o7777;
+    /// FreeBSD `ACCESSPERMS`: the owner/group/other rwx bits.
+    pub const ACCESSPERMS: u32 = 0o777;
+    /// `S_ISTXT`: the sticky bit, stripped from an open-created file.
+    pub const S_ISTXT: u32 = 0o1000;
+
+    /// The value `sys_umask` stores: the new mask limited to [`ALLPERMS`].
+    #[must_use]
+    pub const fn normalize(mask: u32) -> u32 {
+        mask & ALLPERMS
+    }
+
+    /// The mode of a file created by `open(..., O_CREAT, mode)`.
+    ///
+    /// FreeBSD `sys_open` computes `((mode & ~pd_cmask) & ALLPERMS) & ~S_ISTXT`; the sticky bit is
+    /// never inherited from the requested mode.
+    #[must_use]
+    pub const fn open_create_mode(mode: u32, mask: u32) -> u32 {
+        (mode & !normalize(mask) & ALLPERMS) & !S_ISTXT
+    }
+}
+
+/// The kernel-authenticated creation context of a scheme request.
+///
+/// A filesystem server asks the kernel for the context of the request it is serving; the kernel
+/// fills the caller's credentials and file-creation mask from its own process state. The record is
+/// fixed-size and versioned so a consumer can reject an unknown layout instead of misreading it.
+/// The kernel masks [`Context::mode`] before writing it; a server must use it verbatim.
+pub mod creation {
+    /// Record version.
+    pub const VERSION: u32 = 1;
+    /// Maximum supplementary groups carried by the record.
+    pub const MAX_GROUPS: usize = 16;
+    /// Encoded record size in bytes.
+    pub const SIZE: usize = 120;
+
+    /// One authenticated creation context.
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+    pub struct Context {
+        /// [`VERSION`].
+        pub version: u32,
+        /// [`SIZE`]; a consumer rejects a mismatch.
+        pub size: u32,
+        /// Kernel request id the context is bound to.
+        pub request_id: u64,
+        /// Client process id.
+        pub pid: u64,
+        /// Client real user id.
+        pub uid: u32,
+        /// Client effective user id.
+        pub euid: u32,
+        /// Client real group id.
+        pub gid: u32,
+        /// Client effective group id.
+        pub egid: u32,
+        /// Client file-creation mask (`p_pd->pd_cmask` equivalent).
+        pub umask: u32,
+        /// Requested creation mode after the mask and `~S_ISTXT` were applied.
+        pub mode: u32,
+        /// Number of valid entries in [`Context::groups`].
+        pub group_count: u32,
+        /// Reserved; zero.
+        pub reserved: u32,
+        /// Client supplementary groups.
+        pub groups: [u32; MAX_GROUPS],
+    }
+
+    const _: () = assert!(core::mem::size_of::<Context>() == SIZE);
+    const _: () = assert!(core::mem::align_of::<Context>() == 8);
+    const _: () = assert!(core::mem::offset_of!(Context, version) == 0);
+    const _: () = assert!(core::mem::offset_of!(Context, size) == 4);
+    const _: () = assert!(core::mem::offset_of!(Context, request_id) == 8);
+    const _: () = assert!(core::mem::offset_of!(Context, pid) == 16);
+    const _: () = assert!(core::mem::offset_of!(Context, uid) == 24);
+    const _: () = assert!(core::mem::offset_of!(Context, euid) == 28);
+    const _: () = assert!(core::mem::offset_of!(Context, gid) == 32);
+    const _: () = assert!(core::mem::offset_of!(Context, egid) == 36);
+    const _: () = assert!(core::mem::offset_of!(Context, umask) == 40);
+    const _: () = assert!(core::mem::offset_of!(Context, mode) == 44);
+    const _: () = assert!(core::mem::offset_of!(Context, group_count) == 48);
+    const _: () = assert!(core::mem::offset_of!(Context, groups) == 56);
 }
 
 const _: () = assert!(core::mem::size_of::<Timespec>() == 16);
