@@ -2051,7 +2051,10 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         .map_err(ProcessError::Handle)?;
     register_pid(&process);
     crate::sched::init().map_err(ProcessError::Sched)?;
-    let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack, user_stack)
+    // C8: `sp0` is both the initial stack pointer and the value in the argument register
+    // (`rdi`/`x0`/`a0`), which `_start` passes to `__raven_start` untouched.
+    let (stack_top, arg) = (user_stack, user_stack);
+    let thread = crate::sched::new_user_thread(&process, elf.entry(), stack_top, arg)
         .map_err(ProcessError::Sched)?;
     arch_syscall::init();
 

@@ -3,8 +3,10 @@
 
 //! The `_start` trampoline and `__raven_start`.
 //!
-//! The kernel/spawn enters a new thread with `sp0` in the first argument register and the C8 stack
-//! at that pointer. The assembly aligns the stack and calls the Rust entry function.
+//! The kernel/spawn enters a new thread with the C8 stack pointer `sp0` in the first argument
+//! register (`rdi`/`x0`/`a0`); `rsp`/`sp` points at the same stack. The assembly aligns the stack
+//! register and calls the Rust entry without writing the argument register, so `sp0` reaches
+//! `__raven_start` exactly as the contract specifies.
 
 #[cfg(not(test))]
 use crate::Args;
@@ -15,7 +17,6 @@ use crate::args::parse_stack;
 core::arch::global_asm!(
     ".global _start",
     "_start:",
-    "mov %rsp, %rdi",
     "and $-16, %rsp",
     "xor %ebp, %ebp",
     "call __raven_start",
@@ -27,9 +28,9 @@ core::arch::global_asm!(
 core::arch::global_asm!(
     ".global _start",
     "_start:",
-    "mov x0, sp",
-    "and x0, x0, #0xfffffffffffffff0",
-    "mov sp, x0",
+    "mov x1, sp",
+    "and x1, x1, #0xfffffffffffffff0",
+    "mov sp, x1",
     "bl __raven_start",
     "brk #0",
 );
@@ -38,7 +39,6 @@ core::arch::global_asm!(
 core::arch::global_asm!(
     ".global _start",
     "_start:",
-    "mv a0, sp",
     "andi sp, sp, -16",
     "call __raven_start",
     "unimp",
