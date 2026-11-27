@@ -364,6 +364,20 @@ fn print_leaked_process_holders() {
         .iter()
         .filter_map(Weak::upgrade)
         .collect();
+    let zombies: Vec<(u64, usize, bool)> = ZOMBIES
+        .lock()
+        .iter()
+        .map(|zombie| {
+            (
+                zombie.id,
+                Arc::strong_count(zombie),
+                zombie.reaped.load(Ordering::Acquire),
+            )
+        })
+        .collect();
+    for (pid, refs, reaped) in zombies {
+        kprintln!("s36: zombie pid={pid} refs={refs} reaped={reaped}");
+    }
     for process in &processes {
         if !process.torn_down.load(Ordering::Acquire) {
             continue;
@@ -382,14 +396,39 @@ fn print_leaked_process_holders() {
             continue;
         }
         let ppid = process.ids.lock().ppid;
+        let reaped = process.reaped.load(Ordering::Acquire);
+        let state = match *process.state.lock() {
+            ProcessState::Created => "created",
+            ProcessState::Running => "running",
+            ProcessState::Exited => "exited",
+        };
         kprintln!(
-            "s36: leak pid={} ppid={} cmd={} refs={} threads={}",
+            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped}",
             process.id,
             ppid,
             process.command.lock(),
             Arc::strong_count(process),
             process.threads.load(Ordering::Acquire)
         );
+        for parent in &processes {
+            if parent.id != ppid {
+                continue;
+            }
+            let parent_state = match *parent.state.lock() {
+                ProcessState::Created => "created",
+                ProcessState::Running => "running",
+                ProcessState::Exited => "exited",
+            };
+            kprintln!(
+                "s36: leak-parent pid={} refs={} threads={} state={parent_state} last_syscall={} in_syscall={} wait_object={}",
+                parent.id,
+                Arc::strong_count(parent),
+                parent.threads.load(Ordering::Acquire),
+                parent.last_syscall.load(Ordering::Acquire),
+                parent.in_syscall.load(Ordering::Acquire),
+                parent.wait_object.load(Ordering::Acquire)
+            );
+        }
         for holder in &processes {
             holder.handles.lock().for_each_live(|_, object, _, _| {
                 let kind = match object {
