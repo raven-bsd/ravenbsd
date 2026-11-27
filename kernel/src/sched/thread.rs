@@ -82,6 +82,38 @@ fn remember_thread(thread: &Arc<Thread>) {
     registry.push(Arc::downgrade(thread));
 }
 
+/// Count `target` words on every live thread's kernel stack (`s36-holders`).
+///
+/// A `Process` reference held by a blocked syscall sits in a kernel-stack local, outside every
+/// object table the census can walk. Scanning the recorded stack range proves that owner and
+/// names its count; it only runs in the diagnostic image.
+pub fn stack_holders(target: usize) -> [u64; 2] {
+    let mut threads = 0u64;
+    let mut hits = 0u64;
+    let word = core::mem::size_of::<usize>();
+    for weak in ALL_THREADS.lock().iter() {
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        let base = thread.kernel_stack_base as usize;
+        let top = thread.kernel_stack_top as usize;
+        if base == 0 || top <= base {
+            continue;
+        }
+        threads = threads.saturating_add(1);
+        let mut address = base;
+        while address.saturating_add(word) <= top {
+            // SAFETY: `base..top` is the thread's live kernel-stack allocation for as long as
+            // the thread object is registered, and the scan stays inside it.
+            if unsafe { *(address as *const usize) } == target {
+                hits = hits.saturating_add(1);
+            }
+            address = address.saturating_add(word);
+        }
+    }
+    [threads, hits]
+}
+
 /// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
 ///
 /// Returns `(leaked, external_refs_1, external_refs_2plus, blocked, ready, dead, token_set,

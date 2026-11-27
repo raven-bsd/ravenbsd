@@ -402,13 +402,16 @@ fn print_leaked_process_holders() {
             ProcessState::Running => "running",
             ProcessState::Exited => "exited",
         };
+        let stack = crate::sched::thread::stack_holders(Arc::as_ptr(process) as usize);
         kprintln!(
-            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped}",
+            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped} stacks={} stack_refs={}",
             process.id,
             ppid,
             process.command.lock(),
             Arc::strong_count(process),
-            process.threads.load(Ordering::Acquire)
+            process.threads.load(Ordering::Acquire),
+            stack[0],
+            stack[1]
         );
         for parent in &processes {
             if parent.id != ppid {
