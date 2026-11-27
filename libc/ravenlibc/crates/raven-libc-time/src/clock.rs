@@ -11,8 +11,9 @@ use raven_libc_abi::errno::Errno;
 use raven_libc_abi::errno::{EINVAL, ENOSYS, ENOTSUP, EPERM};
 use raven_libc_abi::structs::Timespec;
 use raven_libc_abi::time::{
-    CLOCK_BOOTTIME, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW,
-    CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_COARSE, CLOCK_THREAD_CPUTIME_ID,
+    CLOCK_MONOTONIC, CLOCK_MONOTONIC_FAST, CLOCK_MONOTONIC_PRECISE, CLOCK_MONOTONIC_RAW,
+    CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_FAST, CLOCK_REALTIME_PRECISE,
+    CLOCK_SECOND, CLOCK_THREAD_CPUTIME_ID, CLOCK_UPTIME, CLOCK_UPTIME_FAST, CLOCK_UPTIME_PRECISE,
     TIME_UTC,
 };
 
@@ -22,10 +23,15 @@ use crate::sys::{ClockId, TimeSys, errno};
 #[must_use]
 pub fn clock_id(id: i32) -> Option<ClockId> {
     match id {
-        CLOCK_REALTIME | CLOCK_REALTIME_COARSE => Some(ClockId::Realtime),
-        CLOCK_MONOTONIC | CLOCK_MONOTONIC_RAW | CLOCK_MONOTONIC_COARSE | CLOCK_BOOTTIME => {
-            Some(ClockId::Monotonic)
-        }
+        CLOCK_REALTIME | CLOCK_REALTIME_PRECISE | CLOCK_REALTIME_FAST => Some(ClockId::Realtime),
+        CLOCK_MONOTONIC
+        | CLOCK_UPTIME
+        | CLOCK_UPTIME_PRECISE
+        | CLOCK_UPTIME_FAST
+        | CLOCK_MONOTONIC_PRECISE
+        | CLOCK_MONOTONIC_FAST
+        | CLOCK_MONOTONIC_RAW
+        | CLOCK_SECOND => Some(ClockId::Monotonic),
         _ => None,
     }
 }
@@ -63,9 +69,8 @@ pub fn clock_getres(id: i32) -> Result<Timespec, Errno> {
         | CLOCK_PROCESS_CPUTIME_ID
         | CLOCK_THREAD_CPUTIME_ID
         | CLOCK_MONOTONIC_RAW
-        | CLOCK_REALTIME_COARSE
-        | CLOCK_MONOTONIC_COARSE
-        | CLOCK_BOOTTIME => Ok(Timespec {
+        | CLOCK_REALTIME_FAST
+        | CLOCK_MONOTONIC_FAST => Ok(Timespec {
             tv_sec: 0,
             tv_nsec: 1,
         }),

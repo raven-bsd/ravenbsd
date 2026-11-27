@@ -178,6 +178,7 @@ pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
 }
 
 /// Account the user-mode interval that ends now, then clear the entry stamp.
+#[cfg(target_arch = "x86_64")]
 fn account_user_time(thread: &Thread) {
     if !thread.user {
         return;
@@ -192,6 +193,7 @@ fn account_user_time(thread: &Thread) {
 }
 
 /// Start a user-mode interval when the thread is about to run in ring 3.
+#[cfg(target_arch = "x86_64")]
 fn start_user_time(thread: &Thread) {
     if thread.user {
         thread
@@ -204,11 +206,6 @@ fn start_user_time(thread: &Thread) {
 #[cfg(target_arch = "x86_64")]
 fn thread_in_syscall(thread: &Thread) -> bool {
     thread.user && thread.fpu_saved.load(Ordering::Acquire)
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-fn thread_in_syscall(_thread: &Thread) -> bool {
-    false
 }
 
 /// Switch from `from` to `to`.

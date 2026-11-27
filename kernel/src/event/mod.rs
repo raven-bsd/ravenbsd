@@ -386,20 +386,20 @@ pub fn notify_source(source: u64) {
             let Some(queue) = watch.queue.upgrade() else {
                 continue;
             };
-            if ready[..count]
-                .iter()
-                .flatten()
-                .any(|queued| Arc::ptr_eq(queued, &queue))
-            {
+            if ready.get(..count).is_some_and(|seen| {
+                seen.iter()
+                    .flatten()
+                    .any(|queued| Arc::ptr_eq(queued, &queue))
+            }) {
                 continue;
             }
-            if count < ready.len() {
-                ready[count] = Some(queue);
-                count += 1;
+            if let Some(slot) = ready.get_mut(count) {
+                *slot = Some(queue);
+                count = count.saturating_add(1);
             }
         }
     }
-    for queue in ready[..count].iter().flatten() {
+    for queue in ready.iter().flatten().take(count) {
         let _ = queue.waiters.wake_one(queue.owner, 0);
     }
 }
@@ -429,20 +429,20 @@ pub fn notify_timers(now: u64) {
             let Some(queue) = watch.queue.upgrade() else {
                 continue;
             };
-            if ready[..count]
-                .iter()
-                .flatten()
-                .any(|queued| Arc::ptr_eq(queued, &queue))
-            {
+            if ready.get(..count).is_some_and(|seen| {
+                seen.iter()
+                    .flatten()
+                    .any(|queued| Arc::ptr_eq(queued, &queue))
+            }) {
                 continue;
             }
-            if count < ready.len() {
-                ready[count] = Some(queue);
-                count += 1;
+            if let Some(slot) = ready.get_mut(count) {
+                *slot = Some(queue);
+                count = count.saturating_add(1);
             }
         }
     }
-    for queue in ready[..count].iter().flatten() {
+    for queue in ready.iter().flatten().take(count) {
         let _ = queue.waiters.wake_one(queue.owner, 0);
     }
 }

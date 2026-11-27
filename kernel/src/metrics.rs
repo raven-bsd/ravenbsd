@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+#![cfg(target_arch = "x86_64")]
+
 //! K449 test-only resource metrics.
 //!
 //! Enabled by `k449-metrics=<seconds>` on the kernel command line. A kernel thread prints one

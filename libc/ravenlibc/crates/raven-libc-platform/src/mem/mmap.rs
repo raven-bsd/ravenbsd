@@ -163,8 +163,9 @@ pub fn msync<B: SysBackend, L: Lock>(
     if len == 0 || !addr.is_multiple_of(PAGE_SIZE) {
         return Err(Errno::EINVAL);
     }
-    let allowed = mman::MS_ASYNC | mman::MS_INVALIDATE | mman::MS_SYNC;
-    if flags & !allowed != 0 || flags & (mman::MS_ASYNC | mman::MS_SYNC) == 0 {
+    // FreeBSD MS_SYNC is zero; the explicit bits are ASYNC and INVALIDATE.
+    let allowed = mman::MS_ASYNC | mman::MS_INVALIDATE;
+    if flags & !allowed != 0 {
         return Err(Errno::EINVAL);
     }
     let len = len.checked_add(PAGE_SIZE - 1).ok_or(Errno::ENOMEM)? & !(PAGE_SIZE - 1);

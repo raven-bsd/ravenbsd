@@ -2010,7 +2010,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         if flags & !known != 0 {
             return Err(Errno::EINVAL);
         }
-        let kernel_flags = flags | fcntl::O_NONBLOCK as u32;
+        // The kernel pipe flags are a private wire encoding, not the public open flags.
+        const KERNEL_PIPE_CLOEXEC: u32 = 0o2000000;
+        const KERNEL_PIPE_NONBLOCK: u32 = 0o4000;
+        let mut kernel_flags = KERNEL_PIPE_NONBLOCK;
+        if flags & fcntl::O_CLOEXEC as u32 != 0 {
+            kernel_flags |= KERNEL_PIPE_CLOEXEC;
+        }
         let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(kernel_flags)?;
         let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
         let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
@@ -2272,9 +2278,12 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 };
                 (ofd.kind, ofd.handle.get())
             };
-            if !matches!(kind, OfdKind::Socket | OfdKind::Tty | OfdKind::Pipe)
-                || handle == Handle::NONE
-            {
+            // A pty master/slave keeps the kernel's single server reference across fork. Dupping
+            // it gave the child a second server reference that only its process exit released,
+            // so the server saw the master CLOSE after the foreground process was gone. The
+            // kernel `SchemeFile` Arc already tracks both handles and sends the CLOSE at the
+            // last one; FreeBSD `tty_pty.c` `ptyclose` hangs up on that last master close.
+            if !matches!(kind, OfdKind::Socket | OfdKind::Pipe) || handle == Handle::NONE {
                 continue;
             }
             if let Ok(duplicate) = self

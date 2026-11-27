@@ -48,8 +48,11 @@ fn winsize_field_offsets_are_packed_u16() {
 
 #[test]
 fn termios_is_the_c36_record() {
-    assert_eq!(core::mem::size_of::<Termios>(), 60);
+    assert_eq!(core::mem::size_of::<Termios>(), 44);
     assert_eq!(core::mem::align_of::<Termios>(), 4);
+    assert_eq!(core::mem::offset_of!(Termios, c_cc), 16);
+    assert_eq!(core::mem::offset_of!(Termios, c_ispeed), 36);
+    assert_eq!(core::mem::offset_of!(Termios, c_ospeed), 40);
 }
 
 #[test]

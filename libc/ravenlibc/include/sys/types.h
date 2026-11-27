@@ -64,8 +64,6 @@ __BEGIN_DECLS
 #define __NEED_pthread_cond_t
 #define __NEED_pthread_rwlock_t
 #define __NEED_pthread_barrier_t
-#define __NEED_pthread_spinlock_t
-#define __NEED_pthread_key_t
 #define __NEED_pthread_once_t
 #define __NEED_useconds_t
 
@@ -80,6 +78,7 @@ __BEGIN_DECLS
 #endif
 
 #include <bits/alltypes.h>
+#include <bits/pthread_types.h>
 
 #if __BSD_VISIBLE
 typedef unsigned char u_int8_t;

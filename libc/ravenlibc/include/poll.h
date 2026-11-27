@@ -48,6 +48,11 @@ struct pollfd {
 
 int poll (struct pollfd *, nfds_t, int);
 
+#if __BSD_VISIBLE
+/* FreeBSD sys/sys/poll.h:93 (BSD-3-Clause, donor 133344405). */
+#define INFTIM (-1)
+#endif
+
 #if __BSD_VISIBLE || __POSIX_VISIBLE >= 202405
 #define __NEED_time_t
 #define __NEED_struct_timespec

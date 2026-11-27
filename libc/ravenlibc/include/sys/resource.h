@@ -68,6 +68,14 @@ struct rusage {
 	long    __reserved[16];
 };
 
+#if __BSD_VISIBLE
+/* FreeBSD sys/sys/resource.h:92 (BSD-3-Clause, donor 133344405). */
+struct __wrusage {
+	struct rusage	wru_self;
+	struct rusage	wru_children;
+};
+#endif
+
 #if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
 int getrlimit (int, struct rlimit *);
 int setrlimit (int, const struct rlimit *);

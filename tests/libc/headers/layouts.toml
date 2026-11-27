@@ -977,7 +977,7 @@ offset = 24
 [[type]]
 name = "struct termios"
 headers = ["bits/termios.h"]
-size = 60
+size = 44
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
 
@@ -998,21 +998,17 @@ name = "c_lflag"
 offset = 12
 
 [[type.field]]
-name = "c_line"
-offset = 16
-
-[[type.field]]
 name = "c_cc"
-offset = 17
-bytes = 32
+offset = 16
+bytes = 20
 
 [[type.field]]
-name = "__c_ispeed"
-offset = 52
+name = "c_ispeed"
+offset = 36
 
 [[type.field]]
-name = "__c_ospeed"
-offset = 56
+name = "c_ospeed"
+offset = 40
 
 [[type]]
 name = "stack_t"

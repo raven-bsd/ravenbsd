@@ -5,5 +5,6 @@ use super::*;
 #[test]
 fn ilseq_is_the_only_error_and_matches_the_abi_constant() {
     assert_eq!(MbError::Ilseq, MbError::Ilseq);
-    assert_eq!(raven_libc_abi::errno::EILSEQ, 84);
+    // FreeBSD errno.h: EILSEQ is 86 (DR-69). Linux's 84 is a different error.
+    assert_eq!(raven_libc_abi::errno::EILSEQ, 86);
 }

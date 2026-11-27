@@ -35,11 +35,12 @@ use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use crate::kernel::ThreadKernel;
 use crate::limits::{
-    EAGAIN, EBUSY, EDEADLK, EINVAL, ENOTRECOVERABLE, ENOTSUP, EOWNERDEAD, EPERM, MUTEX_TYPE_MASK,
-    MUTEX_TYPE_PI, MUTEX_TYPE_ROBUST, MUTEX_TYPE_SHARED, MUTEX_UNRECOVERABLE, OWNER_DIED,
-    OWNER_MASK, PTHREAD_MUTEX_ERRORCHECK, PTHREAD_MUTEX_NORMAL, PTHREAD_MUTEX_RECURSIVE,
-    PTHREAD_PRIO_INHERIT, PTHREAD_PRIO_NONE, PTHREAD_PRIO_PROTECT, PTHREAD_PROCESS_PRIVATE,
-    PTHREAD_PROCESS_SHARED, Timespec, WAITERS_BIT,
+    EAGAIN, EBUSY, EDEADLK, EINVAL, ENOTRECOVERABLE, ENOTSUP, EOWNERDEAD, EPERM,
+    MUTEX_KIND_DEFAULT, MUTEX_KIND_NORMAL, MUTEX_KIND_RECURSIVE, MUTEX_TYPE_MASK, MUTEX_TYPE_PI,
+    MUTEX_TYPE_ROBUST, MUTEX_TYPE_SHARED, MUTEX_UNRECOVERABLE, OWNER_DIED, OWNER_MASK,
+    PTHREAD_MUTEX_ERRORCHECK, PTHREAD_MUTEX_NORMAL, PTHREAD_MUTEX_RECURSIVE, PTHREAD_PRIO_INHERIT,
+    PTHREAD_PRIO_NONE, PTHREAD_PRIO_PROTECT, PTHREAD_PROCESS_PRIVATE, PTHREAD_PROCESS_SHARED,
+    Timespec, WAITERS_BIT,
 };
 use crate::raw;
 use crate::sched_point;
@@ -57,7 +58,7 @@ const _: () = assert!(core::mem::size_of::<Mutex>() == 40);
 const _: () = assert!(core::mem::align_of::<Mutex>() == 8);
 
 impl Mutex {
-    /// A statically initialised normal mutex.
+    /// A statically initialised default (error-checking) mutex.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -155,7 +156,9 @@ const _: () = assert!(core::mem::size_of::<MutexAttr>() == 4);
 
 /// `pthread_mutexattr_init`.
 pub fn attr_init() -> MutexAttr {
-    MutexAttr { attr: 0 }
+    MutexAttr {
+        attr: MUTEX_KIND_DEFAULT,
+    }
 }
 
 /// `pthread_mutexattr_destroy`.
@@ -163,21 +166,32 @@ pub fn attr_destroy(_attr: &MutexAttr) {}
 
 /// `pthread_mutexattr_settype`.
 ///
+/// The public FreeBSD type word is mapped to the internal kind word so a
+/// statically initialised (all-zero) object stays the default, error-checking
+/// mutex.
+///
 /// # Errors
 ///
 /// `EINVAL` outside normal, recursive and error-checking.
 pub fn attr_settype(attr: &mut MutexAttr, kind: i32) -> Result<(), crate::limits::Errno> {
-    if !(0..=2).contains(&kind) {
-        return Err(EINVAL);
-    }
-    attr.attr = (attr.attr & !3) | kind;
+    let internal = match kind {
+        PTHREAD_MUTEX_ERRORCHECK => MUTEX_KIND_DEFAULT,
+        PTHREAD_MUTEX_RECURSIVE => MUTEX_KIND_RECURSIVE,
+        PTHREAD_MUTEX_NORMAL => MUTEX_KIND_NORMAL,
+        _ => return Err(EINVAL),
+    };
+    attr.attr = (attr.attr & !3) | internal;
     Ok(())
 }
 
 /// `pthread_mutexattr_gettype`.
 #[must_use]
 pub fn attr_gettype(attr: &MutexAttr) -> i32 {
-    attr.attr & 3
+    match attr.attr & 3 {
+        MUTEX_KIND_RECURSIVE => PTHREAD_MUTEX_RECURSIVE,
+        MUTEX_KIND_NORMAL => PTHREAD_MUTEX_NORMAL,
+        _ => PTHREAD_MUTEX_ERRORCHECK,
+    }
 }
 
 /// `pthread_mutexattr_setpshared`.
@@ -301,7 +315,7 @@ pub fn lock<K: ThreadKernel>(kernel: &K, mutex: &Mutex) -> Result<(), crate::lim
     if mutex.type_word() & MUTEX_TYPE_PI != 0 {
         return Err(ENOTSUP);
     }
-    if mutex.kind() == PTHREAD_MUTEX_NORMAL
+    if mutex.kind() == MUTEX_KIND_NORMAL
         && mutex
             .lock_word()
             .compare_exchange(0, EBUSY.0 as i32, Ordering::AcqRel, Ordering::Acquire)
@@ -321,7 +335,7 @@ pub fn trylock<K: ThreadKernel>(kernel: &K, mutex: &Mutex) -> Result<(), crate::
     if mutex.type_word() & MUTEX_TYPE_PI != 0 {
         return Err(ENOTSUP);
     }
-    if mutex.kind() == PTHREAD_MUTEX_NORMAL {
+    if mutex.kind() == MUTEX_KIND_NORMAL {
         return match mutex.lock_word().compare_exchange(
             0,
             EBUSY.0 as i32,
@@ -347,7 +361,7 @@ fn trylock_owner<K: ThreadKernel>(kernel: &K, mutex: &Mutex) -> Result<(), crate
             mutex.set_count(0);
             return success_after_try(kernel, mutex, old & OWNER_DIED);
         }
-        if type_word & 3 == PTHREAD_MUTEX_RECURSIVE {
+        if type_word & 3 == MUTEX_KIND_RECURSIVE {
             if mutex.count() == i32::MAX {
                 return Err(EAGAIN);
             }
@@ -474,7 +488,7 @@ fn timedlock_inner<K: ThreadKernel>(
     mutex: &Mutex,
     at: Option<Timespec>,
 ) -> Result<(), crate::limits::Errno> {
-    if mutex.kind() == PTHREAD_MUTEX_NORMAL
+    if mutex.kind() == MUTEX_KIND_NORMAL
         && mutex
             .lock_word()
             .compare_exchange(0, EBUSY.0 as i32, Ordering::AcqRel, Ordering::Acquire)
@@ -507,7 +521,7 @@ fn timedlock_inner<K: ThreadKernel>(
         if own == 0 && (current == 0 || type_word & MUTEX_TYPE_ROBUST != 0) {
             continue;
         }
-        if type_word & 3 == PTHREAD_MUTEX_ERRORCHECK
+        if type_word & 3 == MUTEX_KIND_DEFAULT
             && own == current_pthread(kernel).tid.load(Ordering::Acquire) as u32
         {
             return Err(EDEADLK);
@@ -549,14 +563,14 @@ pub fn unlock<K: ThreadKernel>(kernel: &K, mutex: &Mutex) -> Result<(), crate::l
     let waiters = mutex.waiters();
     let kind = mutex.kind();
     let mut new = 0i32;
-    if kind != PTHREAD_MUTEX_NORMAL {
+    if kind != MUTEX_KIND_NORMAL {
         let self_pthread = current_pthread(kernel);
         let old = mutex.lock_value();
         let own = old & OWNER_MASK;
         if own != self_pthread.tid.load(Ordering::Acquire) as u32 {
             return Err(EPERM);
         }
-        if kind & 3 == PTHREAD_MUTEX_RECURSIVE && mutex.count() != 0 {
+        if kind & 3 == MUTEX_KIND_RECURSIVE && mutex.count() != 0 {
             mutex.set_count(mutex.count().wrapping_sub(1));
             return Ok(());
         }

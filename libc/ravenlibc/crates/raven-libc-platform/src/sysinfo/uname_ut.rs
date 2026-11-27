@@ -19,10 +19,16 @@ fn uname_fills_every_field_from_the_syscall() {
 }
 
 #[test]
-fn libc_record_has_the_domainname_field() {
+fn libc_record_is_the_freebsd_five_by_256_record() {
     let platform = Platform::new(FakeSys::new());
     let record = uname(&platform).expect("uname");
-    assert_eq!(record.domainname, [0; 65]);
+    assert_eq!(
+        core::mem::size_of::<raven_libc_abi::structs::Utsname>(),
+        1280
+    );
+    // The kernel text is 65 bytes; every byte past it stays zero in the 256-byte field.
+    assert!(record.sysname[65..].iter().all(|byte| *byte == 0));
+    assert!(record.machine[65..].iter().all(|byte| *byte == 0));
 }
 
 #[test]
