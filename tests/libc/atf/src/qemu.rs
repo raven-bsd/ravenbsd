@@ -450,6 +450,7 @@ pub fn run_atf_batch(
     }
 
     let mut specs = service_specs(config, guest);
+    specs.extend(root_skeleton_specs(config));
     for (index, case) in cases.iter().enumerate() {
         let image_path = image_paths
             .get(&case.program_path)
@@ -736,6 +737,21 @@ fn strip_program(program: &Path, workdir: &Path) -> Result<PathBuf> {
     })
 }
 
+/// The FreeBSD base root skeleton the target `t_link` cases read.
+///
+/// `link_perm` links `/root` and `/root/.profile`, so the target guest root must carry both.
+/// `/root` is a directory synthesised by `initfsd`; `/root/.profile` is test input packed at
+/// mode 0644. The file is the single source for the runner and the `guest-root` qtest fixture.
+fn root_skeleton_specs(config: &QemuConfig) -> Vec<String> {
+    vec![format!(
+        "/root/.profile={}:0644",
+        config
+            .root
+            .join("tests/fixtures/guest-root/profile")
+            .display()
+    )]
+}
+
 fn guest_initfs_specs(
     config: &QemuConfig,
     guest: &Guest,
@@ -746,6 +762,7 @@ fn guest_initfs_specs(
     svcd: &Path,
 ) -> Vec<String> {
     let mut specs = service_specs(config, guest);
+    specs.extend(root_skeleton_specs(config));
     specs.push(format!("/tests/program={}:0755", program.display()));
     specs.push(format!("/g1/manifest={}", manifest.display()));
     specs.push(format!("/etc/services.d/g1.toml={}", service.display()));

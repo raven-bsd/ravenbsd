@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S777: the target guest root carries the FreeBSD base /root skeleton. The probe
+# boots as /init, spawns the real initfsd, and requires /root (dir, 0700, root-owned)
+# and /root/.profile (regular, 0644, non-empty, root-owned).
+
+name = "guest-root"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/guest-root/build.sh"]
+initfs = "build/fixtures/guest-root/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^guest-root: /root dir=1 mode=0700 uid=0 gid=0$'
+
+[[expect]]
+regex = '^guest-root: /root/.profile reg=1 mode=0644 size=[1-9][0-9]* uid=0 gid=0$'
+
+[[expect]]
+regex = '^guest-root: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|guest-root: fail'
