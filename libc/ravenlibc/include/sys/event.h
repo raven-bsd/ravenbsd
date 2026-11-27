@@ -169,7 +169,6 @@ struct timespec;
 __BEGIN_DECLS
 #if __BSD_VISIBLE
 int kqueue(void);
-int kqueuex(unsigned int);
 int kqueue1(int);
 int kevent(int, const struct kevent *, int, struct kevent *, int,
     const struct timespec *);
