@@ -860,6 +860,9 @@ fn make_image(config: &QemuConfig, initfs: &Path, image: &Path) -> Result<()> {
             config.kernel.display()
         );
     }
+    // Refuse a cached kernel from another commit, a dirty tree or the debug profile. The G1
+    // runner does not rebuild the artifact, so booting a stale one would test the wrong ABI.
+    crate::freshness::verify_kernel(&config.root, &config.kernel)?;
     let args = image_args(&config.kernel, initfs, image);
     run_tool(
         "cargo",

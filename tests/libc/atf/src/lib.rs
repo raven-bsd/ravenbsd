@@ -17,6 +17,7 @@ pub mod atf_proto;
 pub mod build;
 pub mod check;
 pub mod exclude;
+pub mod freshness;
 pub mod gate;
 pub mod gen_make;
 pub mod gen_meson;
