@@ -1537,3 +1537,32 @@ fn c8_block_pins_the_full_layout() {
         "auxv terminator value"
     );
 }
+
+/// CONTRACTS C8: a fresh thread is created with `sp0` in the stack register and the same value
+/// in the argument register; the kernel loads `rdi`/`x0`/`a0` from `arg`. The C8 block is at
+/// exactly that stack pointer.
+#[test]
+fn c8_thread_create_carries_sp0_in_both_registers() {
+    let mut mock = Mock::default();
+    run(&mut mock).unwrap();
+    let calls = mock.calls();
+    let (stack_top, arg) = calls
+        .iter()
+        .find_map(|call| match call {
+            Call::ThreadCreate { stack_top, arg, .. } => Some((*stack_top, *arg)),
+            _ => None,
+        })
+        .expect("thread create call");
+    assert_eq!(stack_top, arg, "sp0 is the argument register value");
+    assert_eq!(stack_top % 16, 0, "sp0 is 16-byte aligned");
+
+    let stack_base = usize::try_from(USER_END).unwrap() - STACK_SIZE;
+    let image = mock.child_stack();
+    assert_eq!(
+        stack_top,
+        stack_base + STACK_SIZE - image.len(),
+        "the thread's stack register is the C8 block start"
+    );
+    let argc = usize::from_le_bytes(image[..WORD].try_into().expect("argc word"));
+    assert_eq!(argc, 2, "the C8 block starts with argc");
+}
