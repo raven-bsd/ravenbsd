@@ -3472,6 +3472,10 @@ pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
         let _ = robust::walk_thread();
         let _ = terminate_once(&process, code, true);
+        // `exit_thread` switches away without unwinding, so this frame is abandoned with any
+        // live `Arc` local still counted. Drop the process reference before the switch or every
+        // exiting process leaves one strong reference to its own `Process` behind (S170).
+        drop(process);
     }
     crate::sched::exit_thread(code)
 }
