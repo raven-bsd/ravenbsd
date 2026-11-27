@@ -27,11 +27,48 @@ fn name_to_index_and_back() {
 #[test]
 fn unknown_names_and_indices() {
     let fake = fake();
-    assert_eq!(nametoindex(&fake, b"missing"), Err(Errno::ENODEV));
-    assert_eq!(nametoindex(&fake, b"a234567890123456"), Err(Errno::ENODEV));
+    // RFC 2553 4.1 and FreeBSD lib/libc/net/if_nametoindex.c: an unknown name returns 0
+    // with ENXIO, not ENODEV.
+    assert_eq!(nametoindex(&fake, b"missing"), Err(Errno::ENXIO));
+    assert_eq!(nametoindex(&fake, b"a234567890123456"), Err(Errno::ENXIO));
+    assert_eq!(nametoindex(&fake, b""), Err(Errno::ENXIO));
     let mut name = [0u8; MAX_IFNAME];
     assert_eq!(indextoname(&fake, 0, &mut name), Err(Errno::ENXIO));
     assert_eq!(indextoname(&fake, 99, &mut name), Err(Errno::ENXIO));
+}
+
+#[test]
+fn multicast_uses_the_bsd_flag_value() {
+    let fake = fake();
+    assert_eq!(IFF_MULTICAST, 0x8000);
+    let list = getifaddrs(&fake).expect("list");
+    let eth0 = &list[1];
+    assert_ne!(eth0.flags & IFF_MULTICAST, 0);
+    // 0x1000 is the Linux value; the native record must not carry it.
+    assert_eq!(eth0.flags & 0x1000, 0);
+}
+
+#[test]
+fn index_is_recomputed_from_the_live_list() {
+    let fake = fake();
+    assert_eq!(nametoindex(&fake, b"eth0"), Ok(2));
+    // lo disappears; eth0 is now the first live record. A cached/stale index would keep 2.
+    let eth = record("eth0", [10, 0, 2, 15], 24, IF_UP | IF_LINK_UP, 1500, [0; 6]).expect("eth0");
+    fake.set_ifaces(vec![eth]);
+    assert_eq!(nametoindex(&fake, b"eth0"), Ok(1));
+    let mut name = [0u8; MAX_IFNAME];
+    assert_eq!(indextoname(&fake, 1, &mut name), Ok(4));
+    assert_eq!(&name[..5], b"eth0\0");
+}
+
+#[test]
+fn broadcast_flag_tracks_the_broadcast_address() {
+    let fake = FakeNetd::new();
+    let host = record("p32", [10, 4, 0, 1], 32, IF_UP | IF_LINK_UP, 1500, [0; 6]).expect("host");
+    fake.set_ifaces(vec![host]);
+    let list = getifaddrs(&fake).expect("list");
+    assert!(list[0].broadaddr.is_none());
+    assert_eq!(list[0].flags & IFF_BROADCAST, 0);
 }
 
 #[test]
@@ -115,6 +152,16 @@ fn ifindex_capability_is_honoured() {
 }
 
 #[test]
+fn link_state_is_independent_of_administrative_state() {
+    let fake = FakeNetd::new();
+    let info = record("eth2", [10, 2, 0, 1], 24, IF_LINK_UP, 1500, [0; 6]).expect("record");
+    fake.set_ifaces(vec![info]);
+    let list = getifaddrs(&fake).expect("list");
+    assert_eq!(list[0].flags & IFF_UP, 0);
+    assert_ne!(list[0].flags & IFF_RUNNING, 0);
+}
+
+#[test]
 fn point_to_point_prefixes_have_no_broadcast() {
     let fake = FakeNetd::new();
     let a = record("p31", [10, 3, 0, 1], 31, IF_UP | IF_LINK_UP, 1500, [0; 6]).expect("a");
@@ -130,7 +177,7 @@ fn point_to_point_prefixes_have_no_broadcast() {
 #[test]
 fn sixteen_byte_names_are_unknown() {
     let fake = FakeNetd::new();
-    assert_eq!(nametoindex(&fake, b"abcdefghijklmnop"), Err(Errno::ENODEV));
+    assert_eq!(nametoindex(&fake, b"abcdefghijklmnop"), Err(Errno::ENXIO));
     let mut name = [0u8; MAX_IFNAME];
     assert_eq!(indextoname(&fake, 99, &mut name), Err(Errno::ENXIO));
 }

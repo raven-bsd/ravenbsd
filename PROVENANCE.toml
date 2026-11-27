@@ -2438,14 +2438,14 @@ notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R
 
 [[import]]
 path = "libc/ravenlibc/include/net/if.h"
-upstream = "musl"
-upstream_path = "include/net/if.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/net/if.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+notes = "S745: public interface records and IFF_* flags ported from FreeBSD sys/net/if.h (DR-69); userland subset only, no kernel-only members."
 
 [[import]]
 path = "libc/ravenlibc/include/net/if_arp.h"
@@ -2471,14 +2471,14 @@ notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R
 
 [[import]]
 path = "libc/ravenlibc/include/net/route.h"
-upstream = "musl"
-upstream_path = "include/net/route.h"
-upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
-license = "MIT"
+upstream = "freebsd"
+upstream_path = "sys/net/route.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
 tier = "A"
-copied = "2026-11-13"
+copied = "2026-11-26"
 modified = true
-notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+notes = "S745: public routing records and RTF/RTM/RTV/RTA constants ported from FreeBSD sys/net/route.h (DR-69); routing sockets remain unsupported (R31/O-abi-6), so this is a compile-time profile, not a provider claim."
 
 [[import]]
 path = "libc/ravenlibc/include/netinet/in.h"

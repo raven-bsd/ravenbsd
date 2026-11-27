@@ -45,6 +45,7 @@ pub type nl_item = c_int;
 pub type timer_t = *mut c_void;
 pub type uid_t = u32;
 pub type gid_t = u32;
+pub type caddr_t = *mut c_char;
 
 extern_ty! {
     pub enum timezone {}
@@ -400,7 +401,324 @@ s! {
         #[cfg(target_pointer_width = "32")]
         __unused1: Padding<[c_int; 12]>,
     }
+
+    // ifaddrs.h
+    pub struct ifaddrs {
+        pub ifa_next: *mut ifaddrs,
+        pub ifa_name: *mut c_char,
+        pub ifa_flags: c_uint,
+        pub ifa_addr: *mut crate::sockaddr,
+        pub ifa_netmask: *mut crate::sockaddr,
+        pub ifa_dstaddr: *mut crate::sockaddr,
+        pub ifa_data: *mut c_void,
+    }
+
+    // net/if.h
+    pub struct if_nameindex {
+        pub if_index: c_uint,
+        pub if_name: *mut c_char,
+    }
+
+    pub struct ifreq_buffer {
+        pub length: size_t,
+        pub buffer: *mut c_void,
+    }
+
+    pub struct ifreq_nv_req {
+        pub buf_length: c_uint,
+        pub length: c_uint,
+        pub buffer: *mut c_void,
+    }
+
+    pub struct ifa_msghdr {
+        pub ifam_msglen: c_ushort,
+        pub ifam_version: c_uchar,
+        pub ifam_type: c_uchar,
+        pub ifam_addrs: c_int,
+        pub ifam_flags: c_int,
+        pub ifam_index: c_ushort,
+        pub _ifam_spare1: c_ushort,
+        pub ifam_metric: c_int,
+    }
+
+    pub struct ifma_msghdr {
+        pub ifmam_msglen: c_ushort,
+        pub ifmam_version: c_uchar,
+        pub ifmam_type: c_uchar,
+        pub ifmam_addrs: c_int,
+        pub ifmam_flags: c_int,
+        pub ifmam_index: c_ushort,
+        pub _ifmam_spare1: c_ushort,
+    }
+
+    pub struct if_announcemsghdr {
+        pub ifan_msglen: c_ushort,
+        pub ifan_version: c_uchar,
+        pub ifan_type: c_uchar,
+        pub ifan_index: c_ushort,
+        pub ifan_name: [c_char; crate::IFNAMSIZ as usize],
+        pub ifan_what: c_ushort,
+    }
+
+    // net/route.h
+    pub struct rt_metrics {
+        pub rmx_locks: c_ulong,
+        pub rmx_mtu: c_ulong,
+        pub rmx_hopcount: c_ulong,
+        pub rmx_expire: c_ulong,
+        pub rmx_recvpipe: c_ulong,
+        pub rmx_sendpipe: c_ulong,
+        pub rmx_ssthresh: c_ulong,
+        pub rmx_rtt: c_ulong,
+        pub rmx_rttvar: c_ulong,
+        pub rmx_pksent: c_ulong,
+        pub rmx_weight: c_ulong,
+        pub rmx_nhidx: c_ulong,
+        pub rmx_metric: c_ulong,
+        pub rmx_filler: [c_ulong; 1],
+    }
+
+    pub struct rt_msghdr {
+        pub rtm_msglen: c_ushort,
+        pub rtm_version: c_uchar,
+        pub rtm_type: c_uchar,
+        pub rtm_index: c_ushort,
+        pub _rtm_spare1: c_ushort,
+        pub rtm_flags: c_int,
+        pub rtm_addrs: c_int,
+        pub rtm_pid: crate::pid_t,
+        pub rtm_seq: c_int,
+        pub rtm_errno: c_int,
+        pub rtm_fmask: c_int,
+        pub rtm_inits: c_ulong,
+        pub rtm_rmx: rt_metrics,
+    }
 }
+
+s_no_extra_traits! {
+    pub union __c_anonymous_ifr_ifru {
+        pub ifru_addr: crate::sockaddr,
+        pub ifru_dstaddr: crate::sockaddr,
+        pub ifru_broadaddr: crate::sockaddr,
+        pub ifru_buffer: ifreq_buffer,
+        pub ifru_flags: [c_short; 2],
+        pub ifru_index: c_short,
+        pub ifru_jid: c_int,
+        pub ifru_metric: c_int,
+        pub ifru_mtu: c_int,
+        pub ifru_phys: c_int,
+        pub ifru_media: c_int,
+        pub ifru_data: crate::caddr_t,
+        pub ifru_cap: [c_int; 2],
+        pub ifru_fib: c_uint,
+        pub ifru_vlan_pcp: c_uchar,
+        pub ifru_nv: ifreq_nv_req,
+    }
+
+    pub union __c_anonymous_ifc_ifcu {
+        pub ifcu_buf: crate::caddr_t,
+        pub ifcu_req: *mut ifreq,
+    }
+
+    pub union __c_anonymous_ifi_epoch {
+        pub tt: crate::time_t,
+        pub ph: u64,
+    }
+
+    pub union __c_anonymous_ifi_lastchange {
+        pub tv: crate::timeval,
+        pub ph: __c_anonymous_ifi_lastchange_ph,
+    }
+
+    pub struct __c_anonymous_ifi_lastchange_ph {
+        pub ph1: u64,
+        pub ph2: u64,
+    }
+
+    pub struct ifreq {
+        pub ifr_name: [c_char; crate::IFNAMSIZ as usize],
+        pub ifr_ifru: __c_anonymous_ifr_ifru,
+    }
+
+    pub struct ifconf {
+        pub ifc_len: c_int,
+        pub ifc_ifcu: __c_anonymous_ifc_ifcu,
+    }
+
+    pub struct if_data {
+        pub ifi_type: u8,
+        pub ifi_physical: u8,
+        pub ifi_addrlen: u8,
+        pub ifi_hdrlen: u8,
+        pub ifi_link_state: u8,
+        pub ifi_vhid: u8,
+        pub ifi_datalen: u16,
+        pub ifi_mtu: u32,
+        pub ifi_metric: u32,
+        pub ifi_baudrate: u64,
+        pub ifi_ipackets: u64,
+        pub ifi_ierrors: u64,
+        pub ifi_opackets: u64,
+        pub ifi_oerrors: u64,
+        pub ifi_collisions: u64,
+        pub ifi_ibytes: u64,
+        pub ifi_obytes: u64,
+        pub ifi_imcasts: u64,
+        pub ifi_omcasts: u64,
+        pub ifi_iqdrops: u64,
+        pub ifi_oqdrops: u64,
+        pub ifi_noproto: u64,
+        pub ifi_hwassist: u64,
+        pub __ifi_epoch: __c_anonymous_ifi_epoch,
+        pub __ifi_lastchange: __c_anonymous_ifi_lastchange,
+    }
+
+    pub struct if_msghdr {
+        pub ifm_msglen: c_ushort,
+        pub ifm_version: c_uchar,
+        pub ifm_type: c_uchar,
+        pub ifm_addrs: c_int,
+        pub ifm_flags: c_int,
+        pub ifm_index: c_ushort,
+        pub _ifm_spare1: c_ushort,
+        pub ifm_data: if_data,
+    }
+
+    pub struct if_msghdrl {
+        pub ifm_msglen: c_ushort,
+        pub ifm_version: c_uchar,
+        pub ifm_type: c_uchar,
+        pub ifm_addrs: c_int,
+        pub ifm_flags: c_int,
+        pub ifm_index: c_ushort,
+        pub _ifm_spare1: c_ushort,
+        pub ifm_len: c_ushort,
+        pub ifm_data_off: c_ushort,
+        pub _ifm_spare2: c_int,
+        pub ifm_data: if_data,
+    }
+
+    pub struct ifa_msghdrl {
+        pub ifam_msglen: c_ushort,
+        pub ifam_version: c_uchar,
+        pub ifam_type: c_uchar,
+        pub ifam_addrs: c_int,
+        pub ifam_flags: c_int,
+        pub ifam_index: c_ushort,
+        pub _ifam_spare1: c_ushort,
+        pub ifam_len: c_ushort,
+        pub ifam_data_off: c_ushort,
+        pub ifam_metric: c_int,
+        pub ifam_data: if_data,
+    }
+}
+// net/if.h
+pub const IF_MAXUNIT: c_int = 0x7fff;
+pub const IFF_UP: c_int = 0x1;
+pub const IFF_BROADCAST: c_int = 0x2;
+pub const IFF_DEBUG: c_int = 0x4;
+pub const IFF_LOOPBACK: c_int = 0x8;
+pub const IFF_POINTOPOINT: c_int = 0x10;
+pub const IFF_NEEDSEPOCH: c_int = 0x20;
+pub const IFF_DRV_RUNNING: c_int = 0x40;
+pub const IFF_NOARP: c_int = 0x80;
+pub const IFF_PROMISC: c_int = 0x100;
+pub const IFF_ALLMULTI: c_int = 0x200;
+pub const IFF_DRV_OACTIVE: c_int = 0x400;
+pub const IFF_SIMPLEX: c_int = 0x800;
+pub const IFF_LINK0: c_int = 0x1000;
+pub const IFF_LINK1: c_int = 0x2000;
+pub const IFF_LINK2: c_int = 0x4000;
+pub const IFF_ALTPHYS: c_int = IFF_LINK2;
+pub const IFF_MULTICAST: c_int = 0x8000;
+pub const IFF_CANTCONFIG: c_int = 0x10000;
+pub const IFF_PPROMISC: c_int = 0x20000;
+pub const IFF_MONITOR: c_int = 0x40000;
+pub const IFF_STATICARP: c_int = 0x80000;
+pub const IFF_STICKYARP: c_int = 0x100000;
+pub const IFF_DYING: c_int = 0x200000;
+pub const IFF_PALLMULTI: c_int = 0x800000;
+pub const IFF_NETLINK_1: c_int = 0x1000000;
+pub const IFF_RUNNING: c_int = IFF_DRV_RUNNING;
+pub const IFF_OACTIVE: c_int = IFF_DRV_OACTIVE;
+pub const IFAN_ARRIVAL: c_int = 0;
+pub const IFAN_DEPARTURE: c_int = 1;
+pub const IFSTATMAX: c_int = 800;
+
+// net/route.h
+pub const RTM_RTTUNIT: c_int = 1_000_000;
+pub const RT_DEFAULT_WEIGHT: c_int = 1;
+pub const RT_DEFAULT_METRIC: c_int = 1;
+pub const RT_WILDCARD_METRIC: c_int = 0;
+pub const RT_DEFAULT_FIB: c_int = 0;
+pub const RT_ALL_FIBS: c_int = -1;
+pub const RTF_UP: c_int = 0x1;
+pub const RTF_GATEWAY: c_int = 0x2;
+pub const RTF_HOST: c_int = 0x4;
+pub const RTF_REJECT: c_int = 0x8;
+pub const RTF_DYNAMIC: c_int = 0x10;
+pub const RTF_MODIFIED: c_int = 0x20;
+pub const RTF_DONE: c_int = 0x40;
+pub const RTF_XRESOLVE: c_int = 0x200;
+pub const RTF_LLINFO: c_int = 0x400;
+pub const RTF_LLDATA: c_int = 0x400;
+pub const RTF_STATIC: c_int = 0x800;
+pub const RTF_BLACKHOLE: c_int = 0x1000;
+pub const RTF_PROTO2: c_int = 0x4000;
+pub const RTF_PROTO1: c_int = 0x8000;
+pub const RTF_PROTO3: c_int = 0x40000;
+pub const RTF_FIXEDMTU: c_int = 0x80000;
+pub const RTF_PINNED: c_int = 0x100000;
+pub const RTF_LOCAL: c_int = 0x200000;
+pub const RTF_BROADCAST: c_int = 0x400000;
+pub const RTF_MULTICAST: c_int = 0x800000;
+pub const RTF_STICKY: c_int = 0x10000000;
+pub const RTM_ADD: c_int = 0x1;
+pub const RTM_DELETE: c_int = 0x2;
+pub const RTM_CHANGE: c_int = 0x3;
+pub const RTM_GET: c_int = 0x4;
+pub const RTM_LOSING: c_int = 0x5;
+pub const RTM_REDIRECT: c_int = 0x6;
+pub const RTM_MISS: c_int = 0x7;
+pub const RTM_LOCK: c_int = 0x8;
+pub const RTM_RESOLVE: c_int = 0xb;
+pub const RTM_NEWADDR: c_int = 0xc;
+pub const RTM_DELADDR: c_int = 0xd;
+pub const RTM_IFINFO: c_int = 0xe;
+pub const RTM_NEWMADDR: c_int = 0xf;
+pub const RTM_DELMADDR: c_int = 0x10;
+pub const RTM_IFANNOUNCE: c_int = 0x11;
+pub const RTM_IEEE80211: c_int = 0x12;
+pub const RTM_IPFWLOG: c_int = 0x13;
+pub const RTM_VERSION: c_int = 5;
+pub const RTV_MTU: c_int = 0x1;
+pub const RTV_HOPCOUNT: c_int = 0x2;
+pub const RTV_EXPIRE: c_int = 0x4;
+pub const RTV_RPIPE: c_int = 0x8;
+pub const RTV_SPIPE: c_int = 0x10;
+pub const RTV_SSTHRESH: c_int = 0x20;
+pub const RTV_RTT: c_int = 0x40;
+pub const RTV_RTTVAR: c_int = 0x80;
+pub const RTV_WEIGHT: c_int = 0x100;
+pub const RTV_METRIC: c_int = 0x200;
+pub const RTA_DST: c_int = 0x1;
+pub const RTA_GATEWAY: c_int = 0x2;
+pub const RTA_NETMASK: c_int = 0x4;
+pub const RTA_GENMASK: c_int = 0x8;
+pub const RTA_IFP: c_int = 0x10;
+pub const RTA_IFA: c_int = 0x20;
+pub const RTA_AUTHOR: c_int = 0x40;
+pub const RTA_BRD: c_int = 0x80;
+pub const RTAX_DST: c_int = 0;
+pub const RTAX_GATEWAY: c_int = 1;
+pub const RTAX_NETMASK: c_int = 2;
+pub const RTAX_GENMASK: c_int = 3;
+pub const RTAX_IFP: c_int = 4;
+pub const RTAX_IFA: c_int = 5;
+pub const RTAX_AUTHOR: c_int = 6;
+pub const RTAX_BRD: c_int = 7;
+pub const RTAX_MAX: c_int = 8;
+
 const _PTHREAD_ATTR_SIZE: usize = 56;
 const _PTHREAD_RWLOCKATTR_SIZE: usize = 8;
 const _PTHREAD_RWLOCK_SIZE: usize = 56;
@@ -1779,6 +2097,16 @@ extern "C" {
     // errno.h
     pub fn __errno_location() -> *mut c_int;
     pub fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+
+    // ifaddrs.h
+    pub fn getifaddrs(ifap: *mut *mut ifaddrs) -> c_int;
+    pub fn freeifaddrs(ifa: *mut ifaddrs);
+
+    // net/if.h
+    pub fn if_nametoindex(ifname: *const c_char) -> c_uint;
+    pub fn if_indextoname(ifindex: c_uint, ifname: *mut c_char) -> *mut c_char;
+    pub fn if_nameindex() -> *mut if_nameindex;
+    pub fn if_freenameindex(ptr: *mut if_nameindex);
 
     // langinfo.h
     pub fn nl_langinfo(item: nl_item) -> *mut c_char;

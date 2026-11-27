@@ -43,6 +43,37 @@ fn list_roundtrips_the_interface_record() {
 }
 
 #[test]
+fn addresses_use_the_shared_socket_writer() {
+    let items = [sample()];
+    let head = build_list(&items).expect("list");
+    let mut expected = [0u8; 16];
+    let full = raven_libc_net::addr::write_sockaddr(
+        &NetSockAddr::In {
+            ip: [10, 0, 0, 1],
+            port: 0,
+        },
+        &mut expected,
+    );
+    assert_eq!(full, 16);
+    // SAFETY: `head` is the live node built above; `ifa_addr` is a 16-byte sockaddr_in.
+    let node = unsafe { &*head };
+    // SAFETY: `ifa_addr` points at the 16 bytes written by the shared writer.
+    let address = unsafe { core::slice::from_raw_parts(node.ifa_addr.cast::<u8>(), full) };
+    assert_eq!(address, &expected);
+    // SAFETY: the list is freed exactly once here.
+    unsafe { free_list(head) };
+}
+
+#[test]
+fn malformed_name_fails_the_list_without_a_partial_output() {
+    let mut bad = sample();
+    bad.name = b"bad\0name".to_vec();
+    let items = [sample(), bad];
+    let result = build_list(&items);
+    assert_eq!(result.err(), Some(raven_libc_abi::errno::Errno::ENOMEM));
+}
+
+#[test]
 fn null_output_is_rejected_without_touching_the_net() {
     // SAFETY: the wrapper checks the NULL output before any backend call.
     let result = unsafe { getifaddrs(core::ptr::null_mut()) };

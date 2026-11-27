@@ -23,8 +23,8 @@ pub const IFF_BROADCAST: u32 = 0x2;
 pub const IFF_LOOPBACK: u32 = 0x8;
 /// `IFF_RUNNING`.
 pub const IFF_RUNNING: u32 = 0x40;
-/// `IFF_MULTICAST`.
-pub const IFF_MULTICAST: u32 = 0x1000;
+/// `IFF_MULTICAST` (`net/if.h`, FreeBSD 133344405; the Linux value 0x1000 is not exposed).
+pub const IFF_MULTICAST: u32 = 0x8000;
 
 /// One entry returned by `getifaddrs`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,9 +65,12 @@ pub fn list(backend: &dyn NetBackend) -> Result<Vec<IfaceInfo>, Errno> {
 }
 
 /// `if_nametoindex`.
+///
+/// RFC 2553 4.1 and FreeBSD `lib/libc/net/if_nametoindex.c`: an unknown name returns 0 with
+/// `ENXIO`. The index itself is the netd list position until PG-42 publishes a stable index.
 pub fn nametoindex(backend: &dyn NetBackend, name: &[u8]) -> Result<u32, Errno> {
     if name.is_empty() || name.len() >= MAX_IFNAME {
-        return Err(Errno::ENODEV);
+        return Err(Errno::ENXIO);
     }
     let list = list(backend)?;
     for (position, info) in list.iter().enumerate() {
@@ -75,7 +78,7 @@ pub fn nametoindex(backend: &dyn NetBackend, name: &[u8]) -> Result<u32, Errno> 
             return Ok(index_of(backend, info, position));
         }
     }
-    Err(Errno::ENODEV)
+    Err(Errno::ENXIO)
 }
 
 /// `if_indextoname`; writes the NUL-terminated name into the 16-byte buffer.
@@ -126,26 +129,32 @@ pub fn getifaddrs(backend: &dyn NetBackend) -> Result<Vec<IfAddr>, Errno> {
     let mut out = Vec::new();
     for info in list.iter() {
         let loopback = info.flags & IF_LOOPBACK != 0;
-        let flags = (if info.flags & IF_UP != 0 {
-            IFF_UP
-                | if info.flags & IF_LINK_UP != 0 {
-                    IFF_RUNNING
-                } else {
-                    0
-                }
-        } else {
-            0
-        }) | if loopback {
-            IFF_LOOPBACK
-        } else {
-            IFF_BROADCAST | IFF_MULTICAST
-        };
         let netmask = prefix_mask(info.prefix);
+        // IFF_BROADCAST is a property of this address record, not of every non-loopback
+        // interface: a /31, /32 or loopback record has no broadcast address.
         let broadaddr = if !loopback && info.prefix <= 30 {
             Some(broadcast(info.addr, netmask))
         } else {
             None
         };
+        // IFF_UP is administrative state and IFF_RUNNING is link state; the provider reports
+        // them independently, so one must not imply the other.
+        let flags = (if info.flags & IF_UP != 0 { IFF_UP } else { 0 })
+            | (if info.flags & IF_LINK_UP != 0 {
+                IFF_RUNNING
+            } else {
+                0
+            })
+            | (if loopback {
+                IFF_LOOPBACK
+            } else {
+                IFF_MULTICAST
+            })
+            | (if broadaddr.is_some() {
+                IFF_BROADCAST
+            } else {
+                0
+            });
         out.push(IfAddr {
             name: info.name.as_str().as_bytes().to_vec(),
             flags,

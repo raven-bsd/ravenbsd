@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S745: one one-shot interface-discovery probe on the server profile.
+name = "interfaces-conformance"
+exec = "/bin/interfaces-conformance"
+args = []
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
