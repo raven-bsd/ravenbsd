@@ -296,6 +296,16 @@ pub const PROC_CREATION_CONTEXT: usize = 0x83;
 /// [`Syscall`] variant.
 pub const PROC_DELEGATE: usize = 0x8D;
 
+/// `user_copy(dst: *mut u8, src: *const u8, len: usize) -> 0` (raw 0x8E).
+///
+/// Fault-safe copy between two ranges in the calling thread's current address space. The
+/// kernel uses the existing `copy_from_user`/`copy_to_user` fixups; an unmapped in-window
+/// page is `EFAULT`, never a kernel fault. Overlapping ranges are `EINVAL` (this is not
+/// `memmove`), `len > 64 KiB` is `EINVAL`, and `len == 0` succeeds without touching either
+/// pointer. The destination is unspecified on `EFAULT`. No process/handle argument exists.
+/// Raw constant, not a [`Syscall`] variant.
+pub const USER_COPY: usize = 0x8E;
+
 /// `thread_set_tls(thread: Handle, tp: usize) -> 0`.
 ///
 /// Sets the per-thread user TLS base (`IA32_FS_BASE` on x86-64, `TPIDR_EL0`
