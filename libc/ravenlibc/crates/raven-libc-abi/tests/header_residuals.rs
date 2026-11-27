@@ -306,13 +306,13 @@ fn fcntl_open_flags_are_the_freebsd_pinned_values() {
 
 /// S746 review negative double: the old musl values must fail the same assertion.
 ///
-/// Compiled only for the explicit review run (`--features s746-negative`). The
-/// normal gate keeps the production header untouched and this test absent, so no
-/// product code is edited or restored for the negative check.
+/// The double is a test-only Rust string, not a C/C++ scaffold file. Compiled only
+/// for the explicit review run (`--features s746-negative`). The normal gate keeps
+/// the production header untouched and this test absent, so no product code is
+/// edited or restored for the negative check.
 #[cfg(feature = "s746-negative")]
 #[test]
 fn fcntl_musl_fixture_is_rejected_by_the_pinned_value_assertion() {
-    let fixture =
-        read("libc/ravenlibc/crates/raven-libc-abi/tests/fixtures/fcntl-musl/bits/abi_fcntl.h");
-    assert_c_header_flags("isolated musl fixture", &fixture);
+    let fixture = "#define O_CLOEXEC 02000000\n#define O_NONBLOCK 04000\n";
+    assert_c_header_flags("isolated musl fixture", fixture);
 }
