@@ -5,6 +5,10 @@ use crate::prelude::*;
 
 mod abi_probe;
 
+#[path = "statfs_record.rs"]
+mod statfs_record;
+pub use self::statfs_record::statfs;
+
 pub type wchar_t = i32;
 
 pub type blkcnt_t = c_longlong;
@@ -337,21 +341,6 @@ s! {
 
     pub struct fsid_t {
         pub __val: [c_int; 2],
-    }
-
-    pub struct statfs {
-        pub f_type: c_ulong,
-        pub f_bsize: c_ulong,
-        pub f_blocks: crate::fsblkcnt_t,
-        pub f_bfree: crate::fsblkcnt_t,
-        pub f_bavail: crate::fsblkcnt_t,
-        pub f_files: crate::fsfilcnt_t,
-        pub f_ffree: crate::fsfilcnt_t,
-        pub f_fsid: crate::fsid_t,
-        pub f_namelen: c_ulong,
-        pub f_frsize: c_ulong,
-        pub f_flags: c_ulong,
-        pub f_spare: [c_ulong; 4],
     }
 
     pub struct sigevent {

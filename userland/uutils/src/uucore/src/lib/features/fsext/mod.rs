@@ -484,7 +484,7 @@ impl FsUsage {
     pub fn new(statvfs: StatFs) -> Self {
         {
             #[cfg(all(
-                not(any(target_os = "freebsd", target_os = "openbsd")),
+                not(any(target_os = "freebsd", target_os = "openbsd", target_os = "ravenbsd")),
                 target_pointer_width = "64"
             ))]
             return Self {
@@ -497,7 +497,7 @@ impl FsUsage {
                 ffree: statvfs.f_ffree,
             };
             #[cfg(all(
-                not(any(target_os = "freebsd", target_os = "openbsd")),
+                not(any(target_os = "freebsd", target_os = "openbsd", target_os = "ravenbsd")),
                 not(target_pointer_width = "64")
             ))]
             return Self {
@@ -509,10 +509,11 @@ impl FsUsage {
                 files: statvfs.f_files.into(),
                 ffree: statvfs.f_ffree.into(),
             };
-            #[cfg(target_os = "freebsd")]
+            #[cfg(any(target_os = "freebsd", target_os = "ravenbsd"))]
             return Self {
                 // FreeBSD's `struct statfs` has no fragment size; `f_bsize`
-                // is the block size the counts are expressed in.
+                // is the block size the counts are expressed in. Raven's
+                // record is the same FreeBSD record.
                 blocksize: statvfs.f_bsize,
                 blocks: statvfs.f_blocks,
                 bfree: statvfs.f_bfree,
@@ -539,10 +540,6 @@ impl FsUsage {
     }
 }
 
-/// Filesystem type used when the platform's `statvfs` has no type field.
-#[cfg(target_os = "ravenbsd")]
-const UNKNOWN_FS_TYPE: i64 = 0;
-
 #[cfg(unix)]
 pub trait FsMeta {
     fn fs_type(&self) -> i64;
@@ -567,7 +564,7 @@ impl FsMeta for StatFs {
     /// `f_bsize` next to a 4 KiB `f_frsize`, which scales every size derived
     /// from the counts by 256. `f_frsize` is zero on pre-2.6 kernels, so fall
     /// back to `f_bsize` there.
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "ravenbsd"))]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[allow(clippy::unnecessary_cast)]
     fn block_size(&self) -> i64 {
         if self.f_frsize == 0 {
@@ -575,6 +572,13 @@ impl FsMeta for StatFs {
         } else {
             self.f_frsize as i64
         }
+    }
+
+    /// Raven's record is the FreeBSD record: there is no fragment size, and `f_bsize` is the
+    /// block size the counts are expressed in.
+    #[cfg(target_os = "ravenbsd")]
+    fn block_size(&self) -> i64 {
+        self.f_bsize as i64
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "ravenbsd")))]
@@ -636,16 +640,18 @@ impl FsMeta for StatFs {
         #[cfg(all(
             not(target_os = "freebsd"),
             not(target_os = "openbsd"),
+            not(target_os = "ravenbsd"),
             target_pointer_width = "64"
         ))]
         return self.f_bavail;
         #[cfg(all(
             not(target_os = "freebsd"),
             not(target_os = "openbsd"),
+            not(target_os = "ravenbsd"),
             not(target_pointer_width = "64")
         ))]
         return self.f_bavail.into();
-        #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
+        #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "ravenbsd"))]
         return self.f_bavail.try_into().unwrap();
     }
     fn total_file_nodes(&self) -> u64 {
@@ -655,11 +661,19 @@ impl FsMeta for StatFs {
         return self.f_files.into();
     }
     fn free_file_nodes(&self) -> u64 {
-        #[cfg(all(not(target_os = "freebsd"), target_pointer_width = "64"))]
+        #[cfg(all(
+            not(target_os = "freebsd"),
+            not(target_os = "ravenbsd"),
+            target_pointer_width = "64"
+        ))]
         return self.f_ffree;
-        #[cfg(all(not(target_os = "freebsd"), not(target_pointer_width = "64")))]
+        #[cfg(all(
+            not(target_os = "freebsd"),
+            not(target_os = "ravenbsd"),
+            not(target_pointer_width = "64")
+        ))]
         return self.f_ffree.into();
-        #[cfg(target_os = "freebsd")]
+        #[cfg(any(target_os = "freebsd", target_os = "ravenbsd"))]
         return self.f_ffree.try_into().unwrap();
     }
     #[cfg(any(
@@ -698,9 +712,9 @@ impl FsMeta for StatFs {
     }
     #[cfg(target_os = "ravenbsd")]
     fn fs_type(&self) -> i64 {
-        // Raven's statvfs has no f_type. Zero is the defined "unknown" value; it is not
-        // matched by pretty_fstype, which renders it as `UNKNOWN (0x0)`.
-        UNKNOWN_FS_TYPE
+        // Raven's record carries the FreeBSD `f_type`; zero is the defined "unknown" value
+        // while the native writer does not fill it.
+        i64::from(self.f_type)
     }
     #[cfg(not(any(
         target_vendor = "apple",
@@ -720,7 +734,12 @@ impl FsMeta for StatFs {
     fn io_size(&self) -> u64 {
         self.f_bsize as u64
     }
-    #[cfg(any(target_vendor = "apple", target_os = "freebsd", target_os = "netbsd"))]
+    #[cfg(any(
+        target_vendor = "apple",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "ravenbsd"
+    ))]
     #[allow(clippy::unnecessary_cast)]
     fn io_size(&self) -> u64 {
         #[cfg(target_os = "freebsd")]
@@ -735,7 +754,8 @@ impl FsMeta for StatFs {
         target_os = "freebsd",
         target_os = "linux",
         target_os = "android",
-        target_os = "netbsd"
+        target_os = "netbsd",
+        target_os = "ravenbsd"
     )))]
     #[allow(clippy::unnecessary_cast)]
     fn io_size(&self) -> u64 {
@@ -776,7 +796,7 @@ impl FsMeta for StatFs {
         self.f_fsid as u64
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "ravenbsd"))]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn namelen(&self) -> u64 {
         self.f_namelen as u64
     }
@@ -788,7 +808,8 @@ impl FsMeta for StatFs {
         target_os = "aix",
         target_os = "freebsd",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "ravenbsd"
     ))]
     #[allow(clippy::unnecessary_cast)]
     fn namelen(&self) -> u64 {
