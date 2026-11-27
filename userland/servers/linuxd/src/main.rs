@@ -369,7 +369,7 @@ mod program {
             let call = match decode(packet.data_bytes()) {
                 Ok(call) => call,
                 Err(_) => {
-                    let reply = reply_packet(packet, -(Errno::EPROTO.0 as i64));
+                    let reply = reply_packet(packet, -(raven_linux_abi::errno::EPROTO as i64));
                     let _ = sys::send(request, &reply);
                     continue;
                 }
@@ -420,7 +420,7 @@ mod program {
             let source = call.args.get(argument).copied().unwrap_or(0);
             if let Err(error) = raw::copy_in(sys, &loaded.regions, source, &mut process.user_buffer)
             {
-                let reply = reply_packet(packet, -(error.0 as i64));
+                let reply = reply_packet(packet, linuxd::linux_error(error) as i64);
                 let _ = sys::send(request, &reply);
                 return None;
             }
@@ -431,13 +431,13 @@ mod program {
         if let Some(base) = process.pending_tls.take() {
             match raw::set_tls(process.thread, base) {
                 Ok(()) => process.fs_base = base,
-                Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
+                Err(error) => action = TrapAction::Reply(linuxd::linux_error(error)),
             }
         }
         if let Some(op) = process.pending_file.take() {
             match run_file_op(sys, process, loaded, op) {
                 Ok(value) => action = TrapAction::Reply(value),
-                Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
+                Err(error) => action = TrapAction::Reply(linuxd::linux_error(error)),
             }
         }
         // `clone` is the one handler that needs kernel work: the trap loop maps the trampoline,
@@ -447,7 +447,7 @@ mod program {
                 Ok(value) => action = TrapAction::Reply(value),
                 Err(error) => {
                     println!("linuxd: clone failed: {}", error.description());
-                    action = TrapAction::Reply(-(error.0 as isize));
+                    action = TrapAction::Reply(linuxd::linux_error(error));
                 }
             }
         }
@@ -466,7 +466,7 @@ mod program {
         if let Some((address, pending)) = process.pending_write.take()
             && raw::copy_out(sys, &loaded.regions, address, &pending).is_err()
         {
-            let reply = reply_packet(packet, -(Errno::EFAULT.0 as i64));
+            let reply = reply_packet(packet, -(raven_linux_abi::errno::EFAULT as i64));
             let _ = sys::send(request, &reply);
             return None;
         }

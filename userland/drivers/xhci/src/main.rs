@@ -9,6 +9,10 @@
 //! descriptor and hands the transport to the S62 [`usb_hid::KeyboardService`]. The service selects
 //! the boot protocol and primes one interrupt-IN transfer.
 //!
+//! The `serve` argument (the release driver table uses it) keeps the keyboard service alive for
+//! the console session and pushes every decoded byte to the `usb-hid` `kbd:` scheme that `consd`
+//! reads. Without `serve` the driver keeps the S67 one-shot enumeration transcript.
+//!
 //! S67 proves enumeration and the transport seam on QEMU; key injection and console/TTY delivery
 //! are S63. The Pi/RP1 DWC3 register offset remains UNVERIFIED.
 
@@ -24,11 +28,13 @@ mod program {
     use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec;
+    use core::sync::atomic::{AtomicU32, Ordering};
 
     use raven_abi::types::Handle;
     use raven_driver::{ConfigRegion, DmaRegion, Irq, MmioRegion};
     use raven_rt::entry;
     use raven_rt::println;
+    use raven_scheme::Client;
     use raven_usb_core::descriptor::{Direction as EndpointDirection, TransferType};
     use raven_usb_core::{
         AddressPool, ControlError, ControlTransport, Enumerator, SetupPacket, UsbError,
@@ -45,6 +51,18 @@ mod program {
     const DMA_HANDLE: Handle = Handle::new(5, 0);
     const IRQ_HANDLE: Handle = Handle::new(6, 0);
 
+    /// Wire open flag for write access to the `kbd:` console queue.
+    const OPEN_WRITE: u32 = 2;
+    /// Bounded retries while the `usb-hid` service has not registered `kbd:` yet.
+    const PUSH_ATTEMPTS: u8 = 5;
+    /// Backoff between `kbd:` open attempts.
+    const PUSH_RETRY_NS: u64 = 10_000_000;
+    /// Idle pause between service-loop iterations.
+    const SERVE_TICK_NS: u64 = 10_000_000;
+
+    /// Bounded diagnostics: report the first failed `kbd:` open, never the keystrokes.
+    static OPEN_FAILED: AtomicU32 = AtomicU32::new(0);
+
     fn main(args: raven_rt::Args) -> i32 {
         match run(args) {
             Ok(()) => 0,
@@ -56,7 +74,7 @@ mod program {
     }
 
     fn run(args: raven_rt::Args) -> Result<(), String> {
-        let (bar_size, dma_size) = parse_args(args)?;
+        let (bar_size, dma_size, serve) = parse_args(args)?;
         if bar_size == 0 || dma_size < MIN_DMA_LEN {
             return Err("devd passed no usable BAR/DMA buffer".to_string());
         }
@@ -184,6 +202,9 @@ mod program {
         let mut service = KeyboardService::new(transport);
         service.init(&report).map_err(hid_text)?;
         println!("usb-keyboard: boot protocol ok");
+        if serve {
+            return serve_console(&mut service);
+        }
         let mut queued = 0usize;
         for _ in 0..8 {
             queued = queued.saturating_add(service.poll().map_err(hid_text)?);
@@ -199,9 +220,58 @@ mod program {
         Ok(())
     }
 
-    fn parse_args(args: raven_rt::Args) -> Result<(usize, usize), String> {
+    /// Keep the keyboard service alive and feed decoded bytes to the `kbd:` console queue.
+    ///
+    /// `consd` owns the console multiplexer and reads `kbd:console`; the driver is only the
+    /// producer. A missing `usb-hid` service is retried for a bounded time and then the bytes are
+    /// dropped locally, exactly like the Pi 4 bridge: the UART console must never depend on a
+    /// keyboard.
+    fn serve_console(service: &mut KeyboardService<HidTransport>) -> Result<(), String> {
+        println!("usb-keyboard: serving");
+        let mut first = true;
+        loop {
+            service.poll().map_err(hid_text)?;
+            let mut console = [0u8; 8];
+            let count = service.read_console(&mut console);
+            if count > 0 {
+                if first {
+                    println!("usb-keyboard: first console bytes len={count}");
+                    first = false;
+                }
+                push_console(&console[..count]);
+            }
+            let _ = raven_rt::nanosleep(SERVE_TICK_NS);
+        }
+    }
+
+    /// Push decoded ASCII bytes to the `usb-hid` `kbd:` service.
+    fn push_console(bytes: &[u8]) {
+        if bytes.is_empty() {
+            return;
+        }
+        let client = Client::new();
+        let mut error = None;
+        for _ in 0..PUSH_ATTEMPTS {
+            match client.open("kbd:console", OPEN_WRITE) {
+                Ok(handle) => {
+                    let _ = client.write(handle, 0, bytes);
+                    let _ = client.close(handle);
+                    return;
+                }
+                Err(open) => error = Some(open),
+            }
+            let _ = raven_rt::nanosleep(PUSH_RETRY_NS);
+        }
+        if OPEN_FAILED.fetch_add(1, Ordering::Relaxed) == 0 {
+            let text = error.map_or("none", |error| error.description());
+            println!("usb-keyboard: kbd open failed: {text}");
+        }
+    }
+
+    fn parse_args(args: raven_rt::Args) -> Result<(usize, usize, bool), String> {
         let mut bar_size = 0usize;
         let mut dma_size = 0usize;
+        let mut serve = false;
         for argument in args.iter().skip(1) {
             if let Some(value) = argument.strip_prefix("bar_size=") {
                 bar_size = value
@@ -209,9 +279,11 @@ mod program {
                     .map_err(|_| format!("bad bar_size `{argument}`"))?;
             } else if let Some(value) = argument.strip_prefix("dma=") {
                 dma_size = value.parse().map_err(|_| format!("bad dma `{argument}`"))?;
+            } else if argument == "serve" {
+                serve = true;
             }
         }
-        Ok((bar_size, dma_size))
+        Ok((bar_size, dma_size, serve))
     }
 
     struct RealSeam {

@@ -3,7 +3,7 @@
 
 name = "consd"
 exec = "/sbin/consd"
-needs = ["logd"]
+needs = ["logd", "scheme:kbd"]
 provides = ["scheme:tty"]
 readiness = "scheme"
 ready_timeout_ms = 60_000

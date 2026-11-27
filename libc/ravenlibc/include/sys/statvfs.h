@@ -34,15 +34,20 @@ __BEGIN_DECLS
 #define __NEED_fsfilcnt_t
 #include <bits/alltypes.h>
 
+/* RavenBSD: public `struct statvfs` is the FreeBSD 133344405 field order (DR-69, S733),
+ * 88 bytes; the Linux order stays confined to linuxd. */
 struct statvfs {
-	unsigned long f_bsize, f_frsize;
-	fsblkcnt_t f_blocks, f_bfree, f_bavail;
-	fsfilcnt_t f_files, f_ffree, f_favail;
+	fsblkcnt_t f_bavail;
+	fsblkcnt_t f_bfree;
+	fsblkcnt_t f_blocks;
+	fsfilcnt_t f_favail;
+	fsfilcnt_t f_ffree;
+	fsfilcnt_t f_files;
+	unsigned long f_bsize;
+	unsigned long f_flag;
+	unsigned long f_frsize;
 	unsigned long f_fsid;
-	unsigned :8*(2*sizeof(int)-sizeof(long));
-	unsigned long f_flag, f_namemax;
-	unsigned int f_type;
-	int __reserved[5];
+	unsigned long f_namemax;
 };
 
 int statvfs (const char *__restrict, struct statvfs *__restrict);

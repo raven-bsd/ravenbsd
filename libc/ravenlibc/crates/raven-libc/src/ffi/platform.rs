@@ -143,29 +143,10 @@ fn apply_startup_cwd(platform: &Platform<RealSys, ShellLock>) {
 
 /// Install the spawner's descriptors and adopt standard descriptors on the first use.
 fn apply_startup(platform: &Platform<RealSys, ShellLock>) {
-    #[cfg(target_os = "none")]
-    restore_exec_umask(platform);
     restore_inherited_fds(platform);
     if !EXEC_INHERITED.load(Ordering::Acquire) {
         ensure_standard_fds(platform);
     }
-}
-
-/// Restore the caller's process mask from the `execve` environment hand-off, once.
-///
-/// The kernel keeps no umask; the BSD donor keeps it in the process credential where exec cannot
-/// clear it (`p_pd->pd_cmask`, FreeBSD `kern_descrip.c:2707`). Raven's libc passes it through the
-/// exec metadata channel and removes the entry here, so it never becomes a user-visible variable.
-#[cfg(target_os = "none")]
-fn restore_exec_umask(platform: &Platform<RealSys, ShellLock>) {
-    let name = raven_libc_platform::exec_umask::ENV_NAME;
-    let Some(value) = crate::stdlib::env_support::get(name) else {
-        return;
-    };
-    if let Some(mask) = raven_libc_platform::exec_umask::decode(value) {
-        platform.set_umask(mask);
-    }
-    let _ = crate::stdlib::env_support::unset(name);
 }
 
 /// Install the `RFDM` block the spawner mapped into this process.

@@ -15,8 +15,6 @@ use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 #[cfg(target_os = "none")]
 use raven_abi::types::Handle;
-#[cfg(target_os = "none")]
-use raven_abi::types::Timespec;
 
 /// Raw syscall with one argument.
 ///
@@ -418,22 +416,6 @@ pub fn getrandom(buffer: &mut [u8]) -> Result<(), Errno> {
     let raw = unsafe { syscall3(GETRANDOM, buffer.as_mut_ptr() as usize, buffer.len(), 0) };
     Errno::from_ret(raw)?;
     Ok(())
-}
-
-/// Read a clock (`clock::REALTIME` or `clock::MONOTONIC`).
-#[cfg(target_os = "none")]
-pub fn clock_get(clock_id: u32) -> Result<Timespec, Errno> {
-    let mut timespec = Timespec::default();
-    // SAFETY: CLOCK_GET writes one `Timespec` into the valid `&mut timespec` pointer.
-    let raw = unsafe {
-        syscall2(
-            Syscall::CLOCK_GET as usize,
-            clock_id as usize,
-            &mut timespec as *mut Timespec as usize,
-        )
-    };
-    Errno::from_ret(raw)?;
-    Ok(timespec)
 }
 
 /// Raw `PROC_HANDLE_INFO` (P9b): map a process handle to its kernel pid.

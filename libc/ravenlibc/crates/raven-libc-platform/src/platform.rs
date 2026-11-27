@@ -165,14 +165,27 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         crate::dir::getcwd(&cwd, buf, size)
     }
 
-    /// The process umask.
+    /// The process file-creation mask.
+    ///
+    /// The kernel is authoritative (`PROC_UMASK`); this accessor mirrors the last value set in
+    /// this image for the lexical `umask` consumers that do not create inodes. It is never used
+    /// to mask a create: the kernel stamps the mask onto the request and the filesystem applies
+    /// it at inode creation.
     pub fn umask(&self) -> u32 {
         self.umask.get()
     }
 
-    /// Set the umask and return the previous value.
+    /// Swap the kernel file-creation mask and return the previous value.
+    ///
+    /// The returned value comes from the kernel, so a mask inherited across fork/exec is
+    /// respected. The cell mirror is updated for [`Self::umask`] only.
     pub fn set_umask(&self, mask: u32) -> u32 {
-        self.umask.replace(mask & 0o777)
+        let previous = self
+            .backend
+            .umask(mask)
+            .unwrap_or_else(|_| self.umask.get());
+        self.umask.set(mask & 0o777);
+        previous
     }
 
     /// The rlimit cell.
@@ -781,7 +794,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             crate::intr::run(
                 crate::intr::CallClass::Restartable,
                 crate::intr::restart_wanted(),
-                || self.backend.open(&wire_path, u32::from(wire)),
+                || self.backend.open_mode(&wire_path, u32::from(wire), mode),
             )
         })?;
         let kind = if pty_wire.is_some() || is_tty_path(&resolved.abs) {
@@ -805,14 +818,6 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             && let Ok(reference) = self.get(fd)
         {
             reference.set_pty_master();
-        }
-        if flags & fcntl::O_CREAT as u32 != 0 {
-            // PG-24: protocol v1 has no mode on the wire; apply `mode & ~umask` after the create.
-            let wanted = (mode & 0o777) & !self.umask.get();
-            let _ = self.root_call(Call::Chmod {
-                mode: wanted,
-                path: &resolved.abs,
-            });
         }
         Ok(fd)
     }
@@ -1103,10 +1108,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         let mut record = [0u8; raven_proto_fs::STAT_LEN];
         self.backend.fstat(reference.handle(), &mut record)?;
         let wire = WireStat::decode(&record).map_err(|error| error.errno())?;
-        Ok(crate::stat::from_wire(
-            &wire,
-            StatSource::from_kind(reference.kind()),
-        ))
+        crate::stat::from_wire(&wire, StatSource::from_kind(reference.kind()))
     }
 
     /// `stat`: interim `open + FSTAT + close` (3.14 sequence 7); one `OP_STAT` after PG-31.
@@ -1144,7 +1146,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .map_err(|error| error.errno())?
         {
             CallResponse::Stat { status: 0, stat } => {
-                Ok(crate::stat::from_wire(&stat, StatSource::Unknown))
+                crate::stat::from_wire(&stat, StatSource::Unknown)
             }
             CallResponse::Stat { status, .. } => match xlat::call_status(status) {
                 Err(error) => Err(error),
@@ -1185,7 +1187,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             let execute = raven_libc_abi::stat::S_IXUSR
                 | raven_libc_abi::stat::S_IXGRP
                 | raven_libc_abi::stat::S_IXOTH;
-            if stat.st_mode & execute == 0 {
+            if u32::from(stat.st_mode) & execute == 0 {
                 return Err(Errno::EACCES);
             }
         }
@@ -1450,7 +1452,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .cwd
             .resolve(path, false, &self.limits)
             .map_err(crate::path::path_errno)?;
-        let mode = (mode & 0o7777) & !self.umask.get();
+        // The server applies the kernel-recorded mask at directory creation.
+        let mode = mode & 0o7777;
         self.root_call(Call::Mkdir {
             mode,
             path: &resolved.abs,
@@ -1516,7 +1519,9 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             .map_err(crate::path::path_errno)?;
         if source.must_be_dir {
             let stat = self.stat(&source.abs)?;
-            if stat.st_mode & raven_libc_abi::stat::S_IFMT != raven_libc_abi::stat::S_IFDIR {
+            if u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT
+                != raven_libc_abi::stat::S_IFDIR
+            {
                 return Err(Errno::ENOTDIR);
             }
         }
@@ -1624,7 +1629,8 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         }
         if reference.kind() == OfdKind::File || reference.kind() == OfdKind::Unknown {
             let stat = self.fstat(fd)?;
-            return Ok(stat.st_mode & raven_libc_abi::stat::S_IFMT == raven_libc_abi::stat::S_IFDIR);
+            return Ok(u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT
+                == raven_libc_abi::stat::S_IFDIR);
         }
         Ok(false)
     }
@@ -2004,7 +2010,13 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         if flags & !known != 0 {
             return Err(Errno::EINVAL);
         }
-        let kernel_flags = flags | fcntl::O_NONBLOCK as u32;
+        // The kernel pipe flags are a private wire encoding, not the public open flags.
+        const KERNEL_PIPE_CLOEXEC: u32 = 0o2000000;
+        const KERNEL_PIPE_NONBLOCK: u32 = 0o4000;
+        let mut kernel_flags = KERNEL_PIPE_NONBLOCK;
+        if flags & fcntl::O_CLOEXEC as u32 != 0 {
+            kernel_flags |= KERNEL_PIPE_CLOEXEC;
+        }
         let (read_handle, write_handle) = raven_libc_sys::sys::pipe2(kernel_flags)?;
         let cloexec = flags & fcntl::O_CLOEXEC as u32 != 0;
         let status = if flags & fcntl::O_NONBLOCK as u32 != 0 {
@@ -2266,9 +2278,12 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
                 };
                 (ofd.kind, ofd.handle.get())
             };
-            if !matches!(kind, OfdKind::Socket | OfdKind::Tty | OfdKind::Pipe)
-                || handle == Handle::NONE
-            {
+            // A pty master/slave keeps the kernel's single server reference across fork. Dupping
+            // it gave the child a second server reference that only its process exit released,
+            // so the server saw the master CLOSE after the foreground process was gone. The
+            // kernel `SchemeFile` Arc already tracks both handles and sends the CLOSE at the
+            // last one; FreeBSD `tty_pty.c` `ptyclose` hangs up on that last master close.
+            if !matches!(kind, OfdKind::Socket | OfdKind::Pipe) || handle == Handle::NONE {
                 continue;
             }
             if let Ok(duplicate) = self

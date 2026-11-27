@@ -55,6 +55,7 @@ name = "raven-smp-lock-time"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-initfs",
  "raven-rt",
 ]
 

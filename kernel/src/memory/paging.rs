@@ -128,6 +128,7 @@ impl From<MapError> for PagingError {
 static PAGE_TABLE_FRAMES: AtomicU64 = AtomicU64::new(0);
 
 /// Page-table frames currently allocated (K449 test-only metric).
+#[allow(dead_code)] // Retained for the next diagnostic image; the sampler zeroed the column (20a6cb182).
 pub fn page_table_frames() -> u64 {
     PAGE_TABLE_FRAMES.load(Ordering::Acquire)
 }

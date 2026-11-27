@@ -14,7 +14,280 @@ use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::arch::serial::Serial;
-use crate::cmdline::LogLevel;
+use crate::cmdline::{CmdLine, LogLevel};
+use crate::sync::IrqSpinLock;
+
+/// Fixed kernel log ring size in bytes.
+pub const RING_SIZE: usize = 64 * 1024;
+/// Fixed record header size, mirrored from the ABI.
+pub const RECORD_HEADER_LEN: usize = raven_abi::types::klog::HEADER_LEN;
+/// Maximum record body, mirrored from the ABI.
+pub const RECORD_MAX_BODY: usize = raven_abi::types::klog::MAX_BODY;
+/// Panic-path record flag, mirrored from the ABI.
+pub const RECORD_FLAG_PANIC: u8 = raven_abi::types::klog::RECORD_PANIC;
+
+/// One read plan over the retained records.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReadPlan {
+    /// First record the caller may read (clamped cursor).
+    pub start: u64,
+    /// Cursor after the last record that fits.
+    pub next: u64,
+    /// Total bytes of the records between `start` and `next`.
+    pub bytes: usize,
+    /// The supplied cursor was older than the first retained record.
+    pub lost: bool,
+    /// The next record does not fit in the caller's buffer.
+    pub more: bool,
+}
+
+/// A fixed circular byte ring of complete kernel log records.
+///
+/// `write_cursor` and `first_cursor` are absolute byte positions; the physical index is the
+/// position modulo the ring size, so a record may wrap across the end. Records are never split:
+/// a write that does not fit (oversized body, or no longer representable) increments `dropped`.
+/// A write that reuses physical space drops whole oldest records first, so `first_cursor` always
+/// names a complete retained record.
+pub struct Ring<const N: usize> {
+    buffer: [u8; N],
+    write_cursor: u64,
+    first_cursor: u64,
+    dropped: u64,
+}
+
+impl<const N: usize> Ring<N> {
+    /// Create an empty ring.
+    pub const fn new() -> Self {
+        Self {
+            buffer: [0; N],
+            write_cursor: 0,
+            first_cursor: 0,
+            dropped: 0,
+        }
+    }
+
+    /// Absolute cursor of the oldest retained record.
+    pub const fn first_cursor(&self) -> u64 {
+        self.first_cursor
+    }
+
+    /// Absolute cursor of the next write (also the caught-up read position).
+    pub const fn last_cursor(&self) -> u64 {
+        self.write_cursor
+    }
+
+    /// Cumulative records lost to overwrite or oversized bodies.
+    pub const fn dropped(&self) -> u64 {
+        self.dropped
+    }
+
+    /// Note one record that was not stored because its body was too large.
+    pub fn note_dropped(&mut self) {
+        self.dropped = self.dropped.saturating_add(1);
+    }
+
+    /// Append one record at `mono_ns`.
+    ///
+    /// Returns false and increments `dropped` when the body exceeds the record maximum or the
+    /// record cannot be represented in this ring.
+    pub fn write_at(&mut self, mono_ns: u64, level: u8, flags: u8, body: &[u8]) -> bool {
+        let Some(record_len) = RECORD_HEADER_LEN.checked_add(body.len()) else {
+            self.note_dropped();
+            return false;
+        };
+        if body.len() > RECORD_MAX_BODY || record_len > N {
+            self.note_dropped();
+            return false;
+        }
+        let capacity = N as u64;
+        let record_len = record_len as u64;
+        while self
+            .write_cursor
+            .saturating_sub(self.first_cursor)
+            .saturating_add(record_len)
+            > capacity
+        {
+            let Some(size) = self.record_size(self.first_cursor) else {
+                break;
+            };
+            self.first_cursor = self.first_cursor.saturating_add(size as u64);
+            self.dropped = self.dropped.saturating_add(1);
+        }
+        if self
+            .write_cursor
+            .saturating_sub(self.first_cursor)
+            .saturating_add(record_len)
+            > capacity
+        {
+            self.note_dropped();
+            return false;
+        }
+        self.store(mono_ns, level, flags, body)
+    }
+
+    /// Size of the record at `cursor`, or None when `cursor` is not a retained record start.
+    pub fn record_size(&self, cursor: u64) -> Option<usize> {
+        if cursor < self.first_cursor || cursor >= self.write_cursor {
+            return None;
+        }
+        let mut header = [0u8; RECORD_HEADER_LEN];
+        for (index, slot) in header.iter_mut().enumerate() {
+            *slot = self.read_byte(cursor.checked_add(index as u64)?)?;
+        }
+        let len = u16::from_le_bytes([*header.get(10)?, *header.get(11)?]) as usize;
+        if len > RECORD_MAX_BODY {
+            return None;
+        }
+        RECORD_HEADER_LEN.checked_add(len)
+    }
+
+    /// Copy one complete record to `out`, whose length must equal [`Self::record_size`].
+    pub fn copy_record(&self, cursor: u64, out: &mut [u8]) -> Option<()> {
+        let size = self.record_size(cursor)?;
+        if out.len() != size {
+            return None;
+        }
+        for (index, slot) in out.iter_mut().enumerate() {
+            *slot = self.read_byte(cursor.checked_add(index as u64)?)?;
+        }
+        Some(())
+    }
+
+    /// Plan one read. `capacity` is the caller's byte budget.
+    pub fn plan_read(&self, cursor: u64, capacity: usize) -> ReadPlan {
+        let mut start = cursor;
+        let mut lost = false;
+        if start < self.first_cursor {
+            start = self.first_cursor;
+            lost = true;
+        }
+        if start > self.write_cursor {
+            start = self.write_cursor;
+        }
+        let mut next = start;
+        let mut bytes = 0usize;
+        let mut more = false;
+        while next < self.write_cursor {
+            let Some(size) = self.record_size(next) else {
+                break;
+            };
+            let Some(total) = bytes.checked_add(size) else {
+                more = true;
+                break;
+            };
+            if total > capacity {
+                more = true;
+                break;
+            }
+            bytes = total;
+            next = next.saturating_add(size as u64);
+        }
+        ReadPlan {
+            start,
+            next,
+            bytes,
+            lost,
+            more,
+        }
+    }
+
+    fn store(&mut self, mono_ns: u64, level: u8, flags: u8, body: &[u8]) -> bool {
+        let mut header = [0u8; RECORD_HEADER_LEN];
+        if let Some(slice) = header.get_mut(..8) {
+            slice.copy_from_slice(&mono_ns.to_le_bytes());
+        }
+        if let Some(slot) = header.get_mut(8) {
+            *slot = level;
+        }
+        if let Some(slot) = header.get_mut(9) {
+            *slot = flags;
+        }
+        let Ok(len) = u16::try_from(body.len()) else {
+            return false;
+        };
+        if let Some(slice) = header.get_mut(10..12) {
+            slice.copy_from_slice(&len.to_le_bytes());
+        }
+        let mut cursor = self.write_cursor;
+        for byte in header {
+            if !self.write_byte(cursor, byte) {
+                return false;
+            }
+            cursor = cursor.saturating_add(1);
+        }
+        for byte in body.iter().copied() {
+            if !self.write_byte(cursor, byte) {
+                return false;
+            }
+            cursor = cursor.saturating_add(1);
+        }
+        self.write_cursor = cursor;
+        true
+    }
+
+    fn read_byte(&self, cursor: u64) -> Option<u8> {
+        let index = usize::try_from(cursor.checked_rem(N as u64)?).ok()?;
+        self.buffer.get(index).copied()
+    }
+
+    fn write_byte(&mut self, cursor: u64, value: u8) -> bool {
+        let Some(index) = cursor
+            .checked_rem(N as u64)
+            .and_then(|value| usize::try_from(value).ok())
+        else {
+            return false;
+        };
+        let Some(slot) = self.buffer.get_mut(index) else {
+            return false;
+        };
+        *slot = value;
+        true
+    }
+}
+
+/// A bounded UTF-8 formatter for one ring record body.
+struct LineBuffer {
+    bytes: [u8; RECORD_MAX_BODY],
+    len: usize,
+    overflow: bool,
+}
+
+impl LineBuffer {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; RECORD_MAX_BODY],
+            len: 0,
+            overflow: false,
+        }
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        self.bytes.get(..self.len).unwrap_or(&[])
+    }
+}
+
+impl fmt::Write for LineBuffer {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        if self.overflow {
+            return Ok(());
+        }
+        let Some(end) = self.len.checked_add(value.len()) else {
+            self.overflow = true;
+            return Ok(());
+        };
+        if end > RECORD_MAX_BODY {
+            self.overflow = true;
+            return Ok(());
+        }
+        let Some(slice) = self.bytes.get_mut(self.len..end) else {
+            self.overflow = true;
+            return Ok(());
+        };
+        slice.copy_from_slice(value.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
 
 /// A small spin lock used by the kernel. Interrupts are not disabled (S04 runs with them off).
 pub struct SpinMutex<T> {
@@ -95,6 +368,14 @@ impl<T> Drop for SpinGuard<'_, T> {
 static SERIAL: SpinMutex<Serial> = SpinMutex::new(Serial);
 static LEVEL: AtomicU8 = AtomicU8::new(LogLevel::Info as u8);
 static TEST_EXIT: AtomicBool = AtomicBool::new(false);
+static TEST_WRITE: AtomicU8 = AtomicU8::new(TEST_WRITE_UNKNOWN);
+/// The fixed kernel log ring. It has a const initialiser, so it exists before the first
+/// `kprintln!` and retains early boot lines.
+pub(crate) static RING: IrqSpinLock<Ring<RING_SIZE>> = IrqSpinLock::new(Ring::new());
+
+const TEST_WRITE_UNKNOWN: u8 = 0;
+const TEST_WRITE_OFF: u8 = 1;
+const TEST_WRITE_ON: u8 = 2;
 
 /// Deliberately hold the log lock for the exception-fallback injection.
 ///
@@ -129,8 +410,15 @@ fn level_enabled(level: LogLevel) -> bool {
 /// log line. Donor: FreeBSD `sys/kern/kern_cons.c:566 cnputsn` holds `cnputs_mtx` across the whole
 /// string (the same console-lock shape as [`_print_line`]).
 pub fn write_bytes(bytes: &[u8]) {
-    let _guard = SERIAL.lock();
-    crate::arch::serial::write_bytes(bytes);
+    {
+        let _guard = SERIAL.lock();
+        crate::arch::serial::write_bytes(bytes);
+    }
+    // S51b qtest injection: `klog-test=1` lets the fixture write ring records through the
+    // existing DEBUG_WRITE path without adding a second user-facing logging syscall.
+    if test_write_enabled() {
+        record_bytes(LogLevel::Info, 0, bytes);
+    }
 }
 
 /// Write raw formatted output, without a trailing newline.
@@ -141,9 +429,69 @@ pub fn _print(args: fmt::Arguments<'_>) {
 
 /// Write one formatted line, with a trailing newline.
 pub fn _print_line(args: fmt::Arguments<'_>) {
-    let mut serial = SERIAL.lock();
-    let _ = serial.write_fmt(args);
-    let _ = serial.write_str("\n");
+    _print_line_at(LogLevel::Info, args);
+}
+
+fn _print_line_at(level: LogLevel, args: fmt::Arguments<'_>) {
+    let mut line = LineBuffer::new();
+    let _ = line.write_fmt(args);
+    {
+        let mut serial = SERIAL.lock();
+        let _ = serial.write_fmt(args);
+        let _ = serial.write_str("\n");
+    }
+    record_line(level, 0, &line);
+}
+
+fn record_line(level: LogLevel, flags: u8, line: &LineBuffer) {
+    if line.overflow {
+        RING.lock().note_dropped();
+        return;
+    }
+    record_bytes(level, flags, line.as_bytes());
+}
+
+fn record_bytes(level: LogLevel, flags: u8, body: &[u8]) {
+    let now = crate::time::now_ns();
+    RING.lock().write_at(now, level as u8, flags, body);
+}
+
+fn record_panic(line: &LineBuffer) -> bool {
+    let now = crate::time::now_ns();
+    let Some(mut ring) = RING.try_lock() else {
+        return false;
+    };
+    if line.overflow {
+        ring.note_dropped();
+        return false;
+    }
+    ring.write_at(
+        now,
+        LogLevel::Error as u8,
+        RECORD_FLAG_PANIC,
+        line.as_bytes(),
+    )
+}
+
+fn test_write_enabled() -> bool {
+    match TEST_WRITE.load(Ordering::Acquire) {
+        TEST_WRITE_ON => true,
+        TEST_WRITE_OFF => false,
+        _ => {
+            let enabled = CmdLine::parse(crate::memory::paging::cmdline())
+                .get("klog-test")
+                .is_some();
+            TEST_WRITE.store(
+                if enabled {
+                    TEST_WRITE_ON
+                } else {
+                    TEST_WRITE_OFF
+                },
+                Ordering::Release,
+            );
+            enabled
+        }
+    }
 }
 
 /// Write one emergency line without waiting for the log lock.
@@ -167,7 +515,7 @@ pub fn _print_line_emergency(args: fmt::Arguments<'_>) {
 /// Write one line when `level` is enabled.
 pub fn _print_level(level: LogLevel, args: fmt::Arguments<'_>) {
     if level_enabled(level) {
-        _print_line(args);
+        _print_line_at(level, args);
     }
 }
 
@@ -253,6 +601,17 @@ fn panic(info: &PanicInfo<'_>) -> ! {
         file,
         line
     );
+    let mut panic_line = LineBuffer::new();
+    let _ = write!(
+        &mut panic_line,
+        "KERNEL PANIC: {} at {}:{}",
+        info.message(),
+        file,
+        line
+    );
+    // Try-lock only: a panic on the CPU that already holds the ring must not deadlock. The serial
+    // transcript above is unconditional.
+    let _ = record_panic(&panic_line);
     let (fail_size, fail_align, ra0, ra1) = crate::memory::heap::fail_info();
     if fail_size != 0 {
         let _ = writeln!(
@@ -309,15 +668,15 @@ fn panic(info: &PanicInfo<'_>) -> ! {
             "K434 alloc-bt 0x{:x} 0x{:x} 0x{:x} 0x{:x} 0x{:x} 0x{:x}",
             bt[0], bt[1], bt[2], bt[3], bt[4], bt[5]
         );
-        if let Some(index) = raven_kmem::class_for(fail_size) {
-            if let Some(stats) = crate::memory::heap::class_stats(index) {
-                let class = raven_kmem::SIZE_CLASSES.get(index).copied().unwrap_or(0);
-                let _ = writeln!(
-                    serial,
-                    "K434 class size={fail_size} index={index} class={class} slabs={} used={} free={} waste={} fail={}",
-                    stats.slabs, stats.in_use, stats.free, stats.waste_bytes, stats.alloc_fail
-                );
-            }
+        if let Some(index) = raven_kmem::class_for(fail_size)
+            && let Some(stats) = crate::memory::heap::class_stats(index)
+        {
+            let class = raven_kmem::SIZE_CLASSES.get(index).copied().unwrap_or(0);
+            let _ = writeln!(
+                serial,
+                "K434 class size={fail_size} index={index} class={class} slabs={} used={} free={} waste={} fail={}",
+                stats.slabs, stats.in_use, stats.free, stats.waste_bytes, stats.alloc_fail
+            );
         }
         let grow = crate::memory::heap::grow_fail();
         if let Some((spans, free, largest, fail, used)) = crate::memory::heap::arena_stats() {
@@ -332,3 +691,7 @@ fn panic(info: &PanicInfo<'_>) -> ! {
     }
     crate::arch::halt()
 }
+
+#[cfg(test)]
+#[path = "log_ut.rs"]
+mod tests;

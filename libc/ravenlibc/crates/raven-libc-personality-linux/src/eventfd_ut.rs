@@ -176,3 +176,22 @@ fn two_creates_are_independent() {
     assert_eq!(state.get(first).map(|counter| counter.value), Some(11));
     assert_eq!(state.get(second).map(|counter| counter.value), Some(2));
 }
+
+#[test]
+fn target_eventfd_flags_must_be_the_native_o_flags() {
+    // FreeBSD sys/sys/eventfd.h: EFD_CLOEXEC is O_CLOEXEC and EFD_NONBLOCK is O_NONBLOCK.
+    // The target libc used 0x80000/0x800 before the S765 alignment; these are not native
+    // Raven descriptor bits and the wrapper rejects them with EINVAL.
+    assert_eq!(EFD_CLOEXEC, raven_libc_abi::fcntl::O_CLOEXEC);
+    assert_eq!(EFD_NONBLOCK, raven_libc_abi::fcntl::O_NONBLOCK);
+
+    let (_table, _event, _state, fd) = setup(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    assert!(fd >= 0);
+
+    let (mut table, mut event, mut state) =
+        (FakeFdTable::new(), FakeEvent::new(), EventFdTable::new());
+    assert_eq!(
+        create(&mut table, &mut event, &mut state, 0, 0x80000 | 0x800),
+        Err(Errno::EINVAL)
+    );
+}

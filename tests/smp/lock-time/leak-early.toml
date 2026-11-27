@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Negative control for `leak.toml`: the same fixture starts before resolvd, so the service
+# startup frames fall inside the exit-90/exit-91 window and the forbidden `lockcheck leak` row
+# must appear. This case is expected to fail; it proves the settled service dependency is what
+# makes the measured delta zero.
+name = "smp-lock-time-leak-early"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/smp/lock-time/build.sh leak-early"]
+initfs = "build/smp/lock-time/leak-early-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on s36-lockcheck=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^s36: lockcheck base allocated=[0-9]+$'
+
+[[expect]]
+regex = '^lock-time: leak churn wake=5000 timeout=1000$'
+
+[[expect]]
+regex = '^s36: lockcheck delta=[0-9]+ allocated=[0-9]+$'
+
+[[expect]]
+regex = '^s36: lockcheck ok$'
+
+[[expect]]
+regex = '^lock-time: leak done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|lock-time: failed|s36: lockcheck leak'

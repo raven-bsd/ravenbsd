@@ -102,7 +102,7 @@ pub(crate) fn platform_ssize(r: Result<usize, raven_libc_platform::Errno>) -> is
         Ok(value) => match isize::try_from(value) {
             Ok(count) => count,
             Err(_) => {
-                super::errno::set(Errno(75));
+                super::errno::set(Errno::from_generated(raven_libc_abi::errno::EOVERFLOW));
                 -1
             }
         },

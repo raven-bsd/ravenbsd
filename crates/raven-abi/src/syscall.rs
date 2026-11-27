@@ -63,10 +63,12 @@ syscalls! {
     THREAD_CREATE = 0x20;
     /// `thread_exit(code: i32) -> !` terminates the calling thread.
     THREAD_EXIT = 0x21;
-    /// `futex(addr: *const u32, op: u32, val: u32, timeout_ns: u64) -> isize`. `op` is
-    /// [`crate::types::futex::WAIT`] (sleep while `*addr == val`; `-EAGAIN` if it differs, `-ETIMEDOUT` on
-    /// timeout, `timeout_ns == 0` means no timeout) or [`crate::types::futex::WAKE`] (wake up to `val`
-    /// waiters, returns the number woken).
+    /// `futex(addr: *const u32, op: u32, val: u32, arg4: u64, addr2: usize, val3: usize) -> isize`.
+    /// `op` is [`crate::types::futex::WAIT`] (sleep while `*addr == val`; `-EAGAIN` if it differs,
+    /// `-ETIMEDOUT` on timeout; `arg4` is the relative timeout in nanoseconds, 0 = no timeout),
+    /// [`crate::types::futex::WAKE`] (wake up to `val` waiters, returns the number woken) or
+    /// [`crate::types::futex::REQUEUE`] (wake up to `val` waiters at `addr`, move up to `arg4` of
+    /// the rest to `addr2`, and return the number woken plus requeued; `val3` is unused).
     FUTEX = 0x22;
 
     /// `proc_create(flags: usize) -> Handle` creates an empty process (no threads) and returns a
@@ -144,6 +146,10 @@ syscalls! {
     /// `scheme_register(name: &str, handle: Handle) -> 0`; register a scheme server handle under a name.
     SCHEME_REGISTER = 0x60;
     /// `open(path: &str, flags: u32, mode: u32) -> Handle`; scheme-routed open (file/scheme namespace).
+    ///
+    /// `mode` is the requested creation mode for `O_CREAT`; the kernel records it in the request
+    /// packet and the serving filesystem applies the caller's mask with
+    /// [`crate::types::umask::open_create_mode`] at inode creation.
     OPEN = 0x61;
     /// `read(h: Handle, buf: &mut [u8]) -> usize`.
     READ = 0x62;
@@ -215,6 +221,19 @@ pub const TRACE_SET: usize = 0x0B;
 /// exact.
 pub const RECORD_LOCK: usize = 0x0C;
 
+/// `klog_read(cursor: u64, buf: *mut u8, len: usize, info: *mut KlogInfo) -> usize`.
+///
+/// Copies complete kernel log records starting at the absolute byte `cursor`. Returns the number
+/// of bytes copied (0 when caught up) or a negative errno. `info` is [`crate::types::klog::KlogInfo`]
+/// and reports `LOST`, `MORE`, `next_cursor`, `first_cursor`, `last_cursor` and the cumulative
+/// `dropped` count. A buffer shorter than one record copies nothing for that record and sets
+/// `MORE`; `len < 16` is `ENOBUFS`. The caller needs `ADMIN` on the root device capability.
+///
+/// Raw constant, not a [`Syscall`] variant. The S51b proposal named `0x0C`, but that number is
+/// already [`RECORD_LOCK`] and `0x0D` is `PROC_CHROOT`; `0x0E` is the next free basic number.
+/// The reviewer signs the final ABI.
+pub const KLOG_READ: usize = 0x0E;
+
 /// `proc_chroot(path: *const u8, len: usize) -> 0` sets the calling process's root.
 ///
 /// Root-only (`euid == 0`); the path is resolved inside the current root, must name a directory
@@ -240,6 +259,42 @@ pub const MSYNC: usize = 0x44;
 /// threads yet. A non-`Handle::NONE` handler must be a transferable scheme
 /// file/server and is duplicated into `proc`.
 pub const PROC_SET_PERSONALITY: usize = 0x34;
+
+/// `proc_umask(mask: u32) -> previous` (raw 0x47).
+///
+/// Atomically swaps the calling process's file-creation mask and returns the previous value. The
+/// stored value is the new mask limited to [`crate::types::umask::ALLPERMS`], exactly FreeBSD
+/// `sys_umask` (`sys/kern/vfs_syscalls.c`). `PROC_CREATE` and `PROC_FORK` inherit the mask;
+/// `PROC_EXEC` preserves it. A raw constant, not a [`Syscall`] variant, so existing exhaustive
+/// matches downstream stay intact.
+pub const PROC_UMASK: usize = 0x47;
+
+/// `proc_creation_context(request: Handle, mode: u32, out: *mut Context, len: usize) -> 0` (raw 0x83).
+///
+/// Returns the kernel-authenticated creation context of the scheme request the caller is serving.
+/// `request` is the server-side handle returned by `RECV`; possession of it is the delegation
+/// right, and it is retired with the request. The kernel reads the request's recorded client
+/// credentials and mask (the original caller's, when a broker delegated the request with
+/// [`PROC_DELEGATE`]) and writes a [`crate::types::creation::Context`] with
+/// [`crate::types::umask::open_create_mode`] applied to `mode`. A handle that is not a live
+/// creation or control (`Open`/`Call`) request this process serves is `EINVAL`. Illumos
+/// `door_ucred` is the behaviour donor: the caller of the operation is the immediate request
+/// caller, never a userspace-supplied identity, and a delegated create keeps that caller.
+/// A raw constant, not a [`Syscall`] variant, so existing exhaustive matches downstream stay
+/// intact.
+pub const PROC_CREATION_CONTEXT: usize = 0x83;
+
+/// `proc_delegate(request: Handle) -> 0` (raw 0x8D).
+///
+/// Records the authenticated creation context of the scheme request the calling server is
+/// serving and applies it to the next scheme request this thread submits. A filesystem broker
+/// (`vfsd`) uses it immediately before forwarding a client's create, so the backing server sees
+/// the original caller's credentials and mask instead of the broker's. Possession of the live
+/// server-side request handle is the delegation right: the kernel requires the caller to serve
+/// the request and to hold it with `WRITE`. The stamp is one-shot and per-thread; a request that
+/// does not create uses the credentials only for its own permission checks. A raw constant, not a
+/// [`Syscall`] variant.
+pub const PROC_DELEGATE: usize = 0x8D;
 
 /// `thread_set_tls(thread: Handle, tp: usize) -> 0`.
 ///

@@ -116,7 +116,7 @@ Socket option ids (native protocol ids, not Linux `SOL_SOCKET` numbers):
 | 6 ERR | none; `status` carries the errno and must be non-zero |
 | 7 ICMP | `source` endpoint, `id: u16`, `seq: u16`, `rtt_ms: u32`, `len: u16`, then `len` payload bytes |
 
-`EAGAIN` (11) is therefore `01 00 0b 00 06 00`. A tag other than ERR with a non-zero status, or
+`EAGAIN` (FreeBSD 35, `0x23`) is therefore `01 00 23 00 06 00`. A tag other than ERR with a non-zero status, or
 ERR with status 0, is malformed.
 `EVENT` replies with `OK` followed by one S25 attachment pair `[u32 user_event][u32 rights]`; the
 client registers the transferred UserEvent in an S26 event queue with `SIGNALED|EDGE` and waits

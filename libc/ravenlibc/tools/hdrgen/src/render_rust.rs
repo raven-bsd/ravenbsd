@@ -366,7 +366,11 @@ fn render_group(
             let _ = writeln!(out, "#[cfg({})]", arch_cfg(&constant.arch));
         }
         let ty = constant.ty.as_deref().unwrap_or(&def.rust_type);
-        let rendered = values::render_rust(constant, value.value, &def.base);
+        let number = match constant.arch.first() {
+            Some(arch) => value.for_arch(arch),
+            None => value.value,
+        };
+        let rendered = values::render_rust(constant, number, &def.base);
         let _ = writeln!(out, "pub const {}: {ty} = {rendered};", constant.name);
     }
     out.push('\n');
@@ -383,7 +387,10 @@ fn render_group(
             out,
             "    (\"{}\", {}),",
             constant.name,
-            render_i128(value.value)
+            render_i128(match constant.arch.first() {
+                Some(arch) => value.for_arch(arch),
+                None => value.value,
+            })
         );
     }
     out.push_str("];\n");

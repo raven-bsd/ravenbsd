@@ -339,8 +339,8 @@ pub(crate) const O_RDWR: c_int = 2;
 /// `O_NOCTTY`.
 pub(crate) const O_NOCTTY: c_int = 0o400;
 /// `TIOCSCTTY`.
-pub(crate) const TIOCSCTTY: core::ffi::c_ulong = 0x540e;
+pub(crate) const TIOCSCTTY: core::ffi::c_ulong = 0x2000_7461;
 /// `TIOCSWINSZ`.
-pub(crate) const TIOCSWINSZ: core::ffi::c_ulong = 0x5414;
+pub(crate) const TIOCSWINSZ: core::ffi::c_ulong = 0x8008_7467;
 /// `SEEK_END`.
 pub(crate) const SEEK_END: c_int = 2;

@@ -157,6 +157,32 @@ impl RequestBuffers {
     }
 }
 
+/// Kernel-recorded caller context stamped onto one request packet.
+///
+/// It is captured when the request is submitted, so a later `umask` change cannot alter a create
+/// already in flight (FreeBSD computes `cmode` in `kern_openat` before `vn_open_cred`). A broker
+/// that delegated its served request (`PROC_DELEGATE`) replaces this stamp with the original
+/// client's, which is how a backing filesystem authenticates the proxied create.
+#[derive(Clone, Copy)]
+pub struct CreationStamp {
+    /// Client real user id.
+    pub uid: u32,
+    /// Client effective user id.
+    pub euid: u32,
+    /// Client real group id.
+    pub gid: u32,
+    /// Client effective group id.
+    pub egid: u32,
+    /// Number of valid supplementary groups.
+    pub group_count: u32,
+    /// Supplementary groups.
+    pub groups: [u32; MAX_GROUPS],
+    /// File-creation mask at submit time.
+    pub umask: u32,
+    /// Requested creation mode (zero when the opcode carries none).
+    pub mode: u32,
+}
+
 /// One in-flight request.
 pub struct PendingRequest {
     /// Kernel request id echoed by the server.
@@ -171,6 +197,8 @@ pub struct PendingRequest {
     pub opcode: Opcode,
     /// Request packet template.
     pub packet: Mutex<SchemePacket>,
+    /// Authenticated caller context stamped onto the packet at delivery.
+    pub stamp: Mutex<CreationStamp>,
     /// Captured buffers, released when the request completes.
     pub buffers: Mutex<RequestBuffers>,
     /// Server's response packet.
@@ -212,6 +240,19 @@ impl PendingRequest {
             thread.tid
         });
         LIVE_REQUESTS.fetch_add(1, Ordering::Relaxed);
+        let stamp = router::take_delegation(client_tid).unwrap_or_else(|| {
+            let ids = client.ids.lock();
+            CreationStamp {
+                uid: ids.uid,
+                euid: ids.euid,
+                gid: ids.gid,
+                egid: ids.egid,
+                group_count: ids.group_count.min(MAX_GROUPS as u32),
+                groups: ids.groups,
+                umask: client.umask(),
+                mode: packet.mode,
+            }
+        });
         Arc::new(Self {
             id: packet.request_id,
             client,
@@ -219,6 +260,7 @@ impl PendingRequest {
             file,
             opcode,
             packet: Mutex::new(packet),
+            stamp: Mutex::new(stamp),
             buffers: Mutex::new(buffers),
             response: Mutex::new(SchemePacket::default()),
             done: AtomicBool::new(false),
@@ -241,19 +283,15 @@ impl PendingRequest {
         if let Some(response) = buffers.response.as_ref() {
             packet.response_addr = response.address();
         }
-        let ids = self.client.ids.lock();
-        packet.uid = ids.uid;
-        packet.euid = ids.euid;
-        packet.gid = ids.gid;
-        packet.egid = ids.egid;
-        packet.group_count = ids.group_count.min(MAX_GROUPS as u32);
-        for (slot, group) in packet
-            .groups
-            .iter_mut()
-            .zip(ids.groups.iter().copied().take(MAX_GROUPS))
-        {
-            *slot = group;
-        }
+        let stamp = *self.stamp.lock();
+        packet.uid = stamp.uid;
+        packet.euid = stamp.euid;
+        packet.gid = stamp.gid;
+        packet.egid = stamp.egid;
+        packet.group_count = stamp.group_count;
+        packet.groups = stamp.groups;
+        packet.mode = stamp.mode;
+        packet.umask = stamp.umask;
         packet
     }
 
@@ -376,6 +414,7 @@ fn pop_request(
 }
 
 /// K449 diagnostic: total request entries in the per-process scheme, active and client queues.
+#[cfg(target_arch = "x86_64")]
 pub fn pending_counts() -> (usize, usize, usize) {
     let mut queued = 0usize;
     let mut active = 0usize;

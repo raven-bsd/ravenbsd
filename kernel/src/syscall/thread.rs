@@ -499,9 +499,74 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let act = frame.rsi as *const UserSigAction;
     let old = frame.rdx as *mut UserSigAction;
-    let mut sigacts = caller.sigacts.lock();
-    if !old.is_null() {
-        let previous = sigacts.get(signo);
+    // FreeBSD `sys_sigaction` copies the new action in first and `kern_sigaction` validates it
+    // before the prior action is captured; an invalid or unreadable `act` therefore leaves the
+    // caller's `old` object byte-identical. This also snapshots an aliased `act == old` input
+    // before the reply can overwrite it.
+    let mut input = None;
+    if !act.is_null() {
+        let mut value = ZERO_SIGACTION;
+        let source = UserSlice::new(act as u64, size_of::<UserSigAction>() as u64)?;
+        let bytes = unsafe {
+            // SAFETY: `value` is a live, uninitialised-by-value POD mirror; the mutable byte view
+            // covers exactly its size and the copy fills it before it is read.
+            core::slice::from_raw_parts_mut(
+                &mut value as *mut UserSigAction as *mut u8,
+                size_of::<UserSigAction>(),
+            )
+        };
+        copy_from_user(bytes, source)?;
+        let handler = value.handler;
+        let flags = value.flags;
+        if handler != process::SIG_DFL
+            && handler != process::SIG_IGN
+            && flags & !process::SA_SUPPORTED != 0
+        {
+            return Err(Errno::EINVAL);
+        }
+        if handler != process::SIG_DFL && handler != process::SIG_IGN && !is_user_address(handler) {
+            return Err(Errno::EFAULT);
+        }
+        if (signo == status::SIGKILL || signo == status::SIGSTOP) && handler != process::SIG_DFL {
+            return Err(Errno::EINVAL);
+        }
+        input = Some(value);
+    }
+    // Snapshot the prior action and install the new one under the table lock. The old-action
+    // copy-out below happens only after this successful update (`sys_sigaction: if (oactp &&
+    // !error)`); a failed copy-out leaves the new action installed, as FreeBSD does.
+    let previous = {
+        let mut sigacts = caller.sigacts.lock();
+        let previous = if old.is_null() {
+            None
+        } else {
+            Some(sigacts.get(signo))
+        };
+        if let Some(value) = input {
+            // FreeBSD `kern_sigaction:842-843` applies `SIG_CANTMASK` before storing the catch
+            // mask; SIGKILL/SIGSTOP can never be stored as blocked.
+            let unmaskable =
+                process::signal_bit(status::SIGKILL) | process::signal_bit(status::SIGSTOP);
+            let mask = value.mask.first().copied().unwrap_or(0) & !unmaskable;
+            sigacts.set(
+                signo,
+                process::SigAction {
+                    handler: value.handler,
+                    mask,
+                    flags: value.flags,
+                },
+            );
+            if value.handler == process::SIG_IGN {
+                // The donor drops a queued signal when it becomes ignored (`sigqueue_delete_proc`).
+                caller
+                    .pending_signals
+                    .lock()
+                    .retain(|signal| signal.signo != signo);
+            }
+        }
+        previous
+    };
+    if let Some(previous) = previous {
         let mut out = ZERO_SIGACTION;
         out.handler = previous.handler;
         out.mask[0] = previous.mask;
@@ -516,48 +581,6 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
             )
         };
         copy_to_user(destination, bytes)?;
-    }
-    if !act.is_null() {
-        let mut input = ZERO_SIGACTION;
-        let source = UserSlice::new(act as u64, size_of::<UserSigAction>() as u64)?;
-        let bytes = unsafe {
-            // SAFETY: `input` is a live, uninitialised-by-value POD mirror; the mutable byte view
-            // covers exactly its size and the copy fills it before it is read.
-            core::slice::from_raw_parts_mut(
-                &mut input as *mut UserSigAction as *mut u8,
-                size_of::<UserSigAction>(),
-            )
-        };
-        copy_from_user(bytes, source)?;
-        let handler = input.handler;
-        let flags = input.flags as u32;
-        if handler != process::SIG_DFL
-            && handler != process::SIG_IGN
-            && flags & !process::SA_SUPPORTED != 0
-        {
-            return Err(Errno::EINVAL);
-        }
-        if handler != process::SIG_DFL && handler != process::SIG_IGN && !is_user_address(handler) {
-            return Err(Errno::EFAULT);
-        }
-        if (signo == status::SIGKILL || signo == status::SIGSTOP) && handler != process::SIG_DFL {
-            return Err(Errno::EINVAL);
-        }
-        sigacts.set(
-            signo,
-            process::SigAction {
-                handler,
-                mask: input.mask.first().copied().unwrap_or(0),
-                flags,
-            },
-        );
-        if handler == process::SIG_IGN {
-            // The donor drops a queued signal when it becomes ignored (`sigqueue_delete_proc`).
-            caller
-                .pending_signals
-                .lock()
-                .retain(|signal| signal.signo != signo);
-        }
     }
     Ok(0)
 }
@@ -667,7 +690,7 @@ pub fn sigaltstack(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
         copy_from_user(bytes, source)?;
         let flags = input.ss_flags as u32;
-        if flags & !(process::SS_DISABLE | process::SS_AUTODISARM) != 0 {
+        if flags & !process::SS_DISABLE != 0 {
             return Err(Errno::EINVAL);
         }
         if flags & process::SS_DISABLE != 0 {

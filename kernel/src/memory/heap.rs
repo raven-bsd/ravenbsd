@@ -297,11 +297,13 @@ fn grow(state: &mut State) -> bool {
 // so no allocation re-enters this lock.
 unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let (mut ra0, mut ra1) = (0usize, 0usize);
         #[cfg(target_arch = "x86_64")]
-        unsafe {
-            // The allocator is built with a frame pointer: `[rbp + 8]` is this call's return
-            // address and `[rbp]` the caller's frame pointer.
+        let (ra0, ra1) = unsafe {
+            // SAFETY: the allocator is built with a frame pointer; `[rbp + 8]` is this call's
+            // return address and `[rbp]` the caller's frame pointer. Both reads are register
+            // loads with no memory side effects.
+            let mut ra0 = 0usize;
+            let mut ra1 = 0usize;
             core::arch::asm!(
                 "mov {}, [rbp + 8]",
                 out(reg) ra0,
@@ -312,7 +314,10 @@ unsafe impl GlobalAlloc for Allocator {
                 out(reg) ra1,
                 options(nomem, nostack, preserves_flags)
             );
-        }
+            (ra0, ra1)
+        };
+        #[cfg(not(target_arch = "x86_64"))]
+        let (ra0, ra1) = (0usize, 0usize);
         if layout.size() == 0 {
             // A zero-size allocation still needs a non-null, aligned address.
             return layout.align() as *mut u8;
@@ -340,17 +345,16 @@ unsafe impl GlobalAlloc for Allocator {
             return;
         }
         let mut guard = HEAP.lock();
-        if let Some(state) = guard.as_mut() {
-            if state
+        if let Some(state) = guard.as_mut()
+            && state
                 .heap
                 .free(pointer as usize as u64, layout.size(), layout.align())
                 .is_err()
-            {
-                FREE_FAILS.fetch_add(1, Ordering::AcqRel);
-                FREE_FAIL_SIZE.store(layout.size(), Ordering::Release);
-                FREE_FAIL_ALIGN.store(layout.align(), Ordering::Release);
-                FREE_FAIL_PTR.store(pointer as usize, Ordering::Release);
-            }
+        {
+            FREE_FAILS.fetch_add(1, Ordering::AcqRel);
+            FREE_FAIL_SIZE.store(layout.size(), Ordering::Release);
+            FREE_FAIL_ALIGN.store(layout.align(), Ordering::Release);
+            FREE_FAIL_PTR.store(pointer as usize, Ordering::Release);
         }
     }
 }

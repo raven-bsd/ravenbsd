@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S201: 10,000 THREAD_CREATE/THREAD_EXIT cycles on x86_64 -smp 4 with the heap/stack baseline
+# captured by a marker child. The churn vehicle is the dedicated K434 fixture; this case isolates
+# the thread cycle row from the rest of the process lifecycle so an allocator panic or a kernel
+# fault cannot be hidden behind the unrelated rows. The closing counter sample races with init
+# teardown in that fixture, so the report compares the series from the runs instead of asserting
+# the closing line here; the userspace ABI has no kmem free-slot query.
+
+name = "kmem-churn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/s36-churn/build.sh"]
+initfs = "build/fixtures/s36-churn/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s36-stackcheck=1"
+qemu_extra = []
+expect_exit = "success"
+
+# Heap/stack baseline sampled by the marker child before the churn.
+[[expect]]
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+ frames=\d+ allocated=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^s36: cycles done=10000$'
+
+[[expect]]
+regex = '^s36: churn done$'
+
+[[forbid]]
+regex = '(?i)panic|exception|fault|s36: failed'

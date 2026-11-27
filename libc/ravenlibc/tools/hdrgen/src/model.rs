@@ -232,6 +232,13 @@ pub struct ConstFile {
     /// first-party (bare sources).
     #[serde(default)]
     pub donor: Option<DonorSpec>,
+    /// Reason that names the donor does not define are kept as explicit Raven extensions.
+    ///
+    /// The FreeBSD oracle cannot measure a name the donor lacks; a table that declares this
+    /// policy keeps those rows visible as `APPROVED` extensions instead of deleting them or
+    /// pretending the donor defines them.
+    #[serde(default)]
+    pub donor_absent: Option<String>,
     /// Prefixes used by the completeness scan.
     #[serde(default)]
     pub prefixes: Vec<String>,
@@ -338,7 +345,7 @@ pub struct DeviationFile {
 pub struct Deviation {
     /// Constant, type, record or opaque name.
     pub name: String,
-    /// `musl` or `linux-abi`.
+    /// `musl`, `linux-abi` or `freebsd`.
     pub against: String,
     /// Our value: an integer, a "size/align" string, or a per-architecture table.
     pub ours: toml::Value,

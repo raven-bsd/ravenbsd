@@ -391,6 +391,108 @@ pub mod tty {
             let _ = Client::new().close(self.handle);
         }
     }
+
+    /// A pty pair that gives the session shell a blocking stdin.
+    ///
+    /// The console scheme answers an idle read with `EAGAIN` so the single-threaded server can
+    /// keep dispatching writes (K536/K570). A foreign shell such as brush treats that as a fatal
+    /// input error, so getty starts it on the slave side of a pty: the pty read waits for the
+    /// writer, as the BSD tty handoff does. `forward_console_to_pty` supplies the writer.
+    pub struct PtyPair {
+        master: Handle,
+        slave: Handle,
+    }
+
+    impl PtyPair {
+        /// Open the `pty:` pair and put the slave in raw mode without echo.
+        pub fn open() -> Result<Self, Errno> {
+            let flags = fs::s11_flags(O_RDWR)?;
+            let client = Client::new();
+            let master = client.open("pty:master", flags)?;
+            let slave = match client.open("pty:slave", flags) {
+                Ok(slave) => slave,
+                Err(error) => {
+                    let _ = client.close(master);
+                    return Err(error);
+                }
+            };
+            let request = Request::SetMode {
+                settings: Settings {
+                    mode: Mode::Raw,
+                    echo: false,
+                },
+            };
+            let mut encoded = [0u8; CALL_LEN];
+            encode_request(request, &mut encoded);
+            let mut response = [0u8; CALL_LEN];
+            // A pair that rejects the mode still works canonically; the shell keeps its line
+            // discipline either way.
+            let _ = client.call(slave, &encoded, &mut response);
+            Ok(Self { master, slave })
+        }
+
+        /// The master side the console forwarder writes to.
+        pub const fn master(&self) -> Handle {
+            self.master
+        }
+
+        /// The slave side handed to the session shell as fd 0.
+        pub const fn slave(&self) -> Handle {
+            self.slave
+        }
+    }
+
+    impl Drop for PtyPair {
+        fn drop(&mut self) {
+            let client = Client::new();
+            let _ = client.close(self.master);
+            let _ = client.close(self.slave);
+        }
+    }
+
+    /// Forward console input to a pty master until the console closes.
+    ///
+    /// Runs on a getty session thread. The console read is polled on `EAGAIN` (K536/K570) and
+    /// every byte is copied unchanged; the shell reads the matching pty slave with the pty
+    /// server's blocking-read contract.
+    pub fn forward_console_to_pty(argument: usize) {
+        let Ok(raw) = u32::try_from(argument) else {
+            return;
+        };
+        let master = Handle(raw);
+        let Ok(console) = Console::open() else {
+            return;
+        };
+        let client = Client::new();
+        let mut buffer = [0u8; 256];
+        loop {
+            match client.read(console.handle, 0, &mut buffer) {
+                Ok(0) => return,
+                Ok(count) => {
+                    let mut offset = 0usize;
+                    while offset < count {
+                        let Some(chunk) = buffer.get(offset..count) else {
+                            return;
+                        };
+                        match client.write(master, 0, chunk) {
+                            Ok(0) => return,
+                            Ok(written) => offset = offset.saturating_add(written),
+                            Err(Errno::EAGAIN) => {
+                                let _ = raven_rt::nanosleep(10_000_000);
+                            }
+                            Err(Errno::EINTR) => {}
+                            Err(_) => return,
+                        }
+                    }
+                }
+                Err(Errno::EAGAIN) => {
+                    let _ = raven_rt::nanosleep(10_000_000);
+                }
+                Err(Errno::EINTR) => {}
+                Err(_) => return,
+            }
+        }
+    }
 }
 
 #[cfg(test)]

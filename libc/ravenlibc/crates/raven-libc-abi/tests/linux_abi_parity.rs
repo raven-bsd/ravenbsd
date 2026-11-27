@@ -127,10 +127,13 @@ fn flag_parity_with_raven_linux_abi() {
     let deviations = linux_abi_deviations();
     let mut compared = 0usize;
     let mut mismatches = Vec::new();
+    // The native signal domain is FreeBSD (S713); `raven-linux-abi` keeps the Linux values and
+    // is checked by `native_signal_domain_and_linux_keep_their_values` below. The wait selectors
+    // are likewise native-domain values.
+    const NATIVE_WAIT: &[&str] = &["WEXITED", "WCONTINUED", "WNOWAIT"];
     for group in [
         &raven_libc_abi::fcntl::ALL,
         &raven_libc_abi::mman::ALL,
-        &raven_libc_abi::signal::ALL,
         &raven_libc_abi::socket::ALL,
         &raven_libc_abi::netinet::ALL,
         &raven_libc_abi::poll::ALL,
@@ -142,7 +145,7 @@ fn flag_parity_with_raven_linux_abi() {
             let Some(their) = linux.get(*name) else {
                 continue;
             };
-            if deviations.contains_key(*name) {
+            if deviations.contains_key(*name) || NATIVE_WAIT.contains(name) {
                 continue;
             }
             compared += 1;
@@ -152,29 +155,102 @@ fn flag_parity_with_raven_linux_abi() {
         }
     }
     assert!(mismatches.is_empty(), "{mismatches:#?}");
-    assert!(compared > 300, "only {compared} names compared");
+    assert!(compared > 250, "only {compared} names compared");
     println!("linux-abi flag parity: compared {compared} constants");
 }
 
 #[test]
-fn errno_parity_with_raven_linux_abi() {
+fn native_signal_domain_and_linux_keep_their_values() {
+    // FreeBSD sys/sys/signal.h at the S700 pin owns the native numbers; raven-linux-abi keeps
+    // the Linux personality numbers and must not be renumbered with the native table.
+    let linux = parse_flags();
+    for (name, native, linux_value) in [
+        ("SIGUSR1", raven_libc_abi::signal::SIGUSR1, 10),
+        ("SIGUSR2", raven_libc_abi::signal::SIGUSR2, 12),
+        ("SIGCHLD", raven_libc_abi::signal::SIGCHLD, 17),
+        ("SIGCONT", raven_libc_abi::signal::SIGCONT, 18),
+        ("SIGSTOP", raven_libc_abi::signal::SIGSTOP, 19),
+        ("SIGTSTP", raven_libc_abi::signal::SIGTSTP, 20),
+        ("SIGURG", raven_libc_abi::signal::SIGURG, 23),
+        ("SIGSYS", raven_libc_abi::signal::SIGSYS, 31),
+    ] {
+        assert_ne!(
+            i128::from(native),
+            i128::from(linux_value),
+            "{name} must not use Linux"
+        );
+        assert_eq!(
+            linux.get(name),
+            Some(&linux_value),
+            "{name} linux-abi value"
+        );
+    }
+    assert_eq!(raven_libc_abi::signal::SIGUSR1, 30);
+    assert_eq!(raven_libc_abi::signal::SIGEMT, 7);
+    assert_eq!(raven_libc_abi::signal::SIGBUS, 10);
+    assert_eq!(raven_libc_abi::signal::SIGSYS, 12);
+    assert_eq!(raven_libc_abi::signal::SIGURG, 16);
+    assert_eq!(raven_libc_abi::signal::SIGCHLD, 20);
+    assert_eq!(raven_libc_abi::signal::SIGCONT, 19);
+    assert_eq!(raven_libc_abi::signal::SIGUSR2, 31);
+}
+
+#[test]
+fn native_wait_selectors_are_freebsd() {
+    // FreeBSD sys/sys/wait.h: WCONTINUED 4, WEXITED 16, WNOWAIT 8. The Linux personality keeps
+    // its own values in raven-linux-abi and is not asserted from this native ABI table.
+    assert_eq!(raven_libc_abi::misc::WCONTINUED, 4);
+    assert_eq!(raven_libc_abi::misc::WEXITED, 16);
+    assert_eq!(raven_libc_abi::misc::WNOWAIT, 8);
+}
+
+#[test]
+fn errno_domains_are_separate() {
+    // `raven-linux-abi` is the Linux UAPI table and must not follow the native cutover. The
+    // native table is FreeBSD-valued (DR-69); these boundary facts prove neither domain
+    // silently aliased the other.
     let linux = parse_errno();
     assert_eq!(linux.len(), 133, "raven-linux-abi errno table changed");
-    let mut compared = 0usize;
-    for (name, value) in &linux {
-        let found = raven_libc_abi::errno::ALL
-            .iter()
-            .find(|(candidate, _)| *candidate == name);
-        assert!(found.is_some(), "libc errno lacks {name}");
-        assert_eq!(
-            found.expect("checked").1,
-            i128::from(*value),
-            "{name} differs"
+    for name in [
+        "EAGAIN",
+        "EDEADLK",
+        "ENOSYS",
+        "EADDRINUSE",
+        "EOVERFLOW",
+        "EILSEQ",
+    ] {
+        assert!(linux.contains_key(name), "raven-linux-abi lacks {name}");
+        assert!(
+            raven_libc_abi::errno::ALL
+                .iter()
+                .any(|(candidate, _)| *candidate == name),
+            "libc native errno lacks {name}"
         );
-        compared += 1;
     }
-    assert_eq!(compared, 133);
-    println!("linux-abi errno parity: compared {compared} constants");
+    for (name, native, linux_value) in [
+        ("EAGAIN", 35, 11),
+        ("EDEADLK", 11, 35),
+        ("ENOSYS", 78, 38),
+        ("EADDRINUSE", 48, 98),
+        ("EOVERFLOW", 84, 75),
+        ("EILSEQ", 86, 84),
+    ] {
+        let ours = raven_libc_abi::errno::ALL
+            .iter()
+            .find(|(candidate, _)| *candidate == name)
+            .expect("checked above")
+            .1;
+        let theirs = i128::from(*linux.get(name).expect("checked above"));
+        assert_eq!(ours, i128::from(native), "native {name}");
+        assert_eq!(theirs, i128::from(linux_value), "linux {name}");
+        assert_ne!(ours, theirs, "{name} domains aliased");
+    }
+    assert_eq!(
+        raven_libc_abi::errno::EWOULDBLOCK,
+        raven_libc_abi::errno::EAGAIN
+    );
+    assert_eq!(*linux.get("EWOULDBLOCK").expect("linux alias"), 11);
+    println!("native and Linux errno domains are separate");
 }
 
 #[test]
@@ -182,8 +258,13 @@ fn no_linux_abi_deviation_is_stale() {
     let linux = parse_flags();
     let our = [
         &raven_libc_abi::fcntl::ALL,
+        &raven_libc_abi::mman::ALL,
         &raven_libc_abi::signal::ALL,
         &raven_libc_abi::socket::ALL,
+        &raven_libc_abi::poll::ALL,
+        &raven_libc_abi::time::ALL,
+        &raven_libc_abi::resource::ALL,
+        &raven_libc_abi::misc::ALL,
     ];
     for name in linux_abi_deviations().keys() {
         let ours = our
@@ -206,31 +287,31 @@ fn no_linux_abi_deviation_is_stale() {
 fn errno_values_are_the_frozen_table() {
     assert_eq!(raven_libc_abi::errno::EPERM, 1);
     assert_eq!(raven_libc_abi::errno::ENOENT, 2);
-    assert_eq!(raven_libc_abi::errno::EAGAIN, 11);
+    assert_eq!(raven_libc_abi::errno::EAGAIN, 35);
     assert_eq!(
         raven_libc_abi::errno::EAGAIN,
         raven_libc_abi::errno::EWOULDBLOCK
     );
-    assert_eq!(raven_libc_abi::errno::ENOTSUP, 95);
+    assert_eq!(raven_libc_abi::errno::ENOTSUP, 45);
     assert_eq!(
         raven_libc_abi::errno::ENOTSUP,
         raven_libc_abi::errno::EOPNOTSUPP
     );
-    assert_eq!(
-        raven_libc_abi::errno::ENOATTR,
-        raven_libc_abi::errno::ENODATA
-    );
-    assert_eq!(raven_libc_abi::errno::EDOOFUS, 1000);
-    assert_eq!(raven_libc_abi::errno::EIPSEC, 1013);
-    for absent in [41i128, 58] {
+    assert_eq!(raven_libc_abi::errno::ENOATTR, 87);
+    assert_eq!(raven_libc_abi::errno::EDOOFUS, 88);
+    assert_eq!(raven_libc_abi::errno::EDEADLK, 11);
+    assert_eq!(raven_libc_abi::errno::ENOLCK, 77);
+    assert_eq!(raven_libc_abi::errno::EINTEGRITY, 97);
+    for value in 1i128..=97 {
         assert!(
-            !raven_libc_abi::errno::ALL
+            raven_libc_abi::errno::ALL
                 .iter()
-                .any(|(_, value)| *value == absent),
-            "errno {absent} must be unused"
+                .any(|(_, candidate)| *candidate == value),
+            "native errno {value} is missing"
         );
     }
-    assert_eq!(raven_libc_abi::errno::ALL.len(), 149);
+    // 97 donor names plus the EWOULDBLOCK and ENOTSUP alias rows.
+    assert_eq!(raven_libc_abi::errno::ALL.len(), 99);
 }
 
 #[test]
@@ -249,23 +330,34 @@ fn errno_classification() {
 
 #[test]
 fn flag_values_are_the_frozen_table() {
-    assert_eq!(
-        raven_libc_abi::fcntl::O_ACCMODE,
-        raven_libc_abi::fcntl::O_PATH | 3
-    );
+    assert_eq!(raven_libc_abi::fcntl::O_ACCMODE, 3);
     assert_eq!(raven_libc_abi::fcntl::O_LARGEFILE, 0);
     assert_eq!(raven_libc_abi::fcntl::AT_FDCWD, -100);
     assert_eq!(raven_libc_abi::mman::MAP_HUGE_16KB, 14 << 26);
-    assert_eq!(raven_libc_abi::mman::MAP_32BIT, 0x40);
-    assert_eq!(raven_libc_abi::resource::RLIM_INFINITY, u64::MAX);
+    assert_eq!(raven_libc_abi::mman::MAP_32BIT, 0x80000);
+    assert_eq!(
+        raven_libc_abi::resource::RLIM_INFINITY,
+        0x7fff_ffff_ffff_ffff
+    );
     assert_eq!(raven_libc_abi::socket::SOMAXCONN, 4096);
     assert_eq!(raven_libc_abi::socket::AF_ROUTE, 128);
     assert_eq!(raven_libc_abi::socket::AF_LINK, 129);
     assert_eq!(raven_libc_abi::signal::SIGRTMIN, 35);
     assert_eq!(raven_libc_abi::signal::SIGRTMAX, 64);
-    assert_eq!(raven_libc_abi::signal::NSIG, 65);
-    assert_eq!(raven_libc_abi::signal::MINSIGSTKSZ, 6144);
-    assert_eq!(raven_libc_abi::signal::SIGSTKSZ, 16384);
+    assert_eq!(raven_libc_abi::signal::NSIG, 32);
+    // FreeBSD sys/sys/_sigaltstack.h with sys/{x86,arm64}/include/_limits.h. The generator
+    // currently collapses the two per-arch rows to the last value, so x86 is still red here;
+    // the hdrgen per-arch fix is the recorded S713 blocker.
+    #[cfg(target_arch = "x86_64")]
+    {
+        assert_eq!(raven_libc_abi::signal::MINSIGSTKSZ, 2048);
+        assert_eq!(raven_libc_abi::signal::SIGSTKSZ, 34816);
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        assert_eq!(raven_libc_abi::signal::MINSIGSTKSZ, 4096);
+        assert_eq!(raven_libc_abi::signal::SIGSTKSZ, 36864);
+    }
 }
 
 #[test]
@@ -294,11 +386,11 @@ fn byte_order_and_socket_types_are_the_frozen_table() {
     assert_eq!(raven_libc_abi::netinet::TCP_CORK, 3);
     assert_eq!(raven_libc_abi::netinet::TCP_NOPUSH, 3);
     assert_eq!(raven_libc_abi::poll::POLLIN, 1);
-    assert_eq!(raven_libc_abi::poll::POLLRDHUP, 0x2000);
-    assert_eq!(raven_libc_abi::time::CLOCKS_PER_SEC, 1_000_000);
+    assert_eq!(raven_libc_abi::poll::POLLRDHUP, 0x4000);
+    assert_eq!(raven_libc_abi::time::CLOCKS_PER_SEC, 128);
     assert_eq!(raven_libc_abi::misc::FD_SETSIZE, 1024);
     assert_eq!(raven_libc_abi::misc::EAI_OVERFLOW, -12);
-    assert_eq!(raven_libc_abi::pthread::PTHREAD_MUTEX_RECURSIVE, 1);
+    assert_eq!(raven_libc_abi::pthread::PTHREAD_MUTEX_RECURSIVE, 2);
 }
 
 #[test]
@@ -329,7 +421,8 @@ fn stat_layout_and_zero() {
     assert_eq!(zero.st_ino, 0);
     assert_eq!(zero.st_nlink, 0);
     assert_eq!(zero.st_blocks, 0);
-    assert_eq!(zero.__unused, [0; 2]);
+    assert_eq!(zero.st_spare, [0; 9]);
+    assert_eq!(zero.st_birthtim, raven_libc_abi::structs::Timespec::ZERO);
     assert_eq!(zero.st_atim, raven_libc_abi::structs::Timespec::ZERO);
     assert_eq!(zero.st_mtim.tv_nsec, 0);
 }
@@ -344,8 +437,9 @@ fn every_record_runtime_layout_matches_the_constant_table() {
     );
     assert_eq!(
         core::mem::size_of::<raven_libc_abi::structs::Utsname>(),
-        390
+        1280
     );
+    assert_eq!(core::mem::size_of::<raven_libc_abi::structs::Passwd>(), 80);
     assert_eq!(
         core::mem::size_of::<raven_libc_abi::structs::Sigaction>(),
         152
@@ -367,12 +461,15 @@ typedef struct { long tv_sec; long tv_nsec; } __ab_timespec;
 typedef struct { long tv_sec; long tv_usec; } __ab_timeval;
 typedef struct { __ab_timespec it_interval; __ab_timespec it_value; } __ab_itimerspec;
 typedef struct { void *iov_base; unsigned long iov_len; } __ab_iovec;
-typedef struct { unsigned long st_dev; unsigned long st_ino; unsigned int st_mode;
-  unsigned int st_nlink; unsigned int st_uid; unsigned int st_gid; unsigned long st_rdev;
-  unsigned long __pad1; long st_size; int st_blksize; int __pad2; long st_blocks;
-  __ab_timespec st_atim; __ab_timespec st_mtim; __ab_timespec st_ctim; unsigned int __unused[2]; } __ab_stat;
-typedef struct { unsigned long d_ino; long d_off; unsigned short d_reclen;
-  unsigned char d_type; char d_name[256]; } __ab_dirent;
+typedef struct { unsigned long st_dev; unsigned long st_ino; unsigned long st_nlink;
+  unsigned short st_mode; short st_bsdflags; unsigned int st_uid; unsigned int st_gid;
+  int st_padding1; unsigned long st_rdev; __ab_timespec st_atim; __ab_timespec st_mtim;
+  __ab_timespec st_ctim; __ab_timespec st_birthtim; long st_size; long st_blocks;
+  int st_blksize; unsigned int st_flags; unsigned long st_gen; unsigned long st_filerev;
+  unsigned long st_spare[9]; } __ab_stat;
+typedef struct { unsigned long d_fileno; long d_off; unsigned short d_reclen;
+  unsigned char d_type; unsigned char d_pad0; unsigned short d_namlen;
+  unsigned short d_pad1; char d_name[256]; } __ab_dirent;
 typedef struct { unsigned short sa_family; char sa_data[14]; } __ab_sockaddr;
 typedef struct { unsigned short sin_family; unsigned short sin_port; unsigned int sin_addr;
   unsigned char sin_zero[8]; } __ab_sockaddr_in;
@@ -392,19 +489,20 @@ typedef struct { __ab_timeval ru_utime; __ab_timeval ru_stime;
   long ru_maxrss, ru_ixrss, ru_idrss, ru_isrss, ru_minflt, ru_majflt, ru_nswap, ru_inblock,
   ru_oublock, ru_msgsnd, ru_msgrcv, ru_nsignals, ru_nvcsw, ru_nivcsw;
   long __reserved[16]; } __ab_rusage;
-typedef struct { char sysname[65]; char nodename[65]; char release[65]; char version[65];
-  char machine[65]; char domainname[65]; } __ab_utsname;
+typedef struct { char sysname[256]; char nodename[256]; char release[256]; char version[256];
+  char machine[256]; } __ab_utsname;
 typedef union { unsigned long __u; unsigned char __b[128]; } __ab_sigset_t;
 typedef struct { void *sa_handler; __ab_sigset_t sa_mask; int sa_flags; void *sa_restorer; } __ab_sigaction;
 typedef struct { void *ss_sp; int ss_flags; unsigned long ss_size; } __ab_stack_t;
 typedef struct { int si_signo; int si_errno; int si_code; int __pad; unsigned long __si_fields[14]; } __ab_siginfo_t;
 typedef struct { unsigned int c_iflag; unsigned int c_oflag; unsigned int c_cflag;
-  unsigned int c_lflag; unsigned char c_line; unsigned char c_cc[32];
-  unsigned int __c_ispeed; unsigned int __c_ospeed; } __ab_termios;
-typedef struct { unsigned long f_bsize, f_frsize, f_blocks, f_bfree, f_bavail, f_files,
-  f_ffree, f_favail, f_fsid, f_flag, f_namemax; unsigned int f_type; int __reserved[5]; } __ab_statvfs;
+  unsigned int c_lflag; unsigned char c_cc[20];
+  unsigned int c_ispeed; unsigned int c_ospeed; } __ab_termios;
+typedef struct { unsigned long f_bavail, f_bfree, f_blocks, f_favail, f_ffree, f_files,
+  f_bsize, f_flag, f_frsize, f_fsid, f_namemax; } __ab_statvfs;
 typedef struct { void *pw_name; void *pw_passwd; unsigned int pw_uid; unsigned int pw_gid;
-  void *pw_gecos; void *pw_dir; void *pw_shell; } __ab_passwd;
+  long pw_change; void *pw_class; void *pw_gecos; void *pw_dir; void *pw_shell;
+  long pw_expire; int pw_fields; } __ab_passwd;
 typedef struct { void *gr_name; void *gr_passwd; unsigned int gr_gid; void *gr_mem; } __ab_group;
 typedef struct { short l_type; short l_whence; long l_start; long l_len; int l_pid; } __ab_flock;
 
@@ -418,11 +516,16 @@ REC(utsname) REC(sigaction) REC(stack_t) REC(siginfo_t) REC(termios)
 REC(statvfs) REC(passwd) REC(group) REC(flock)
 
 #define OFF(rec, field) const int off_##rec##_##field = offsetof(__ab_##rec, field);
-OFF(stat, st_dev) OFF(stat, st_ino) OFF(stat, st_mode) OFF(stat, st_nlink) OFF(stat, st_uid)
-OFF(stat, st_gid) OFF(stat, st_rdev) OFF(stat, __pad1) OFF(stat, st_size) OFF(stat, st_blksize)
-OFF(stat, __pad2) OFF(stat, st_blocks) OFF(stat, st_atim) OFF(stat, st_mtim) OFF(stat, st_ctim)
-OFF(stat, __unused)
-OFF(dirent, d_ino) OFF(dirent, d_off) OFF(dirent, d_reclen) OFF(dirent, d_type) OFF(dirent, d_name)
+OFF(stat, st_dev) OFF(stat, st_ino) OFF(stat, st_nlink) OFF(stat, st_mode)
+OFF(stat, st_bsdflags) OFF(stat, st_uid) OFF(stat, st_gid) OFF(stat, st_padding1)
+OFF(stat, st_rdev) OFF(stat, st_atim) OFF(stat, st_mtim) OFF(stat, st_ctim)
+OFF(stat, st_birthtim) OFF(stat, st_size) OFF(stat, st_blocks) OFF(stat, st_blksize)
+OFF(stat, st_flags) OFF(stat, st_gen) OFF(stat, st_filerev) OFF(stat, st_spare)
+OFF(dirent, d_fileno) OFF(dirent, d_off) OFF(dirent, d_reclen) OFF(dirent, d_type)
+OFF(dirent, d_pad0) OFF(dirent, d_namlen) OFF(dirent, d_pad1) OFF(dirent, d_name)
+OFF(statvfs, f_bavail) OFF(statvfs, f_bfree) OFF(statvfs, f_blocks) OFF(statvfs, f_favail)
+OFF(statvfs, f_ffree) OFF(statvfs, f_files) OFF(statvfs, f_bsize) OFF(statvfs, f_flag)
+OFF(statvfs, f_frsize) OFF(statvfs, f_fsid) OFF(statvfs, f_namemax)
 OFF(msghdr, msg_name) OFF(msghdr, msg_namelen) OFF(msghdr, msg_iov) OFF(msghdr, msg_iovlen)
 OFF(msghdr, msg_control) OFF(msghdr, msg_controllen) OFF(msghdr, msg_flags)
 OFF(sigaction, sa_handler) OFF(sigaction, sa_mask) OFF(sigaction, sa_flags) OFF(sigaction, sa_restorer)
@@ -430,7 +533,7 @@ OFF(siginfo_t, si_signo) OFF(siginfo_t, si_errno) OFF(siginfo_t, si_code) OFF(si
 OFF(sockaddr_in6, sin6_addr) OFF(sockaddr_in6, sin6_scope_id)
 OFF(tm, tm_gmtoff) OFF(tm, tm_zone)
 OFF(rusage, __reserved)
-OFF(termios, c_cc) OFF(termios, __c_ispeed)
+OFF(termios, c_cc) OFF(termios, c_ispeed) OFF(termios, c_ospeed)
 "#;
 
 fn clang_available() -> bool {

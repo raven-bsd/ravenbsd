@@ -285,7 +285,7 @@ fn a_malformed_getdents_record_is_eio() {
         ) -> Result<raven_libc_abi::generated::structs::Stat, raven_libc_abi::errno::Errno>
         {
             let mut stat = raven_libc_abi::generated::structs::Stat::ZERO;
-            stat.st_mode = raven_libc_abi::generated::stat::S_IFDIR;
+            stat.st_mode = raven_libc_abi::generated::stat::S_IFDIR as u16;
             Ok(stat)
         }
         fn getdents(

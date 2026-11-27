@@ -10,11 +10,32 @@ schema = 1
 # --- Against the musl measurement (doc 14 3.A.3) -------------------------------------------
 
 [[deviation]]
-name = "stat"
+name = "UTIME_NOW"
 against = "musl"
-ours = "128/8"
-theirs = { x86_64 = "144/8" }
-reason = "DV5/H-15: one 128-byte struct stat on all three arches; musl x86_64 is Linux's 144-byte kernel shape; linuxd converts"
+ours = -1
+theirs = 1073741823
+reason = "FreeBSD stat.h defines UTIME_NOW as -1; musl uses (1<<30)-1. The stat record is FreeBSD-valued."
+
+[[deviation]]
+name = "UTIME_OMIT"
+against = "musl"
+ours = -2
+theirs = 1073741822
+reason = "FreeBSD stat.h defines UTIME_OMIT as -2; musl uses (1<<30)-2. The stat record is FreeBSD-valued."
+
+[[deviation]]
+name = "statvfs"
+against = "musl"
+ours = "88/8"
+theirs = { x86_64 = "112/8", aarch64 = "112/8", riscv64 = "112/8" }
+reason = "DR-69: the public struct statvfs is the FreeBSD 133344405 field order (88 bytes); musl's 112-byte order is the Linux one and stays confined to linuxd"
+
+[[deviation]]
+name = "termios"
+against = "musl"
+ours = "44/4"
+theirs = { x86_64 = "60/4", aarch64 = "60/4", riscv64 = "60/4" }
+reason = "DR-71/C20: the public struct termios is the FreeBSD 133344405 record (NCCS=20, no c_line, c_cc[20] at 16, c_ispeed/c_ospeed at 36/40); the 60-byte musl record is not the public ABI"
 
 [[deviation]]
 name = "nlink_t"
@@ -47,41 +68,6 @@ reason = "DV3/RD-new: same blob as jmp_buf on all arches"
 # --- Against musl constants (H1 x86_64, H3 aarch64 fcntl) ----------------------------------
 
 [[deviation]]
-name = "O_LARGEFILE"
-against = "musl"
-ours = 0
-theirs = { x86_64 = 32768, aarch64 = 131072, riscv64 = 32768 }
-reason = "files are always large; the bit carries no meaning (doc 14 3.A.6); on aarch64 musl puts it at a different bit, so H3 lists it too"
-
-[[deviation]]
-name = "O_DIRECTORY"
-against = "musl"
-ours = 65536
-theirs = { aarch64 = 16384 }
-reason = "D8: the x86_64 O_* value set is used on every arch; aarch64 musl differs; linuxd swaps the aarch64 Linux set"
-
-[[deviation]]
-name = "O_NOFOLLOW"
-against = "musl"
-ours = 131072
-theirs = { aarch64 = 32768 }
-reason = "D8: x86_64 O_* set on every arch; aarch64 musl differs"
-
-[[deviation]]
-name = "O_DIRECT"
-against = "musl"
-ours = 16384
-theirs = { aarch64 = 65536 }
-reason = "D8: x86_64 O_* set on every arch; aarch64 musl differs"
-
-[[deviation]]
-name = "O_TMPFILE"
-against = "musl"
-ours = 4259840
-theirs = { aarch64 = 4210688 }
-reason = "D8: x86_64 O_* set on every arch; aarch64 musl differs"
-
-[[deviation]]
 name = "AF_ROUTE"
 against = "musl"
 ours = 128
@@ -94,20 +80,6 @@ against = "musl"
 ours = 128
 theirs = 16
 reason = "PF_* are aliases of the AF_* entries; the BSD route family is at 128"
-
-[[deviation]]
-name = "MINSIGSTKSZ"
-against = "musl"
-ours = 6144
-theirs = { x86_64 = 2048, riscv64 = 2048 }
-reason = "one value that fits AVX-512/SVE frames; musl aarch64 already uses 6144; sysconf(_SC_MINSIGSTKSZ) gives the dynamic value"
-
-[[deviation]]
-name = "SIGSTKSZ"
-against = "musl"
-ours = 16384
-theirs = { x86_64 = 8192, aarch64 = 12288, riscv64 = 8192 }
-reason = "one stack size that covers the largest signal frame; sysconf(_SC_SIGSTKSZ) gives the dynamic value"
 
 [[deviation]]
 name = "NGROUPS_MAX"
@@ -144,14 +116,84 @@ ours = 4096
 theirs = 128
 reason = "01 B.8/RD-78: the header backlog value is 4096; the runtime cap is a sysctl"
 
-# --- Against raven-linux-abi (T4b parity) --------------------------------------------------
+[[deviation]]
+name = "utsname"
+against = "musl"
+ours = "1280/1"
+theirs = { x86_64 = "390/1", aarch64 = "390/1", riscv64 = "390/1" }
+reason = "S746: the public struct utsname is the FreeBSD 133344405 record (SYS_NMLN 256, five fields, no domainname, 1280 bytes); musl's six 65-byte fields are the Linux record"
 
 [[deviation]]
-name = "O_ACCMODE"
-against = "linux-abi"
-ours = 2097155
-theirs = 3
-reason = "musl defines O_ACCMODE as (03|O_PATH); raven-linux-abi has the kernel mask 3; doc 14 3.A.6 fixes the musl expression"
+name = "passwd"
+against = "musl"
+ours = "80/8"
+theirs = { x86_64 = "48/8", aarch64 = "48/8", riscv64 = "48/8" }
+reason = "S746: the public struct passwd is the FreeBSD 133344405 eleven-field record (80 bytes); musl has the seven-field 48-byte record"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_NORMAL"
+against = "musl"
+ours = 3
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h enum pthread_mutextype, PTHREAD_MUTEX_NORMAL = 3"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_RECURSIVE"
+against = "musl"
+ours = 2
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h enum pthread_mutextype, PTHREAD_MUTEX_RECURSIVE = 2"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_ERRORCHECK"
+against = "musl"
+ours = 1
+theirs = 2
+reason = "S746: FreeBSD include/pthread.h enum pthread_mutextype, PTHREAD_MUTEX_ERRORCHECK = 1"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_DEFAULT"
+against = "musl"
+ours = 1
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h defines PTHREAD_MUTEX_DEFAULT as PTHREAD_MUTEX_ERRORCHECK (1)"
+
+[[deviation]]
+name = "PTHREAD_SCOPE_SYSTEM"
+against = "musl"
+ours = 2
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h PTHREAD_SCOPE_SYSTEM = 0x2"
+
+[[deviation]]
+name = "PTHREAD_SCOPE_PROCESS"
+against = "musl"
+ours = 0
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h PTHREAD_SCOPE_PROCESS = 0"
+
+[[deviation]]
+name = "PTHREAD_INHERIT_SCHED"
+against = "musl"
+ours = 4
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h PTHREAD_INHERIT_SCHED = 0x4"
+
+[[deviation]]
+name = "PTHREAD_EXPLICIT_SCHED"
+against = "musl"
+ours = 0
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h PTHREAD_EXPLICIT_SCHED = 0"
+
+[[deviation]]
+name = "PTHREAD_CANCEL_ASYNCHRONOUS"
+against = "musl"
+ours = 2
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h PTHREAD_CANCEL_ASYNCHRONOUS = 2"
+
+# --- Against raven-linux-abi (T4b parity) --------------------------------------------------
 
 [[deviation]]
 name = "O_LARGEFILE"
@@ -170,9 +212,30 @@ reason = "B.8/09 A-sig-2: libc reserves 32, 33 and 34, so the public SIGRTMIN is
 [[deviation]]
 name = "SIGSTKSZ"
 against = "linux-abi"
-ours = 16384
-theirs = { x86_64 = 8192, riscv64 = 8192 }
-reason = "same reasoned value as the musl row; aarch64 already matches"
+ours = { x86_64 = 34816, aarch64 = 36864, riscv64 = 36864 }
+theirs = { x86_64 = 8192, aarch64 = 16384, riscv64 = 8192 }
+reason = "native SIGSTKSZ follows the FreeBSD profile; the Linux personality keeps its own value"
+
+[[deviation]]
+name = "WEXITED"
+against = "musl"
+ours = 16
+theirs = 4
+reason = "native wait selectors follow the FreeBSD profile (sys/sys/wait.h); the Linux personality keeps 4"
+
+[[deviation]]
+name = "WCONTINUED"
+against = "musl"
+ours = 4
+theirs = 8
+reason = "native wait selectors follow the FreeBSD profile (sys/sys/wait.h); the Linux personality keeps 8"
+
+[[deviation]]
+name = "WNOWAIT"
+against = "musl"
+ours = 8
+theirs = 16777216
+reason = "native wait selectors follow the FreeBSD profile (sys/sys/wait.h); the Linux personality keeps 0x1000000"
 
 [[deviation]]
 name = "AF_MAX"
@@ -180,3 +243,576 @@ against = "linux-abi"
 ours = 45
 theirs = 46
 reason = "doc 14 4.6 fixes AF_MAX at 45; the pinned Linux table already counts AF_MCTP 45, so Linux's AF_MAX is 46"
+
+[[deviation]]
+name = "AT_EACCESS"
+against = "linux-abi"
+ours = 256
+theirs = 512
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 512"
+
+[[deviation]]
+name = "AT_EMPTY_PATH"
+against = "linux-abi"
+ours = 16384
+theirs = 4096
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 4096"
+
+[[deviation]]
+name = "AT_NO_AUTOMOUNT"
+against = "linux-abi"
+ours = 65536
+theirs = 2048
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 2048"
+
+[[deviation]]
+name = "AT_RECURSIVE"
+against = "linux-abi"
+ours = 1048576
+theirs = 32768
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 32768"
+
+[[deviation]]
+name = "AT_REMOVEDIR"
+against = "linux-abi"
+ours = 2048
+theirs = 512
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 512"
+
+[[deviation]]
+name = "AT_STATX_DONT_SYNC"
+against = "linux-abi"
+ours = 524288
+theirs = 16384
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 16384"
+
+[[deviation]]
+name = "AT_STATX_FORCE_SYNC"
+against = "linux-abi"
+ours = 262144
+theirs = 8192
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 8192"
+
+[[deviation]]
+name = "AT_STATX_SYNC_TYPE"
+against = "linux-abi"
+ours = 131072
+theirs = 24576
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 24576"
+
+[[deviation]]
+name = "AT_SYMLINK_NOFOLLOW"
+against = "linux-abi"
+ours = 512
+theirs = 256
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 256"
+
+[[deviation]]
+name = "F_ADD_SEALS"
+against = "linux-abi"
+ours = 19
+theirs = 1033
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1033"
+
+[[deviation]]
+name = "F_CANCELLK"
+against = "linux-abi"
+ours = 33
+theirs = 1029
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1029"
+
+[[deviation]]
+name = "F_DUPFD_CLOEXEC"
+against = "linux-abi"
+ours = 17
+theirs = 1030
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1030"
+
+[[deviation]]
+name = "F_GETLEASE"
+against = "linux-abi"
+ours = 35
+theirs = 1025
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1025"
+
+[[deviation]]
+name = "F_GETLK"
+against = "linux-abi"
+ours = 11
+theirs = 5
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 5"
+
+[[deviation]]
+name = "F_GETOWN"
+against = "linux-abi"
+ours = 5
+theirs = 9
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 9"
+
+[[deviation]]
+name = "F_GETOWNER_UIDS"
+against = "linux-abi"
+ours = 29
+theirs = 17
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 17"
+
+[[deviation]]
+name = "F_GETOWN_EX"
+against = "linux-abi"
+ours = 28
+theirs = 16
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 16"
+
+[[deviation]]
+name = "F_GETPIPE_SZ"
+against = "linux-abi"
+ours = 38
+theirs = 1032
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1032"
+
+[[deviation]]
+name = "F_GETSIG"
+against = "linux-abi"
+ours = 25
+theirs = 11
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 11"
+
+[[deviation]]
+name = "F_GET_FILE_RW_HINT"
+against = "linux-abi"
+ours = 41
+theirs = 1037
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1037"
+
+[[deviation]]
+name = "F_GET_RW_HINT"
+against = "linux-abi"
+ours = 39
+theirs = 1035
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1035"
+
+[[deviation]]
+name = "F_GET_SEALS"
+against = "linux-abi"
+ours = 20
+theirs = 1034
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1034"
+
+[[deviation]]
+name = "F_NOTIFY"
+against = "linux-abi"
+ours = 36
+theirs = 1026
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1026"
+
+[[deviation]]
+name = "F_OFD_GETLK"
+against = "linux-abi"
+ours = 30
+theirs = 36
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 36"
+
+[[deviation]]
+name = "F_OFD_SETLK"
+against = "linux-abi"
+ours = 31
+theirs = 37
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 37"
+
+[[deviation]]
+name = "F_OFD_SETLKW"
+against = "linux-abi"
+ours = 32
+theirs = 38
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 38"
+
+[[deviation]]
+name = "F_RDLCK"
+against = "linux-abi"
+ours = 1
+theirs = 0
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 0"
+
+[[deviation]]
+name = "F_SETLEASE"
+against = "linux-abi"
+ours = 34
+theirs = 1024
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1024"
+
+[[deviation]]
+name = "F_SETLK"
+against = "linux-abi"
+ours = 12
+theirs = 6
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 6"
+
+[[deviation]]
+name = "F_SETLKW"
+against = "linux-abi"
+ours = 13
+theirs = 7
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 7"
+
+[[deviation]]
+name = "F_SETOWN"
+against = "linux-abi"
+ours = 6
+theirs = 8
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 8"
+
+[[deviation]]
+name = "F_SETOWN_EX"
+against = "linux-abi"
+ours = 27
+theirs = 15
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 15"
+
+[[deviation]]
+name = "F_SETPIPE_SZ"
+against = "linux-abi"
+ours = 37
+theirs = 1031
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1031"
+
+[[deviation]]
+name = "F_SETSIG"
+against = "linux-abi"
+ours = 26
+theirs = 10
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 10"
+
+[[deviation]]
+name = "F_SET_FILE_RW_HINT"
+against = "linux-abi"
+ours = 42
+theirs = 1038
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1038"
+
+[[deviation]]
+name = "F_SET_RW_HINT"
+against = "linux-abi"
+ours = 40
+theirs = 1036
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1036"
+
+[[deviation]]
+name = "F_WRLCK"
+against = "linux-abi"
+ours = 3
+theirs = 1
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1"
+
+[[deviation]]
+name = "O_APPEND"
+against = "linux-abi"
+ours = 8
+theirs = 1024
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1024"
+
+[[deviation]]
+name = "O_CLOEXEC"
+against = "linux-abi"
+ours = 1048576
+theirs = 524288
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 524288"
+
+[[deviation]]
+name = "O_CREAT"
+against = "linux-abi"
+ours = 512
+theirs = 64
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 64"
+
+[[deviation]]
+name = "O_DIRECT"
+against = "linux-abi"
+ours = 65536
+theirs = 16384
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 16384"
+
+[[deviation]]
+name = "O_DIRECTORY"
+against = "linux-abi"
+ours = 131072
+theirs = 65536
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 65536"
+
+[[deviation]]
+name = "O_DSYNC"
+against = "linux-abi"
+ours = 16777216
+theirs = 4096
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 4096"
+
+[[deviation]]
+name = "O_EXCL"
+against = "linux-abi"
+ours = 2048
+theirs = 128
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 128"
+
+[[deviation]]
+name = "O_NDELAY"
+against = "linux-abi"
+ours = 4
+theirs = 2048
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 2048"
+
+[[deviation]]
+name = "O_NOATIME"
+against = "linux-abi"
+ours = 536870912
+theirs = 262144
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 262144"
+
+[[deviation]]
+name = "O_NOCTTY"
+against = "linux-abi"
+ours = 32768
+theirs = 256
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 256"
+
+[[deviation]]
+name = "O_NOFOLLOW"
+against = "linux-abi"
+ours = 256
+theirs = 131072
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 131072"
+
+[[deviation]]
+name = "O_NONBLOCK"
+against = "linux-abi"
+ours = 4
+theirs = 2048
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 2048"
+
+[[deviation]]
+name = "O_PATH"
+against = "linux-abi"
+ours = 4194304
+theirs = 2097152
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 2097152"
+
+[[deviation]]
+name = "O_SYNC"
+against = "linux-abi"
+ours = 128
+theirs = 1052672
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1052672"
+
+[[deviation]]
+name = "O_TMPFILE"
+against = "linux-abi"
+ours = 268435456
+theirs = 4259840
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 4259840"
+
+[[deviation]]
+name = "O_TRUNC"
+against = "linux-abi"
+ours = 1024
+theirs = 512
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 512"
+
+[[deviation]]
+name = "MAP_32BIT"
+against = "linux-abi"
+ours = 524288
+theirs = 64
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 64"
+
+[[deviation]]
+name = "MAP_ANONYMOUS"
+against = "linux-abi"
+ours = 4096
+theirs = 32
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 32"
+
+[[deviation]]
+name = "MAP_DENYWRITE"
+against = "linux-abi"
+ours = 536870912
+theirs = 2048
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 2048"
+
+[[deviation]]
+name = "MAP_EXECUTABLE"
+against = "linux-abi"
+ours = 1073741824
+theirs = 4096
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 4096"
+
+[[deviation]]
+name = "MAP_FIXED_NOREPLACE"
+against = "linux-abi"
+ours = 2097152
+theirs = 1048576
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1048576"
+
+[[deviation]]
+name = "MAP_GROWSDOWN"
+against = "linux-abi"
+ours = 268435456
+theirs = 256
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 256"
+
+[[deviation]]
+name = "MAP_HUGETLB"
+against = "linux-abi"
+ours = 8388608
+theirs = 262144
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 262144"
+
+[[deviation]]
+name = "MAP_LOCKED"
+against = "linux-abi"
+ours = 134217728
+theirs = 8192
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 8192"
+
+[[deviation]]
+name = "MAP_NONBLOCK"
+against = "linux-abi"
+ours = 16777216
+theirs = 65536
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 65536"
+
+[[deviation]]
+name = "MAP_NORESERVE"
+against = "linux-abi"
+ours = 67108864
+theirs = 16384
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 16384"
+
+[[deviation]]
+name = "MAP_POPULATE"
+against = "linux-abi"
+ours = 33554432
+theirs = 32768
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 32768"
+
+[[deviation]]
+name = "MAP_STACK"
+against = "linux-abi"
+ours = 1024
+theirs = 131072
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 131072"
+
+[[deviation]]
+name = "MAP_SYNC"
+against = "linux-abi"
+ours = 1048576
+theirs = 524288
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 524288"
+
+[[deviation]]
+name = "POLLRDHUP"
+against = "linux-abi"
+ours = 16384
+theirs = 8192
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 8192"
+
+[[deviation]]
+name = "POLLWRBAND"
+against = "linux-abi"
+ours = 256
+theirs = 512
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 512"
+
+[[deviation]]
+name = "POLLWRNORM"
+against = "linux-abi"
+ours = 4
+theirs = 256
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 256"
+
+[[deviation]]
+name = "CLOCK_BOOTTIME"
+against = "linux-abi"
+ours = 4
+theirs = 7
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 7"
+
+[[deviation]]
+name = "CLOCK_BOOTTIME_ALARM"
+against = "linux-abi"
+ours = 19
+theirs = 9
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 9"
+
+[[deviation]]
+name = "CLOCK_MONOTONIC"
+against = "linux-abi"
+ours = 4
+theirs = 1
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 1"
+
+[[deviation]]
+name = "CLOCK_MONOTONIC_COARSE"
+against = "linux-abi"
+ours = 12
+theirs = 6
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 6"
+
+[[deviation]]
+name = "CLOCK_MONOTONIC_RAW"
+against = "linux-abi"
+ours = 17
+theirs = 4
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 4"
+
+[[deviation]]
+name = "CLOCK_PROCESS_CPUTIME_ID"
+against = "linux-abi"
+ours = 15
+theirs = 2
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 2"
+
+[[deviation]]
+name = "CLOCK_REALTIME_ALARM"
+against = "linux-abi"
+ours = 18
+theirs = 8
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 8"
+
+[[deviation]]
+name = "CLOCK_REALTIME_COARSE"
+against = "linux-abi"
+ours = 10
+theirs = 5
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 5"
+
+[[deviation]]
+name = "CLOCK_SGI_CYCLE"
+against = "linux-abi"
+ours = 20
+theirs = 10
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 10"
+
+[[deviation]]
+name = "CLOCK_TAI"
+against = "linux-abi"
+ours = 16
+theirs = 11
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 11"
+
+[[deviation]]
+name = "CLOCK_THREAD_CPUTIME_ID"
+against = "linux-abi"
+ours = 14
+theirs = 3
+reason = "native FreeBSD value (DR-69); the Linux personality keeps 3"
+[[deviation]]
+name = "SIGRTMIN"
+against = "freebsd"
+ours = 35
+theirs = 65
+reason = "C19 keeps the private signal range at 1..=64 and the kernel set width at u64; the public real-time range stays 35..64 until the kernel 128-bit set-width unit. FreeBSD SIGRTMIN is 65."
+
+[[deviation]]
+name = "SIGRTMAX"
+against = "freebsd"
+ours = 64
+theirs = 126
+reason = "C19 keeps the private signal range at 1..=64 and the kernel set width at u64; the public real-time range stays 35..64 until the kernel 128-bit set-width unit. FreeBSD SIGRTMAX is 126."

@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone qtest fixture: a non-root `file:` client that creates with a caller
+# umask and reads the mode and owner back from FSTAT. The package has its own
+# workspace so it is not a product workspace member (same pattern as
+# tests/fixtures/libc-kernel).
+[workspace]
+
+[package]
+name = "raven-vfs-umask"
+version = "0.1.0"
+description = "S204 fixture: caller credentials and umask on the vfsd create path."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97.1"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-vfs-umask"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"

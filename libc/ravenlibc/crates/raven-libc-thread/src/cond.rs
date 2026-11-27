@@ -427,7 +427,7 @@ pub fn timedwait<K: ThreadKernel>(
     {
         return Err(EINVAL);
     }
-    if mutex.kind() != 0
+    if mutex.kind() != crate::limits::MUTEX_KIND_NORMAL
         && (mutex.lock_value() & 0x3fff_ffff) != crate::thread::current_tid(kernel) as u32
     {
         return Err(EPERM);
