@@ -570,6 +570,18 @@ fn retire_terminal(mut next: Arc<Thread>, state: &mut CpuSched, cpu: usize) -> A
         // block meanwhile. A thread preempted in user mode has no syscall frame and is still
         // reaped here, so it can never run user code again.
         if parked_in_syscall(&next) {
+            // The unwinding thread has only kernel frames left, and the exiting process's user
+            // frames may be released by the concurrent teardown. Run it on the kernel page
+            // tables: a user access then fails closed through the usercopy fixup instead of
+            // touching released frames.
+            if let Some(root) = kernel_cr3() {
+                // SAFETY: the thread is not current and is queued to this CPU only; the slot
+                // lock above serialises the switch, the sole reader of `cr3`. The write mirrors
+                // the raw install in `process::exec` when it adopts a new address space.
+                unsafe {
+                    (*(Arc::as_ptr(&next) as *mut Thread)).cr3 = root;
+                }
+            }
             return next;
         }
         next.set_state(ThreadState::Dead);
