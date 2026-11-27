@@ -84,14 +84,25 @@ fn remember_thread(thread: &Arc<Thread>) {
 
 /// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
 ///
-/// Returns `(leaked, external_refs_1, external_refs_2plus, blocked, ready, dead, token_set)`.
-pub fn leaked_thread_objects() -> [u64; 7] {
-    let mut stats = [0u64; 7];
+/// Returns `(leaked, external_refs_1, external_refs_2plus, blocked, ready, dead, token_set,
+/// self_process)`. The caller's own exiting thread is counted in `self_process`, not in
+/// `leaked`: it is still on its exit stack when the S36b row prints, and counting it made the
+/// S170 churn gate fail on the row it was printing.
+pub fn leaked_thread_objects() -> [u64; 8] {
+    let mut stats = [0u64; 8];
+    let self_process = crate::process::current();
     for weak in ALL_THREADS.lock().iter() {
         let Some(thread) = weak.upgrade() else {
             continue;
         };
         if !thread.process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        if self_process
+            .as_ref()
+            .is_some_and(|own| Arc::ptr_eq(own, &thread.process))
+        {
+            stats[7] = stats[7].saturating_add(1);
             continue;
         }
         stats[0] = stats[0].saturating_add(1);
@@ -123,10 +134,16 @@ pub fn thread_holder_stats() -> [u64; 12] {
     let Some(registry) = ALL_THREADS.try_lock() else {
         return [0u64; 12];
     };
+    let self_process = crate::process::current();
     let threads: Vec<Arc<Thread>> = registry
         .iter()
         .filter_map(|weak| weak.upgrade())
         .filter(|thread| thread.process.torn_down.load(Ordering::Acquire))
+        .filter(|thread| {
+            !self_process
+                .as_ref()
+                .is_some_and(|own| Arc::ptr_eq(own, &thread.process))
+        })
         .collect();
     drop(registry);
     let Some(processes) = crate::process::processes_try() else {
