@@ -466,7 +466,13 @@ pub fn run_atf_batch(
         let manifest = workdir.join(format!("manifest-{index}"));
         fs::write(
             &manifest,
-            batch_manifest(&case.ident, image_path, &result, wrapper.is_some()),
+            batch_manifest(
+                &case.ident,
+                image_path,
+                &result,
+                wrapper.is_some(),
+                config.timeout_secs.min(120),
+            ),
         )
         .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
@@ -602,7 +608,7 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn batch_manifest(ident: &str, image_path: &str, result: &str, wrapper: bool) -> String {
+fn batch_manifest(ident: &str, image_path: &str, result: &str, wrapper: bool, timeout: u64) -> String {
     let (program, prefix) = if wrapper {
         (
             "/tests/atf-wrapper",
@@ -613,7 +619,7 @@ fn batch_manifest(ident: &str, image_path: &str, result: &str, wrapper: bool) ->
     };
     let mut text = format!(
         "mode=exec\nprogram={program}\narg={program}\n{prefix}arg=-r\narg={result}\n\
-arg=-s\narg=/tests\narg={ident}\n"
+arg=-s\narg=/tests\narg={ident}\nenv=ATF_CASE_TIMEOUT={timeout}\n"
     );
     for item in target_env() {
         text.push_str("env=");
