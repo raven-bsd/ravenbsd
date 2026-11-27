@@ -1621,9 +1621,15 @@ fn eintr_is_propagated() {
 fn kqueue1_accepts_o_nonblock() {
     let mut evq = FakeEvq::new();
     let mut table = FakeFdTable::new();
-    assert!(kqueue1(&mut evq, &mut table, raven_libc_abi::fcntl::O_NONBLOCK).is_ok());
-    let fd = kqueue1(&mut evq, &mut table, raven_libc_abi::fcntl::O_NONBLOCK).unwrap();
+    // The values come from the installed C header `bits/abi_fcntl.h`, which is what the
+    // `kqueue1` callers compile against.
+    let cloexec = 0o2000000;
+    let nonblock = 0o4000;
+    assert!(kqueue1(&mut evq, &mut table, nonblock).is_ok());
+    let fd = kqueue1(&mut evq, &mut table, nonblock).unwrap();
     assert!(!table.cloexec(fd));
+    let fd = kqueue1(&mut evq, &mut table, cloexec | nonblock).unwrap();
+    assert!(table.cloexec(fd));
 }
 
 #[test]

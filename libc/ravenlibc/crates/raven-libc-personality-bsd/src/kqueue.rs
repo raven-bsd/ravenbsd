@@ -273,12 +273,20 @@ pub fn kqueue<E: EvqOps, T: FdTable>(e: &mut E, t: &mut T, cloexec: bool) -> Res
     t.install(queue, FdKind::Kqueue, cloexec)
 }
 
+/// `O_CLOEXEC` and `O_NONBLOCK` as the installed C header `bits/abi_fcntl.h` defines them.
+///
+/// `raven_libc_abi::fcntl` currently carries the FreeBSD-pin numbers (`0x100000`/`0x4`) while
+/// the installed musl-profile header keeps `02000000`/`04000`.  A C caller compiles against the
+/// header, so the entry point validates exactly those bits.
+const O_CLOEXEC: i32 = 0o2000000;
+const O_NONBLOCK: i32 = 0o4000;
+
 /// `kqueue1(flags)`; `O_CLOEXEC` is honoured and `O_NONBLOCK` is accepted and ignored.
 pub fn kqueue1<E: EvqOps, T: FdTable>(e: &mut E, t: &mut T, flags: i32) -> Result<i32, Errno> {
-    if flags & !(raven_libc_abi::fcntl::O_CLOEXEC | raven_libc_abi::fcntl::O_NONBLOCK) != 0 {
+    if flags & !(O_CLOEXEC | O_NONBLOCK) != 0 {
         return Err(Errno::EINVAL);
     }
-    kqueue(e, t, flags & raven_libc_abi::fcntl::O_CLOEXEC != 0)
+    kqueue(e, t, flags & O_CLOEXEC != 0)
 }
 
 fn timeout_ns(timeout: Option<Timespec>) -> Result<u64, Errno> {
