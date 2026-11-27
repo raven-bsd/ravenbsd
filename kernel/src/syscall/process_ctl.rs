@@ -1415,7 +1415,11 @@ fn wait6_core_dump(child: &Process, event: WaitEvent) -> bool {
         return false;
     }
     let signo = code.unsigned_abs() & 0x7f;
-    let limit = child.limits.lock()[status::RLIMIT_CORE].cur;
+    let limit = child
+        .limits
+        .lock()
+        .get(status::RLIMIT_CORE)
+        .map_or(0, |limit| limit.cur);
     status::core_dump(signo, limit)
 }
 
