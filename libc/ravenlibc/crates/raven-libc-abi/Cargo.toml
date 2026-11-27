@@ -16,6 +16,8 @@ workspace = true
 
 [features]
 default = []
+# Isolated S746 review fixture: compiles the negative fcntl double only when requested.
+s746-negative = []
 
 [dependencies]
 
