@@ -38,10 +38,12 @@ const TOPIC: &str = "process";
 const SELF: &[u8] = b"/bin/conformance-probe\0";
 const BRUSH: &[u8] = b"/bin/brush\0";
 
+// Public FreeBSD-shaped values from the generated ABI headers (S700 profile):
+// `include/bits/abi_fcntl.h` O_CREAT 0x200, O_TRUNC 0x400, O_CLOEXEC 0x100000.
 const O_RDWR: c_int = 2;
-const O_CREAT: c_int = 0o100;
-const O_TRUNC: c_int = 0o1000;
-const O_CLOEXEC: c_int = 0o2000000;
+const O_CREAT: c_int = 0x200;
+const O_TRUNC: c_int = 0x400;
+const O_CLOEXEC: c_int = 0x100000;
 
 const SEEK_SET: c_int = 0;
 
@@ -54,11 +56,14 @@ const EBADF: c_int = 9;
 const ECHILD: c_int = 10;
 const ESRCH: c_int = 3;
 
+// FreeBSD signal numbering from `include/bits/signum.h` (SIGUSR1 30, SIGUSR2 31) and
+// `SIG_BLOCK` 1; the pre-S700 Linux numbering is gone from the native profile.
 const SIGKILL: c_int = 9;
-const SIGUSR1: c_int = 10;
-const SIGUSR2: c_int = 12;
+const SIGUSR1: c_int = 30;
+const SIGUSR2: c_int = 31;
 
-const SIG_BLOCK: c_int = 0;
+const SIG_BLOCK: c_int = 1;
+const SIG_SETMASK: c_int = 3;
 const SIG_DFL: usize = 0;
 
 /// The public 128-byte `sigset_t`.
@@ -421,10 +426,10 @@ fn block_signal(signal: c_int) -> bool {
 }
 
 fn clear_signal_mask() -> bool {
-    // SIG_SETMASK (2) with an empty set clears the mask; the probe installs no other blockers.
+    // SIG_SETMASK with an empty set clears the mask; the probe installs no other blockers.
     let set = Sigset::ZERO;
     // SAFETY: `set` is readable for the call.
-    unsafe { sigprocmask(2, &set, null_mut()) == 0 }
+    unsafe { sigprocmask(SIG_SETMASK, &set, null_mut()) == 0 }
 }
 
 fn wait_blocking(pid: c_int) -> (bool, i32) {
