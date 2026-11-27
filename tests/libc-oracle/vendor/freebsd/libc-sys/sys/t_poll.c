@@ -233,7 +233,13 @@ ATF_TC_BODY(poll_err, tc)
 	ATF_REQUIRE_ERRNO(EINVAL, poll(&pfd, 1, -2) == -1);
 }
 
-#ifndef __FreeBSD__
+/*
+ * RavenBSD portability: NetBSD has pollts(2); FreeBSD and Raven have ppoll(2) with the same
+ * prototype and the same contract (poll(2) with a temporary signal mask). The affected bodies
+ * keep their donor names and expectations and call ppoll(2); no product pollts alias is added.
+ * FreeBSD's own port of this test compiles these bodies out; this port runs them so the mask
+ * behaviour is exercised.
+ */
 ATF_TC(pollts_basic);
 ATF_TC_HEAD(pollts_basic, tc)
 {
@@ -266,7 +272,7 @@ ATF_TC_BODY(pollts_basic, tc)
 	 */
 	pfds[0].revents = -1;
 	pfds[1].revents = -1;
-	ATF_REQUIRE_EQ_MSG(ret = pollts(&pfds[0], 1, &timeout, NULL), 0,
+	ATF_REQUIRE_EQ_MSG(ret = ppoll(&pfds[0], 1, &timeout, NULL), 0,
 	    "got: %d", ret);
 	ATF_REQUIRE_EQ_MSG(pfds[0].revents, 0, "got: %d", pfds[0].revents);
 	ATF_REQUIRE_EQ_MSG(pfds[1].revents, -1, "got: %d", pfds[1].revents);
@@ -274,7 +280,7 @@ ATF_TC_BODY(pollts_basic, tc)
 	/* Check that the write end of the pipe as reported as ready. */
 	pfds[0].revents = -1;
 	pfds[1].revents = -1;
-	ATF_REQUIRE_EQ_MSG(ret = pollts(&pfds[1], 1, &timeout, NULL), 1,
+	ATF_REQUIRE_EQ_MSG(ret = ppoll(&pfds[1], 1, &timeout, NULL), 1,
 	    "got: %d", ret);
 	ATF_REQUIRE_EQ_MSG(pfds[0].revents, -1, "got: %d", pfds[0].revents);
 	ATF_REQUIRE_EQ_MSG(pfds[1].revents, POLLOUT, "got: %d",\
@@ -283,7 +289,7 @@ ATF_TC_BODY(pollts_basic, tc)
 	/* Check that only the write end of the pipe as reported as ready. */
 	pfds[0].revents = -1;
 	pfds[1].revents = -1;
-	ATF_REQUIRE_EQ_MSG(ret = pollts(pfds, 2, &timeout, NULL), 1,
+	ATF_REQUIRE_EQ_MSG(ret = ppoll(pfds, 2, &timeout, NULL), 1,
 	    "got: %d", ret);
 	ATF_REQUIRE_EQ_MSG(pfds[0].revents, 0, "got: %d", pfds[0].revents);
 	ATF_REQUIRE_EQ_MSG(pfds[1].revents, POLLOUT, "got: %d",
@@ -295,7 +301,7 @@ ATF_TC_BODY(pollts_basic, tc)
 	/* Check that both ends of our pipe are reported as ready. */
 	pfds[0].revents = -1;
 	pfds[1].revents = -1;
-	ATF_REQUIRE_EQ_MSG(ret = pollts(pfds, 2, &timeout, NULL), 2,
+	ATF_REQUIRE_EQ_MSG(ret = ppoll(pfds, 2, &timeout, NULL), 2,
 	    "got: %d", ret);
 	ATF_REQUIRE_EQ_MSG(pfds[0].revents, POLLIN, "got: %d",
 	    pfds[0].revents);
@@ -325,13 +331,13 @@ ATF_TC_BODY(pollts_err, tc)
 	timeout.tv_nsec = 0;
 
 	errno = 0;
-	ATF_REQUIRE_ERRNO(EFAULT, pollts((void *)-1, 1, &timeout, NULL) == -1);
+	ATF_REQUIRE_ERRNO(EFAULT, ppoll((void *)-1, 1, &timeout, NULL) == -1);
 
 	timeout.tv_sec = -1;
 	timeout.tv_nsec = -1;
 
 	errno = 0;
-	ATF_REQUIRE_ERRNO(EINVAL, pollts(&pfd, 1, &timeout, NULL) == -1);
+	ATF_REQUIRE_ERRNO(EINVAL, ppoll(&pfd, 1, &timeout, NULL) == -1);
 }
 
 ATF_TC(pollts_sigmask);
@@ -368,7 +374,7 @@ ATF_TC_BODY(pollts_sigmask, tc)
 	 * Check that pollts(2) immediately returns. We block *all*
 	 * signals during pollts(2).
 	 */
-	ATF_REQUIRE_EQ_MSG(ret = pollts(&pfd, 1, &timeout, &mask), 1,
+	ATF_REQUIRE_EQ_MSG(ret = ppoll(&pfd, 1, &timeout, &mask), 1,
 	    "got: %d", ret);
 
 	/* Check that signals are now longer blocked. */
