@@ -1621,10 +1621,10 @@ fn eintr_is_propagated() {
 fn kqueue1_accepts_o_nonblock() {
     let mut evq = FakeEvq::new();
     let mut table = FakeFdTable::new();
-    // The values come from the installed C header `bits/abi_fcntl.h`, which is what the
-    // `kqueue1` callers compile against.
-    let cloexec = 0o2000000;
-    let nonblock = 0o4000;
+    // The values are the FreeBSD-pin ABI constants, matching the installed C header
+    // `bits/abi_fcntl.h` that `kqueue1` callers compile against.
+    let cloexec = raven_libc_abi::fcntl::O_CLOEXEC;
+    let nonblock = raven_libc_abi::fcntl::O_NONBLOCK;
     assert!(kqueue1(&mut evq, &mut table, nonblock).is_ok());
     let fd = kqueue1(&mut evq, &mut table, nonblock).unwrap();
     assert!(!table.cloexec(fd));

@@ -46,8 +46,41 @@ const EV_ENABLE: u16 = 0x0004;
 const NOTE_TRIGGER: u32 = 0x0100_0000;
 const NOTE_LOWAT: u32 = 0x0001;
 
-const O_CLOEXEC: c_int = 0o2000000;
-const O_NONBLOCK: c_int = 0o4000;
+/// The installed public C header that `libc-pack` deploys. The layout row reads the same
+/// `bits/abi_fcntl.h` bytes the C caller compiles against.
+const INSTALLED_FCNTL_H: &str = include_str!("../../../libc/ravenlibc/include/bits/abi_fcntl.h");
+
+/// FreeBSD `sys/sys/fcntl.h:89,130` at the S700 pin.
+const FCNTL_O_CLOEXEC: c_int = 0x10_0000;
+const FCNTL_O_NONBLOCK: c_int = 0x4;
+
+fn c_integer(text: &str) -> Option<i64> {
+    let text = text.trim();
+    if let Some(hex) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+        i64::from_str_radix(hex, 16).ok()
+    } else if text.len() > 1 && text.starts_with('0') {
+        i64::from_str_radix(&text[1..], 8).ok()
+    } else {
+        text.parse().ok()
+    }
+}
+
+fn c_define(name: &str) -> Option<c_int> {
+    for line in INSTALLED_FCNTL_H.lines() {
+        let Some(rest) = line.trim().strip_prefix("#define ") else {
+            continue;
+        };
+        let mut fields = rest.split_whitespace();
+        if fields.next() != Some(name) {
+            continue;
+        }
+        return fields
+            .next()
+            .and_then(c_integer)
+            .and_then(|value| c_int::try_from(value).ok());
+    }
+    None
+}
 
 const AF_UNIX: c_int = 1;
 const SOCK_STREAM: c_int = 1;
@@ -219,12 +252,17 @@ fn apply(kq: c_int, changes: &[Kevent], events: &mut [Kevent], timeout: &Timespe
 }
 
 fn row_layout(state: &mut State) {
+    let header_cloexec = c_define("O_CLOEXEC").unwrap_or(-1);
+    let header_nonblock = c_define("O_NONBLOCK").unwrap_or(-1);
+    let header_ok =
+        header_cloexec == FCNTL_O_CLOEXEC && header_nonblock == FCNTL_O_NONBLOCK;
     let kq = unsafe { kqueue() };
-    let cloexec = unsafe { kqueue1(O_CLOEXEC | O_NONBLOCK) };
+    let cloexec = unsafe { kqueue1(header_cloexec | header_nonblock) };
     set_errno(0);
     let rejected = unsafe { kqueue1(0x10) };
     let bad_errno = errno();
     let ok = core::mem::size_of::<Kevent>() == 64
+        && header_ok
         && kq >= 0
         && cloexec >= 0
         && rejected == -1
@@ -233,8 +271,11 @@ fn row_layout(state: &mut State) {
         "layout",
         ok,
         format_args!(
-            "size={} kq={} cloexec={} rejected={} errno={}",
+            "size={} header=0x{:x}/0x{:x} freebsd={} kq={} cloexec={} rejected={} errno={}",
             core::mem::size_of::<Kevent>(),
+            header_cloexec,
+            header_nonblock,
+            flag(header_ok),
             kq,
             cloexec,
             rejected,
