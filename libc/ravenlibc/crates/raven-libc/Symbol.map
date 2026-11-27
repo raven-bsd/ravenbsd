@@ -1337,6 +1337,7 @@ RAVEN_1.0 {
 		wait;
 		wait3;
 		wait4;
+		wait6;
 		waitid;
 		waitpid;
 		# --- process identity ---

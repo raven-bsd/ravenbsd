@@ -4,7 +4,7 @@
 [package]
 name = "raven-s45-fault"
 version = "0.1.0"
-description = "S45 fixture: user faults delivered as FaultRecord, SIGRETURN PC rewrite and default SIGSEGV status."
+description = "S776 fixture: C19 SIGACTION fault delivery, SIGRETURN PC rewrite and default SIGSEGV status."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true

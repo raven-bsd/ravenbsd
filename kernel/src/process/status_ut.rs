@@ -25,7 +25,8 @@ fn stop_and_continue_statuses_match_posix() {
 fn wait_events_encode_once() {
     assert_eq!(WaitEvent::Exited(7).status(), 7 << 8);
     assert_eq!(WaitEvent::Stopped(SIGSTOP).status(), (17 << 8) | 0x7f);
-    assert_eq!(WaitEvent::Continued.status(), 0xffff);
+    // FreeBSD `sys/sys/wait.h`: `WIFCONTINUED(x)` is `x == 0x13`, matching the product header.
+    assert_eq!(WaitEvent::Continued.status(), 0x13);
 }
 
 #[test]
@@ -190,4 +191,99 @@ fn a_default_ignore_signal_is_discarded() {
         signal_disposition(SIGCHLD, false, false, false),
         SignalDisposition::Discard
     );
+}
+
+/// Read one little-endian `i32` field of the `siginfo_t` bytes.
+fn siginfo_i32(bytes: &[u8; SIGINFO_SIZE], offset: usize) -> i32 {
+    let field = &bytes[offset..offset + 4];
+    i32::from_le_bytes([field[0], field[1], field[2], field[3]])
+}
+
+/// Read one little-endian `i64` field of the `siginfo_t` bytes.
+fn siginfo_i64(bytes: &[u8; SIGINFO_SIZE], offset: usize) -> i64 {
+    let field = &bytes[offset..offset + 8];
+    i64::from_le_bytes([
+        field[0], field[1], field[2], field[3], field[4], field[5], field[6], field[7],
+    ])
+}
+
+#[test]
+fn wait6_options_follow_freebsd_checkopt() {
+    // FreeBSD sys/kern/kern_exit.c:1387 wait6_checkopt: unknown bits are EINVAL and at
+    // least one of WEXITED/WUNTRACED/WCONTINUED must be set.
+    assert_eq!(WEXITED, 16);
+    assert_eq!(WNOWAIT, 8);
+    assert!(!wait6_options_valid(0));
+    assert!(!wait6_options_valid(WNOHANG));
+    assert!(!wait6_options_valid(WNOWAIT));
+    assert!(!wait6_options_valid(WNOHANG | WNOWAIT));
+    assert!(!wait6_options_valid(WEXITED | 0x8000_0000));
+    assert!(wait6_options_valid(WEXITED));
+    assert!(wait6_options_valid(WUNTRACED));
+    assert!(wait6_options_valid(WCONTINUED));
+    assert!(wait6_options_valid(WEXITED | WNOHANG));
+    assert!(wait6_options_valid(WEXITED | WNOWAIT));
+    assert!(
+        wait6_options_valid(WUNTRACED | WCONTINUED | WNOWAIT),
+        "WSTOPPED/WEXITED/WCONTINUED are the event selectors"
+    );
+}
+
+#[test]
+fn wait6_siginfo_reports_a_normal_exit() {
+    // NetBSD tests/lib/libc/sys/t_wait.c wait6_exited: full 32-bit exit code, child pid/uid
+    // and CLD_EXITED; the time fields stay zero until rusage accounting.
+    let info = wait6_siginfo(WaitEvent::Exited(0x5a5a_5a5a), 42, 1000, false);
+    assert_eq!(siginfo_i32(&info, 0), 20, "si_signo is SIGCHLD");
+    assert_eq!(siginfo_i32(&info, 4), 0, "si_errno is zero");
+    assert_eq!(siginfo_i32(&info, 8), CLD_EXITED);
+    assert_eq!(siginfo_i32(&info, 16), 42, "si_pid");
+    assert_eq!(siginfo_i32(&info, 20), 1000, "si_uid");
+    assert_eq!(siginfo_i32(&info, 24), 0x5a5a_5a5a, "si_status");
+    assert_eq!(siginfo_i64(&info, 32), 0, "si_utime");
+    assert_eq!(siginfo_i64(&info, 40), 0, "si_stime");
+}
+
+#[test]
+fn wait6_siginfo_reports_a_signalled_child() {
+    let killed = wait6_siginfo(WaitEvent::Exited(-(SIGTERM as i32)), 7, 0, false);
+    assert_eq!(siginfo_i32(&killed, 8), CLD_KILLED);
+    assert_eq!(siginfo_i32(&killed, 24), SIGTERM as i32);
+
+    let dumped = wait6_siginfo(WaitEvent::Exited(-(SIGSEGV as i32)), 8, 0, true);
+    assert_eq!(siginfo_i32(&dumped, 8), CLD_DUMPED);
+    assert_eq!(siginfo_i32(&dumped, 24), SIGSEGV as i32);
+
+    let no_core = wait6_siginfo(WaitEvent::Exited(-(SIGQUIT as i32)), 9, 0, false);
+    assert_eq!(siginfo_i32(&no_core, 8), CLD_KILLED);
+    assert_eq!(siginfo_i32(&no_core, 24), SIGQUIT as i32);
+}
+
+#[test]
+fn wait6_core_dump_follows_the_core_limit() {
+    // FreeBSD `WCOREDUMP` in `p_xsig` is set only when the core file is produced; a zero
+    // RLIMIT_CORE turns the same core-action signal into CLD_KILLED.
+    assert!(core_dump(SIGSEGV, 1));
+    assert!(core_dump(SIGQUIT, u64::MAX));
+    assert!(!core_dump(SIGSEGV, 0));
+    assert!(!core_dump(SIGTERM, u64::MAX));
+    assert_eq!(
+        wait6_status(WaitEvent::Exited(-(SIGSEGV as i32)), true),
+        signal_status(SIGSEGV, true)
+    );
+    assert_eq!(
+        wait6_status(WaitEvent::Exited(-(SIGSEGV as i32)), false),
+        signal_status(SIGSEGV, false)
+    );
+}
+
+#[test]
+fn wait6_siginfo_reports_stop_and_continue() {
+    let stopped = wait6_siginfo(WaitEvent::Stopped(SIGSTOP), 9, 0, false);
+    assert_eq!(siginfo_i32(&stopped, 8), CLD_STOPPED);
+    assert_eq!(siginfo_i32(&stopped, 24), SIGSTOP as i32);
+
+    let continued = wait6_siginfo(WaitEvent::Continued, 9, 0, false);
+    assert_eq!(siginfo_i32(&continued, 8), CLD_CONTINUED);
+    assert_eq!(siginfo_i32(&continued, 24), SIGCONT as i32);
 }

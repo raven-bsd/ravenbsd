@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S168b qtest fixture: an init process that execs a child whose custom `_start` observes the C8
+# argument register and stack pointer the kernel installs. The crate lives outside the product
+# workspace so it builds only when the qtest pre-step asks for it.
+
+[package]
+name = "proc-exec-arg-fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "BSD-3-Clause"
+
+[workspace]
+
+[[bin]]
+name = "arg_init"
+path = "src/bin/arg_init.rs"
+
+[[bin]]
+name = "arg_child"
+path = "src/bin/arg_child.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-rt = { path = "../../../../userland/rt" }
+
+[profile.release]
+panic = "abort"

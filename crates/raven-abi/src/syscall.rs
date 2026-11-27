@@ -376,6 +376,13 @@ pub const SIGWAIT: usize = 0x8C;
 /// `SIGWAIT` flag: poll once and return `-EAGAIN` when no matching signal is pending.
 pub const SIGWAIT_POLL: u32 = 1;
 
+/// `proc_wait6(idtype, id, options, status, wrusage, siginfo) -> pid` (raw 0x8E).
+///
+/// The six arguments are the FreeBSD `wait6` set in register order. `status` is `*mut i32`,
+/// `wrusage` is the zeroed 288-byte `struct __wrusage` and `siginfo` is the 128-byte product
+/// `siginfo_t`; a null output pointer skips that output. See contract C21.
+pub const PROC_WAIT6: usize = 0x8E;
+
 /// `thread_self() -> tid`.
 ///
 /// Returns the calling thread's stable 30-bit, nonzero tid. A raw constant,

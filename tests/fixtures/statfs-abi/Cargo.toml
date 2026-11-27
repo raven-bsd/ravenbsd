@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone probe: the uutils statfs record is compiled here for the host layout test and for
+# the target statfs qtest. It is not a member of the product workspace.
+
+[workspace]
+
+[package]
+name = "raven-statfs-abi"
+version = "0.1.0"
+description = "S775: native statfs record layout test and target statfs probe."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[lib]
+name = "raven_statfs_abi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "statfs-initfs-add"
+path = "src/bin/initfs-add.rs"
+
+[dependencies]
+raven-initfs = { path = "../../../crates/raven-initfs", features = ["std"] }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

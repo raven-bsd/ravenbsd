@@ -212,6 +212,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_WAIT_EX {
         return process_ctl::wait_ex(frame);
     }
+    if number == raven_abi::syscall::PROC_WAIT6 {
+        return process_ctl::wait6(frame);
+    }
     if number == process_ctl::PROC_GETPGID {
         return process_ctl::getpgid(frame);
     }
@@ -393,8 +396,9 @@ fn result_value(result: Result<usize, Errno>) -> u64 {
 
 /// Install a successful exec's entry and stack on the saved user frame.
 ///
-/// The old image is already gone; every general register is cleared so no old-pointer value
-/// leaks into the new program. `_start` takes the C8 stack from `rsp`/`sp`, not from a GPR.
+/// The old image is already gone; every general register except the C8 argument register is
+/// cleared so no old-pointer value leaks into the new program. C8 puts `sp0` in `rdi` and keeps
+/// the same value in `rsp`.
 #[cfg(target_arch = "x86_64")]
 fn apply_exec_context(
     frame: &mut crate::arch::x86_64::trapframe::TrapFrame,
@@ -408,7 +412,7 @@ fn apply_exec_context(
     frame.rcx = 0;
     frame.rdx = 0;
     frame.rsi = 0;
-    frame.rdi = 0;
+    frame.rdi = context.stack;
     frame.rbp = 0;
     frame.r8 = 0;
     frame.r9 = 0;
@@ -421,12 +425,16 @@ fn apply_exec_context(
 }
 
 /// Install a successful exec's entry and stack on the saved user frame.
+///
+/// C8 puts `sp0` in `x0` and keeps the same value in `sp`; every other register is cleared so no
+/// old-image value leaks into the new program.
 #[cfg(target_arch = "aarch64")]
 fn apply_exec_context(
     frame: &mut crate::arch::aarch64::vectors::TrapFrame,
     context: crate::process::exec::ExecContext,
 ) {
     frame.x = [0; 31];
+    frame.x[0] = context.stack;
     frame.sp = context.stack;
     frame.elr = context.entry;
     frame.spsr = 0;
@@ -520,3 +528,7 @@ pub fn svc_dispatch(frame: &mut crate::arch::aarch64::vectors::TrapFrame) {
     }
     crate::sched::syscall_return();
 }
+
+#[cfg(test)]
+#[path = "mod_ut.rs"]
+mod tests;

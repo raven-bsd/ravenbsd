@@ -1,25 +1,25 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! S45 signal-fault fixture.
+//! S776 signal-fault fixture.
 //!
-//! Raises user faults through `SIG_SETUP`: an unmapped page (`SIGSEGV`/
-//! `SEGV_MAPERR`), an `int3`/`brk` breakpoint (`SIGTRAP`), and an x86-64
-//! divide error (`SIGFPE`). The entry receives the `FaultRecord` pointer in
-//! its second argument, advances the saved PC past the faulting instruction
-//! and returns through `SIGRETURN`. A child process with no registration dies
-//! with the default SIGSEGV status.
+//! C19 synchronous-fault delivery: the fixture installs a `SIGSEGV` disposition with the
+//! private 40-byte `SIGACTION` request (never `SIG_SETUP`), writes a read-only page, and checks
+//! that the kernel-built frame runs the handler with `si_signo`/`si_code`/`si_addr` for the
+//! permission fault. The handler rewrites the saved PC in the `ucontext_t` and returns through
+//! the kernel sigcode, so `SIGRETURN` must resume the interrupted execution.
+//!
+//! Two children exercise the default paths: one installs a handler that exits with the signal
+//! number (the NetBSD `t_mprotect` shape) and must report status 11; the other keeps the default
+//! disposition and must die with the SIGSEGV status -11.
 
 #![no_std]
 #![no_main]
 
-use core::arch::asm;
-use core::mem::size_of;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
-use raven_abi::signal::{self, FaultRecord, MContext};
-use raven_abi::types::Handle;
+use raven_abi::types::{Handle, prot};
 use raven_initfs::Initfs;
 use raven_rt::entry;
 use raven_rt::println;
@@ -29,60 +29,197 @@ use raven_rt::sys;
 entry!(main);
 
 const PAGE: usize = 4096;
-const CTX_OFF: usize = 0x100;
-const SCENARIO_PAGE: u32 = 1;
-const SCENARIO_DIVIDE: u32 = 2;
-const SCENARIO_BREAK: u32 = 3;
+const SIGSEGV: i32 = 11;
+/// `SEGV_ACCERR` (FreeBSD `sys/sys/signal.h`; `raven-libc-abi` generated/signal.rs).
+const SEGV_ACCERR: u64 = 2;
 
-static SCENARIO: AtomicU32 = AtomicU32::new(0);
-static ENTRY_COUNT: AtomicU32 = AtomicU32::new(0);
-static EXPECT_ADDR: AtomicU64 = AtomicU64::new(0);
-static EXPECT_PC: AtomicU64 = AtomicU64::new(0);
+static SAVED_SIG: AtomicU64 = AtomicU64::new(0);
+static SAVED_CODE: AtomicU64 = AtomicU64::new(0);
+static SAVED_ADDR: AtomicU64 = AtomicU64::new(0);
 static RESUME_PC: AtomicU64 = AtomicU64::new(0);
 
-// The kernel enters the registered point with a 16-byte-aligned stack. The
-// SysV ABI expects RSP % 16 == 8 at a Rust entry, so the x86 stub aligns and
-// calls; the aarch64 ABI already requires a 16-byte-aligned SP.
+/// The Raven private 40-byte `SIGACTION` request (`kernel/src/syscall/thread.rs:UserSigAction`).
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct KernelSigAction {
+    handler: u64,
+    mask: [u64; 2],
+    flags: u32,
+    _pad: u32,
+    restorer: u64,
+}
+
+const _: () = assert!(core::mem::size_of::<KernelSigAction>() == 40);
+
+#[cfg(target_arch = "x86_64")]
+mod frame {
+    /// System V amd64 `siginfo_t`; the union starts after the 12-byte header plus padding.
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct SigInfo {
+        signo: i32,
+        errno: i32,
+        code: i32,
+        _pad: i32,
+        pub fields: [u8; 112],
+    }
+
+    impl SigInfo {
+        /// `si_addr` is the first word of the union (`_sigfault.si_addr`).
+        pub fn addr(&self) -> u64 {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(&self.fields[..8]);
+            u64::from_le_bytes(bytes)
+        }
+
+        /// `si_code`.
+        pub fn code(&self) -> i32 {
+            self.code
+        }
+
+        /// `si_signo`.
+        pub fn signo(&self) -> i32 {
+            self.signo
+        }
+    }
+
+    /// System V amd64 `stack_t`.
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct Stack {
+        sp: u64,
+        flags: i32,
+        _pad: i32,
+        size: u64,
+    }
+
+    /// C36 `mcontext_t`.
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct MContext {
+        pub gregs: [u64; 23],
+        fpregs: u64,
+        reserved: [u64; 8],
+    }
+
+    /// System V amd64 `ucontext_t` (936 bytes).
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct UContext {
+        flags: u64,
+        link: u64,
+        stack: Stack,
+        pub mcontext: MContext,
+        sigmask: [u64; 16],
+        fpregs: [u64; 64],
+    }
+
+    const _: () = assert!(core::mem::size_of::<UContext>() == 936);
+    const _: () = assert!(core::mem::offset_of!(UContext, mcontext) == 40);
+
+    /// `REG_RIP` index in `gregs`.
+    pub const REG_PC: usize = 16;
+}
+
+#[cfg(target_arch = "aarch64")]
+mod frame {
+    /// C19 aarch64 `siginfo_t` (`S160` layout).
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct SigInfo {
+        signo: i32,
+        errno: i32,
+        code: i32,
+        _pid: i32,
+        _uid: u32,
+        _status: i32,
+        addr: u64,
+        _value: u64,
+        _reason: [u8; 0x28],
+    }
+
+    impl SigInfo {
+        /// `si_addr`.
+        pub fn addr(&self) -> u64 {
+            self.addr
+        }
+
+        /// `si_code`.
+        pub fn code(&self) -> i32 {
+            self.code
+        }
+
+        /// `si_signo`.
+        pub fn signo(&self) -> i32 {
+            self.signo
+        }
+    }
+
+    /// aarch64 `stack_t`.
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct Stack {
+        sp: u64,
+        size: u64,
+        flags: u32,
+        _spare: u32,
+    }
+
+    /// NetBSD aarch64 `__fregset_t`.
+    #[repr(C, align(16))]
+    #[derive(Clone, Copy)]
+    pub struct Fpregset {
+        q: [[u8; 16]; 32],
+        fpcr: u32,
+        fpsr: u32,
+    }
+
+    /// NetBSD aarch64 `mcontext_t`.
+    #[repr(C, align(16))]
+    #[derive(Clone, Copy)]
+    pub struct MContext {
+        pub gregs: [u64; 35],
+        fregs: Fpregset,
+        spare: [u64; 8],
+    }
+
+    /// C19 aarch64 `ucontext_t`.
+    #[repr(C, align(16))]
+    #[derive(Clone, Copy)]
+    pub struct UContext {
+        sigmask: [u32; 4],
+        pub mcontext: MContext,
+        link: u64,
+        stack: Stack,
+        flags: u32,
+        spare: [u32; 4],
+    }
+
+    const _: () = assert!(core::mem::size_of::<UContext>() == 0x3c0);
+
+    /// `REG_ELR` index in `__gregs`.
+    pub const REG_PC: usize = 32;
+}
+
+impl frame::UContext {
+    /// Resume at `pc` when `SIGRETURN` restores this context.
+    fn set_pc(&mut self, pc: u64) {
+        if let Some(slot) = self.mcontext.gregs.get_mut(frame::REG_PC) {
+            *slot = pc;
+        }
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
     r#"
     .section .text
-    .global __s45_sigentry
-    .type __s45_sigentry, @function
-__s45_sigentry:
-    and rsp, -16
-    call s45_signal_body
-    ud2
-
-    /* Faulting sequences. The handler sets the saved PC to the `_after` label,
-     * so the faulting instruction is skipped exactly once. */
-    .global s45_page_fault_seq
-    .type s45_page_fault_seq, @function
-s45_page_fault_seq:
-    mov rax, [rdi]
-    .global s45_page_fault_after
-s45_page_fault_after:
-    ret
-
-    .global s45_break_seq
-    .type s45_break_seq, @function
-s45_break_seq:
-    int3
-    .global s45_break_after
-s45_break_after:
-    ret
-
-    .global s45_divide_seq
-    .type s45_divide_seq, @function
-s45_divide_seq:
-    xor edx, edx
-    mov eax, 1
-    xor ecx, ecx
-    .global s45_divide_fault
-s45_divide_fault:
-    div ecx
-    .global s45_divide_after
-s45_divide_after:
+    .global s776_fault_seq
+    .type s776_fault_seq, @function
+s776_fault_seq:
+    mov byte ptr [rdi], 1
+    .global s776_fault_after
+s776_fault_after:
     ret
 "#
 );
@@ -91,107 +228,19 @@ s45_divide_after:
 core::arch::global_asm!(
     r#"
     .section .text
-    .global __s45_sigentry
-    .type __s45_sigentry, %function
-__s45_sigentry:
-    bl s45_signal_body
-    brk #0
-
-    .global s45_page_fault_seq
-    .type s45_page_fault_seq, %function
-s45_page_fault_seq:
-    ldr x0, [x0]
-    .global s45_page_fault_after
-s45_page_fault_after:
-    ret
-
-    .global s45_break_seq
-    .type s45_break_seq, %function
-s45_break_seq:
-    brk #0
-    .global s45_break_after
-s45_break_after:
+    .global s776_fault_seq
+    .type s776_fault_seq, %function
+s776_fault_seq:
+    strb w0, [x0]
+    .global s776_fault_after
+s776_fault_after:
     ret
 "#
 );
 
 unsafe extern "C" {
-    fn __s45_sigentry();
-    fn s45_page_fault_seq(address: usize);
-    fn s45_page_fault_after();
-    fn s45_break_seq();
-    fn s45_break_after();
-}
-
-#[cfg(target_arch = "x86_64")]
-unsafe extern "C" {
-    fn s45_divide_seq();
-    fn s45_divide_fault();
-    fn s45_divide_after();
-}
-
-fn signal_entry_address() -> usize {
-    __s45_sigentry as *const () as usize
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-unsafe fn syscall6(
-    number: usize,
-    a0: usize,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-) -> isize {
-    let result: isize;
-    // SAFETY: scalar syscall arguments; the kernel validates handles and pointers.
-    unsafe {
-        asm!(
-            "syscall",
-            inlateout("rax") number => result,
-            in("rdi") a0,
-            in("rsi") a1,
-            in("rdx") a2,
-            in("r10") a3,
-            in("r8") a4,
-            in("r9") a5,
-            lateout("rcx") _,
-            lateout("r11") _,
-            options(nostack),
-        );
-    }
-    result
-}
-
-#[cfg(target_arch = "aarch64")]
-#[inline(always)]
-unsafe fn syscall6(
-    number: usize,
-    a0: usize,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-) -> isize {
-    let result: isize;
-    // SAFETY: scalar syscall arguments; the kernel validates handles and pointers.
-    unsafe {
-        asm!(
-            "svc #0",
-            in("x8") number,
-            inlateout("x0") a0 => result,
-            in("x1") a1,
-            in("x2") a2,
-            in("x3") a3,
-            in("x4") a4,
-            in("x5") a5,
-            options(nostack),
-        );
-    }
-    result
+    fn s776_fault_seq(address: usize);
+    fn s776_fault_after();
 }
 
 fn result(raw: isize) -> Result<usize, Errno> {
@@ -202,12 +251,21 @@ fn result(raw: isize) -> Result<usize, Errno> {
     }
 }
 
-fn set_tls(tp: usize) -> Result<(), Errno> {
+type Handler = extern "C" fn(i32, *const frame::SigInfo, *mut frame::UContext);
+
+fn install(signo: i32, handler: Handler) -> Result<(), Errno> {
+    let action = KernelSigAction {
+        handler: handler as *const () as u64,
+        mask: [0; 2],
+        flags: 0,
+        _pad: 0,
+        restorer: 0,
+    };
     result(unsafe {
-        syscall6(
-            raven_abi::syscall::THREAD_SET_TLS,
-            Handle::NONE.0 as usize,
-            tp,
+        sys::syscall6(
+            raven_abi::syscall::SIGACTION,
+            signo as usize,
+            &action as *const KernelSigAction as usize,
             0,
             0,
             0,
@@ -217,215 +275,144 @@ fn set_tls(tp: usize) -> Result<(), Errno> {
     .map(|_| ())
 }
 
-fn sig_setup(entry: usize, offset: usize, flags: u32) -> Result<(), Errno> {
-    result(unsafe { syscall6(signal::SIG_SETUP, entry, offset, flags as usize, 0, 0, 0) })
-        .map(|_| ())
+/// Drop write permission on one page (the `t_mprotect` read-only transition).
+fn protect_read_only(page: usize) -> Result<(), Errno> {
+    result(unsafe {
+        sys::syscall4(
+            raven_abi::syscall::Syscall::PROTECT as usize,
+            Handle::SELF_PROC.0 as usize,
+            page,
+            PAGE,
+            prot::READ,
+        )
+    })
+    .map(|_| ())
 }
 
-fn sigreturn() -> isize {
-    unsafe { syscall6(signal::SIGRETURN, 0, 0, 0, 0, 0, 0) }
-}
-
-#[cfg(target_arch = "x86_64")]
-fn read_tls_base() -> u64 {
-    let base: u64;
-    // SAFETY: FSGSBASE is enabled by the kernel when the CPU advertises it.
-    unsafe {
-        asm!("rdfsbase {}", out(reg) base, options(nomem, nostack, preserves_flags));
-    }
-    base
-}
-
-#[cfg(target_arch = "aarch64")]
-fn read_tls_base() -> u64 {
-    let base: u64;
-    // SAFETY: TPIDR_EL0 is the user TLS base register.
-    unsafe {
-        asm!("mrs {}, tpidr_el0", out(reg) base, options(nomem, nostack, preserves_flags));
-    }
-    base
+fn fault_write(page: usize) {
+    // SAFETY: the caller mapped one page and dropped write permission; the fault is the test.
+    unsafe { s776_fault_seq(page) };
 }
 
 fn main(args: raven_rt::Args) -> i32 {
     match args.get(1) {
         None | Some("init") => controller(),
-        Some("fault-child") => fault_child(),
+        Some("caught-child") => caught_child(),
+        Some("default-child") => default_child(),
         Some(_) => 2,
     }
 }
 
 fn controller() -> i32 {
-    // Two pages: the aarch64 MContext plus the FaultRecord tail crosses one
-    // 4 KiB page at CTX_OFF. The x86-64 context fits in the first page.
-    let tls = match sys::map_anonymous(2 * PAGE) {
-        Ok(page) => page,
-        Err(_) => return 1,
-    };
-    if set_tls(tls).is_err() {
-        println!("signal-fault: tls failed");
-        return 1;
-    }
-    // Install the TLS base on the hardware register before the first entry.
-    let _ = sys::nanosleep(2_000_000);
-    if sig_setup(signal_entry_address(), CTX_OFF, 0).is_err() {
-        println!("signal-fault: setup failed");
-        return 1;
-    }
-    println!("signal-fault: setup=0");
-
     let page = match sys::map_anonymous(PAGE) {
         Ok(page) => page,
         Err(_) => return 1,
     };
-    if sys::unmap(Handle::SELF_PROC, page, PAGE).is_err() {
-        println!("signal-fault: unmap failed");
+    // SAFETY: the mapping has PAGE writable bytes.
+    unsafe { core::ptr::write_volatile(page as *mut u8, 0x41) };
+    if protect_read_only(page).is_err() {
+        println!("signal-fault: protect failed");
         return 1;
     }
-    SCENARIO.store(SCENARIO_PAGE, Ordering::SeqCst);
-    EXPECT_ADDR.store(page as u64, Ordering::SeqCst);
-    EXPECT_PC.store(s45_page_fault_seq as *const () as u64, Ordering::SeqCst);
-    RESUME_PC.store(s45_page_fault_after as *const () as u64, Ordering::SeqCst);
-    unsafe {
-        s45_page_fault_seq(page);
+    if install(SIGSEGV, fault_handler).is_err() {
+        println!("signal-fault: sigaction failed");
+        return 1;
     }
+    RESUME_PC.store(s776_fault_after as *const () as u64, Ordering::SeqCst);
+    fault_write(page);
+    if SAVED_SIG.load(Ordering::SeqCst) != u64::from(SIGSEGV as u32) {
+        println!("signal-fault: page handler=0");
+        return 1;
+    }
+    let code = SAVED_CODE.load(Ordering::SeqCst);
+    let addr = SAVED_ADDR.load(Ordering::SeqCst);
+    println!(
+        "signal-fault: page handler=1 code={code} addr=0x{addr:x} addr-match={}",
+        u8::from(addr == page as u64 && code == SEGV_ACCERR)
+    );
     println!("signal-fault: page resumed=1");
 
-    SCENARIO.store(SCENARIO_BREAK, Ordering::SeqCst);
-    EXPECT_ADDR.store(0, Ordering::SeqCst);
-    // x86 `int3` is a trap: the saved RIP already points after the opcode.
-    // aarch64 `brk` reports the faulting instruction in ELR.
-    #[cfg(target_arch = "x86_64")]
-    EXPECT_PC.store(s45_break_after as *const () as u64, Ordering::SeqCst);
-    #[cfg(target_arch = "aarch64")]
-    EXPECT_PC.store(s45_break_seq as *const () as u64, Ordering::SeqCst);
-    RESUME_PC.store(s45_break_after as *const () as u64, Ordering::SeqCst);
-    unsafe {
-        s45_break_seq();
-    }
-    println!("signal-fault: breakpoint resumed=1");
-
-    #[cfg(target_arch = "x86_64")]
-    {
-        SCENARIO.store(SCENARIO_DIVIDE, Ordering::SeqCst);
-        EXPECT_ADDR.store(0, Ordering::SeqCst);
-        EXPECT_PC.store(s45_divide_fault as *const () as u64, Ordering::SeqCst);
-        RESUME_PC.store(s45_divide_after as *const () as u64, Ordering::SeqCst);
-        unsafe {
-            s45_divide_seq();
-        }
-        println!("signal-fault: divide=fpe");
-        println!("signal-fault: divide done=1");
-    }
-    #[cfg(target_arch = "aarch64")]
-    {
-        // AArch64 integer division by zero does not trap.
-        println!("signal-fault: divide=skip");
-        println!("signal-fault: divide done=1");
-    }
-
-    let image = match sys::map_initfs() {
-        Ok(image) => image,
-        Err(_) => {
-            println!("signal-fault: initfs map failed");
-            return 1;
-        }
-    };
-    let initfs = match Initfs::parse(image) {
-        Ok(initfs) => initfs,
-        Err(_) => {
-            println!("signal-fault: initfs parse failed");
-            return 1;
-        }
-    };
-    let options = SpawnOptions {
-        args: &["init", "fault-child"],
-        env: &[],
-    };
-    let mut rt = RtSys;
-    let child = match spawn_with(&initfs, "/init", &options, &mut rt) {
-        Ok(child) => child,
-        Err(_) => {
-            println!("signal-fault: spawn failed");
-            return 1;
-        }
-    };
-    let mut code = 0i32;
-    if rt.proc_wait(child, &mut code).is_err() {
-        println!("signal-fault: wait failed");
+    if let Err(code) = run_child("caught-child") {
+        println!("signal-fault: caught child failed={code}");
         return 1;
     }
-    println!("signal-fault: child status={code}");
+    if let Err(code) = run_child("default-child") {
+        println!("signal-fault: default child failed={code}");
+        return 1;
+    }
     println!("signal-fault: done");
     0
 }
 
-fn fault_child() -> i32 {
+fn run_child(argument: &str) -> Result<i32, i32> {
+    let image = sys::map_initfs().map_err(|_| 1)?;
+    let initfs = Initfs::parse(image).map_err(|_| 2)?;
+    let options = SpawnOptions {
+        args: &["init", argument],
+        env: &[],
+    };
+    let mut rt = RtSys;
+    let child = spawn_with(&initfs, "/init", &options, &mut rt).map_err(|_| 3)?;
+    let mut code = 0i32;
+    rt.proc_wait(child, &mut code).map_err(|_| 4)?;
+    if argument == "caught-child" {
+        println!("signal-fault: caught status={code}");
+    } else {
+        println!("signal-fault: default status={code}");
+    }
+    Ok(code)
+}
+
+fn caught_child() -> i32 {
     let page = match sys::map_anonymous(PAGE) {
         Ok(page) => page,
         Err(_) => return 1,
     };
-    if sys::unmap(Handle::SELF_PROC, page, PAGE).is_err() {
-        println!("signal-fault: child unmap failed");
+    // SAFETY: the mapping has PAGE writable bytes.
+    unsafe { core::ptr::write_volatile(page as *mut u8, 0x41) };
+    if protect_read_only(page).is_err() {
+        println!("signal-fault: child protect failed");
         return 1;
     }
-    unsafe {
-        s45_page_fault_seq(page);
+    if install(SIGSEGV, exit_handler).is_err() {
+        println!("signal-fault: child sigaction failed");
+        return 1;
     }
-    println!("signal-fault: child returned");
-    println!("signal-fault: child done");
+    fault_write(page);
+    println!("signal-fault: caught child survived");
     0
 }
 
-#[unsafe(no_mangle)]
-extern "C" fn s45_signal_body(bits: usize, fault: *const FaultRecord) -> ! {
-    let scenario = SCENARIO.load(Ordering::SeqCst);
-    let count = ENTRY_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
-    let base = read_tls_base();
-    let context_address = base.wrapping_add(CTX_OFF as u64);
-    // SAFETY: the kernel registered this area through SIG_SETUP and wrote a
-    // full MContext (and the FaultRecord tail) before entering; the TLS page
-    // is mapped by the fixture.
-    let context = unsafe { &mut *(context_address as *mut MContext) };
-    if fault.is_null() {
-        println!(
-            "signal-fault: entry scenario={scenario} bits={bits} count={count} fault=0 ctx-size={}",
-            size_of::<MContext>()
-        );
-    } else {
-        // SAFETY: the kernel wrote one FaultRecord immediately after the
-        // MContext in the registered user area.
-        let record = unsafe { &*fault };
-        let pc_match = record.pc as u64 == EXPECT_PC.load(Ordering::SeqCst);
-        let addr_match = if scenario == SCENARIO_PAGE {
-            record.addr as u64 == EXPECT_ADDR.load(Ordering::SeqCst)
-        } else {
-            record.addr == record.pc
-        };
-        println!(
-            "signal-fault: entry scenario={} bits={} count={} fault=1 kind={} addr=0x{:x} pc=0x{:x} ctx-pc=0x{:x} ctx-size={} resume=0x{:x} pc-match={} addr-match={}",
-            scenario,
-            bits,
-            count,
-            record.kind,
-            record.addr,
-            record.pc,
-            context.pc(),
-            size_of::<MContext>(),
-            RESUME_PC.load(Ordering::SeqCst),
-            u8::from(pc_match),
-            u8::from(addr_match)
-        );
-        match scenario {
-            SCENARIO_PAGE => println!("signal-fault: page entry=1"),
-            SCENARIO_DIVIDE => println!("signal-fault: divide entry=1"),
-            SCENARIO_BREAK => println!("signal-fault: breakpoint entry=1"),
-            _ => {}
-        }
-        context.set_pc(RESUME_PC.load(Ordering::SeqCst));
+fn default_child() -> i32 {
+    let page = match sys::map_anonymous(PAGE) {
+        Ok(page) => page,
+        Err(_) => return 1,
+    };
+    // SAFETY: the mapping has PAGE writable bytes.
+    unsafe { core::ptr::write_volatile(page as *mut u8, 0x41) };
+    if protect_read_only(page).is_err() {
+        println!("signal-fault: default protect failed");
+        return 1;
     }
-    let raw = sigreturn();
-    println!("signal-fault: sigreturn returned raw={raw}");
-    loop {
-        core::hint::spin_loop();
+    fault_write(page);
+    println!("signal-fault: default child survived");
+    0
+}
+
+extern "C" fn fault_handler(_sig: i32, info: *const frame::SigInfo, context: *mut frame::UContext) {
+    if info.is_null() || context.is_null() {
+        return;
     }
+    // SAFETY: the kernel passes the siginfo and ucontext it just wrote inside the handler frame.
+    let (signo, code, addr) = unsafe { ((*info).signo(), (*info).code(), (*info).addr()) };
+    SAVED_SIG.store(u64::from(signo as u32), Ordering::SeqCst);
+    SAVED_CODE.store(u64::from(code as u32), Ordering::SeqCst);
+    SAVED_ADDR.store(addr, Ordering::SeqCst);
+    // SAFETY: the kernel wrote the full ucontext_t; only `gregs` is modified.
+    unsafe { (*context).set_pc(RESUME_PC.load(Ordering::SeqCst)) };
+}
+
+extern "C" fn exit_handler(sig: i32, _info: *const frame::SigInfo, _context: *mut frame::UContext) {
+    // NetBSD `t_mprotect` `sighandler`: exit with the signal number.
+    sys::exit(sig);
 }
