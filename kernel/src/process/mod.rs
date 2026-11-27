@@ -478,6 +478,9 @@ fn print_leaked_process_holders() {
 impl Drop for Process {
     fn drop(&mut self) {
         LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
+        if cmdline_has("s36-holders") {
+            kprintln!("s170: drop pid={}", self.id);
+        }
     }
 }
 
@@ -2834,6 +2837,13 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let _irq = crate::sync::critical();
         *process.handles.lock() = HandleTable::new();
     }
+    if cmdline_has("s36-holders") {
+        kprintln!(
+            "s170: teardown-handles pid={} refs={}",
+            process.id,
+            Arc::strong_count(process)
+        );
+    }
     // S69 cleanup evidence: every kernel-owned resource count plus the process-local waiter and
     // request queues after the table was replaced.  The line is gated to fixture command names so
     // the ten-thousand-exit soak does not flood the serial log; the fixture sets them with
@@ -3521,6 +3531,13 @@ pub fn notify_exit(code: i32) {
         crate::arch::halt()
     };
     let _ = terminate_once(&process, code, true);
+    if cmdline_has("s36-holders") {
+        kprintln!(
+            "s170: notify-exit pid={} refs={}",
+            process.id,
+            Arc::strong_count(&process)
+        );
+    }
 }
 
 /// Terminate the calling process (`EXIT`).
