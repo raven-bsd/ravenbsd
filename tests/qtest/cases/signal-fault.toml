@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S45 fault delivery: an unmapped user page is delivered as SIGSEGV/
-# SEGV_MAPERR with the FaultRecord; the handler rewrites the saved PC and
-# SIGRETURN resumes. A breakpoint is delivered as SIGTRAP, x86-64 divide as
-# SIGFPE, and a child process with no SIG_SETUP dies with the SIGSEGV status.
+# S776 fault delivery without SIG_SETUP: a read-only page write is delivered through the
+# kernel-built C19 frame (SIGACTION disposition, kernel sigcode, SIGRETURN resume). The
+# handler sees SIGSEGV/SEGV_ACCERR and the fault address in the record; a child that exits
+# from the handler reports status 11 and a child with the default disposition dies with -11.
 
 name = "signal-fault"
 arch = "x86_64"
@@ -17,34 +17,16 @@ qemu_extra = ["-cpu", "max"]
 expect_exit = "success"
 
 [[expect]]
-regex = '^signal-fault: setup=0$'
-
-[[expect]]
-regex = '^signal-fault: entry scenario=1 bits=0 count=1 fault=1 kind=1 addr=0x[0-9a-f]+ pc=0x[0-9a-f]+ ctx-pc=0x[0-9a-f]+ ctx-size=(256|4384) resume=0x[0-9a-f]+ pc-match=1 addr-match=1$'
-
-[[expect]]
-regex = '^signal-fault: page entry=1$'
+regex = '^signal-fault: page handler=1 code=2 addr=0x[0-9a-f]+ addr-match=1$'
 
 [[expect]]
 regex = '^signal-fault: page resumed=1$'
 
 [[expect]]
-regex = '^signal-fault: entry scenario=3 bits=0 count=2 fault=1 kind=6 addr=0x[0-9a-f]+ pc=0x[0-9a-f]+ ctx-pc=0x[0-9a-f]+ ctx-size=(256|4384) resume=0x[0-9a-f]+ pc-match=1 addr-match=1$'
+regex = '^signal-fault: caught status=11$'
 
 [[expect]]
-regex = '^signal-fault: breakpoint entry=1$'
-
-[[expect]]
-regex = '^signal-fault: breakpoint resumed=1$'
-
-[[expect]]
-regex = '^signal-fault: divide=(fpe|skip)$'
-
-[[expect]]
-regex = '^signal-fault: divide done=1$'
-
-[[expect]]
-regex = '^signal-fault: child status=-11$'
+regex = '^signal-fault: default status=-11$'
 
 [[expect]]
 regex = '^signal-fault: done$'

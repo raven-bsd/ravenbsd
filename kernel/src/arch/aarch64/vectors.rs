@@ -20,7 +20,7 @@ use core::mem::size_of;
 use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
-use raven_abi::signal::{self, ENTRY_SP, FaultRecord, MContext};
+use raven_abi::signal::{self, ENTRY_SP, MContext};
 use raven_esr::{Esr, data_abort, ec_name, slot_name};
 use raven_usercopy::{UserSlice, is_user_address};
 
@@ -542,6 +542,31 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     let Some((record, action)) = process.next_kernel_signal(blocked) else {
         return false;
     };
+    deliver_signal_record(frame, record, action, None)
+}
+
+/// Write the C19 `sendsig` frame for `record` and enter its handler.
+///
+/// `fault_addr` is `Some` for a synchronous trap and fills `si_addr` from the trap record; a
+/// queued signal keeps the sender pid/uid fields (NetBSD `sendsig_siginfo` fills one union from
+/// `ksi`). Returns false when the process/thread vanished or the thread is not a user thread.
+#[allow(clippy::indexing_slicing)]
+fn deliver_signal_record(
+    frame: &mut TrapFrame,
+    record: crate::process::PendingSignal,
+    action: crate::process::SigAction,
+    fault_addr: Option<u64>,
+) -> bool {
+    let Some(process) = process::current() else {
+        return false;
+    };
+    let Some(thread) = crate::sched::current_thread() else {
+        return false;
+    };
+    if !thread.user {
+        return false;
+    }
+    let blocked = thread.sig_blocked.load(Ordering::Acquire);
     let old_mask = blocked;
     let mut new_mask = old_mask | action.mask;
     if action.flags & crate::process::SA_NODEFER == 0 {
@@ -582,10 +607,14 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
     };
     layout.siginfo.si_signo = record.signo as i32;
     layout.siginfo.si_code = record.code as i32;
-    layout.siginfo.si_pid = record.sender as i32;
-    layout.siginfo.si_uid = record.uid;
-    if record.code == crate::process::SI_QUEUE_CODE {
-        layout.siginfo.si_value = record.value;
+    if let Some(addr) = fault_addr {
+        layout.siginfo.si_addr = addr;
+    } else {
+        layout.siginfo.si_pid = record.sender as i32;
+        layout.siginfo.si_uid = record.uid;
+        if record.code == crate::process::SI_QUEUE_CODE {
+            layout.siginfo.si_value = record.value;
+        }
     }
     layout.ucontext.uc_sigmask[0] = old_mask as u32;
     layout.ucontext.uc_sigmask[1] = (old_mask >> 32) as u32;
@@ -706,26 +735,71 @@ pub fn deliver_signal(frame: &mut TrapFrame) {
     enter_signal(frame, &due, u64::from(due.bits), fault_pointer, due.mask);
 }
 
-/// Deliver a synchronous user fault to the signal entry.
+/// `SEGV_MAPERR`: no mapping at the fault address (FreeBSD `sys/sys/signal.h`; the value
+/// `raven-libc-abi` publishes as `SEGV_MAPERR`).
+const SEGV_MAPERR: u32 = 1;
+/// `SEGV_ACCERR`: the mapping denies the requested access.
+const SEGV_ACCERR: u32 = 2;
+/// `FPE_INTDIV`: integer divide by zero.
+const FPE_INTDIV: u32 = 2;
+/// `ILL_ILLOPC`: illegal opcode.
+const ILL_ILLOPC: u32 = 1;
+/// `BUS_ADRALN`: invalid address alignment.
+const BUS_ADRALN: u32 = 1;
+/// `TRAP_BRKPT`: process breakpoint.
+const TRAP_BRKPT: u32 = 1;
+
+/// Map a C58 fault kind to the C19 `si_signo`/`si_code` pair.
 ///
-/// Returns false when the thread has no usable `SIG_SETUP` (no registration,
-/// already inside a signal); the caller then takes the default-action path.
+/// NetBSD `sys/arch/aarch64/aarch64/trap.c` synthesizes the same `ksi_info` for each exception
+/// class and `kern_sig.c:trapsignal` delivers it through `sendsig`.
+fn fault_signal(kind: u32) -> Option<(u32, u32)> {
+    match kind {
+        signal::FAULT_PAGE_NOMAP => Some((crate::process::status::SIGSEGV, SEGV_MAPERR)),
+        signal::FAULT_PAGE_PERM => Some((crate::process::status::SIGSEGV, SEGV_ACCERR)),
+        signal::FAULT_DIVIDE => Some((crate::process::status::SIGFPE, FPE_INTDIV)),
+        signal::FAULT_ILLEGAL => Some((crate::process::status::SIGILL, ILL_ILLOPC)),
+        signal::FAULT_MISALIGN => Some((crate::process::status::SIGBUS, BUS_ADRALN)),
+        signal::FAULT_BREAKPOINT => Some((crate::process::status::SIGTRAP, TRAP_BRKPT)),
+        _ => None,
+    }
+}
+
+/// Deliver a synchronous user fault through the kernel-built C19 frame.
+///
+/// NetBSD `kern_sig.c:trapsignal` delivers a trap signal immediately when its disposition is a
+/// caught handler and the thread does not mask it; a masked or ignored one is reset to the
+/// default action and posted normally, which here is the caller's termination path.
 pub fn deliver_fault(frame: &mut TrapFrame, kind: u32, addr: u64) -> bool {
-    let Some(due) = thread::signal_fault_due() else {
+    let Some(process) = process::current() else {
         return false;
     };
-    let record = FaultRecord {
-        kind,
-        addr: addr as usize,
-        pc: frame.elr as usize,
+    let Some(thread) = crate::sched::current_thread() else {
+        return false;
     };
-    let fault_pointer = {
-        let mut context = SIGNAL_CONTEXT.lock();
-        context_from_frame(frame, &mut context);
-        thread::signal_commit(&due, &context, Some(&record))
+    if !thread.user {
+        return false;
+    }
+    let Some((signo, code)) = fault_signal(kind) else {
+        return false;
     };
-    enter_signal(frame, &due, 0, fault_pointer, due.mask);
-    true
+    let action = process.sigacts.lock().get(signo);
+    if !action.is_caught()
+        || thread.sig_blocked.load(Ordering::Acquire) & crate::process::signal_bit(signo) != 0
+    {
+        return false;
+    }
+    if process.ensure_sigcode_page().is_err() {
+        process::exit_process(Errno::ENOMEM.to_ret() as i32);
+    }
+    let record = crate::process::PendingSignal {
+        signo,
+        sender: 0,
+        code,
+        uid: 0,
+        value: 0,
+    };
+    deliver_signal_record(frame, record, action, Some(addr))
 }
 
 /// Default action for a user fault with no signal entry: terminate with the
