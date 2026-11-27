@@ -1416,17 +1416,6 @@ pub fn exit_thread(code: i32) -> ! {
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
-    if crate::memory::paging::cmdline()
-        .split_ascii_whitespace()
-        .any(|token| token == "s36-holders")
-    {
-        crate::kprintln!(
-            "s170: switch pid={} thread_refs={}",
-            thread.process.id,
-            Arc::strong_count(&thread)
-        );
-        crate::process::report_process_refs(&thread.process);
-    }
     // The frame that switches away is abandoned on the dead stack, so its `Arc` local can never
     // be dropped. Hand the owning reference to the incoming context; publishing it to `REAP`
     // before the switch would let another CPU free this stack while it is still executing.

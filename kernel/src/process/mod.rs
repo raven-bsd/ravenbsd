@@ -402,17 +402,14 @@ fn print_leaked_process_holders() {
             ProcessState::Running => "running",
             ProcessState::Exited => "exited",
         };
-        let stack = crate::sched::thread::stack_holders(Arc::as_ptr(process) as usize);
         let thread_objects = crate::sched::thread::process_thread_refs(process);
         kprintln!(
-            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped} thread_objects={thread_objects} stacks={} stack_refs={}",
+            "s36: leak pid={} ppid={} cmd={} refs={} threads={} state={state} reaped={reaped} thread_objects={thread_objects}",
             process.id,
             ppid,
             process.command.lock(),
             Arc::strong_count(process),
-            process.threads.load(Ordering::Acquire),
-            stack[0],
-            stack[1]
+            process.threads.load(Ordering::Acquire)
         );
         for parent in &processes {
             if parent.id != ppid {
@@ -476,88 +473,9 @@ fn print_leaked_process_holders() {
     }
 }
 
-/// Name the objects that still hold `target` (`s36-holders`).
-///
-/// Runs at the thread switch, when the exit path is about to abandon its frame: the print names
-/// the surviving strong references by object kind so the leak is attributable before the switch.
-pub fn report_process_refs(target: &Arc<Process>) {
-    let processes: Vec<Arc<Process>> = ALL_PROCESSES
-        .lock()
-        .iter()
-        .filter_map(Weak::upgrade)
-        .collect();
-    let mut stats = [0u64; 8];
-    for holder in &processes {
-        holder.handles.lock().for_each_live(|_, object, _, _| match object {
-            crate::process::handle::Object::Process(process) if Arc::ptr_eq(process, target) => {
-                stats[0] = stats[0].saturating_add(1);
-            }
-            crate::process::handle::Object::Thread(thread)
-                if Arc::ptr_eq(&thread.process, target) =>
-            {
-                stats[1] = stats[1].saturating_add(1);
-            }
-            crate::process::handle::Object::SchemeFile(file)
-                if Arc::ptr_eq(&file.server, target) =>
-            {
-                stats[2] = stats[2].saturating_add(1);
-            }
-            crate::process::handle::Object::SchemeRequest(request) => {
-                if Arc::ptr_eq(&request.client, target) {
-                    stats[3] = stats[3].saturating_add(1);
-                }
-                if Arc::ptr_eq(&request.server, target) {
-                    stats[4] = stats[4].saturating_add(1);
-                }
-                if request
-                    .file
-                    .as_ref()
-                    .is_some_and(|file| Arc::ptr_eq(&file.server, target))
-                {
-                    stats[5] = stats[5].saturating_add(1);
-                }
-            }
-            _ => {}
-        });
-        let queued = holder
-            .client_requests
-            .lock()
-            .iter()
-            .filter(|request| Arc::ptr_eq(&request.client, target))
-            .count() as u64;
-        if queued > 0 {
-            kprintln!(
-                "s170: client-queue holder={} count={queued}",
-                holder.id
-            );
-        }
-        stats[6] = stats[6].saturating_add(queued);
-    }
-    stats[7] = Arc::strong_count(target) as u64;
-    let thread_refs = crate::sched::thread::process_thread_refs(target);
-    let stack = crate::sched::thread::stack_holders(Arc::as_ptr(target) as usize);
-    kprintln!(
-        "s170: refs pid={} total={} handle={} thread={} file={} req-client={} req-server={} req-file={} client-queue={} thread-objects={thread_refs} stacks={} stack_refs={}",
-        target.id,
-        stats[7],
-        stats[0],
-        stats[1],
-        stats[2],
-        stats[3],
-        stats[4],
-        stats[5],
-        stats[6],
-        stack[0],
-        stack[1]
-    );
-}
-
 impl Drop for Process {
     fn drop(&mut self) {
         LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
-        if cmdline_has("s36-holders") {
-            kprintln!("s170: drop pid={}", self.id);
-        }
     }
 }
 
@@ -2914,13 +2832,6 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
         let _irq = crate::sync::critical();
         *process.handles.lock() = HandleTable::new();
     }
-    if cmdline_has("s36-holders") {
-        kprintln!(
-            "s170: teardown-handles pid={} refs={}",
-            process.id,
-            Arc::strong_count(process)
-        );
-    }
     // S69 cleanup evidence: every kernel-owned resource count plus the process-local waiter and
     // request queues after the table was replaced.  The line is gated to fixture command names so
     // the ten-thousand-exit soak does not flood the serial log; the fixture sets them with
@@ -3559,10 +3470,6 @@ pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
         let _ = robust::walk_thread();
         let _ = terminate_once(&process, code, true);
-        // `exit_thread` switches away without unwinding, so this frame is abandoned with any
-        // live `Arc` local still counted. Drop the process reference before the switch or every
-        // exiting process leaves one strong reference to its own `Process` behind (S170).
-        drop(process);
     }
     crate::sched::exit_thread(code)
 }
@@ -3608,13 +3515,6 @@ pub fn notify_exit(code: i32) {
         crate::arch::halt()
     };
     let _ = terminate_once(&process, code, true);
-    if cmdline_has("s36-holders") {
-        kprintln!(
-            "s170: notify-exit pid={} refs={}",
-            process.id,
-            Arc::strong_count(&process)
-        );
-    }
 }
 
 /// Terminate the calling process (`EXIT`).

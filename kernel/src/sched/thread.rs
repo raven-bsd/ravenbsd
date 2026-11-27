@@ -91,53 +91,9 @@ pub fn process_thread_refs(process: &alloc::sync::Arc<crate::process::Process>) 
         };
         if Arc::ptr_eq(&thread.process, process) {
             refs = refs.saturating_add(1);
-            crate::kprintln!(
-                "s170: thread-of pid={} tid={} name={} state={:?} refs={}",
-                process.id,
-                thread.id,
-                thread.name,
-                thread.state(),
-                Arc::strong_count(&thread)
-            );
         }
     }
     refs
-}
-
-/// Count `target` words on every live thread's kernel stack (`s36-holders`).
-///
-/// A `Process` reference held by a blocked syscall sits in a kernel-stack local, outside every
-/// object table the census can walk. Scanning the recorded stack range proves that owner and
-/// names its count; it only runs in the diagnostic image.
-pub fn stack_holders(target: usize) -> [u64; 2] {
-    let mut threads = 0u64;
-    let mut hits = 0u64;
-    let word = core::mem::size_of::<usize>();
-    for weak in ALL_THREADS.lock().iter() {
-        let Some(thread) = weak.upgrade() else {
-            continue;
-        };
-        // `kernel_stack_base` is the unmapped guard page; the stack starts one page above it.
-        let base = thread.kernel_stack_base as usize;
-        let top = thread.kernel_stack_top as usize;
-        let Some(start) = base.checked_add(PAGE as usize) else {
-            continue;
-        };
-        if base == 0 || top <= start {
-            continue;
-        }
-        threads = threads.saturating_add(1);
-        let mut address = start;
-        while address.saturating_add(word) <= top {
-            // SAFETY: `start..top` is the thread's mapped kernel-stack region for as long as
-            // the thread object is registered; the guard page below `start` is excluded.
-            if unsafe { *(address as *const usize) } == target {
-                hits = hits.saturating_add(1);
-            }
-            address = address.saturating_add(word);
-        }
-    }
-    [threads, hits]
 }
 
 /// Leaked thread objects (thread whose process is torn down) and their strong-ref histogram.
