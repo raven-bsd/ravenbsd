@@ -26,6 +26,8 @@ kvm_timeout=15
 tcg_timeout=30
 force_build=0
 wait_idle=0
+allow_jobs=0
+allow_qemu=0
 default_max_load() {
     n=$(nproc 2>/dev/null || echo 4)
     case "$n" in ''|*[!0-9]*) n=4 ;; esac
@@ -92,6 +94,8 @@ usage: sh scripts/smp-boot-soak.sh [options]
   --build         force a release image build (needs a clean tree)
   --out DIR       log root (default build/smp-boot-soak/<utc>)
   --wait-for-idle S wait up to S seconds for no other QEMU/xtask/cargo/rustc and load <= 2.0
+  --allow-jobs    ignore co-tenant cargo/rustc/xtask builds (functional boot rows)
+  --allow-qemu N   tolerate up to N other QEMU processes (functional rows; default 0)
   --max-load L    maximum 1-minute load average for the preflight (default max(2, nproc/4))
   -h, --help      show this help
 
@@ -114,6 +118,8 @@ while [ "$#" -gt 0 ]; do
         --build) force_build=1; shift ;;
         --out) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; out_root=$2; shift 2 ;;
         --wait-for-idle) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; wait_idle=$2; shift 2 ;;
+        --allow-jobs) allow_jobs=1; shift ;;
+        --allow-qemu) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; allow_qemu=$2; shift 2 ;;
         --max-load) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; max_load=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "smp-boot-soak: unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -127,11 +133,16 @@ host_tsv=$out/host.tsv
 printf 'mode\trun\tstart_utc\tend_utc\tload1_before\tqemu_before\tjobs_before\tload1_after\tqemu_after\tjobs_after\tstatus\tlogin_s\n' > "$host_tsv"
 trap print_host_summary EXIT
 
-sh tests/smp/boot/host-idle.sh \
+set -- \
     --context "smp-boot-soak" \
     --wait "$wait_idle" \
     --max-load "$max_load" \
+    --allow-qemu "$allow_qemu" \
     --state-file "$out/host-state.txt"
+if [ "$allow_jobs" -eq 1 ]; then
+    set -- "$@" --allow-jobs
+fi
+sh tests/smp/boot/host-idle.sh "$@"
 
 if [ "$force_build" -eq 1 ] || [ ! -f "$image" ]; then
     cargo xtask image --arch x86_64 --profile "$profile"
