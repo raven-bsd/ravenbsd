@@ -5,9 +5,11 @@
 # S107 KVM/TCG release-image boot-loop soak.
 #
 # Each boot is a foreground QEMU process. Its serial output is tee'd to a raw log and a
-# timestamped log; the runner requires both `smp: N cpus online` and a `login:` prompt, preserves
-# every log, and stops on the first failure without retrying. The timestamp of the first login
-# line gives boot-to-login; the per-mode p50/p90 are written to summary.txt.
+# timestamped log; the runner requires `sched: user SMP on`, `smp: N cpus online` and a
+# `login:` prompt, preserves every log, and stops on the first failure without retrying.
+# The soak passes no boot flags, so `sched: user SMP on` is the shipped-default contract.
+# The timestamp of the first login line gives boot-to-login; the per-mode p50/p90 are
+# written to summary.txt.
 
 set -eu
 
@@ -94,9 +96,9 @@ usage: sh scripts/smp-boot-soak.sh [options]
   -h, --help      show this help
 
 The release image is built only when missing or --build is given. Every boot is foreground;
-a missing `smp: N cpus online` or `login:` line is a failure. The preflight refuses a busy host
-by default; use --wait-for-idle on a shared machine. KVM aarch64 is not available on this host;
-the runner is x86_64 only.
+a missing `sched: user SMP on`, `smp: N cpus online` or `login:` line is a failure. The
+preflight refuses a busy host by default; use --wait-for-idle on a shared machine. KVM aarch64
+is not available on this host; the runner is x86_64 only.
 EOF
 }
 
@@ -207,6 +209,13 @@ run_one() {
         if ! grep -q "smp: $smp cpus online" "$raw"; then
             record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
             echo "smp-boot-soak: FAIL $mode run $i: no 'smp: $smp cpus online'" >&2
+            echo "smp-boot-soak: log=$raw" >&2
+            tail -n 40 "$raw" >&2
+            exit 1
+        fi
+        if ! grep -q 'sched: user SMP on' "$raw"; then
+            record_host_row "$mode" "$i" "$host_start" "$host_end" "$host_before" "$host_after" fail ""
+            echo "smp-boot-soak: FAIL $mode run $i: no 'sched: user SMP on' (default user SMP is off)" >&2
             echo "smp-boot-soak: log=$raw" >&2
             tail -n 40 "$raw" >&2
             exit 1
