@@ -519,14 +519,19 @@ pub fn report_process_refs(target: &Arc<Process>) {
             }
             _ => {}
         });
-        stats[6] = stats[6].saturating_add(
-            holder
-                .client_requests
-                .lock()
-                .iter()
-                .filter(|request| Arc::ptr_eq(&request.client, target))
-                .count() as u64,
-        );
+        let queued = holder
+            .client_requests
+            .lock()
+            .iter()
+            .filter(|request| Arc::ptr_eq(&request.client, target))
+            .count() as u64;
+        if queued > 0 {
+            kprintln!(
+                "s170: client-queue holder={} count={queued}",
+                holder.id
+            );
+        }
+        stats[6] = stats[6].saturating_add(queued);
     }
     stats[7] = Arc::strong_count(target) as u64;
     let thread_refs = crate::sched::thread::process_thread_refs(target);
