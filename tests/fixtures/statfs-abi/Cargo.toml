@@ -20,8 +20,11 @@ name = "raven_statfs_abi"
 path = "src/lib.rs"
 
 [[bin]]
-name = "raven-statfs-abi"
-path = "src/main.rs"
+name = "statfs-initfs-add"
+path = "src/bin/initfs-add.rs"
+
+[dependencies]
+raven-initfs = { path = "../../../crates/raven-initfs", features = ["std"] }
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

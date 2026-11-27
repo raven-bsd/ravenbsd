@@ -147,3 +147,25 @@ const _: [(); 4] = [(); super::CLOCK_MONOTONIC as usize];
 const _: [(); 280] = [(); size_of::<super::dirent>()];
 const _: [(); 0] = [(); core::mem::offset_of!(super::dirent, d_fileno)];
 const _: [(); 24] = [(); core::mem::offset_of!(super::dirent, d_name)];
+
+// `struct statfs` is the pinned FreeBSD 133344405 record the native libc writes: 2344 bytes,
+// alignment 8, the same offsets as `raven-libc`'s `CStatfs`. The pre-S775 Linux shape was 120
+// bytes, and its `write` overran every caller's stack object.
+const _: [(); 2344] = [(); size_of::<super::statfs>()];
+const _: [(); 8] = [(); align_of::<super::statfs>()];
+const _: [(); 0] = [(); core::mem::offset_of!(super::statfs, f_version)];
+const _: [(); 4] = [(); core::mem::offset_of!(super::statfs, f_type)];
+const _: [(); 8] = [(); core::mem::offset_of!(super::statfs, f_flags)];
+const _: [(); 16] = [(); core::mem::offset_of!(super::statfs, f_bsize)];
+const _: [(); 24] = [(); core::mem::offset_of!(super::statfs, f_iosize)];
+const _: [(); 32] = [(); core::mem::offset_of!(super::statfs, f_blocks)];
+const _: [(); 40] = [(); core::mem::offset_of!(super::statfs, f_bfree)];
+const _: [(); 48] = [(); core::mem::offset_of!(super::statfs, f_bavail)];
+const _: [(); 56] = [(); core::mem::offset_of!(super::statfs, f_files)];
+const _: [(); 64] = [(); core::mem::offset_of!(super::statfs, f_ffree)];
+const _: [(); 184] = [(); core::mem::offset_of!(super::statfs, f_namemax)];
+const _: [(); 188] = [(); core::mem::offset_of!(super::statfs, f_owner)];
+const _: [(); 192] = [(); core::mem::offset_of!(super::statfs, f_fsid)];
+const _: [(); 280] = [(); core::mem::offset_of!(super::statfs, f_fstypename)];
+const _: [(); 296] = [(); core::mem::offset_of!(super::statfs, f_mntfromname)];
+const _: [(); 1320] = [(); core::mem::offset_of!(super::statfs, f_mntonname)];
