@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S181: one one-shot process/exec conformance probe.  It runs the normal rows and both controlled
+# mutations; the host runner parses the row contract and owns the final exit mapping.
+
+name = "process-conformance"
+exec = "/bin/conformance-probe"
+args = ["process-conformance", "--all"]
+needs = ["scheme:file", "ramfsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S181 process table: name <TAB> requirement <TAB> gate.
+# S181-R01 exit/wait encoding and status retention; S181-R02 signal disposition and
+# inheritance; S181-R03 start-image layout and descriptor inheritance; S181-R04 AT_RANDOM
+# policy; S181-R05 reparenting to init.
+wait-echild	S181-R01	1
+exit-status	S181-R01	1
+external-status	S181-R01	1
+signal-status	S181-R01	1
+wait-nohang	S181-R01	1
+zombie-until-waited	S181-R01	1
+fork-signal-inheritance	S181-R02	1
+exec-sigreset	S181-R02	1
+fd-inheritance	S181-R03	1
+exec-start-layout	S181-R03	1
+at-random-policy	S181-R04	1
+reparent-reap	S181-R05	1
