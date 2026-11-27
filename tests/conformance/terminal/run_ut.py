@@ -294,6 +294,16 @@ class FinalReadOmittingCollector:
         return captured[0], failure
 
 
+def selected_boundary_collector():
+    name = os.environ.get("S771_COLLECTOR_DOUBLE", "")
+    if not name:
+        return run.collect_serial
+    doubles = {"deadline": DeadlineIgnoringCollector, "final-read": FinalReadOmittingCollector}
+    if name not in doubles:
+        raise SystemExit("unknown S771_COLLECTOR_DOUBLE: " + name)
+    return doubles[name](run.collect_serial)
+
+
 class BoundaryClock:
     def __init__(self, child, deadline):
         self.child = child
@@ -349,7 +359,7 @@ class DeadlineBoundaryTests(unittest.TestCase):
             return text, failure, child.returncode
 
     def test_deadline_boundary_child_exit_is_still_deadline_failure(self) -> None:
-        text, failure, returncode = self._run_boundary(run.collect_serial)
+        text, failure, returncode = self._run_boundary(selected_boundary_collector())
         self.assertEqual(boundary_violations(text, failure, returncode), [])
 
     def test_boundary_regression_rejects_buggy_collector_doubles(self) -> None:
