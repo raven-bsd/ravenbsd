@@ -66,6 +66,9 @@ fn default_process_handle_is_enosys() {
         fn event_signal(&mut self, _handle: Handle, _value: u64) -> Result<(), Errno> {
             Err(Errno::ENOSYS)
         }
+        fn close_source(&mut self, _handle: Handle) -> Result<(), Errno> {
+            Err(Errno::ENOSYS)
+        }
     }
     let mut bare = Bare;
     assert_eq!(bare.process_handle(1), Err(Errno::ENOSYS));

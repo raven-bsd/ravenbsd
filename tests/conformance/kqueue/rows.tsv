@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# name	requirement	gate
+layout	S743-R01	1
+read-ready	S743-R01	1
+socket-ready	S743-R01	1
+read-write-same-fd	S743-R01	1
+modify-udata	S743-R01	1
+disable-enable	S743-R01	1
+oneshot	S743-R01	1
+timer	S743-R01	1
+user	S743-R01	1
+unsupported-filter	S743-R01	1
+unsupported-fflags	S743-R01	1
+receipt	S743-R01	1
+close-reuse	S743-R01	1
+eintr	S743-R01	1
