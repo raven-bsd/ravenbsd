@@ -5,7 +5,7 @@ use core::ffi::c_int;
 
 use crate::personality_common::{RealEvqBsd, RealFdTableBsd, ret_int};
 
-/// Create a kqueue; only `O_CLOEXEC` is accepted.
+/// Create a kqueue; `O_CLOEXEC` is honoured and `O_NONBLOCK` is accepted and ignored.
 #[unsafe(no_mangle)]
 pub extern "C" fn kqueue1(flags: c_int) -> c_int {
     ret_int(raven_libc_personality_bsd::kqueue::kqueue1(

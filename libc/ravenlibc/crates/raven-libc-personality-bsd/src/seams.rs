@@ -208,6 +208,11 @@ pub trait SrcOps {
     fn event_create(&mut self) -> Result<Handle, Errno>;
     /// `EVENT_SIGNAL`.
     fn event_signal(&mut self, handle: Handle, value: u64) -> Result<(), Errno>;
+    /// Release a source handle created by this factory (the knote detach path).
+    ///
+    /// The handle is the process capability that owns the timer, user event or process object;
+    /// dropping the registration without it leaks the kernel object for the life of the process.
+    fn close_source(&mut self, handle: Handle) -> Result<(), Errno>;
     /// The process handle of a pid (`PG-44`); default `ENOSYS`.
     fn process_handle(&mut self, _pid: i32) -> Result<Handle, Errno> {
         Err(Errno::ENOSYS)
