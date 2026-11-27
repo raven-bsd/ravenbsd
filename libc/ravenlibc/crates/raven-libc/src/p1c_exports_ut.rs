@@ -21,6 +21,7 @@ use crate::ffi::{TestLock, errno};
 use core::ffi::{c_char, c_void};
 use raven_libc_abi::errno::{EBADF, EFAULT, EINVAL, ENOSYS};
 use raven_libc_abi::mman::MADV_NORMAL;
+use raven_libc_abi::structs::Pollfd;
 
 fn assert_efault(result: c_int) {
     assert_eq!(result, -1);
@@ -133,6 +134,64 @@ fn ppoll_null_fds_with_a_nonzero_count_is_efault() {
     };
     assert_eq!(result, -1);
     assert_eq!(errno::get(), EFAULT);
+}
+
+/// The donor `t_pollts.c:err` / `t_poll.c:err` pointer, `(struct pollfd *)-1`.
+///
+/// The call must return `-1`/`EFAULT` without ever dereferencing the pointer. It runs in a forked
+/// child so that a missing check is a fatal signal in the child (the page fault on the current
+/// path) and never kills the test process; the parent asserts the exact return and errno through
+/// the child's exit code.
+#[test]
+fn ppoll_rejects_the_donor_invalid_record_pointer_with_efault() {
+    // SAFETY: plain host libc declarations with the C signatures.
+    unsafe extern "C" {
+        fn fork() -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        fn _exit(status: i32) -> !;
+    }
+
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    // SAFETY: fork takes no pointers. nextest runs one test per process, so the child has no
+    // other threads and only calls `ppoll` and `_exit`.
+    let pid = unsafe { fork() };
+    assert!(pid >= 0, "fork failed: {pid}");
+    if pid == 0 {
+        // SAFETY: `(struct pollfd *)-1` is the donor invalid-pointer case; the wrapper must
+        // reject it before forming a slice, so this call must not touch the address.
+        let result = unsafe {
+            ppoll(
+                usize::MAX as *mut Pollfd,
+                1,
+                core::ptr::null(),
+                core::ptr::null(),
+            )
+        };
+        let code = if result == -1 && errno::get() == EFAULT {
+            0
+        } else if result == -1 {
+            1
+        } else {
+            2
+        };
+        // SAFETY: ends the forked child without running the parent's test harness.
+        unsafe { _exit(code) };
+    }
+    let mut status = 0;
+    // SAFETY: `pid` is the child forked above and `status` is a live out pointer.
+    let reaped = unsafe { waitpid(pid, &mut status, 0) };
+    assert_eq!(reaped, pid, "waitpid did not reap the ppoll child");
+    let signal = status & 0x7f;
+    assert_eq!(
+        signal, 0,
+        "ppoll((struct pollfd *)-1) died from signal {signal}; it must return -1/EFAULT"
+    );
+    let code = (status >> 8) & 0xff;
+    assert_eq!(
+        code, 0,
+        "ppoll((struct pollfd *)-1): 0 = -1/EFAULT, 1 = wrong errno, 2 = non-negative return"
+    );
 }
 
 #[test]
