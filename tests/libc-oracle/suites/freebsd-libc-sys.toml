@@ -9,6 +9,10 @@ framework = "atf"
 root = "vendor/freebsd/libc-sys"
 srcdir_for_tests = true
 
+# Program order is deliberate: the mmap/mprotect bodies raise SIGSEGV and SIGBUS by design, so
+# they run after every other program. A fault that stalls the batch then cannot hide an earlier
+# required row; the runner records the remaining bodies from the partial batch.
+
 [[program]]
 name = "sys/t_dup"
 sources = ["sys/t_dup.c"]
@@ -73,24 +77,6 @@ expect_exit = 0
 args = []
 
 [[program]]
-name = "sys/t_mmap"
-sources = ["sys/t_mmap.c"]
-cflags = []
-ldadd = []
-status = "ok"
-expect_exit = 0
-args = []
-
-[[program]]
-name = "sys/t_mprotect"
-sources = ["sys/t_mprotect.c"]
-cflags = []
-ldadd = []
-status = "ok"
-expect_exit = 0
-args = []
-
-[[program]]
 name = "sys/t_umask"
 sources = ["sys/t_umask.c"]
 cflags = []
@@ -138,6 +124,24 @@ args = []
 [[program]]
 name = "gen/execve/t_execve"
 sources = ["gen/execve/t_execve.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_mmap"
+sources = ["sys/t_mmap.c"]
+cflags = []
+ldadd = []
+status = "ok"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "sys/t_mprotect"
+sources = ["sys/t_mprotect.c"]
 cflags = []
 ldadd = []
 status = "ok"

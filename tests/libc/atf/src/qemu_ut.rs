@@ -179,18 +179,17 @@ fn the_guest_initfs_has_the_services_and_the_program() {
 
 #[test]
 fn the_batch_manifest_uses_the_indexed_image_and_result() {
-    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", false, 60);
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", false);
     assert!(text.contains("mode=exec\n"));
     assert!(text.contains("program=/tests/t_foo\n"));
     assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
     assert!(text.contains("arg=-s\narg=/tests\narg=a_case\n"));
-    assert!(text.contains("env=ATF_CASE_TIMEOUT=60\n"));
     assert!(text.contains("result=/tmp/result-7\n"));
 }
 
 #[test]
 fn the_batch_manifest_runs_through_the_workdir_wrapper() {
-    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", true, 60);
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", true);
     assert!(text.contains("program=/tests/atf-wrapper\n"));
     assert!(text.contains("arg=/tests/atf-wrapper\n"));
     assert!(text.contains("arg=/tmp/atf-work\narg=/tests/t_foo\n"));

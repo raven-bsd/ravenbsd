@@ -466,13 +466,7 @@ pub fn run_atf_batch(
         let manifest = workdir.join(format!("manifest-{index}"));
         fs::write(
             &manifest,
-            batch_manifest(
-                &case.ident,
-                image_path,
-                &result,
-                wrapper.is_some(),
-                config.timeout_secs.min(120),
-            ),
+            batch_manifest(&case.ident, image_path, &result, wrapper.is_some()),
         )
         .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
@@ -538,7 +532,7 @@ readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
     make_image(config, &initfs, &image)?;
     copy_firmware_vars(&vars)?;
     let mut batch = config.clone();
-    batch.timeout_secs = batch.timeout_secs.max(1800);
+    batch.timeout_secs = batch.timeout_secs.max(180);
     let (_, timed_out) = boot(&batch, &image, &vars, &serial_path, &error_path)?;
     let serial = read_prefix(&serial_path);
     let text = String::from_utf8_lossy(&serial);
@@ -608,7 +602,7 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn batch_manifest(ident: &str, image_path: &str, result: &str, wrapper: bool, timeout: u64) -> String {
+fn batch_manifest(ident: &str, image_path: &str, result: &str, wrapper: bool) -> String {
     let (program, prefix) = if wrapper {
         (
             "/tests/atf-wrapper",
@@ -619,7 +613,7 @@ fn batch_manifest(ident: &str, image_path: &str, result: &str, wrapper: bool, ti
     };
     let mut text = format!(
         "mode=exec\nprogram={program}\narg={program}\n{prefix}arg=-r\narg={result}\n\
-arg=-s\narg=/tests\narg={ident}\nenv=ATF_CASE_TIMEOUT={timeout}\n"
+arg=-s\narg=/tests\narg={ident}\n"
     );
     for item in target_env() {
         text.push_str("env=");

@@ -63,12 +63,6 @@ main(int argc, char **argv)
 		fprintf(stderr, "atf-wrapper: setenv ATF_CWD: %s\n", strerror(errno));
 		return 2;
 	}
-	{
-		const char *timeout = getenv("ATF_CASE_TIMEOUT");
-
-		if (timeout != NULL && atoi(timeout) > 0)
-			(void)alarm((unsigned)atoi(timeout));
-	}
 
 	execv(program, &argv[2]);
 	fprintf(stderr, "atf-wrapper: execv %s: %s\n", program, strerror(errno));
