@@ -635,6 +635,13 @@ mod program {
         ) -> Result<usize, Errno> {
             let (mount_id, suffix) = mount_suffix(&self.table, path)?;
             let (target_mount, target_suffix) = mount_suffix(&self.table, target)?;
+            // FreeBSD `kern_linkat_vp` rejects a directory target with EPERM before it resolves
+            // the new name; the read-only destination mount must not turn that into EROFS.
+            self.check_traverse(target_mount, parent_bytes(&target_suffix), creds)?;
+            let target_stat = stat_in(&self.table, target_mount, &target_suffix)?;
+            if target_stat.mode & S_IFMT == S_IFDIR {
+                return Err(Errno::EPERM);
+            }
             if mount_id != target_mount {
                 return Err(Errno::EXDEV);
             }
@@ -1455,7 +1462,8 @@ mod program {
                 Call::Statvfs => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
                 Call::Link { path, target } => {
                     let path = self.call_path(&root, &base, path, false, creds)?;
-                    let target = self.call_path(&root, &base, target, false, creds)?;
+                    // FreeBSD `sys_link` passes AT_SYMLINK_FOLLOW for the source name.
+                    let target = self.call_path(&root, &base, target, true, creds)?;
                     Ok(self.forward_link(&path, &target, response, creds)?)
                 }
                 Call::Rename { from, to } => {
