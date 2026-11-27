@@ -67,6 +67,10 @@ pub fn mmap<B: SysBackend, L: Lock>(
         return Err(Errno::EINVAL);
     }
     let anonymous = flags & mman::MAP_ANONYMOUS != 0;
+    // NetBSD uvm_mmap.c:414: an anonymous mapping always has fd == -1.
+    if anonymous && fd != -1 {
+        return Err(Errno::EINVAL);
+    }
     if !anonymous && fd < 0 {
         return Err(Errno::EBADF);
     }
