@@ -261,7 +261,7 @@ fn wait_worker_flags(flags: &[AtomicU32; WORKERS]) -> Result<(), Errno> {
             sys::yield_now();
             spins = spins.saturating_add(1);
             if spins > POLL_LIMIT {
-                return Err(Errno::ETIME);
+                return Err(Errno::ETIMEDOUT);
             }
         }
     }
@@ -329,7 +329,7 @@ fn tlb_round(object: Handle, sampled: usize, round: u32) -> Result<(), Errno> {
             sys::yield_now();
             spins = spins.saturating_add(1);
             if spins > POLL_LIMIT {
-                return Err(Errno::ETIME);
+                return Err(Errno::ETIMEDOUT);
             }
         }
         let observed = SEEN[index].load(Ordering::Acquire);
@@ -352,7 +352,7 @@ fn stop_workers() -> Result<(), Errno> {
             sys::yield_now();
             spins = spins.saturating_add(1);
             if spins > POLL_LIMIT {
-                return Err(Errno::ETIME);
+                return Err(Errno::ETIMEDOUT);
             }
         }
     }
@@ -984,7 +984,7 @@ fn oom_round(
         spins = spins.saturating_add(1);
         if spins > POLL_LIMIT {
             println!("oom: fail children not ready");
-            return Err(Errno::ETIME);
+            return Err(Errno::ETIMEDOUT);
         }
     }
     go.store(1, Ordering::Release);
