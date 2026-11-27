@@ -1406,6 +1406,19 @@ fn wait6_output(pointer: u64, length: usize) -> Result<Option<UserSlice>, Errno>
     }
 }
 
+/// True when the child's death is a core dump under its own `RLIMIT_CORE`.
+fn wait6_core_dump(child: &Process, event: WaitEvent) -> bool {
+    let WaitEvent::Exited(code) = event else {
+        return false;
+    };
+    if code >= 0 {
+        return false;
+    }
+    let signo = code.unsigned_abs() & 0x7f;
+    let limit = child.limits.lock()[status::RLIMIT_CORE].cur;
+    status::core_dump(signo, limit)
+}
+
 /// Zero the outputs of a `WNOHANG` miss as contract C21 requires.
 fn write_wait6_miss(
     status_out: Option<UserSlice>,
@@ -1445,11 +1458,15 @@ pub fn wait6(frame: &SyscallFrame) -> Result<usize, Errno> {
     let pid = wait_loop(&caller, idtype, id, options, |child, event| {
         let pid = i32::try_from(child.id).map_err(|_| Errno::EOVERFLOW)?;
         let uid = child.ids.lock().uid;
+        let core = wait6_core_dump(&child, event);
         if let Some(destination) = status_out {
-            copy_to_user(destination, &event.status().to_le_bytes())?;
+            copy_to_user(
+                destination,
+                &status::wait6_status(event, core).to_le_bytes(),
+            )?;
         }
         if let Some(destination) = siginfo_out {
-            copy_to_user(destination, &status::wait6_siginfo(event, pid, uid))?;
+            copy_to_user(destination, &status::wait6_siginfo(event, pid, uid, core))?;
         }
         if let Some(destination) = wrusage_out {
             // Resource accounting is not wired yet; the 288-byte product record is a documented

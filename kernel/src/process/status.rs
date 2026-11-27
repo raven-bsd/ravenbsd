@@ -312,6 +312,28 @@ pub const fn wait6_options_valid(options: u32) -> bool {
     options & (WEXITED | WUNTRACED | WCONTINUED) != 0
 }
 
+/// True when a signal death is reported as a core dump.
+///
+/// FreeBSD sets `WCOREDUMP` in `p_xsig` only when the core file is actually produced, which the
+/// process core limit gates. The kernel stores the bare signal in `exit_code`, so the wait6
+/// encoder re-applies the FreeBSD `RLIMIT_CORE` decision at reap time.
+#[must_use]
+pub const fn core_dump(signo: u32, core_limit: u64) -> bool {
+    core_limit > 0 && matches!(default_action(signo), Some(DefaultAction::Core))
+}
+
+/// Encode one child event as the POSIX wait status word, honouring the core decision.
+#[must_use]
+pub const fn wait6_status(event: WaitEvent, core: bool) -> i32 {
+    match event {
+        WaitEvent::Exited(code) if code < 0 => {
+            let raw = code.unsigned_abs();
+            signal_status(raw & 0x7f, core)
+        }
+        other => other.status(),
+    }
+}
+
 /// Build the product `siginfo_t` bytes for one child event.
 ///
 /// The record is the musl-layout `siginfo_t` at the C21 offsets: signo 0, errno 4, code 8,
@@ -319,12 +341,11 @@ pub const fn wait6_options_valid(options: u32) -> bool {
 /// the terminating signal, the stop signal or `SIGCONT`; the time fields stay zero until the
 /// rusage accounting ticket (FreeBSD `wait_fill_siginfo`, `sys/kern/kern_exit.c:1141`).
 #[must_use]
-pub fn wait6_siginfo(event: WaitEvent, pid: i32, uid: u32) -> [u8; SIGINFO_SIZE] {
+pub fn wait6_siginfo(event: WaitEvent, pid: i32, uid: u32, core: bool) -> [u8; SIGINFO_SIZE] {
     let (code, status) = match event {
         WaitEvent::Exited(code) if code < 0 => {
-            let raw = code.unsigned_abs();
-            let signo = i32::try_from(raw & 0x7f).unwrap_or(0);
-            if raw & 0x80 != 0 {
+            let signo = i32::try_from(code.unsigned_abs() & 0x7f).unwrap_or(0);
+            if core {
                 (CLD_DUMPED, signo)
             } else {
                 (CLD_KILLED, signo)
