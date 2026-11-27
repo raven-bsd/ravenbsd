@@ -1450,3 +1450,64 @@ fn a_short_read_is_an_io_error() {
     assert!(matches!(result, Err(SpawnError::Sys(Errno::EIO))));
     assert_eq!(calls, 2);
 }
+
+/// CONTRACTS C8: `_start` receives `sp0` in `rdi` (x86-64), `x0` (aarch64) or `a0` (riscv64).
+///
+/// The trampoline may copy the argument register into the stack register and align that stack
+/// register before the Rust entry, but it must not write the argument register. If it derives
+/// `sp0` from `rsp`/`sp` instead, it overwrites the C8 carrier and `__raven_start` receives a
+/// value the kernel did not put there. This asserts the real trampoline source, the same way the
+/// C4 kernel-entry conformance test pins its `rdi`. A runtime comparison of the two registers
+/// cannot catch this, because the kernel sets both to `sp0`.
+#[test]
+fn c8_start_keeps_the_argument_register() {
+    let source = include_str!("../../../userland/rt/src/entry.rs");
+    for (arch, branch, carrier, writes) in [
+        (
+            "x86_64",
+            "call __raven_start",
+            "mov %rdi, %rsp",
+            &["mov %rsp, %rdi", "mov %esp, %edi"][..],
+        ),
+        (
+            "aarch64",
+            "bl __raven_start",
+            "mov sp, x0",
+            &["mov x0, sp", "and x0, x0"][..],
+        ),
+        (
+            "riscv64",
+            "call __raven_start",
+            "mv sp, a0",
+            &["mv a0, sp"][..],
+        ),
+    ] {
+        let trampoline = start_trampoline(source, arch, branch);
+        for write in writes {
+            assert!(
+                !trampoline.contains(write),
+                "C8: the {arch} `_start` must pass the argument register through to \
+                 __raven_start, but it writes it: {write:?} in {trampoline}"
+            );
+        }
+        assert!(
+            trampoline.contains(carrier),
+            "C8: the {arch} `_start` must load the stack register from the argument register \
+             with {carrier:?}, got: {trampoline}"
+        );
+    }
+}
+
+fn start_trampoline<'a>(source: &'a str, arch: &str, branch: &str) -> &'a str {
+    let marker = format!("target_arch = \"{arch}\"");
+    let guard = source.find(&marker).expect("architecture asm block");
+    let start = source[guard..]
+        .find("\"_start:\"")
+        .map(|at| guard + at)
+        .expect("`_start` label");
+    let end = source[start..]
+        .find(branch)
+        .map(|at| start + at)
+        .expect("__raven_start call");
+    &source[start..end]
+}
