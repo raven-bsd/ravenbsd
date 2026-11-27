@@ -248,6 +248,51 @@ with open(serial, "a", encoding="utf-8") as handle:
 sys.exit(code)
 """
 
+BOUNDARY_MARKER = "S175-TERM done failures=1"
+
+
+def boundary_violations(text: str, failure: str | None, returncode: int | None) -> list[str]:
+    """Boundary contract violations: an expired deadline stays a deadline failure."""
+    violations = []
+    if failure != "serial:deadline":
+        violations.append(f"failure={failure!r}")
+    if BOUNDARY_MARKER not in text:
+        violations.append("missing boundary marker")
+    if returncode != 33:
+        violations.append(f"returncode={returncode}")
+    return violations
+
+
+class DeadlineIgnoringCollector:
+    """Test double: hides a deadline verdict from the collector result."""
+
+    def __init__(self, collector):
+        self.collector = collector
+
+    def __call__(self, *args, **kwargs):
+        text, _failure = self.collector(*args, **kwargs)
+        return text, None
+
+
+class FinalReadOmittingCollector:
+    """Test double: drops the post-loop read, returning only in-loop captured text."""
+
+    def __init__(self, collector):
+        self.collector = collector
+
+    def __call__(self, serial, qemu, deadline, *, on_capture=None, **kwargs):
+        captured = [""]
+
+        def capture(text: str) -> None:
+            captured[0] = text
+            if on_capture is not None:
+                on_capture(text)
+
+        _text, failure = self.collector(
+            serial, qemu, deadline, on_capture=capture, **kwargs
+        )
+        return captured[0], failure
+
 
 class BoundaryClock:
     def __init__(self, child, deadline):
@@ -265,7 +310,7 @@ class BoundaryClock:
 
 
 class DeadlineBoundaryTests(unittest.TestCase):
-    def test_deadline_boundary_child_exit_is_still_deadline_failure(self) -> None:
+    def _run_boundary(self, collector):
         with tempfile.TemporaryDirectory() as directory:
             serial = Path(directory) / "serial.log"
             serial.write_text(
@@ -291,7 +336,7 @@ class DeadlineBoundaryTests(unittest.TestCase):
                     os.close(write_fd)
 
             deadline = 1.0
-            text, failure = run.collect_serial(
+            text, failure = collector(
                 serial,
                 child,
                 deadline,
@@ -301,9 +346,24 @@ class DeadlineBoundaryTests(unittest.TestCase):
                 poll_interval=0,
             )
             child.wait(timeout=5)
-            self.assertEqual(failure, "serial:deadline")
-            self.assertIn("S175-TERM done failures=1", text)
-            self.assertEqual(child.returncode, 33)
+            return text, failure, child.returncode
+
+    def test_deadline_boundary_child_exit_is_still_deadline_failure(self) -> None:
+        text, failure, returncode = self._run_boundary(run.collect_serial)
+        self.assertEqual(boundary_violations(text, failure, returncode), [])
+
+    def test_boundary_regression_rejects_buggy_collector_doubles(self) -> None:
+        doubles = (
+            DeadlineIgnoringCollector(run.collect_serial),
+            FinalReadOmittingCollector(run.collect_serial),
+        )
+        for double in doubles:
+            with self.subTest(double=type(double).__name__):
+                text, failure, returncode = self._run_boundary(double)
+                self.assertNotEqual(boundary_violations(text, failure, returncode), [])
+        text, failure, returncode = self._run_boundary(run.collect_serial)
+        self.assertEqual(boundary_violations(text, failure, returncode), [])
+
 
 if __name__ == "__main__":
     unittest.main()
