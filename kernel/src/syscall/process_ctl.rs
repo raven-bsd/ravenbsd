@@ -1397,10 +1397,11 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
 }
 
 /// Validate one optional `PROC_WAIT6` output pointer.
-fn wait6_output(pointer: u64, length: u64) -> Result<Option<UserSlice>, Errno> {
+fn wait6_output(pointer: u64, length: usize) -> Result<Option<UserSlice>, Errno> {
     if pointer == 0 {
         Ok(None)
     } else {
+        let length = u64::try_from(length).map_err(|_| Errno::EOVERFLOW)?;
         UserSlice::new(pointer, length).map(Some)
     }
 }
