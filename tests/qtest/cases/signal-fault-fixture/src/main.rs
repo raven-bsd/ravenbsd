@@ -399,11 +399,7 @@ fn default_child() -> i32 {
     0
 }
 
-extern "C" fn fault_handler(
-    _sig: i32,
-    info: *const frame::SigInfo,
-    context: *mut frame::UContext,
-) {
+extern "C" fn fault_handler(_sig: i32, info: *const frame::SigInfo, context: *mut frame::UContext) {
     if info.is_null() || context.is_null() {
         return;
     }
