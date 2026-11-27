@@ -91,6 +91,14 @@ pub fn process_thread_refs(process: &alloc::sync::Arc<crate::process::Process>) 
         };
         if Arc::ptr_eq(&thread.process, process) {
             refs = refs.saturating_add(1);
+            crate::kprintln!(
+                "s170: thread-of pid={} tid={} name={} state={:?} refs={}",
+                process.id,
+                thread.id,
+                thread.name,
+                thread.state(),
+                Arc::strong_count(&thread)
+            );
         }
     }
     refs
