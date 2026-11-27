@@ -95,16 +95,20 @@ pub fn stack_holders(target: usize) -> [u64; 2] {
         let Some(thread) = weak.upgrade() else {
             continue;
         };
+        // `kernel_stack_base` is the unmapped guard page; the stack starts one page above it.
         let base = thread.kernel_stack_base as usize;
         let top = thread.kernel_stack_top as usize;
-        if base == 0 || top <= base {
+        let Some(start) = base.checked_add(PAGE as usize) else {
+            continue;
+        };
+        if base == 0 || top <= start {
             continue;
         }
         threads = threads.saturating_add(1);
-        let mut address = base;
+        let mut address = start;
         while address.saturating_add(word) <= top {
-            // SAFETY: `base..top` is the thread's live kernel-stack allocation for as long as
-            // the thread object is registered, and the scan stays inside it.
+            // SAFETY: `start..top` is the thread's mapped kernel-stack region for as long as
+            // the thread object is registered; the guard page below `start` is excluded.
             if unsafe { *(address as *const usize) } == target {
                 hits = hits.saturating_add(1);
             }
