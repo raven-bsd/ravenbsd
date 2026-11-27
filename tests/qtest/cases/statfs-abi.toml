@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S775: run the native statfs(2) from the shell image with the uutils record type. statfs needs
+# the mounted root and vfsd, so this boots the shell-test profile with the probe added to its
+# initfs. The pre-S775 120-byte record makes the native 2344-byte write overrun the caller.
+
+name = "statfs-abi"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 180
+pre = ["sh tests/fixtures/statfs-abi/build.sh"]
+initfs = "build/fixtures/statfs-abi/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^statfs-abi: start$'
+
+[[expect]]
+regex = '^statfs-abi: size=2344$'
+
+[[expect]]
+regex = '^statfs-abi: version=0x20140518$'
+
+[[expect]]
+regex = '^statfs-abi: bsize=4096$'
+
+[[expect]]
+regex = '^statfs-abi: blocks ok$'
+
+[[expect]]
+regex = '^statfs-abi: files ok$'
+
+[[expect]]
+regex = '^statfs-abi: namemax=255$'
+
+[[expect]]
+regex = '^statfs-abi: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|statfs-abi: FAIL'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 120
+
+[[step]]
+send = "/bin/statfs-abi\n"
+delay_ms = 100
+
+[[step]]
+wait = '^statfs-abi: done$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 15
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 30
