@@ -10,9 +10,9 @@ use super::*;
 use crate::ErrnoExt;
 use crate::fake::{FakeNetd, WireLog};
 use raven_libc_abi::socket::{
-    AF_INET, AF_INET6, AF_UNIX, MSG_NOSIGNAL, MSG_OOB, SO_ACCEPTCONN, SO_DOMAIN, SO_ERROR,
-    SO_PROTOCOL, SO_RCVBUF, SO_RCVTIMEO, SO_TYPE, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_STREAM,
-    SOL_SOCKET,
+    AF_INET, AF_INET6, AF_ROUTE, AF_UNIX, MSG_NOSIGNAL, MSG_OOB, PF_ROUTE, SO_ACCEPTCONN,
+    SO_DOMAIN, SO_ERROR, SO_PROTOCOL, SO_RCVBUF, SO_RCVTIMEO, SO_TYPE, SOCK_DGRAM, SOCK_NONBLOCK,
+    SOCK_RAW, SOCK_STREAM, SOL_SOCKET,
 };
 use raven_libc_platform::Handle;
 use raven_libc_platform::fd::{InheritedSocket, SocketEndpoint, SocketMeta};
@@ -225,6 +225,20 @@ fn type_flags_and_errors() {
         net.socket(AF_INET6, SOCK_STREAM, 0),
         Err(Errno::EAFNOSUPPORT)
     );
+}
+
+#[test]
+fn route_sockets_are_explicitly_unsupported() {
+    // R31/O-abi-6 and PG-42: AF_ROUTE is a public constant, but this milestone has no route
+    // provider. Every route socket request must fail EAFNOSUPPORT and must not open a dummy
+    // descriptor or reach the backend.
+    let net = net(Caps::default());
+    for domain in [AF_ROUTE, PF_ROUTE] {
+        for ty in [SOCK_RAW, SOCK_DGRAM] {
+            assert_eq!(net.socket(domain, ty, 0), Err(Errno::EAFNOSUPPORT));
+        }
+    }
+    assert_eq!(logs(&net), Vec::new());
 }
 
 #[test]

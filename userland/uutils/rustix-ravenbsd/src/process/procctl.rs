@@ -13,6 +13,7 @@ use core::ptr;
 
 use bitflags::bitflags;
 
+use crate::backend::c;
 use crate::backend::process::syscalls;
 use crate::backend::process::types::RawId;
 use crate::ffi::{c_int, c_uint, c_void};
@@ -55,7 +56,7 @@ pub(crate) unsafe fn procctl(
     data: *mut c_void,
 ) -> io::Result<()> {
     let (idtype, id) = proc_selector_to_raw(process);
-    syscalls::procctl(idtype as c_uint, id as RawId, option, data)
+    syscalls::procctl(idtype as c::idtype_t, id as RawId, option, data)
 }
 
 #[inline]
