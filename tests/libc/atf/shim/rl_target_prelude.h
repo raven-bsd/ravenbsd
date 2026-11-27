@@ -8,6 +8,16 @@
 #ifndef RL_TARGET_PRELUDE_H
 #define RL_TARGET_PRELUDE_H
 
+/*
+ * The target headers are FreeBSD-derived and gate the BSD interfaces on `__BSD_VISIBLE`.
+ * FreeBSD's <sys/cdefs.h> defaults it to one for a program that selects no strict feature
+ * macro; the ravenlibc copy does not, so a donor body that includes <sys/wait.h> or
+ * <sys/resource.h> would not see `wait6(2)` or `struct __wrusage`. Set the FreeBSD default here.
+ */
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE 1
+#endif
+
 #include <stdlib.h>
 #include <unistd.h>
 
