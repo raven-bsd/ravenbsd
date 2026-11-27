@@ -260,6 +260,19 @@ fn rust_const(text: &str, name: &str) -> u64 {
     c_integer(rest.trim().trim_end_matches(';').trim())
 }
 
+fn assert_c_header_flags(origin: &str, text: &str) {
+    assert_eq!(
+        c_define(text, "O_CLOEXEC"),
+        FCNTL_O_CLOEXEC,
+        "{origin} O_CLOEXEC is not the FreeBSD pin 0x100000"
+    );
+    assert_eq!(
+        c_define(text, "O_NONBLOCK"),
+        FCNTL_O_NONBLOCK,
+        "{origin} O_NONBLOCK is not the FreeBSD pin 0x4"
+    );
+}
+
 #[test]
 fn fcntl_open_flags_are_the_freebsd_pinned_values() {
     let installed = read("libc/ravenlibc/include/bits/abi_fcntl.h");
@@ -267,21 +280,8 @@ fn fcntl_open_flags_are_the_freebsd_pinned_values() {
     let table = read("libc/ravenlibc/abi/fcntl.toml");
     let rust = read("libc/ravenlibc/crates/raven-libc-abi/src/generated/fcntl.rs");
 
-    for (origin, text) in [
-        ("installed C header", &installed),
-        ("generated C header", &generated),
-    ] {
-        assert_eq!(
-            c_define(text, "O_CLOEXEC"),
-            FCNTL_O_CLOEXEC,
-            "{origin} O_CLOEXEC is not the FreeBSD pin 0x100000"
-        );
-        assert_eq!(
-            c_define(text, "O_NONBLOCK"),
-            FCNTL_O_NONBLOCK,
-            "{origin} O_NONBLOCK is not the FreeBSD pin 0x4"
-        );
-    }
+    assert_c_header_flags("installed C header", &installed);
+    assert_c_header_flags("generated C header", &generated);
     assert_eq!(
         toml_value(&table, "O_CLOEXEC"),
         FCNTL_O_CLOEXEC,
@@ -302,4 +302,17 @@ fn fcntl_open_flags_are_the_freebsd_pinned_values() {
         FCNTL_O_NONBLOCK,
         "generated Rust O_NONBLOCK is not the FreeBSD pin 0x4"
     );
+}
+
+/// S746 review negative double: the old musl values must fail the same assertion.
+///
+/// Compiled only for the explicit review run (`--features s746-negative`). The
+/// normal gate keeps the production header untouched and this test absent, so no
+/// product code is edited or restored for the negative check.
+#[cfg(feature = "s746-negative")]
+#[test]
+fn fcntl_musl_fixture_is_rejected_by_the_pinned_value_assertion() {
+    let fixture =
+        read("libc/ravenlibc/crates/raven-libc-abi/tests/fixtures/fcntl-musl/bits/abi_fcntl.h");
+    assert_c_header_flags("isolated musl fixture", &fixture);
 }
