@@ -207,3 +207,99 @@ fn copied_headers_carry_bsd3_spdx_and_the_donor_revision() {
         );
     }
 }
+
+/// FreeBSD `sys/sys/fcntl.h:89,130` at the pinned donor revision.
+const FCNTL_O_CLOEXEC: u64 = 0x0010_0000;
+/// FreeBSD `sys/sys/fcntl.h:89` at the pinned donor revision.
+const FCNTL_O_NONBLOCK: u64 = 0x0000_0004;
+
+fn c_integer(text: &str) -> u64 {
+    if let Some(hex) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+        u64::from_str_radix(hex, 16)
+    } else if text.len() > 1 && text.starts_with('0') {
+        u64::from_str_radix(&text[1..], 8)
+    } else {
+        text.parse()
+    }
+    .unwrap_or_else(|error| panic!("cannot parse integer {text:?}: {error}"))
+}
+
+fn c_define(text: &str, name: &str) -> u64 {
+    let prefix = format!("#define {name} ");
+    let value = text
+        .lines()
+        .find_map(|line| line.trim().strip_prefix(&prefix))
+        .unwrap_or_else(|| panic!("no `#define {name}` in the C header"));
+    c_integer(value.trim())
+}
+
+fn toml_value(text: &str, name: &str) -> u64 {
+    let needle = format!("name = \"{name}\"");
+    let line = text
+        .lines()
+        .find(|line| line.contains(&needle))
+        .unwrap_or_else(|| panic!("no {name} row in fcntl.toml"));
+    let rest = line
+        .split("value = ")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no value for {name} in fcntl.toml"));
+    let value = rest.split(',').next().unwrap_or(rest).trim();
+    c_integer(value)
+}
+
+fn rust_const(text: &str, name: &str) -> u64 {
+    let prefix = format!("pub const {name}:");
+    let line = text
+        .lines()
+        .find(|line| line.trim().starts_with(&prefix))
+        .unwrap_or_else(|| panic!("no `pub const {name}` in the generated Rust module"));
+    let rest = line
+        .rsplit('=')
+        .next()
+        .unwrap_or_else(|| panic!("no value for {name}"));
+    c_integer(rest.trim().trim_end_matches(';').trim())
+}
+
+#[test]
+fn fcntl_open_flags_are_the_freebsd_pinned_values() {
+    let installed = read("libc/ravenlibc/include/bits/abi_fcntl.h");
+    let generated = read("libc/ravenlibc/abi/generated/include/bits/abi_fcntl.h");
+    let table = read("libc/ravenlibc/abi/fcntl.toml");
+    let rust = read("libc/ravenlibc/crates/raven-libc-abi/src/generated/fcntl.rs");
+
+    for (origin, text) in [
+        ("installed C header", &installed),
+        ("generated C header", &generated),
+    ] {
+        assert_eq!(
+            c_define(text, "O_CLOEXEC"),
+            FCNTL_O_CLOEXEC,
+            "{origin} O_CLOEXEC is not the FreeBSD pin 0x100000"
+        );
+        assert_eq!(
+            c_define(text, "O_NONBLOCK"),
+            FCNTL_O_NONBLOCK,
+            "{origin} O_NONBLOCK is not the FreeBSD pin 0x4"
+        );
+    }
+    assert_eq!(
+        toml_value(&table, "O_CLOEXEC"),
+        FCNTL_O_CLOEXEC,
+        "abi/fcntl.toml O_CLOEXEC is not the FreeBSD pin 0x100000"
+    );
+    assert_eq!(
+        toml_value(&table, "O_NONBLOCK"),
+        FCNTL_O_NONBLOCK,
+        "abi/fcntl.toml O_NONBLOCK is not the FreeBSD pin 0x4"
+    );
+    assert_eq!(
+        rust_const(&rust, "O_CLOEXEC"),
+        FCNTL_O_CLOEXEC,
+        "generated Rust O_CLOEXEC is not the FreeBSD pin 0x100000"
+    );
+    assert_eq!(
+        rust_const(&rust, "O_NONBLOCK"),
+        FCNTL_O_NONBLOCK,
+        "generated Rust O_NONBLOCK is not the FreeBSD pin 0x4"
+    );
+}
