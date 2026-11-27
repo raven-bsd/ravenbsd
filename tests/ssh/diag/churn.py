@@ -109,6 +109,10 @@ def run_churn(image: Path, sessions: int, timeout: float) -> Path:
     result = subprocess.run(
         command, cwd=ROOT, capture_output=True, text=True, timeout=timeout, check=False,
     )
+    if result.returncode != 0:
+        print(result.stdout[-4000:], file=sys.stderr)
+        print(result.stderr[-4000:], file=sys.stderr)
+        raise SystemExit(f"churn: the soak failed with exit {result.returncode}")
     run = None
     for line in result.stdout.splitlines():
         marker = "reconnect-soak: run="
