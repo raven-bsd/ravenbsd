@@ -532,6 +532,25 @@ pub fn start() -> ! {
     idle::run()
 }
 
+/// True when a terminal user thread is parked inside a system call.
+///
+/// Such a thread must resume only to unwind its syscall handler frames; a thread preempted in
+/// user mode (or blocked outside a syscall) is reaped instead, so it can never run user code
+/// again.
+fn parked_in_syscall(thread: &Thread) -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        // Set by `sched_syscall_enter` and cleared by `sched_syscall_exit`.
+        thread.user && thread.fpu_saved.load(Ordering::Acquire)
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        // aarch64 has no user-mode pager wait; a user thread is off-CPU in a syscall only while
+        // it holds a block token.
+        thread.user && thread.block_token.load(Ordering::SeqCst) != 0
+    }
+}
+
 /// Reap a runnable thread of a terminal process before it is switched in.
 ///
 /// Called under the per-CPU slot lock from both `schedule_locked` and `exit_thread`. It performs
@@ -541,6 +560,16 @@ pub fn start() -> ! {
 fn retire_terminal(mut next: Arc<Thread>, state: &mut CpuSched, cpu: usize) -> Arc<Thread> {
     loop {
         if next.idle || !next.process.exiting.load(Ordering::Acquire) {
+            return next;
+        }
+        // A terminal user thread that is parked in a syscall still owns the handler frames
+        // above `block_current`/`sleep_until`, including their `Arc<Process>` caller. Reaping
+        // it frees that stack without running its destructors and leaks one process reference
+        // (S170: `refs=2` per killed `sshd-session`). Return it so it resumes, unwinds through
+        // the handler and exits at the syscall-return boundary; `begin_block` refuses a new
+        // block meanwhile. A thread preempted in user mode has no syscall frame and is still
+        // reaped here, so it can never run user code again.
+        if parked_in_syscall(&next) {
             return next;
         }
         next.set_state(ThreadState::Dead);
@@ -739,6 +768,12 @@ pub fn timer_return(from_user: bool) {
 /// restores the EL0 frame. A switch here is safe on both: the trap frame lives on the current
 /// thread's kernel stack, which the context switch preserves.
 pub fn syscall_return() {
+    // A terminal process must never reach `sysret`/`eret`: close the window between the
+    // dispatch-boundary check and this return, so the thread exits on the syscall frame that
+    // still owns its handler references.
+    if current_process_exiting() {
+        exit_thread(0);
+    }
     if !sync::preemption_enabled() {
         return;
     }
