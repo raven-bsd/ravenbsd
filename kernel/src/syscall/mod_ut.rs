@@ -23,7 +23,7 @@ fn x86_exec_frame_carries_c8_stack_in_rdi_and_rsp() {
 
     apply_exec_context(
         &mut frame,
-        ExecContext {
+        crate::process::exec::ExecContext {
             entry: 0x40_0000,
             stack: C8_SP0,
         },
@@ -49,7 +49,7 @@ fn aarch64_exec_frame_carries_c8_stack_in_x0_and_sp() {
 
     apply_exec_context(
         &mut frame,
-        ExecContext {
+        crate::process::exec::ExecContext {
             entry: 0x40_0000,
             stack: C8_SP0,
         },
