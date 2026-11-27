@@ -821,8 +821,12 @@ fn row_close_reuse(state: &mut State, mutation: bool) {
             second = [-1i32; 2];
         }
     }
-    let wrote = created
-        && unsafe { write(first[1], b"r".as_ptr().cast::<c_void>(), 1) } == 1;
+    // Trigger the *new* object at the recycled number.  Writing to the old writer would raise
+    // SIGPIPE because its only reader was closed; the recycled descriptor is what a stale
+    // registration would mistake for the old one.
+    let wrote = closed
+        && reused
+        && unsafe { write(second[1], b"r".as_ptr().cast::<c_void>(), 1) } == 1;
     let after = if added == 0 && closed && reused && wrote {
         poll_events(kq, &mut events, &ZERO_TIMEOUT)
     } else {
