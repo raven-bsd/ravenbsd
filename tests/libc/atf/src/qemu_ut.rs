@@ -1,9 +1,23 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+use std::fs;
 use std::path::Path;
 
 use super::*;
+
+static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn temp(name: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "raven-atf-qemu-{name}-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&path);
+    fs::create_dir_all(&path).expect("temp");
+    path
+}
 
 #[test]
 fn the_last_init_exit_wins() {
@@ -165,12 +179,43 @@ fn the_guest_initfs_has_the_services_and_the_program() {
 
 #[test]
 fn the_batch_manifest_uses_the_indexed_image_and_result() {
-    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7");
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", false);
     assert!(text.contains("mode=exec\n"));
     assert!(text.contains("program=/tests/t_foo\n"));
     assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
     assert!(text.contains("arg=-s\narg=/tests\narg=a_case\n"));
     assert!(text.contains("result=/tmp/result-7\n"));
+}
+
+#[test]
+fn the_batch_manifest_runs_through_the_workdir_wrapper() {
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", true);
+    assert!(text.contains("program=/tests/atf-wrapper\n"));
+    assert!(text.contains("arg=/tests/atf-wrapper\n"));
+    assert!(text.contains("arg=/tmp/atf-work\narg=/tests/t_foo\n"));
+    assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
+    assert!(text.contains("arg=-s\narg=/tests\narg=a_case\n"));
+}
+
+#[test]
+fn the_guest_credentials_stage_passwd_and_group() {
+    let workdir = temp("credentials");
+    let specs = guest_credentials(&workdir).expect("credentials");
+    let passwd = fs::read_to_string(workdir.join("etc/passwd")).expect("passwd");
+    let group = fs::read_to_string(workdir.join("etc/group")).expect("group");
+    assert!(passwd.contains("root:x:0:0:"));
+    assert!(passwd.contains("nobody:x:65534:"));
+    assert!(group.contains("wheel:*:0:root"));
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == &format!("/etc/passwd={}:0644", workdir.join("etc/passwd").display()))
+    );
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == &format!("/etc/group={}:0644", workdir.join("etc/group").display()))
+    );
 }
 
 #[test]

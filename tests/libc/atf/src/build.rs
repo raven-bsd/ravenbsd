@@ -21,6 +21,8 @@ use crate::{BuildStatus, Framework, Mode};
 const ATF_SOURCES: &[&str] = &["atf-c", "atf-c/detail"];
 /// Weak target diagnostics the C donor tests call but the current C ABI does not export.
 const TARGET_SHIM: &str = "tests/libc/atf/shim/rl_target_shim.c";
+/// Target wrapper that installs the login group list and a writable working directory.
+const TARGET_WRAPPER: &str = "tests/libc/atf/shim/atf_wrapper.c";
 
 /// Builds programs in one mode.
 #[derive(Clone, Debug)]
@@ -348,6 +350,49 @@ impl Builder {
             bail!("cannot compile the target shim: {line}");
         }
         Ok(object)
+    }
+
+    /// Build the target wrapper that runs a donor body from a writable directory with the login
+    /// group list. The wrapper is a host-side runner artifact, never part of a shipped image.
+    pub fn build_target_wrapper(&self) -> Result<PathBuf> {
+        let sysroot = self.sysroot()?;
+        let directory = self.out.join("target-shim");
+        fs::create_dir_all(&directory)
+            .with_context(|| format!("cannot create {}", directory.display()))?;
+        let object = directory.join("atf_wrapper.o");
+        let binary = directory.join("atf-wrapper");
+        let source = self.root.join(TARGET_WRAPPER);
+        let output = run(
+            self.target_compiler(),
+            &target_shim_args(sysroot, &source, &object),
+            self.root(),
+        )?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot compile the target wrapper: {line}");
+        }
+        let args = target_link_args(
+            sysroot,
+            &binary,
+            &[object],
+            Framework::ExitStatus,
+            &self.out,
+            &[],
+        );
+        let output = run(self.linker()?, &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot link the target wrapper: {line}");
+        }
+        Ok(binary)
     }
 
     fn report(&self, output: CommandOutput, binary: Option<PathBuf>) -> BuildReport {

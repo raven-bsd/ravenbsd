@@ -163,8 +163,8 @@ upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
 license = "BSD-2-Clause"
 tier = "A"
 copied = "2026-11-26"
-modified = false
-notes = "vendored kernel-facing test, never linked into a shipped artifact"
+modified = true
+notes = "vendored kernel-facing test, never linked into a shipped artifact; ported struct wrusage to the FreeBSD struct __wrusage spelling, expectations unchanged"
 
 [[import]]
 path = "tests/libc-oracle/vendor/freebsd/libc-sys/gen/execve/t_execve.c"

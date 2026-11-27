@@ -31,6 +31,13 @@
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_wait.c,v 1.8 2017/01/13 19:28:55 christos Exp $");
 
+/*
+ * RavenBSD portability: FreeBSD spells the wait6(2) usage record `struct __wrusage`
+ * (sys/sys/resource.h:92); NetBSD spells it `struct wrusage`. The target libc exposes the
+ * FreeBSD record only, so this port changes the type name and nothing else. The wait6(2)
+ * bodies and their expected results are unchanged.
+ */
+
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -59,7 +66,7 @@ ATF_TC_HEAD(wait6_invalid, tc)
 ATF_TC_BODY(wait6_invalid, tc)
 {
 	siginfo_t si;
-	struct wrusage wru;
+	struct __wrusage wru;
 	int st;
 	ATF_REQUIRE(wait6(P_ALL, 0, &st, 0, &wru, &si) == -1
 	    && errno == EINVAL);
@@ -75,7 +82,7 @@ ATF_TC_HEAD(wait6_exited, tc)
 ATF_TC_BODY(wait6_exited, tc)
 {
 	siginfo_t si;
-	struct wrusage wru;
+	struct __wrusage wru;
 	int st;
 	pid_t pid;
 
@@ -110,7 +117,7 @@ ATF_TC_HEAD(wait6_terminated, tc)
 ATF_TC_BODY(wait6_terminated, tc)
 {
 	siginfo_t si;
-	struct wrusage wru;
+	struct __wrusage wru;
 	int st;
 	pid_t pid;
 
@@ -146,7 +153,7 @@ ATF_TC_HEAD(wait6_coredumped, tc)
 ATF_TC_BODY(wait6_coredumped, tc)
 {
 	siginfo_t si;
-	struct wrusage wru;
+	struct __wrusage wru;
 	int st;
 	pid_t pid;
 	static const struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -192,7 +199,7 @@ ATF_TC_HEAD(wait6_stop_and_go, tc)
 ATF_TC_BODY(wait6_stop_and_go, tc)
 {
 	siginfo_t si;
-	struct wrusage wru;
+	struct __wrusage wru;
 	int st;
 	pid_t pid;
 	static const struct rlimit rl = { 0, 0 };
@@ -263,7 +270,7 @@ ATF_TC_HEAD(wait6_stopgo_loop, tc)
 ATF_TC_BODY(wait6_stopgo_loop, tc)
 {
 	siginfo_t si;
-	struct wrusage wru;
+	struct __wrusage wru;
 	int st;
 	pid_t pid;
 	static const struct rlimit rl = { 0, 0 };
