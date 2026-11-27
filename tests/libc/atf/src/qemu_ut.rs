@@ -310,6 +310,28 @@ fn the_target_environment_has_the_host_runner_values() {
 }
 
 #[test]
+fn the_g1_mounts_make_dev_a_directory_and_dev_null_a_device_mount() {
+    let work = temp("mounts");
+    let specs = guest_mounts(&work).expect("mounts");
+    assert_eq!(specs.len(), 1);
+    let text = fs::read_to_string(work.join("etc/mounts")).expect("mounts file");
+    let lines: Vec<&str> = text.lines().collect();
+    let dev = lines
+        .iter()
+        .position(|line| *line == "/dev ramfs:")
+        .expect("/dev ramfs:");
+    let null = lines
+        .iter()
+        .position(|line| *line == "/dev/null null:")
+        .expect("/dev/null null:");
+    assert!(dev < null);
+    assert!(!lines.iter().any(|line| line.starts_with("/dev/null=")));
+    assert!(lines.contains(&"/ initfs:"));
+    assert!(lines.contains(&"/tmp ramfs:"));
+    let _ = fs::remove_dir_all(&work);
+}
+
+#[test]
 fn qemu_uses_the_c5_exit_device_and_stdio_serial() {
     let args = qemu_args(
         Path::new("/work/boot.img"),

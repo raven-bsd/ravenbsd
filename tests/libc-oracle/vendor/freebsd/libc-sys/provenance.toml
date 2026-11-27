@@ -1,5 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C text for every import below is embedded as test-only source in
+# tests/libc/atf/src/port_sources.rs (BSD-3-Clause, first-party) and written into the build tree
+# by that module. Each embedded body is verified against its historical Git blob SHA-256 before
+# the single documented build transformation. The `path` fields name the historical repository
+# paths; they are no longer tracked so the structural C/C++ scaffold gate stays closed.
 
 [[import]]
 path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/h_macros.h"
@@ -120,7 +126,7 @@ license = "BSD-2-Clause"
 tier = "A"
 copied = "2026-11-26"
 modified = false
-notes = "vendored kernel-facing test, never linked into a shipped artifact"
+notes = "vendored kernel-facing test, never linked into a shipped artifact; the historical body is embedded byte-identically and the build adds only the S750 prerequisite exit-status check for the pselect child, changing no donor assertion"
 
 [[import]]
 path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/t_socketpair.c"

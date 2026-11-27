@@ -510,9 +510,11 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
             .insert(shell.clone(), BuildStatus::Needs("needs-sh".to_string()));
     }
 
+    let port_root = crate::port_sources::stage(&config.out)?;
     let builder = Builder {
         root: config.root.clone(),
         vendor: oracle.clone(),
+        port_root,
         out: config.out.clone(),
         mode: config.mode,
         cc: config.cc.clone(),

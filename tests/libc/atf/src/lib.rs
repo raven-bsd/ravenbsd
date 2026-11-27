@@ -22,6 +22,7 @@ pub mod gate;
 pub mod gen_make;
 pub mod gen_meson;
 pub mod owners;
+pub mod port_sources;
 pub mod qemu;
 pub mod report;
 pub mod required;

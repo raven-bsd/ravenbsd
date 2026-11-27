@@ -234,6 +234,7 @@ pub fn run_guest(
         &svcd,
     );
     specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
     run_tool(
         "cargo",
         &mkinitfs_with(&initfs, &specs),
@@ -453,6 +454,7 @@ pub fn run_atf_batch(
 
     let mut specs = service_specs(config, guest);
     specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
     if let Some(wrapper) = wrapper {
         let destination = programs_dir.join("atf-wrapper");
         strip_to(wrapper, &destination)?;
@@ -798,6 +800,33 @@ fn guest_credentials(workdir: &Path) -> Result<Vec<String>> {
         format!("/etc/passwd={}:0644", passwd.display()),
         format!("/etc/group={}:0644", group.display()),
     ])
+}
+
+/// Stage the G1 mount table.
+///
+/// The product default mounts `/dev/null` on `null:`, but `vfsd` resolves the parent `/dev` in
+/// the read-only initfs before it looks up the final component. The initfs has no `/dev`, so the
+/// open fails with `ENOENT` before the null mount is reached. Mounting a ramfs at `/dev` makes
+/// the parent a real directory; `/dev/null` itself stays the `null:` device mount and is never a
+/// regular file. This is a test-only namespace file inside the ATF/G1 image, not a product mount
+/// edit.
+fn guest_mounts(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let mounts = directory.join("mounts");
+    fs::write(
+        &mounts,
+        "/ initfs:\n\
+         /tmp ramfs:\n\
+         /dev ramfs:\n\
+         /dev/null null:\n\
+         /dev/zero zero:\n\
+         /dev/random rand:\n\
+         /dev/urandom rand:\n",
+    )
+    .with_context(|| format!("cannot write {}", mounts.display()))?;
+    Ok(vec![format!("/etc/mounts={}:0644", mounts.display())])
 }
 
 fn guest_initfs_specs(
