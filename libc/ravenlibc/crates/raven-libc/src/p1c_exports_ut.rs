@@ -118,6 +118,24 @@ fn ppoll_empty_request_returns_zero() {
 }
 
 #[test]
+fn ppoll_null_fds_with_a_nonzero_count_is_efault() {
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    // SAFETY: a NULL record array with a nonzero count is the documented EFAULT path; the wrapper
+    // must reject it before forming a slice.
+    let result = unsafe {
+        ppoll(
+            core::ptr::null_mut(),
+            1,
+            core::ptr::null(),
+            core::ptr::null(),
+        )
+    };
+    assert_eq!(result, -1);
+    assert_eq!(errno::get(), EFAULT);
+}
+
+#[test]
 fn pselect_empty_request_is_enosys_until_the_signal_swap_lands() {
     let _guard = TestLock::acquire();
     errno::set_raw(0);
