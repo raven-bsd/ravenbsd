@@ -59,21 +59,61 @@ fn reset_after_fork_clears_delivery_state_and_keeps_the_mask() {
     let kernel = HostSigKernel::new();
     let tp = kernel.pointer();
     mask_store(tp, 0x55);
-    set_ctx_area(tp, 0x4000);
     pending_store(tp, 9);
     let mut info = SiginfoT::ZERO;
     info.si_signo = 17;
     store_pending_info(tp, &info);
 
-    assert!(reset_after_fork(tp), "the parent had a registered entry");
+    assert!(!reset_after_fork(tp), "C19 has no entry to re-register");
 
     assert_eq!(mask_load(tp), 0x55, "the child inherits the signal mask");
-    assert_eq!(with_state(tp, |state| state.ctx_area()), 0);
     assert_eq!(pending_load(tp), 0);
     assert_eq!(load_pending_info(tp).si_signo, 0);
+    assert!(!reset_after_fork(tp), "a second reset is still entry-free");
+}
+
+#[test]
+fn the_user_entry_registration_is_deleted() {
+    use std::path::Path;
+
+    fn source_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                source_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    source_files(&src, &mut files);
+    let trampoline = ["__raven_", "sigentry"].concat();
+    let address = ["fn ", "sigentry_address"].concat();
+    let setup = ["fn ", "sig_setup"].concat();
+    let mut violations = Vec::new();
+    for file in files {
+        let text = std::fs::read_to_string(&file).expect("read a signal source file");
+        for needle in [&trampoline, &address, &setup] {
+            if text.contains(needle) {
+                violations.push(format!("{}: {needle}", file.display()));
+            }
+        }
+    }
+    for name in ["entry_x86_64.rs", "entry_aarch64.rs", "entry_riscv64.rs"] {
+        let path = src.join("raw").join(name);
+        if path.exists() {
+            violations.push(format!("{}: entry trampoline file", path.display()));
+        }
+    }
     assert!(
-        !reset_after_fork(tp),
-        "a second reset has no entry to report"
+        violations.is_empty(),
+        "the C19 user entry must be deleted: {violations:?}"
     );
 }
 
@@ -110,8 +150,7 @@ fn stack_pointer_helpers_agree() {
 }
 
 #[test]
-fn entry_and_start_addresses_are_symbols() {
-    assert_ne!(sigentry_address(), 0);
+fn start_address_is_a_symbol() {
     assert_ne!(start_context_address(), 0);
 }
 
@@ -145,14 +184,6 @@ fn hooks_default_to_noop_and_can_be_installed() {
     set_stop_hook(None);
     call_stop_hook(19);
     assert!(!call_exit_hook(0));
-}
-
-#[test]
-fn entry_function_cell_round_trips() {
-    let before = entry_function();
-    set_entry_function(0x1234);
-    assert_eq!(entry_function(), 0x1234);
-    set_entry_function(before);
 }
 
 #[test]

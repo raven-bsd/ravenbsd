@@ -288,7 +288,7 @@ fn platform_stat_converts_the_record() {
     assert_eq!(stat.st_blksize, 4096);
     assert_eq!(stat.st_blocks, 1);
     assert_eq!(
-        stat.st_mode & raven_libc_abi::stat::S_IFMT,
+        u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT,
         raven_libc_abi::stat::S_IFREG
     );
 }

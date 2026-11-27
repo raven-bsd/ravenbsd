@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S203 futex requeue: two waiters block on the source word. One REQUEUE wakes one
+# waiter and moves the other to the destination word; a second REQUEUE on the now
+# empty source returns 0; a source wake returns 0 and the destination wake returns
+# 1. Both waiters return 0, and further wakes on either word return 0.
+
+name = "futex-requeue"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/futex-requeue/build.sh"]
+initfs = "build/fixtures/futex-requeue/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^futex-requeue: requeue1=2 requeue2=0 wake_source=0 wake_target=1 released=2$'
+
+[[expect]]
+regex = '^futex-requeue: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|futex-requeue: FAIL'

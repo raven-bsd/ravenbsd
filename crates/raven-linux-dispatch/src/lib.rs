@@ -29,6 +29,8 @@ use core::fmt;
 pub use raven_abi::errno::Errno;
 pub use raven_linux_abi::Arch;
 
+pub mod xlat;
+
 /// Linux syscall arguments as captured by the trap entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SyscallArgs {
@@ -161,7 +163,7 @@ impl Dispatcher {
         let name = self.name_for(args.nr);
         let hit = self.unimplemented.entry(args.nr).or_insert((name, 0));
         hit.1 = hit.1.saturating_add(1);
-        -(Errno::ENOSYS.0 as isize)
+        -(raven_linux_abi::errno::ENOSYS as isize)
     }
 
     /// Implemented syscall names, sorted.
@@ -199,9 +201,9 @@ impl Dispatcher {
 
 /// Convert a handler result into the Linux syscall return convention.
 ///
-/// `Ok(n)` is returned as `n`; `Err(errno)` becomes `-errno`. A success value above
-/// `isize::MAX` is a handler bug: it trips `debug_assert!` in debug builds and is clamped to
-/// `-EOVERFLOW` in release builds.
+/// `Ok(n)` is returned as `n`; `Err(errno)` is translated from the native error domain to the
+/// Linux number before it becomes `-errno`. A success value above `isize::MAX` is a handler bug:
+/// it trips `debug_assert!` in debug builds and is clamped to `-EOVERFLOW` in release builds.
 pub fn ret(result: Result<usize, Errno>) -> isize {
     match result {
         Ok(value) => {
@@ -210,11 +212,14 @@ pub fn ret(result: Result<usize, Errno>) -> isize {
                 "syscall success value exceeds isize::MAX"
             );
             if value > isize::MAX as usize {
-                -(Errno::EOVERFLOW.0 as isize)
+                -(raven_linux_abi::errno::EOVERFLOW as isize)
             } else {
                 value as isize
             }
         }
-        Err(error) => -(error.0 as isize),
+        Err(error) => {
+            let linux = xlat::linux_from_native(error.0).unwrap_or(raven_linux_abi::errno::EIO);
+            -(linux as isize)
+        }
     }
 }

@@ -203,7 +203,10 @@ fn deliver(
     let reply = match LinuxReplyV1::decode(response.data_bytes()) {
         Ok(reply) => reply,
         Err(_) => {
-            return Ok((isize::from(Errno::EPROTO.0 as i16).saturating_neg(), None));
+            // A malformed reply is a transport failure observed as a Linux syscall error: use
+            // the Linux personality number, not the native EPROTO value.
+            const LINUX_EPROTO: isize = 71;
+            return Ok((-LINUX_EPROTO, None));
         }
     };
     let reply_frame = if response.path.get(..4) == Some(FRAME_MAGIC.as_slice()) {

@@ -7,19 +7,19 @@
 # build does not depend on a test pre-step.
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/lsblk"
+src = "build/fixtures/disk-tools/{arch}/tools/lsblk"
 path = "/bin/lsblk"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/newfs"
+src = "build/fixtures/disk-tools/{arch}/tools/newfs"
 path = "/sbin/newfs"
 mode = 0o755
 generated = true
 
 [[initfs.files]]
-src = "build/fixtures/disk-tools/tools/gpart"
+src = "build/fixtures/disk-tools/{arch}/tools/gpart"
 path = "/sbin/gpart"
 mode = 0o755
 generated = true

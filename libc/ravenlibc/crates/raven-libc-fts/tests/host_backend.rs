@@ -78,16 +78,13 @@ impl LinuxStat {
         Stat {
             st_dev: self.st_dev,
             st_ino: self.st_ino,
-            st_mode: self.st_mode,
-            st_nlink: self.st_nlink as u32,
+            st_nlink: self.st_nlink,
+            st_mode: self.st_mode as u16,
+            st_bsdflags: 0,
             st_uid: self.st_uid,
             st_gid: self.st_gid,
+            st_padding1: 0,
             st_rdev: self.st_rdev,
-            __pad1: 0,
-            st_size: self.st_size,
-            st_blksize: self.st_blksize as i32,
-            __pad2: 0,
-            st_blocks: self.st_blocks,
             st_atim: Timespec {
                 tv_sec: self.st_atim.tv_sec,
                 tv_nsec: self.st_atim.tv_nsec,
@@ -100,7 +97,17 @@ impl LinuxStat {
                 tv_sec: self.st_ctim.tv_sec,
                 tv_nsec: self.st_ctim.tv_nsec,
             },
-            __unused: [0; 2],
+            st_birthtim: Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            },
+            st_size: self.st_size,
+            st_blocks: self.st_blocks,
+            st_blksize: self.st_blksize as i32,
+            st_flags: 0,
+            st_gen: 0,
+            st_filerev: 0,
+            st_spare: [0; 9],
         }
     }
 }
@@ -167,12 +174,52 @@ impl DirSys for HostDirSys {
     }
 
     fn getdents(&mut self, fd: Fd, buf: &mut [u8]) -> Result<usize, Errno> {
-        // SAFETY: the buffer is valid for `buf.len()` bytes and the fd is owned by the stream.
-        let rc = unsafe { getdents64(fd.0, buf.as_mut_ptr().cast::<c_void>(), buf.len()) };
+        // The host returns Linux `dirent64` records; the crate's contract is the public FreeBSD
+        // `struct dirent`, so translate a window that cannot expand past the caller buffer (a
+        // 19+name record becomes a 24+name record, at most 5/3 for a full name).
+        let raw_len = (buf.len().saturating_mul(3) / 5).clamp(272, 4096);
+        let mut raw = vec![0u8; raw_len];
+        // SAFETY: the buffer is valid for `raw.len()` bytes and the fd is owned by the stream.
+        let rc = unsafe { getdents64(fd.0, raw.as_mut_ptr().cast::<c_void>(), raw.len()) };
         if rc < 0 {
             return Err(errno());
         }
-        usize::try_from(rc).map_err(|_| Errno(ENOENT as u16))
+        let length = usize::try_from(rc).map_err(|_| Errno(ENOENT as u16))?;
+        let mut written = 0usize;
+        let mut pos = 0usize;
+        while pos < length {
+            let Some(header) = raw.get(pos..pos + 20) else {
+                return Err(Errno(raven_libc_abi::generated::errno::EIO as u16));
+            };
+            let reclen = u16::from_le_bytes([header[16], header[17]]) as usize;
+            let Some(record) = raw.get(pos..pos + reclen) else {
+                return Err(Errno(raven_libc_abi::generated::errno::EIO as u16));
+            };
+            if reclen < 20 {
+                return Err(Errno(raven_libc_abi::generated::errno::EIO as u16));
+            }
+            let Some(nul) = record[19..].iter().position(|&byte| byte == 0) else {
+                return Err(Errno(raven_libc_abi::generated::errno::EIO as u16));
+            };
+            let name = &record[19..19 + nul];
+            let out_len = (24 + name.len() + 1 + 7) & !7;
+            let Some(end) = written.checked_add(out_len) else {
+                return Err(Errno(raven_libc_abi::generated::errno::EIO as u16));
+            };
+            let Some(out) = buf.get_mut(written..end) else {
+                return Err(Errno(raven_libc_abi::generated::errno::EINVAL as u16));
+            };
+            out.fill(0);
+            out[0..8].copy_from_slice(&record[0..8]);
+            out[8..16].copy_from_slice(&record[8..16]);
+            out[16..18].copy_from_slice(&(out_len as u16).to_le_bytes());
+            out[18] = record[18];
+            out[20..22].copy_from_slice(&(name.len() as u16).to_le_bytes());
+            out[24..24 + name.len()].copy_from_slice(name);
+            written = end;
+            pos += reclen;
+        }
+        Ok(written)
     }
 
     fn lseek(&mut self, fd: Fd, off: i64, whence: Whence) -> Result<i64, Errno> {

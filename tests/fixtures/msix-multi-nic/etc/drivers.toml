@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S199: two QEMU virtio-net functions (vendor 0x1af4, device 0x1041), each with BAR4 and a
+# 64 KiB DMA buffer. devd must create one MSI-X vector per function before launching it.
+[[driver]]
+name = "virtio-net"
+vendor = 0x1af4
+device = 0x1041
+exec = "/sbin/virtio-net"
+args = ["bar=4", "resources=dma+irq", "test"]
+cycles = 1

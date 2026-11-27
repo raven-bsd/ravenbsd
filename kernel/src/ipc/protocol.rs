@@ -103,6 +103,7 @@ pub enum ObjectKind {
 
 impl ObjectKind {
     /// Every kind, for the conformance table.
+    #[cfg(test)]
     pub const ALL: [Self; 18] = [
         Self::Process,
         Self::MemObjectInitfs,
@@ -259,6 +260,11 @@ pub struct SchemePacket {
     pub root_len: u32,
     /// Cross-process trace id (`R-OBS-6`); zero means "not traced".
     pub trace_id: u64,
+    /// Requested creation mode for `Open` (S731); zero otherwise. The serving filesystem masks
+    /// it with the request's authenticated umask before the inode is published.
+    pub mode: u32,
+    /// The request's authenticated file-creation mask at submit time (S731).
+    pub umask: u32,
 }
 
 impl Default for SchemePacket {
@@ -289,6 +295,8 @@ impl Default for SchemePacket {
             groups: [0; MAX_GROUPS],
             root_len: 0,
             trace_id: 0,
+            mode: 0,
+            umask: 0,
         }
     }
 }
@@ -297,7 +305,7 @@ impl Default for SchemePacket {
 pub const PACKET_SIZE: usize = size_of::<SchemePacket>();
 
 const _: () = {
-    assert!(PACKET_SIZE == 536);
+    assert!(PACKET_SIZE == 544);
     assert!(offset_of!(SchemePacket, version) == 0);
     assert!(offset_of!(SchemePacket, opcode) == 4);
     assert!(offset_of!(SchemePacket, flags) == 6);
@@ -469,6 +477,8 @@ pub fn encode(packet: &SchemePacket, out: &mut [u8]) -> Result<(), PacketError> 
     }
     put_u32(out, offset_of!(SchemePacket, root_len), packet.root_len);
     put_u64(out, offset_of!(SchemePacket, trace_id), packet.trace_id);
+    put_u32(out, offset_of!(SchemePacket, mode), packet.mode);
+    put_u32(out, offset_of!(SchemePacket, umask), packet.umask);
     Ok(())
 }
 
@@ -533,6 +543,8 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
         groups,
         root_len: get_u32(input, offset_of!(SchemePacket, root_len))?,
         trace_id: get_u64(input, offset_of!(SchemePacket, trace_id))?,
+        mode: get_u32(input, offset_of!(SchemePacket, mode))?,
+        umask: get_u32(input, offset_of!(SchemePacket, umask))?,
     })
 }
 

@@ -110,17 +110,20 @@ macro_rules! clock_id_case {
 }
 
 clock_id_case!(clock_0, 0, true);
-clock_id_case!(clock_1, 1, true);
+clock_id_case!(clock_1, 1, false);
 clock_id_case!(clock_2, 2, false);
 clock_id_case!(clock_3, 3, false);
 clock_id_case!(clock_4, 4, true);
 clock_id_case!(clock_5, 5, true);
-clock_id_case!(clock_6, 6, true);
+clock_id_case!(clock_6, 6, false);
 clock_id_case!(clock_7, 7, true);
-clock_id_case!(clock_8, 8, false);
-clock_id_case!(clock_9, 9, false);
-clock_id_case!(clock_10, 10, false);
-clock_id_case!(clock_11, 11, false);
+clock_id_case!(clock_8, 8, true);
+clock_id_case!(clock_9, 9, true);
+clock_id_case!(clock_10, 10, true);
+clock_id_case!(clock_11, 11, true);
+clock_id_case!(clock_12, 12, true);
+clock_id_case!(clock_13, 13, true);
+clock_id_case!(clock_17, 17, true);
 clock_id_case!(clock_negative, -1, false);
 clock_id_case!(clock_large, 1000, false);
 
@@ -275,11 +278,11 @@ macro_rules! timer_create_case {
 }
 
 timer_create_case!(timer_create_realtime, 0);
-timer_create_case!(timer_create_monotonic, 1);
-timer_create_case!(timer_create_raw, 4);
-timer_create_case!(timer_create_realtime_coarse, 5);
-timer_create_case!(timer_create_monotonic_coarse, 6);
-timer_create_case!(timer_create_boottime, 7);
+timer_create_case!(timer_create_monotonic, 4);
+timer_create_case!(timer_create_raw, 17);
+timer_create_case!(timer_create_realtime_coarse, 10);
+timer_create_case!(timer_create_monotonic_coarse, 12);
+timer_create_case!(timer_create_boottime, 4);
 
 #[test]
 fn the_donor_limits_are_public() {

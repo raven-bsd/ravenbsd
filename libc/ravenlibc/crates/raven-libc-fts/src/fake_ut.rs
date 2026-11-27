@@ -171,8 +171,8 @@ fn hook_after_can_swap_a_directory_for_a_symlink() {
     let _ = dir.readdir(&mut fs).unwrap();
     assert_eq!(
         fs.fstatat(crate::AT_FDCWD, b"d", false).unwrap().st_mode
-            & raven_libc_abi::generated::stat::S_IFMT,
-        raven_libc_abi::generated::stat::S_IFREG
+            & raven_libc_abi::generated::stat::S_IFMT as u16,
+        raven_libc_abi::generated::stat::S_IFREG as u16
     );
     dir.closedir(&mut fs).unwrap();
 }

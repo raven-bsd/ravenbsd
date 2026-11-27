@@ -41,21 +41,57 @@ __BEGIN_DECLS
 #define __NEED_blksize_t
 #define __NEED_blkcnt_t
 #define __NEED_struct_timespec
-
-#if __BSD_VISIBLE
+#define __NEED_int16_t
+#define __NEED_int32_t
 #define __NEED_int64_t
-#define __NEED_uint64_t
-#define __NEED_uint32_t
 #define __NEED_uint16_t
-#endif
+#define __NEED_uint32_t
+#define __NEED_uint64_t
 
 #include <bits/alltypes.h>
 
-#include <bits/stat.h>
+/* RavenBSD: the public record is the FreeBSD 133344405 layout (DR-69, S733), not the musl
+ * 128-byte shape. `mode_t` and `nlink_t` keep their historical widths in bits/alltypes.h, so
+ * the donor-width members are spelled with the explicit fixed-width types. Only numeric
+ * layout facts are used. */
+struct stat {
+	dev_t st_dev;
+	ino_t st_ino;
+	uint64_t st_nlink;
+	uint16_t st_mode;
+	int16_t st_bsdflags;
+	uid_t st_uid;
+	gid_t st_gid;
+	int32_t st_padding1;
+	dev_t st_rdev;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	struct timespec st_birthtim;
+	off_t st_size;
+	blkcnt_t st_blocks;
+	blksize_t st_blksize;
+	uint32_t st_flags;
+	uint64_t st_gen;
+	uint64_t st_filerev;
+	uint64_t st_spare[9];
+};
 
 #define st_atime st_atim.tv_sec
+#define st_atimensec st_atim.tv_nsec
 #define st_mtime st_mtim.tv_sec
+#define st_mtimensec st_mtim.tv_nsec
 #define st_ctime st_ctim.tv_sec
+#define st_ctimensec st_ctim.tv_nsec
+#define st_birthtime st_birthtim.tv_sec
+#define st_birthtimensec st_birthtim.tv_nsec
+
+#if __BSD_VISIBLE
+#define st_atimespec st_atim
+#define st_mtimespec st_mtim
+#define st_ctimespec st_ctim
+#define st_birthtimespec st_birthtim
+#endif
 
 #define S_TYPEISMQ(buf)  0
 #define S_TYPEISSEM(buf) 0

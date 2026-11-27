@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S51b kernel log ring: /init reads the retained boot banner, writes more than 64 KiB through
+# the klog-test DEBUG_WRITE injection, observes LOST/MORE and the dropped count, drains to the
+# write cursor, reads a fresh record and proves the ADMIN denial path.
+
+name = "kernel-log"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/kernel-log-fixture/build.sh"]
+initfs = "build/fixtures/kernel-log/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 klog-test=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^kernel-log: boot=1$'
+
+[[expect]]
+regex = '^kernel-log: wrap dropped=[1-9][0-9]* lost=1 more=1$'
+
+[[expect]]
+regex = '^kernel-log: drain next=last=1$'
+
+[[expect]]
+regex = '^kernel-log: fresh$'
+
+[[expect]]
+regex = '^kernel-log: fresh=1$'
+
+[[expect]]
+regex = '^kernel-log: oversize=1$'
+
+[[expect]]
+regex = '^kernel-log: eacces=1$'
+
+[[expect]]
+regex = '^kernel-log: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|kernel-log: fail'

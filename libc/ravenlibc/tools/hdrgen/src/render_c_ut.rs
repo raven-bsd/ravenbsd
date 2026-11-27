@@ -82,15 +82,38 @@ fn headers_have_a_notice_and_guard() {
     let Some(files) = files() else {
         return;
     };
+    let freebsd = [
+        "bits/errno.h",
+        "bits/signum.h",
+        "bits/abi_fcntl.h",
+        "bits/abi_mman.h",
+        "bits/abi_poll.h",
+        "bits/abi_time.h",
+        "bits/abi_resource.h",
+        "bits/sysconf.h",
+    ];
     for (name, text) in files {
-        assert!(
-            text.starts_with("/*\n * SPDX-License-Identifier: MIT"),
-            "{name}"
-        );
-        assert!(
-            text.contains("Copyright © 2005-2020 Rich Felker, et al."),
-            "{name}"
-        );
+        if freebsd.contains(&name.as_str()) {
+            // The errno, signal and six selector tables are FreeBSD-derived, not musl.
+            assert!(
+                text.starts_with("/*\n * SPDX-License-Identifier: BSD-3-Clause"),
+                "{name}"
+            );
+            assert!(
+                text.contains("Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors"),
+                "{name}"
+            );
+            assert!(text.contains("derived from freebsd:"), "{name}");
+        } else {
+            assert!(
+                text.starts_with("/*\n * SPDX-License-Identifier: MIT"),
+                "{name}"
+            );
+            assert!(
+                text.contains("Copyright © 2005-2020 Rich Felker, et al."),
+                "{name}"
+            );
+        }
         assert!(text.contains("#ifndef "), "{name}");
         assert!(text.contains("#endif /* "), "{name}");
     }
@@ -103,8 +126,10 @@ fn errno_header_has_the_values() {
     };
     let text = &files["bits/errno.h"];
     assert!(text.contains("#define EPERM 1\n"));
-    assert!(text.contains("#define EWOULDBLOCK EAGAIN\n"));
-    assert!(text.contains("#define ENOATTR ENODATA\n"));
+    assert!(text.contains("#define EWOULDBLOCK 35\n"));
+    assert!(text.contains("#define ENOTSUP 45\n"));
+    assert!(text.contains("#define ENOATTR 87\n"));
+    assert!(!text.contains("#define ENOATTR ENODATA"));
     assert!(!text.contains("#define ENOATTR 61"));
 }
 
@@ -114,21 +139,21 @@ fn fcntl_header_keeps_octal_and_expressions() {
         return;
     };
     let text = &files["bits/abi_fcntl.h"];
-    assert!(text.contains("#define O_CREAT 0100\n"));
-    assert!(text.contains("#define O_ACCMODE (03|O_PATH)\n"));
+    assert!(text.contains("#define O_CREAT 0x200\n"));
+    assert!(text.contains("#define O_ACCMODE 03\n"));
     assert!(text.contains("#define O_LARGEFILE 0\n"));
     assert!(text.contains("#define AT_FDCWD (-100)\n"));
-    assert!(text.contains("#define O_SEARCH O_PATH\n"));
+    assert!(text.contains("#define O_SEARCH O_EXEC\n"));
 }
 
 #[test]
-fn arch_entries_are_guarded() {
+fn map_32bit_has_the_freebsd_value() {
     let Some(files) = files() else {
         return;
     };
     let text = &files["bits/abi_mman.h"];
-    assert!(text.contains("#if defined(__x86_64__)\n"));
-    assert!(text.contains("#define MAP_32BIT 0x40\n"));
+    assert!(text.contains("#define MAP_32BIT 0x80000\n"));
+    assert!(!text.contains("#if defined(__x86_64__)\n"));
 }
 
 #[test]
@@ -138,7 +163,7 @@ fn visibility_entries_are_guarded() {
     };
     let text = &files["bits/abi_fcntl.h"];
     assert!(text.contains("#if __BSD_VISIBLE\n"));
-    assert!(text.contains("#define O_EXLOCK 0x10000000\n"));
+    assert!(text.contains("#define O_EXLOCK 0x20\n"));
     assert!(!text.contains("/* visible: bsd */\n/* visible: bsd */"));
 }
 
@@ -148,10 +173,16 @@ fn signal_header_has_the_frozen_stack_sizes() {
         return;
     };
     let text = &files["bits/signum.h"];
-    assert!(text.contains("#define MINSIGSTKSZ 6144\n"));
-    assert!(text.contains("#define SIGSTKSZ 16384\n"));
+    assert!(text.contains(
+        "#if defined(__aarch64__) || defined(__riscv)\n#define MINSIGSTKSZ 4096\n#endif\n"
+    ));
+    assert!(text.contains("#if defined(__x86_64__)\n#define MINSIGSTKSZ 2048\n#endif\n"));
+    assert!(text.contains(
+        "#if defined(__aarch64__) || defined(__riscv)\n#define SIGSTKSZ 36864\n#endif\n"
+    ));
+    assert!(text.contains("#if defined(__x86_64__)\n#define SIGSTKSZ 34816\n#endif\n"));
     assert!(text.contains("#define SIGRTMIN 35\n"));
-    assert!(text.contains("#define NSIG _NSIG\n"));
+    assert!(text.contains("#define NSIG 32\n"));
 }
 
 #[test]

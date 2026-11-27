@@ -6,9 +6,7 @@ use super::*;
 #[test]
 fn production_capability_matrix_is_all_false() {
     let caps = SigKernel::caps(&SysKernel);
-    assert!(!caps.entry);
     assert!(!caps.kick);
-    assert!(!caps.sigreturn);
     assert!(!caps.resend);
     assert!(!caps.eintr);
     assert!(!caps.proc_kill);
@@ -20,7 +18,7 @@ fn production_capability_matrix_is_all_false() {
 #[test]
 fn host_capability_matrix_is_all_true_but_fp() {
     let caps = SigCaps::HOST;
-    assert!(caps.entry && caps.kick && caps.sigreturn && caps.resend);
+    assert!(caps.kick && caps.resend);
     assert!(caps.eintr && caps.proc_kill && caps.stop);
     assert!(!caps.fp_in_frame);
 }
@@ -29,7 +27,6 @@ fn host_capability_matrix_is_all_true_but_fp() {
 fn missing_kernel_primitives_return_enosys() {
     let kernel = SysKernel::new();
     assert_eq!(kernel.kick(1, KICK_CHECK), Err(ENOSYS_ERR));
-    assert_eq!(kernel.sig_setup(0x1000, 0, 0), Err(ENOSYS_ERR));
     assert_eq!(kernel.resend(1, &SiginfoT::ZERO, 0), Err(ENOSYS_ERR));
     assert_eq!(kernel.proc_kill(1, 15, None), Err(ENOSYS_ERR));
     assert_eq!(kernel.take_process_pending(!0), None);

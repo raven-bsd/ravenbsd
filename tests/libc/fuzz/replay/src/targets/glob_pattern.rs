@@ -58,9 +58,9 @@ fn errno(value: i32) -> Errno {
 fn mode(dir: bool) -> Stat {
     let mut stat = Stat::ZERO;
     stat.st_mode = if dir {
-        S_IFDIR | 0o755
+        S_IFDIR as u16 | 0o755
     } else {
-        S_IFREG | 0o644
+        S_IFREG as u16 | 0o644
     };
     stat
 }

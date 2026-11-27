@@ -7,7 +7,7 @@ use super::*;
 use crate::consts::{KERNEL_WCONTINUED, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WUNTRACED};
 
 fn reference(raw: i32) -> Option<WaitStatus> {
-    if raw == 0xffff {
+    if raw == 0x13 {
         return Some(WaitStatus::Continued);
     }
     if raw & 0x7f == 0 {
@@ -55,11 +55,27 @@ fn exit_codes_round_trip() {
 #[test]
 fn signals_round_trip_with_and_without_core() {
     for sig in 1..=64u8 {
+        if sig == 19 {
+            // FreeBSD `W_CONTINUED` is 0x13 (SIGCONT): a killed-by-SIGCONT status is not a
+            // signal termination (`WIFSIGNALED` excludes it), so it cannot round-trip.
+            continue;
+        }
         for core in [false, true] {
             let status = WaitStatus::Signaled { sig, core };
             assert_eq!(decode(encode(status)), Some(status));
         }
     }
+}
+
+#[test]
+fn a_sigcont_status_is_continued_not_signaled() {
+    // FreeBSD `sys/sys/wait.h`: `WIFCONTINUED(x)` is `x == 0x13` and `WIFSIGNALED` excludes it.
+    let raw = encode(WaitStatus::Signaled {
+        sig: 19,
+        core: false,
+    });
+    assert_eq!(raw, 0x13);
+    assert_eq!(decode(raw), Some(WaitStatus::Continued));
 }
 
 #[test]
@@ -71,9 +87,9 @@ fn stopped_statuses_round_trip() {
 }
 
 #[test]
-fn continued_is_ffff() {
-    assert_eq!(encode(WaitStatus::Continued), 0xffff);
-    assert_eq!(decode(0xffff), Some(WaitStatus::Continued));
+fn continued_is_sigcont() {
+    assert_eq!(encode(WaitStatus::Continued), 0x13);
+    assert_eq!(decode(0x13), Some(WaitStatus::Continued));
 }
 
 #[test]
@@ -212,8 +228,8 @@ fn wait4_keeps_wno_wait() {
 
 #[test]
 fn the_two_layer_continued_contract_is_pinned() {
-    assert_eq!(WCONTINUED, 8);
-    assert_eq!(WEXITED, 4);
+    assert_eq!(WCONTINUED, 4);
+    assert_eq!(WEXITED, 16);
     assert_eq!(KERNEL_WCONTINUED, 4);
     assert_eq!(kernel_wait_options(WCONTINUED), KERNEL_WCONTINUED);
     assert_eq!(kernel_wait_options(WEXITED), 0);

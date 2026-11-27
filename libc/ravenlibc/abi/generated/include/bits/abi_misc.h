@@ -73,10 +73,10 @@
 #define SCHED_IDLE 5
 #define SCHED_OTHER 0
 #define SCHED_RR 2
-#define WCONTINUED 8
-#define WEXITED 4
+#define WCONTINUED 4
+#define WEXITED 16
 #define WNOHANG 1
-#define WNOWAIT 16777216
+#define WNOWAIT 8
 #define WSTOPPED 2
 #define WUNTRACED 2
 

@@ -80,7 +80,7 @@ pub use defaults::{DefaultAction, default_action};
 pub use dispositions::{
     DispTable, Disposition, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART, SA_SIGINFO,
 };
-pub use entry::{EntryOutcome, run_direct, signal_entry};
+pub use entry::{EntryOutcome, run_direct};
 pub use errors::{
     EAGAIN_ERR, EINTR_ERR, EINVAL_ERR, ENOMEM_ERR, ENOSYS_ERR, EPERM_ERR, ETIMEDOUT_ERR, errno,
 };
@@ -94,7 +94,5 @@ pub use safe_list::is_async_signal_safe;
 pub use send::{kill, killpg, raise, sigqueue};
 pub use sig2str::{SIG2STR_MAX, sig2str, str2sig};
 pub use sigjmp::{LONGJMP, SETJMP, longjmp, setjmp, siglongjmp, sigsetjmp};
-pub use sigset::{
-    ALL_MASK, APP_MASK, NSIG, SIGCANCEL, SIGRTMAX, SIGRTMIN, SIGSYNCCALL, SIGTIMER, SigSet,
-};
+pub use sigset::{ALL_MASK, APP_MASK, NSIG, SIG_MAXSIG, SIGRTMAX, SIGRTMIN, SigSet};
 pub use wait::{sigsuspend, sigtimedwait, sigwait, sigwaitinfo};

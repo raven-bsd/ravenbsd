@@ -66,9 +66,9 @@ impl SysFile for ShellEnv {
     fn fstat(&self, fd: i32) -> Result<StatLite, Errno> {
         let stat = platform::global().fstat(fd).map_err(error)?;
         Ok(StatLite {
-            mode: stat.st_mode,
+            mode: u32::from(stat.st_mode),
             blksize: u32::try_from(stat.st_blksize).unwrap_or(0),
-            is_char_dev: stat.st_mode & raven_libc_abi::stat::S_IFMT
+            is_char_dev: u32::from(stat.st_mode) & raven_libc_abi::stat::S_IFMT
                 == raven_libc_abi::stat::S_IFCHR,
         })
     }
@@ -77,7 +77,7 @@ impl SysFile for ShellEnv {
         let value = platform::global()
             .fcntl(fd, raven_libc_abi::fcntl::F_GETFL, 0)
             .map_err(error)?;
-        i32::try_from(value).map_err(|_| Errno(22))
+        i32::try_from(value).map_err(|_| Errno::from_generated(raven_libc_abi::errno::EINVAL))
     }
 
     fn setfl(&self, fd: i32, flags: i32) -> Result<(), Errno> {

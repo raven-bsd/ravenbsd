@@ -9,7 +9,6 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_libc_abi::poll::{POLLERR, POLLHUP, POLLIN, POLLNVAL, POLLOUT, POLLPRI};
 use raven_libc_abi::structs::Pollfd;
-use raven_libc_abi::time::CLOCK_MONOTONIC;
 use raven_libc_sys::sys::EvqEvent;
 use raven_proto_net::socket::{READY_ERROR, READY_HUP, READY_READABLE, READY_WRITABLE};
 use raven_proto_net::{Call, Response, SocketRequest};
@@ -65,7 +64,12 @@ pub fn poll<B: SysBackend, L: Lock>(
                     ready = ready.saturating_add(1);
                 }
             }
-            OfdKind::Tty | OfdKind::Pipe | OfdKind::Socket | OfdKind::Unknown => {
+            OfdKind::Tty
+            | OfdKind::Pipe
+            | OfdKind::Socket
+            | OfdKind::EventFd
+            | OfdKind::Timer
+            | OfdKind::Unknown => {
                 let mut wanted = 0u32;
                 if events & (POLLIN | POLLPRI) != 0 {
                     wanted |= EV_READABLE;
@@ -78,9 +82,12 @@ pub fn poll<B: SysBackend, L: Lock>(
                 if wanted == 0 {
                     continue;
                 }
-                if reference.poll_signaled() {
-                    // A scheme-backed socket reports through its attached notification event,
-                    // not through the data handle's level.
+                if reference.poll_signaled()
+                    || matches!(reference.kind(), OfdKind::EventFd | OfdKind::Timer)
+                {
+                    // A scheme-backed socket reports through its attached notification event;
+                    // an eventfd/timerfd reports through its kernel event handle, whose
+                    // readiness bit is EV_SIGNALED.
                     wanted |= EV_SIGNALED;
                 }
                 let handle = reference.poll_handle();
@@ -100,7 +107,7 @@ pub fn poll<B: SysBackend, L: Lock>(
                     });
                 }
             }
-            OfdKind::Epoll | OfdKind::Timer | OfdKind::EventFd | OfdKind::ProcessFd => {
+            OfdKind::Epoll | OfdKind::ProcessFd => {
                 entry.revents = POLLNVAL as i16;
                 ready = ready.saturating_add(1);
             }
@@ -125,7 +132,7 @@ pub fn poll<B: SysBackend, L: Lock>(
     if ready > 0 {
         return Ok(ready);
     }
-    if registrations.is_empty() || timeout_ms == 0 {
+    if registrations.is_empty() {
         return Ok(0);
     }
     let deadline = if timeout_ms < 0 {
@@ -138,17 +145,25 @@ pub fn poll<B: SysBackend, L: Lock>(
     };
     let mut events = [EvqEvent::default(); MAX_POLL_FDS];
     let mut attempt = 0usize;
+    // POSIX: a zero timeout is a non-blocking level query, not "no readiness". Allow the first
+    // wait to run with a zero timeout so the current level is read; later iterations honor the
+    // deadline.
+    let mut first_wait = true;
     loop {
         let timeout_ns = match deadline {
             Some(deadline) => {
                 let remaining = deadline.saturating_sub(monotonic_ns(backend));
-                if remaining == 0 {
+                if remaining == 0 && !first_wait {
                     return Ok(0);
                 }
-                remaining
+                // EVQ_WAIT treats 0 as "wait forever". A zero-timeout poll/select is a
+                // non-blocking level query: probe with 1 ns; the kernel collects ready events
+                // before it sleeps, so a ready source returns immediately.
+                if remaining == 0 { 1 } else { remaining }
             }
             None => 0,
         };
+        first_wait = false;
         let queue = platform.event_queue()?;
         for (position, registration) in registrations.iter().enumerate() {
             if let Err(error) = backend.evq_ctl(
@@ -286,7 +301,9 @@ fn live_readiness<B: SysBackend>(backend: &B, handle: Handle) -> Option<i32> {
 
 /// Monotonic nanoseconds, used for the remaining poll deadline.
 fn monotonic_ns<B: SysBackend>(backend: &B) -> u64 {
-    let Ok(time) = backend.clock_get(CLOCK_MONOTONIC as u32) else {
+    // The public CLOCK_MONOTONIC is 4; the kernel seam keeps its private 0/1 encoding.
+    const KERNEL_CLOCK_MONOTONIC: u32 = 1;
+    let Ok(time) = backend.clock_get(KERNEL_CLOCK_MONOTONIC) else {
         return 0;
     };
     let sec = u64::try_from(time.tv_sec).unwrap_or(0);

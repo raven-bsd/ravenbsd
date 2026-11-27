@@ -51,6 +51,24 @@ pub const GETGR_R_SIZE_MAX: usize = 1024;
 /// Maximum positive cache entries.
 pub const MAX_CACHE: usize = 8;
 
+/// FreeBSD `_PWF_NAME`.
+pub const PWF_NAME: i32 = 1 << 0;
+/// FreeBSD `_PWF_PASSWD`.
+pub const PWF_PASSWD: i32 = 1 << 1;
+/// FreeBSD `_PWF_UID`.
+pub const PWF_UID: i32 = 1 << 2;
+/// FreeBSD `_PWF_GID`.
+pub const PWF_GID: i32 = 1 << 3;
+/// FreeBSD `_PWF_GECOS`.
+pub const PWF_GECOS: i32 = 1 << 6;
+/// FreeBSD `_PWF_DIR`.
+pub const PWF_DIR: i32 = 1 << 7;
+/// FreeBSD `_PWF_SHELL`.
+pub const PWF_SHELL: i32 = 1 << 8;
+/// The bits for the seven fields a plain `/etc/passwd` line supplies.
+pub const PWF_PLAIN: i32 =
+    PWF_NAME | PWF_PASSWD | PWF_UID | PWF_GID | PWF_GECOS | PWF_DIR | PWF_SHELL;
+
 /// A passwd entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Passwd {

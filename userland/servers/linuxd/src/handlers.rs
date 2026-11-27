@@ -18,6 +18,8 @@ use raven_linux_abi::Arch;
 use raven_linux_abi::flags::clone as clone_flags;
 use raven_linux_dispatch::{Dispatcher, LinuxContext, SyscallArgs};
 
+use crate::linux_error;
+
 use crate::files::{
     self, AT_FDCWD, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_SETFD, F_SETFL, FD_CLOEXEC,
     FileOp, O_ACCMODE, O_APPEND, O_CLOEXEC, O_DIRECTORY, O_NOFOLLOW, O_NONBLOCK, O_RDONLY, O_TRUNC,
@@ -42,7 +44,7 @@ const ARCH_SET_FS: i32 = 0x1002;
 const ARCH_GET_FS: i32 = 0x1003;
 
 /// The Linux root is read-only for the synthetic surface.
-const EROFS: i32 = Errno::EROFS.0 as i32;
+const EROFS: i32 = raven_linux_abi::errno::EROFS as i32;
 
 /// `PR_SET_NAME`.
 const PR_SET_NAME: i32 = 15;
@@ -98,7 +100,7 @@ fn with<R>(ctx: &mut dyn LinuxContext, f: impl FnOnce(&mut LinuxProcess) -> R) -
 }
 
 /// `EINVAL` as the dispatcher's `isize`.
-const EINVAL: i32 = Errno::EINVAL.0 as i32;
+const EINVAL: i32 = raven_linux_abi::errno::EINVAL as i32;
 
 fn einval() -> isize {
     -(EINVAL as isize)
@@ -140,7 +142,7 @@ fn set_robust_list(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let length = args.size(1);
     with(ctx, |process| {
         if length != ROBUST_LIST_HEAD_SIZE {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         }
         process.robust_list = head;
         process.robust_list_len = length;
@@ -165,7 +167,7 @@ fn prctl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
             process.pending_write = Some((args.ptr(1) as u64, process.name_bytes().to_vec()));
             0
         }
-        _ => -(Errno::EINVAL.0 as isize),
+        _ => linux_error(Errno::EINVAL),
     });
     result.unwrap_or_else(|_| einval())
 }
@@ -179,7 +181,7 @@ fn prctl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
 fn clone(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let result = with(ctx, |process| {
         let Some(frame) = process.frame else {
-            return -(Errno::ENOSYS.0 as isize);
+            return linux_error(Errno::ENOSYS);
         };
         let request = CloneRequest {
             flags: args.ptr(0) as u64,
@@ -191,17 +193,17 @@ fn clone(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
         };
         match crate::clone::classify(&request) {
             Ok(_) => {}
-            Err(error) => return -(error.0 as isize),
+            Err(error) => return linux_error(error),
         }
         if request.flags & clone_flags::CLONE_PARENT_SETTID != 0
             && !writable_word(process, request.ptid)
         {
-            return -(Errno::EFAULT.0 as isize);
+            return linux_error(Errno::EFAULT);
         }
         if request.flags & clone_flags::CLONE_CHILD_SETTID != 0
             && !writable_word(process, request.ctid)
         {
-            return -(Errno::EFAULT.0 as isize);
+            return linux_error(Errno::EFAULT);
         }
         process.pending_clone = Some(request);
         0
@@ -232,20 +234,20 @@ fn mmap(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let result = with(ctx, |process| {
         if flags & MAP_ANONYMOUS == 0 {
             // File-backed mappings need a `file:` descriptor; the skeleton does not serve them.
-            return -(Errno::ENOSYS.0 as isize);
+            return linux_error(Errno::ENOSYS);
         }
         if protection & PROT_EXEC != 0 {
             // The anonymous arena is read/write; executable anonymous memory is not served.
-            return -(Errno::ENOSYS.0 as isize);
+            return linux_error(Errno::ENOSYS);
         }
         let Some(length) = round_up(length, PAGE) else {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         };
         let Some(end) = process.mmap_next.checked_add(length) else {
-            return -(Errno::ENOMEM.0 as isize);
+            return linux_error(Errno::ENOMEM);
         };
         if end > process.mmap_limit {
-            return -(Errno::ENOMEM.0 as isize);
+            return linux_error(Errno::ENOMEM);
         }
         let address = process.mmap_next;
         process.mmap_next = end;
@@ -286,7 +288,7 @@ fn uname(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
 /// still validated so a caller with a wrong `sigset_t` learns about it.
 fn rt_sigprocmask(_ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     if args.size(3) != 8 {
-        return -(Errno::EINVAL.0 as isize);
+        return linux_error(Errno::EINVAL);
     }
     0
 }
@@ -315,7 +317,7 @@ fn arch_prctl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
             process.pending_write = Some((value, process.fs_base.to_le_bytes().to_vec()));
             0
         }
-        _ => -(Errno::EINVAL.0 as isize),
+        _ => linux_error(Errno::EINVAL),
     });
     result.unwrap_or_else(|_| einval())
 }
@@ -338,11 +340,11 @@ fn path_bytes(process: &LinuxProcess) -> Result<&[u8], i32> {
 fn open_impl(process: &mut LinuxProcess, dirfd: i32, flags: i32) -> isize {
     let path = match path_bytes(process) {
         Ok(path) => path.to_vec(),
-        Err(_) => return -(Errno::EINVAL.0 as isize),
+        Err(_) => return linux_error(Errno::EINVAL),
     };
     let resolved = match files::resolve_path(process, dirfd, &path) {
         Ok(resolved) => resolved,
-        Err(error) => return -(error.0 as isize),
+        Err(error) => return linux_error(error),
     };
     if files::is_synthetic(&resolved) {
         if flags & O_ACCMODE != O_RDONLY
@@ -357,25 +359,25 @@ fn open_impl(process: &mut LinuxProcess, dirfd: i32, flags: i32) -> isize {
             | crate::files::O_LARGEFILE
             | crate::files::O_NOCTTY;
         if flags & !allowed != 0 {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         }
         return match procfs::lookup(process, &resolved) {
             Ok(Resource::File(bytes)) => {
                 if flags & O_DIRECTORY != 0 {
-                    return -(Errno::ENOTDIR.0 as isize);
+                    return linux_error(Errno::ENOTDIR);
                 }
                 process.open_with_flags(resolved, FileKind::Regular(bytes), flags) as isize
             }
             Ok(Resource::Directory(entries)) => {
                 process.open_with_flags(resolved, FileKind::Directory(entries), flags) as isize
             }
-            Ok(Resource::Symlink(_)) => -(Errno::ELOOP.0 as isize),
-            Err(error) => -(error.0 as isize),
+            Ok(Resource::Symlink(_)) => linux_error(Errno::ELOOP),
+            Err(error) => linux_error(error),
         };
     }
     let scheme = files::scheme_path(&resolved);
     if scheme.len() > 256 {
-        return -(Errno::ENAMETOOLONG.0 as isize);
+        return linux_error(Errno::ENAMETOOLONG);
     }
     process.pending_file = Some(FileOp::Open {
         scheme,
@@ -412,13 +414,13 @@ fn read(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
         }
         let (data, take) = {
             let Some(file) = process.file_mut(fd) else {
-                return -(Errno::EBADF.0 as isize);
+                return linux_error(Errno::EBADF);
             };
             let bytes = match &file.kind {
                 FileKind::Regular(bytes) => bytes,
-                FileKind::Directory(_) => return -(Errno::EISDIR.0 as isize),
-                FileKind::Symlink(_) => return -(Errno::EINVAL.0 as isize),
-                FileKind::Remote(_) => return -(Errno::EBADF.0 as isize),
+                FileKind::Directory(_) => return linux_error(Errno::EISDIR),
+                FileKind::Symlink(_) => return linux_error(Errno::EINVAL),
+                FileKind::Remote(_) => return linux_error(Errno::EBADF),
             };
             let start = usize::try_from(file.offset).unwrap_or(usize::MAX);
             let take = bytes.len().saturating_sub(start).min(count);
@@ -451,7 +453,7 @@ fn write(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
             return take as isize;
         }
         if fd != 1 && fd != 2 {
-            return -(Errno::EBADF.0 as isize);
+            return linux_error(Errno::EBADF);
         }
         let bytes = process.user_buffer.as_slice();
         process.output.extend_from_slice(&bytes[..take]);
@@ -478,13 +480,13 @@ fn pread64(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
         }
         let (data, take) = {
             let Some(file) = process.file_mut(fd) else {
-                return -(Errno::EBADF.0 as isize);
+                return linux_error(Errno::EBADF);
             };
             let bytes = match &file.kind {
                 FileKind::Regular(bytes) => bytes,
-                FileKind::Directory(_) => return -(Errno::EISDIR.0 as isize),
-                FileKind::Symlink(_) => return -(Errno::EINVAL.0 as isize),
-                FileKind::Remote(_) => return -(Errno::EBADF.0 as isize),
+                FileKind::Directory(_) => return linux_error(Errno::EISDIR),
+                FileKind::Symlink(_) => return linux_error(Errno::EINVAL),
+                FileKind::Remote(_) => return linux_error(Errno::EBADF),
             };
             let start = usize::try_from(offset).unwrap_or(usize::MAX);
             let take = bytes.len().saturating_sub(start).min(count);
@@ -531,7 +533,7 @@ fn close(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
         if process.close_file(fd) {
             0
         } else {
-            -(Errno::EBADF.0 as isize)
+            linux_error(Errno::EBADF)
         }
     });
     result.unwrap_or_else(|_| einval())
@@ -543,29 +545,29 @@ fn lseek(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let whence = args.int(2);
     let result = with(ctx, |process| {
         if !matches!(whence, SEEK_SET | SEEK_CUR | SEEK_END) {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         }
         if process.file(fd).is_some_and(|file| file.remote().is_some()) {
             process.pending_file = Some(FileOp::Seek { fd, offset, whence });
             return 0;
         }
         let Some(file) = process.file_mut(fd) else {
-            return -(Errno::EBADF.0 as isize);
+            return linux_error(Errno::EBADF);
         };
         if matches!(file.kind, FileKind::Directory(_)) {
-            return -(Errno::EISDIR.0 as isize);
+            return linux_error(Errno::EISDIR);
         }
         let base = match whence {
             SEEK_SET => 0,
             SEEK_CUR => file.offset as i64,
             SEEK_END => file.size() as i64,
-            _ => return -(Errno::EINVAL.0 as isize),
+            _ => return linux_error(Errno::EINVAL),
         };
         let Some(next) = base.checked_add(offset) else {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         };
         if next < 0 {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         }
         file.offset = next as u64;
         next as isize
@@ -579,15 +581,15 @@ fn fcntl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let argument = args.ptr(2) as u64;
     let result = with(ctx, |process| {
         let Some(file) = process.file(fd) else {
-            return -(Errno::EBADF.0 as isize);
+            return linux_error(Errno::EBADF);
         };
         match command {
             F_DUPFD | F_DUPFD_CLOEXEC => {
                 let Ok(min) = i32::try_from(argument) else {
-                    return -(Errno::EINVAL.0 as isize);
+                    return linux_error(Errno::EINVAL);
                 };
                 if min < 0 {
-                    return -(Errno::EINVAL.0 as isize);
+                    return linux_error(Errno::EINVAL);
                 }
                 process.pending_file = Some(FileOp::FcntlDup {
                     fd,
@@ -612,7 +614,7 @@ fn fcntl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
                 }
                 0
             }
-            _ => -(Errno::EINVAL.0 as isize),
+            _ => linux_error(Errno::EINVAL),
         }
     });
     result.unwrap_or_else(|_| einval())
@@ -624,10 +626,10 @@ fn dup3(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let flags = args.int(2);
     let result = with(ctx, |process| {
         if oldfd == newfd || flags & !O_CLOEXEC != 0 || newfd < 0 {
-            return -(Errno::EINVAL.0 as isize);
+            return linux_error(Errno::EINVAL);
         }
         if process.file(oldfd).is_none() {
-            return -(Errno::EBADF.0 as isize);
+            return linux_error(Errno::EBADF);
         }
         process.pending_file = Some(FileOp::Dup3 {
             oldfd,
@@ -641,11 +643,11 @@ fn dup3(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
 
 fn read_link(process: &mut LinuxProcess, address: u64, size: usize) -> isize {
     if size == 0 {
-        return -(Errno::EINVAL.0 as isize);
+        return linux_error(Errno::EINVAL);
     }
     let path = match path_bytes(process) {
         Ok(path) => path.to_vec(),
-        Err(_) => return -(Errno::EINVAL.0 as isize),
+        Err(_) => return linux_error(Errno::EINVAL),
     };
     match procfs::lookup(process, &path) {
         Ok(Resource::Symlink(target)) => {
@@ -654,8 +656,8 @@ fn read_link(process: &mut LinuxProcess, address: u64, size: usize) -> isize {
             process.pending_write = Some((address, data));
             take as isize
         }
-        Ok(_) => -(Errno::EINVAL.0 as isize),
-        Err(error) => -(error.0 as isize),
+        Ok(_) => linux_error(Errno::EINVAL),
+        Err(error) => linux_error(error),
     }
 }
 
@@ -678,11 +680,11 @@ fn getdents64(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let result = with(ctx, |process| {
         let (data, total) = {
             let Some(file) = process.file_mut(fd) else {
-                return -(Errno::EBADF.0 as isize);
+                return linux_error(Errno::EBADF);
             };
             let entries = match &file.kind {
                 FileKind::Directory(entries) => entries,
-                _ => return -(Errno::ENOTDIR.0 as isize),
+                _ => return linux_error(Errno::ENOTDIR),
             };
             let start = usize::try_from(file.offset).unwrap_or(usize::MAX);
             let Some(slice) = entries.get(start..) else {
@@ -710,7 +712,7 @@ fn getdents64(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
                 emitted += 1;
             }
             if emitted == 0 && !slice.is_empty() {
-                return -(Errno::EINVAL.0 as isize);
+                return linux_error(Errno::EINVAL);
             }
             file.offset = file.offset.saturating_add(emitted as u64);
             let total = data.len();

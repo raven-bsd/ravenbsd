@@ -20,15 +20,26 @@ use crate::backend::SysBackend;
 use crate::lock::Lock;
 use crate::platform::Platform;
 
+/// Translate the public FreeBSD clock ID to the private kernel clock number.
+///
+/// The public ABI uses `CLOCK_REALTIME = 0` and `CLOCK_MONOTONIC = 4`; the kernel seam keeps
+/// its existing two-number wire encoding. This is representation only.
+fn wire_clock(id: i32) -> Result<u32, Errno> {
+    if id == time::CLOCK_REALTIME {
+        Ok(0)
+    } else if id == time::CLOCK_MONOTONIC {
+        Ok(1)
+    } else {
+        Err(Errno::EINVAL)
+    }
+}
+
 /// `clock_gettime`.
 pub fn clock_gettime<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     id: i32,
 ) -> Result<Timespec, Errno> {
-    if !matches!(id, time::CLOCK_REALTIME | time::CLOCK_MONOTONIC) {
-        return Err(Errno::EINVAL);
-    }
-    platform.backend().clock_get(id as u32)
+    platform.backend().clock_get(wire_clock(id)?)
 }
 
 /// `clock_getres`: one nanosecond for the two implemented clocks.

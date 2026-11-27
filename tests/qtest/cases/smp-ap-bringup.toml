@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+name = "smp-ap-bringup"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/smp-ap/run-boot-loop.sh"]
+image = "build/qtest/smp-ap-bringup.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+# The pre step boots the base image fifty times with -smp 4 and stops on the first boot that
+# reports fewer than four CPUs, prints `smp: cpu N did not start`, or does not exit cleanly.
+# This case then boots the same image once more with the full expectation set.
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '^smp: cpu [0-9]+ did not start$'
+
+[[forbid]]
+regex = '(?i)panic'

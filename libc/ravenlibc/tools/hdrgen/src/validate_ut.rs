@@ -48,7 +48,7 @@ fn the_committed_tables_validate() {
     assert_eq!(tables.structs.record.len(), 26);
     assert_eq!(tables.structs.opaque.len(), 32);
     assert_eq!(tables.types.types.len(), 46);
-    assert_eq!(tables.deviations.deviation.len(), 24);
+    assert_eq!(tables.deviations.deviation.len(), 114);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn the_constant_count_is_frozen() {
         .iter()
         .map(|group| group.def.consts.len())
         .sum();
-    assert_eq!(total, 1341);
+    assert_eq!(total, 1318);
     let counts: Vec<(&str, usize)> = tables
         .groups
         .iter()
@@ -68,16 +68,16 @@ fn the_constant_count_is_frozen() {
     assert_eq!(
         counts,
         vec![
-            ("errno", 149),
-            ("signal", 116),
-            ("fcntl", 111),
-            ("mman", 86),
+            ("errno", 99),
+            ("signal", 106),
+            ("fcntl", 133),
+            ("mman", 93),
             ("stat", 38),
             ("socket", 235),
             ("netinet", 235),
-            ("poll", 12),
-            ("time", 25),
-            ("resource", 36),
+            ("poll", 14),
+            ("time", 29),
+            ("resource", 38),
             ("limits", 19),
             ("sysconf", 206),
             ("pthread", 24),
@@ -90,10 +90,10 @@ fn the_constant_count_is_frozen() {
 fn values_resolve_for_every_group() {
     let tables = real();
     let values = validate(&tables).expect("values");
-    assert_eq!(values.by_name.len(), 1341);
+    assert_eq!(values.by_name.len(), 1316);
     assert_eq!(values.by_name["EPERM"].value, 1);
-    assert_eq!(values.by_name["O_ACCMODE"].value, 0o10000003);
-    assert_eq!(values.by_name["RLIM_INFINITY"].value, i128::from(u64::MAX));
+    assert_eq!(values.by_name["O_ACCMODE"].value, 3);
+    assert_eq!(values.by_name["RLIM_INFINITY"].value, 0x7fff_ffff_ffff_ffff);
 }
 
 #[test]
@@ -125,6 +125,7 @@ fn an_unknown_alias_is_rejected() {
         .iter_mut()
         .find(|constant| constant.name == "EWOULDBLOCK")
         .expect("EWOULDBLOCK");
+    entry.value = None;
     entry.alias = Some("NOPE".to_string());
     let error = validate(&tables).unwrap_err().to_string();
     assert!(error.contains("NOPE"), "{error}");
@@ -141,6 +142,14 @@ fn an_alias_cycle_is_rejected() {
         .expect("EAGAIN");
     entry.value = None;
     entry.alias = Some("EWOULDBLOCK".to_string());
+    let reverse = tables.groups[0]
+        .def
+        .consts
+        .iter_mut()
+        .find(|constant| constant.name == "EWOULDBLOCK")
+        .expect("EWOULDBLOCK");
+    reverse.value = None;
+    reverse.alias = Some("EAGAIN".to_string());
     let error = validate(&tables).unwrap_err().to_string();
     assert!(error.contains("cycle"), "{error}");
 }
@@ -426,8 +435,8 @@ fn a_constant_row_without_integer_values_is_rejected() {
         .deviations
         .deviation
         .iter_mut()
-        .find(|row| row.name == "O_LARGEFILE" && row.against == "musl")
-        .expect("O_LARGEFILE");
+        .find(|row| row.name == "NGROUPS_MAX" && row.against == "musl")
+        .expect("NGROUPS_MAX");
     row.ours = toml::Value::String("128/8".to_string());
     let error = validate(&tables).unwrap_err().to_string();
     assert!(error.contains("integer"), "{error}");

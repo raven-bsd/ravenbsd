@@ -86,11 +86,17 @@ pub const CLOCK_REALTIME: u32 = 0;
 pub const CLOCK_MONOTONIC: u32 = 1;
 
 /// `PTHREAD_MUTEX_NORMAL`.
-pub const PTHREAD_MUTEX_NORMAL: i32 = 0;
+pub const PTHREAD_MUTEX_NORMAL: i32 = 3;
 /// `PTHREAD_MUTEX_RECURSIVE`.
-pub const PTHREAD_MUTEX_RECURSIVE: i32 = 1;
+pub const PTHREAD_MUTEX_RECURSIVE: i32 = 2;
 /// `PTHREAD_MUTEX_ERRORCHECK`.
-pub const PTHREAD_MUTEX_ERRORCHECK: i32 = 2;
+pub const PTHREAD_MUTEX_ERRORCHECK: i32 = 1;
+/// The internal kind word for the default (error-checking) type.
+pub const MUTEX_KIND_DEFAULT: i32 = 0;
+/// The internal kind word for a recursive mutex.
+pub const MUTEX_KIND_RECURSIVE: i32 = 1;
+/// The internal kind word for a normal (unchecked) mutex.
+pub const MUTEX_KIND_NORMAL: i32 = 2;
 /// `PTHREAD_MUTEX_ROBUST`.
 pub const PTHREAD_MUTEX_ROBUST: i32 = 1;
 /// `PTHREAD_MUTEX_STALLED`.
@@ -106,17 +112,17 @@ pub const PTHREAD_PRIO_INHERIT: i32 = 1;
 /// `PTHREAD_PRIO_PROTECT`.
 pub const PTHREAD_PRIO_PROTECT: i32 = 2;
 /// `PTHREAD_SCOPE_SYSTEM`.
-pub const PTHREAD_SCOPE_SYSTEM: i32 = 0;
+pub const PTHREAD_SCOPE_SYSTEM: i32 = 2;
 /// `PTHREAD_SCOPE_PROCESS`.
-pub const PTHREAD_SCOPE_PROCESS: i32 = 1;
+pub const PTHREAD_SCOPE_PROCESS: i32 = 0;
 /// `PTHREAD_CREATE_JOINABLE`.
 pub const PTHREAD_CREATE_JOINABLE: i32 = 0;
 /// `PTHREAD_CREATE_DETACHED`.
 pub const PTHREAD_CREATE_DETACHED: i32 = 1;
 /// `PTHREAD_INHERIT_SCHED`.
-pub const PTHREAD_INHERIT_SCHED: i32 = 0;
+pub const PTHREAD_INHERIT_SCHED: i32 = 4;
 /// `PTHREAD_EXPLICIT_SCHED`.
-pub const PTHREAD_EXPLICIT_SCHED: i32 = 1;
+pub const PTHREAD_EXPLICIT_SCHED: i32 = 0;
 /// `PTHREAD_CANCEL_ENABLE`.
 pub const PTHREAD_CANCEL_ENABLE: i32 = 0;
 /// `PTHREAD_CANCEL_DISABLE`.
@@ -126,7 +132,7 @@ pub const PTHREAD_CANCEL_MASKED: i32 = 2;
 /// `PTHREAD_CANCEL_DEFERRED`.
 pub const PTHREAD_CANCEL_DEFERRED: i32 = 0;
 /// `PTHREAD_CANCEL_ASYNCHRONOUS`.
-pub const PTHREAD_CANCEL_ASYNCHRONOUS: i32 = 1;
+pub const PTHREAD_CANCEL_ASYNCHRONOUS: i32 = 2;
 /// `SCHED_OTHER`.
 pub const SCHED_OTHER: i32 = 0;
 /// `SCHED_FIFO`.

@@ -11,8 +11,8 @@ use raven_libc_abi::errno::Errno;
 /// Apply a `strto*` status: `Range` -> `ERANGE`, `InvalidBase` -> `EINVAL`, otherwise nothing.
 pub(crate) fn apply(status: IntStatus) {
     match status {
-        IntStatus::Range => errno::set(Errno(34)),
-        IntStatus::InvalidBase => errno::set(Errno(22)),
+        IntStatus::Range => errno::set(Errno::from_generated(raven_libc_abi::errno::ERANGE)),
+        IntStatus::InvalidBase => errno::set(Errno::from_generated(raven_libc_abi::errno::EINVAL)),
         IntStatus::Ok | IntStatus::NoDigits => {}
     }
 }

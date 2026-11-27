@@ -25,6 +25,7 @@ const SA_SIGINFO: u32 = 4;
 const SA_ONSTACK: u32 = 0x0800_0000;
 const SA_RESTART: u32 = 0x1000_0000;
 const EFAULT: isize = -14;
+const EINVAL: isize = -22;
 const CANARY: u8 = 0x5a;
 
 /// The Raven 40-byte `SIGACTION` request (`kernel/src/syscall/thread.rs:UserSigAction`).
@@ -57,10 +58,18 @@ impl KernelSigAction {
 }
 
 extern "C" fn raw_handler(_sig: i32) {}
+extern "C" fn raw_handler_b(_sig: i32) {}
 
 fn handler_address() -> u64 {
     raw_handler as *const () as u64
 }
+
+fn handler_b_address() -> u64 {
+    raw_handler_b as *const () as u64
+}
+
+const MASK_A: u64 = 0x2;
+const MASK_B: u64 = 0x4;
 
 /// One read/write page followed by an inaccessible guard page.
 struct GuardRegion {
@@ -108,9 +117,13 @@ impl Drop for GuardRegion {
 }
 
 fn sigaction(act: usize, old: usize) -> isize {
+    sigaction_signo(SIGUSR1, act, old)
+}
+
+fn sigaction_signo(signo: i32, act: usize, old: usize) -> isize {
     // SAFETY: SIGACTION copies the 40-byte live requests at the caller-supplied addresses; the
     // kernel validates both ranges and a null pointer means the object is absent.
-    unsafe { sys::syscall3(raven_abi::syscall::SIGACTION, SIGUSR1 as usize, act, old) }
+    unsafe { sys::syscall3(raven_abi::syscall::SIGACTION, signo as usize, act, old) }
 }
 
 fn write_request(address: usize, action: KernelSigAction) {
@@ -123,6 +136,13 @@ fn read_request(address: usize) -> KernelSigAction {
     // SAFETY: every call site passes an 8-aligned slot inside a live readable page filled by
     // the kernel with exactly the 40-byte wire object.
     unsafe { ptr::read(address as *const KernelSigAction) }
+}
+
+fn request_is(address: usize, byte: u8) -> bool {
+    (0..WIRE).all(|offset| {
+        // SAFETY: every caller passes a live readable 40-byte slot.
+        unsafe { ptr::read((address + offset) as *const u8) == byte }
+    })
 }
 
 fn fill(address: usize, byte: u8, len: usize) {
@@ -182,22 +202,44 @@ pub fn run() -> Result<(), &'static str> {
         )?;
     }
 
-    // both: distinct new and old objects, each at its own guard-page boundary.
+    // both: preinstall A, poison old, install distinct B with both pointers; the returned old is
+    // A before any second query, then a separate object queries B. This observes the combined
+    // call's own old output instead of overwriting it with a later query (S710-REV-01).
     {
         let act_region = GuardRegion::new().ok_or("both-act-map")?;
         let old_region = GuardRegion::new().ok_or("both-old-map")?;
+        let query_region = GuardRegion::new().ok_or("both-query-map")?;
         let at = act_region.last_wire_slot();
         let old = old_region.last_wire_slot();
-        let mut action = KernelSigAction::zero();
-        action.handler = handler_address();
-        action.flags = SA_SIGINFO;
-        write_request(at, action);
+        let query = query_region.last_wire_slot();
+        let mut a = KernelSigAction::zero();
+        a.handler = handler_address();
+        a.mask = [MASK_A, 0];
+        a.flags = SA_SIGINFO;
+        write_request(at, a);
+        expect("both-preinstall", sigaction(at, 0) == 0)?;
+        fill(old, 0xa5, WIRE);
+        let mut b = KernelSigAction::zero();
+        b.handler = handler_b_address();
+        b.mask = [MASK_B, 0];
+        b.flags = SA_ONSTACK;
+        write_request(at, b);
         expect("both-install", sigaction(at, old) == 0)?;
-        expect("both-query", sigaction(0, old) == 0)?;
-        let previous = read_request(old);
+        let returned = read_request(old);
         expect(
-            "both-fields",
-            previous.handler == handler_address() && previous.flags & SA_SIGINFO != 0,
+            "both-old",
+            returned.handler == a.handler
+                && returned.mask == [MASK_A, 0]
+                && returned.flags == a.flags
+                && returned.restorer == 0,
+        )?;
+        expect("both-query", sigaction(0, query) == 0)?;
+        let installed = read_request(query);
+        expect(
+            "both-installed",
+            installed.handler == b.handler
+                && installed.mask == [MASK_B, 0]
+                && installed.flags == b.flags,
         )?;
     }
 
@@ -215,41 +257,58 @@ pub fn run() -> Result<(), &'static str> {
         )?;
     }
 
-    // nonzero flags and mask round-trip; canaries prove neither the 40-byte old slot nor the
-    // surrounding bytes move. A 152-byte write would damage the canary after the old slot.
+    // nonzero flags and mask round-trip; canaries prove the 40-byte old and query slots and the
+    // surrounding bytes do not move. The combined call's old output is observed before the query.
     {
         let base = sys::map_anonymous(PAGE).map_err(|_| "canary-map")?;
         fill(base, CANARY, PAGE);
         let at = 64;
         let old = 512;
-        let mut action = KernelSigAction::zero();
-        action.handler = handler_address();
-        action.mask = [0x0000_0000_0000_0002, 0];
-        action.flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
-        write_request(base + at, action);
+        let query = 960;
+        let mut a = KernelSigAction::zero();
+        a.handler = handler_address();
+        a.mask = [MASK_A, 0];
+        a.flags = SA_SIGINFO;
+        write_request(base + at, a);
+        expect("canary-preinstall", sigaction(base + at, 0) == 0)?;
+        fill(base + old, 0xa5, WIRE);
+        let mut b = KernelSigAction::zero();
+        b.handler = handler_b_address();
+        b.mask = [MASK_B, 0];
+        b.flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
+        write_request(base + at, b);
         let install = sigaction(base + at, base + old);
-        let query = sigaction(0, base + old);
-        let previous = read_request(base + old);
-        let intact = canaries_intact(base, &[(at, at + WIRE), (old, old + WIRE)]);
-        let fields = previous.handler == handler_address()
-            && previous.mask == [0x0000_0000_0000_0002, 0]
-            && previous.flags & (SA_SIGINFO | SA_ONSTACK | SA_RESTART)
+        let returned = read_request(base + old);
+        let query_result = sigaction(0, base + query);
+        let installed = read_request(base + query);
+        let intact = canaries_intact(
+            base,
+            &[(at, at + WIRE), (old, old + WIRE), (query, query + WIRE)],
+        );
+        let old_fields = returned.handler == a.handler
+            && returned.mask == [MASK_A, 0]
+            && returned.flags == a.flags
+            && returned.restorer == 0;
+        let new_fields = installed.handler == b.handler
+            && installed.mask == [MASK_B, 0]
+            && installed.flags & (SA_SIGINFO | SA_ONSTACK | SA_RESTART)
                 == SA_SIGINFO | SA_ONSTACK | SA_RESTART
-            && previous.restorer == 0;
+            && installed.restorer == 0;
         expect("canary-install", install == 0)?;
-        expect("canary-query", query == 0)?;
+        expect("canary-old", old_fields)?;
+        expect("canary-query", query_result == 0)?;
         expect("canary-data", intact)?;
-        if !fields {
+        if !new_fields {
             println!(
                 "signal-raw: canary values handler=0x{:x} mask=0x{:x},0x{:x} flags=0x{:x} restorer=0x{:x}",
-                previous.handler,
-                previous.mask[0],
-                previous.mask[1],
-                previous.flags,
-                previous.restorer
+                installed.handler,
+                installed.mask[0],
+                installed.mask[1],
+                installed.flags,
+                installed.restorer
             );
         }
-        expect("canary-flags-mask", fields)?;
+        expect("canary-flags-mask", new_fields)?;
         let _ = sys::unmap(Handle::SELF_PROC, base, PAGE);
     }
 
@@ -264,6 +323,88 @@ pub fn run() -> Result<(), &'static str> {
             previous.flags & (SA_SIGINFO | SA_ONSTACK | SA_RESTART)
                 == SA_SIGINFO | SA_ONSTACK | SA_RESTART,
         )?;
+    }
+
+    // failure path: a rejected or unreadable act leaves old byte-identical (S710-REV-02).
+    {
+        let base = sys::map_anonymous(PAGE).map_err(|_| "fail-map")?;
+        fill(base, CANARY, PAGE);
+        let at = 64;
+        let old = 512;
+        fill(base + old, 0xa5, WIRE);
+        let mut bad = KernelSigAction::zero();
+        bad.handler = handler_address();
+        bad.flags = 0x2000_0000;
+        write_request(base + at, bad);
+        expect("fail-flags", sigaction(base + at, base + old) == EINVAL)?;
+        expect("fail-flags-old", request_is(base + old, 0xa5))?;
+        let mut kill = KernelSigAction::zero();
+        kill.handler = handler_address();
+        write_request(base + at, kill);
+        expect(
+            "fail-kill",
+            sigaction_signo(9, base + at, base + old) == EINVAL,
+        )?;
+        expect("fail-kill-old", request_is(base + old, 0xa5))?;
+        expect(
+            "fail-unmapped",
+            sigaction(0x0000_0fff_ffff_f000, base + old) == EFAULT,
+        )?;
+        expect("fail-unmapped-old", request_is(base + old, 0xa5))?;
+        let _ = sys::unmap(Handle::SELF_PROC, base, PAGE);
+    }
+
+    // alias: act and old are the same address; the input B is snapshotted before the reply A
+    // overwrites it, and the installed action must be B.
+    {
+        let region = GuardRegion::new().ok_or("alias-map")?;
+        let query_region = GuardRegion::new().ok_or("alias-query-map")?;
+        let slot = region.last_wire_slot();
+        let query = query_region.last_wire_slot();
+        let mut a = KernelSigAction::zero();
+        a.handler = handler_address();
+        a.mask = [MASK_A, 0];
+        a.flags = SA_SIGINFO;
+        write_request(slot, a);
+        expect("alias-preinstall", sigaction(slot, 0) == 0)?;
+        let mut b = KernelSigAction::zero();
+        b.handler = handler_b_address();
+        b.mask = [MASK_B, 0];
+        b.flags = SA_ONSTACK;
+        write_request(slot, b);
+        expect("alias-install", sigaction(slot, slot) == 0)?;
+        let returned = read_request(slot);
+        expect(
+            "alias-old",
+            returned.handler == a.handler
+                && returned.mask == [MASK_A, 0]
+                && returned.flags == a.flags,
+        )?;
+        expect("alias-query", sigaction(0, query) == 0)?;
+        let installed = read_request(query);
+        expect(
+            "alias-installed",
+            installed.handler == b.handler
+                && installed.mask == [MASK_B, 0]
+                && installed.flags == b.flags,
+        )?;
+    }
+
+    // installed mask: the unmaskable SIGKILL/SIGSTOP bits are removed before storage (S710-REV-03).
+    {
+        let region = GuardRegion::new().ok_or("mask-map")?;
+        let old_region = GuardRegion::new().ok_or("mask-old-map")?;
+        let at = region.last_wire_slot();
+        let old = old_region.last_wire_slot();
+        let mut action = KernelSigAction::zero();
+        action.handler = handler_address();
+        action.mask = [(1 << 8) | (1 << 18) | MASK_A, 0];
+        action.flags = SA_SIGINFO;
+        write_request(at, action);
+        expect("mask-install", sigaction(at, 0) == 0)?;
+        expect("mask-query", sigaction(0, old) == 0)?;
+        let installed = read_request(old);
+        expect("mask-sanitized", installed.mask == [MASK_A, 0])?;
     }
 
     Ok(())

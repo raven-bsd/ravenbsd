@@ -17,6 +17,7 @@ use super::*;
 use crate::fake_ut::{Kind, leaked_file, leaked_state};
 use crate::file::{F_APP, F_LAZYBUF, F_NORD, F_NOWR, F_PERM};
 use crate::traits::SysFile;
+use raven_libc_abi::generated::fcntl::{O_ACCMODE, O_APPEND};
 
 #[test]
 fn fopen_modes_and_flags() {
@@ -84,7 +85,7 @@ fn fdopen_append_sets_o_append() {
     state.env().setfl(fd, 1).expect("setfl");
     let file = crate::raw::file_ref(crate::open::fdopen(state, fd, b"a").expect("fdopen a"));
     assert_ne!(file.flags() & F_APP, 0);
-    assert_ne!(state.env().getfl(fd).expect("getfl") & 0o2000, 0);
+    assert_ne!(state.env().getfl(fd).expect("getfl") & O_APPEND, 0);
 }
 
 #[test]
@@ -97,7 +98,7 @@ fn freopen_without_a_path_reapplies_the_flags() {
         crate::open::freopen(state, None, b"w", file).map(|_| ()),
         Ok(())
     );
-    assert_eq!(state.env().getfl(fd).expect("getfl") & 3, 1);
+    assert_eq!(state.env().getfl(fd).expect("getfl") & O_ACCMODE, 1);
     assert_eq!(file.st().mode, 0);
 }
 

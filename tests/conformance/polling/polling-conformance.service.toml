@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S173: one one-shot polling conformance probe. It runs the normal rows and the controlled
+# mutation; the host runner parses the row contract and owns the final exit mapping.
+
+name = "polling-conformance"
+exec = "/bin/conformance-probe"
+args = ["polling-conformance", "--all"]
+needs = ["scheme:file", "scheme:net"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+required = false

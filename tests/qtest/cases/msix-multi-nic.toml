@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S199: two virtio-net functions on the x86_64 profile. devd must create one MSI-X vector per
+# function from its ROOT_DEVICE capability and run both functions through the `nic:` service.
+# On the unfixed tree both MSI-X creates return EBADF and fall back to legacy IRQ 11; in the
+# production launch order the second function then fails with `irq: resource busy`, and in this
+# sequential two-function case there is no MSI-X vector at all.
+#
+# The fixture stages the real `etc/services.d/devd.toml` (only the devd test mode token and the
+# driver's `nic:` readiness name change), so removing its grant makes this case red again.
+
+name = "msix-multi-nic"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/msix-multi-nic/build.sh"]
+initfs = "build/fixtures/msix-multi-nic/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+    "-netdev", "user,id=n1",
+    "-device", "virtio-net-pci,netdev=n1,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[2-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched 00:02\.0 vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: matched 00:03\.0 vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver virtio-net bar=4 size=16384$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net bar=4 size=16384$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net dma bus=0x[0-9a-f]+ len=65536$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net dma bus=0x[0-9a-f]+ len=65536$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net msix capability table_bar=1 table=0x0 entries=4$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net msix vector=[0-9]+ table=0x0 bar=1$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net msix vector=[0-9]+ table=0x0 bar=1$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: msix table=0x0 bar=1 vector=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: msix table=0x0 bar=1 vector=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+unordered = true
+
+[[expect]]
+regex = '^msix-probe: cycle 1 quit$'
+
+[[expect]]
+regex = '^msix-probe: cycle 2 quit$'
+
+[[expect]]
+regex = '^devd: driver virtio-net cycle 1 exit=0$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net cycle 1 exit=0$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net cycles=1$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net cycles=1$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|irq: resource busy|launch failed'

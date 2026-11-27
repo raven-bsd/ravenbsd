@@ -16,15 +16,15 @@ fn exit_status_uses_the_high_byte() {
 
 #[test]
 fn stop_and_continue_statuses_match_posix() {
-    assert_eq!(stop_status(SIGSTOP), (19 << 8) | 0x7f);
-    assert_eq!(stop_status(SIGTSTP), (20 << 8) | 0x7f);
-    assert_eq!(CONTINUED_STATUS, 0xffff);
+    assert_eq!(stop_status(SIGSTOP), (17 << 8) | 0x7f);
+    assert_eq!(stop_status(SIGTSTP), (18 << 8) | 0x7f);
+    assert_eq!(CONTINUED_STATUS, 0x13);
 }
 
 #[test]
 fn wait_events_encode_once() {
     assert_eq!(WaitEvent::Exited(7).status(), 7 << 8);
-    assert_eq!(WaitEvent::Stopped(SIGSTOP).status(), (19 << 8) | 0x7f);
+    assert_eq!(WaitEvent::Stopped(SIGSTOP).status(), (17 << 8) | 0x7f);
     assert_eq!(WaitEvent::Continued.status(), 0xffff);
 }
 
@@ -60,6 +60,40 @@ fn signal_numbers_are_bounded() {
     assert!(is_stop_signal(SIGSTOP));
     assert!(is_stop_signal(SIGTSTP));
     assert!(!is_stop_signal(SIGCHLD));
+}
+
+#[test]
+fn native_signal_numbers_match_freebsd() {
+    // FreeBSD sys/sys/signal.h at the S700 pin: the native domain is the FreeBSD numbering.
+    assert_eq!(SIGUSR1, 30);
+    assert_eq!(SIGCHLD, 20);
+    assert_eq!(SIGSTOP, 17);
+    assert_eq!(SIGTSTP, 18);
+    assert_eq!(SIGCONT, 19);
+    assert_eq!(SIGTTIN, 21);
+    assert_eq!(SIGTTOU, 22);
+}
+
+#[test]
+fn freebsd_default_actions_follow_sigproptbl() {
+    // FreeBSD sys/kern/kern_sig.c sigproptbl: the numbers differ from the Linux table.
+    assert_eq!(default_action(10), Some(DefaultAction::Core)); // SIGBUS
+    assert_eq!(default_action(12), Some(DefaultAction::Core)); // SIGSYS
+    assert_eq!(default_action(16), Some(DefaultAction::Ignore)); // SIGURG
+    assert_eq!(default_action(17), Some(DefaultAction::Stop)); // SIGSTOP
+    assert_eq!(default_action(18), Some(DefaultAction::Stop)); // SIGTSTP
+    assert_eq!(default_action(19), Some(DefaultAction::Continue)); // SIGCONT
+    assert_eq!(default_action(20), Some(DefaultAction::Ignore)); // SIGCHLD
+    assert_eq!(default_action(30), Some(DefaultAction::Terminate)); // SIGUSR1
+}
+
+#[test]
+fn wait_idtypes_and_continued_status_match_freebsd() {
+    // FreeBSD sys/sys/wait.h: the idtype enum values are Solaris-compatible.
+    assert_eq!(P_PID, 0);
+    assert_eq!(P_PGID, 2);
+    assert_eq!(P_ALL, 7);
+    assert_eq!(CONTINUED_STATUS, 0x13);
 }
 
 #[test]

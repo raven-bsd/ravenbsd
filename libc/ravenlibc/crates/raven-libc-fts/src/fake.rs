@@ -430,20 +430,14 @@ impl FakeFs {
             Some(node) => Stat {
                 st_dev: node.dev,
                 st_ino: node.ino,
-                st_mode: node.mode,
-                st_nlink: node.nlink,
+                st_nlink: u64::from(node.nlink),
+                // The fake tree keeps its mode as a 32-bit mask; the public field is 16 bits.
+                st_mode: node.mode as u16,
+                st_bsdflags: 0,
                 st_uid: 0,
                 st_gid: 0,
+                st_padding1: 0,
                 st_rdev: 0,
-                __pad1: 0,
-                st_size: if node.kind == NodeKind::File {
-                    node.size
-                } else {
-                    0
-                },
-                st_blksize: 4096,
-                __pad2: 0,
-                st_blocks: node.size / 512,
                 st_atim: Timespec {
                     tv_sec: node.mtime,
                     tv_nsec: 0,
@@ -456,7 +450,21 @@ impl FakeFs {
                     tv_sec: node.mtime,
                     tv_nsec: 0,
                 },
-                __unused: [0; 2],
+                st_birthtim: Timespec {
+                    tv_sec: 0,
+                    tv_nsec: 0,
+                },
+                st_size: if node.kind == NodeKind::File {
+                    node.size
+                } else {
+                    0
+                },
+                st_blocks: node.size / 512,
+                st_blksize: 4096,
+                st_flags: 0,
+                st_gen: 0,
+                st_filerev: 0,
+                st_spare: [0; 9],
             },
             None => Stat::ZERO,
         }
@@ -550,7 +558,7 @@ impl Default for FakeFs {
 }
 
 fn dirent_reclen(name_len: usize) -> usize {
-    let raw = 19usize.wrapping_add(name_len).wrapping_add(1);
+    let raw = 24usize.wrapping_add(name_len).wrapping_add(1);
     raw.wrapping_add(7) & !7
 }
 
@@ -689,13 +697,20 @@ impl DirSys for FakeFs {
                 u16::try_from(reclen).unwrap_or(u16::MAX),
             );
             put_u8(buf, written.wrapping_add(18), typ);
-            if let Some(slot) = buf.get_mut(written.wrapping_add(19)..end) {
+            put_u8(buf, written.wrapping_add(19), 0);
+            put_u16(
+                buf,
+                written.wrapping_add(20),
+                u16::try_from(name.len()).unwrap_or(u16::MAX),
+            );
+            put_u16(buf, written.wrapping_add(22), 0);
+            if let Some(slot) = buf.get_mut(written.wrapping_add(24)..end) {
                 for byte in slot.iter_mut() {
                     *byte = 0;
                 }
             }
             if let Some(slot) = buf.get_mut(
-                written.wrapping_add(19)..written.wrapping_add(19).wrapping_add(name.len()),
+                written.wrapping_add(24)..written.wrapping_add(24).wrapping_add(name.len()),
             ) {
                 slot.copy_from_slice(&name);
             }

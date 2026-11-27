@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! The `DIR` stream and the Linux `dirent64` record (doc 07 3.6 and 4.3).
+//! The `DIR` stream and the public FreeBSD `struct dirent` record (doc 07 3.6 and 4.3).
 //!
 //! `DirStream` is the musl `__dirstream` design (COPY, MIT via `musl/COPYRIGHT`): a 2048-byte
 //! `getdents` buffer, the `d_off` of the last returned entry, and `buf_pos`/`buf_end`. The record
 //! parser is ours (doc 07 4.3, `RD-new: malformed getdents record -> EIO`): every length is
-//! bounds-checked with `checked_add`, `d_reclen` below 20 or past the buffer is `EIO`, and a name
-//! without a NUL inside its record is `EIO` too.
+//! bounds-checked with `checked_add`, a record shorter than the donor 32-byte minimum or past the
+//! buffer is `EIO`, a `d_namlen` outside 1..=255 is `EIO`, and a name without its terminating NUL
+//! inside the record is `EIO` too.
 
 use alloc::vec::Vec;
 
@@ -28,18 +29,18 @@ pub mod telldir;
 
 pub use dirstream::DirStream;
 
-/// One parsed `dirent64` record.
+/// One parsed public `struct dirent` record.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DirEntry {
-    /// `d_ino`: the inode number.
+    /// `d_fileno`: the inode number.
     pub ino: u64,
-    /// `d_off`: the `lseek` cookie that resumes after this record (OI-2).
+    /// `d_off`: the iteration cookie (zero when the private stream carries none).
     pub off: i64,
     /// `d_type`: one of the `DT_*` values.
     pub typ: u8,
     /// `d_name` without its NUL.
     pub name: Vec<u8>,
-    /// `d_reclen`: the record length, at least 20.
+    /// `d_reclen`: the record length, at least 32.
     pub reclen: u16,
 }
 
@@ -70,17 +71,29 @@ fn le_u16(buf: &[u8], pos: usize) -> Result<u16, Errno> {
     Ok(u16::from_le_bytes(array))
 }
 
-/// Parse one Linux `dirent64` record at `pos`; returns the entry and the next position.
+/// Offset of `d_name` in the public FreeBSD `struct dirent`.
+const DIRENT_NAME_OFFSET: usize = 24;
+/// Shortest public record: the header plus a one-byte name and its NUL, 8-aligned.
+const DIRENT_MIN_LEN: u16 = 32;
+/// Longest name the donor record holds.
+const DIRENT_NAME_MAX: usize = 255;
+
+/// Parse one public FreeBSD `struct dirent` record at `pos`; returns the entry and the next
+/// position.
 ///
-/// Layout (`doc 07 4.3`): `d_ino: u64` at 0, `d_off: i64` at 8, `d_reclen: u16` at 16,
-/// `d_type: u8` at 18, `d_name: [u8; ...]` NUL-terminated at 19.
+/// Layout (`freebsd:sys/sys/dirent.h` at 133344405): `d_fileno: u64` at 0, `d_off: i64` at 8,
+/// `d_reclen: u16` at 16, `d_type: u8` at 18, `d_pad0` at 19, `d_namlen: u16` at 20, `d_pad1` at
+/// 22, `d_name` at 24, NUL after `d_namlen` bytes.
 ///
 /// # Errors
 ///
-/// `EIO` for a truncated header, `d_reclen < 20`, a record past the buffer, a name without a NUL
-/// inside the record, or an allocation failure (`ENOMEM`).
+/// `EIO` for a truncated header, `d_reclen < 32`, a record past the buffer, a `d_namlen` outside
+/// 1..=255, a name longer than its record, a missing NUL or an embedded NUL, or an allocation
+/// failure (`ENOMEM`).
 pub fn parse_dirent(buf: &[u8], pos: usize) -> Result<(DirEntry, usize), Errno> {
-    let header_end = pos.checked_add(20).ok_or(Errno(EIO as u16))?;
+    let header_end = pos
+        .checked_add(DIRENT_NAME_OFFSET)
+        .ok_or(Errno(EIO as u16))?;
     let Some(header) = buf.get(pos..header_end) else {
         return Err(Errno(EIO as u16));
     };
@@ -88,7 +101,7 @@ pub fn parse_dirent(buf: &[u8], pos: usize) -> Result<(DirEntry, usize), Errno> 
     let off = le_i64(header, 8)?;
     let reclen = le_u16(header, 16)?;
     let typ = header.get(18).copied().unwrap_or(0);
-    if reclen < 20 {
+    if reclen < DIRENT_MIN_LEN {
         return Err(Errno(EIO as u16));
     }
     let record_end = pos
@@ -97,21 +110,30 @@ pub fn parse_dirent(buf: &[u8], pos: usize) -> Result<(DirEntry, usize), Errno> 
     let Some(record) = buf.get(pos..record_end) else {
         return Err(Errno(EIO as u16));
     };
-    let Some(name_field) = record.get(19..) else {
+    let namlen = usize::from(le_u16(header, 20)?);
+    if namlen == 0 || namlen > DIRENT_NAME_MAX {
+        return Err(Errno(EIO as u16));
+    }
+    let name_end = DIRENT_NAME_OFFSET
+        .checked_add(namlen)
+        .ok_or(Errno(EIO as u16))?;
+    let Some(name) = record.get(DIRENT_NAME_OFFSET..name_end) else {
         return Err(Errno(EIO as u16));
     };
-    let Some(nul) = name_field.iter().position(|&b| b == 0) else {
+    if name.contains(&0) || record.get(name_end) != Some(&0) {
         return Err(Errno(EIO as u16));
-    };
-    let mut name = Vec::new();
-    name.try_reserve(nul).map_err(|_| Errno(ENOMEM as u16))?;
-    name.extend_from_slice(name_field.get(..nul).unwrap_or(&[]));
+    }
+    let mut owned = Vec::new();
+    owned
+        .try_reserve(namlen)
+        .map_err(|_| Errno(ENOMEM as u16))?;
+    owned.extend_from_slice(name);
     Ok((
         DirEntry {
             ino,
             off,
             typ,
-            name,
+            name: owned,
             reclen,
         },
         record_end,

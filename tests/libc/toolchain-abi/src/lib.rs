@@ -519,6 +519,14 @@ fn normalized_type(name: &str) -> Option<String> {
         };
         return Some(format!("[{element}; {count}]"));
     }
+    // The vendored module marks donor padding slots with the zero-sized `Padding<T>`
+    // shim; the budgeted ABI record names the same slot with its scalar type.
+    if let Some(inner) = name
+        .strip_prefix("Padding<")
+        .and_then(|rest| rest.strip_suffix('>'))
+    {
+        return normalized_type(inner.trim());
+    }
     let (width, signed) = scalar_shape(name)?;
     Some(match (width, signed) {
         (8, true) => "i8".into(),

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot probe: verify the driver's partition and data patterns through `disk:0`, then flush to
+# end the first launch. It stays alive until devd has finished the second launch.
+name = "s205-probe"
+exec = "/sbin/s205-probe"
+args = ["s205-probe"]
+needs = ["scheme:disk"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

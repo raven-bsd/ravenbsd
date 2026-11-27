@@ -100,7 +100,7 @@ fn musl_group_files_carry_the_notice_and_revision() {
     let Some(files) = files() else {
         return;
     };
-    for name in ["errno.rs", "signal.rs", "fcntl.rs", "sysconf.rs"] {
+    for name in ["limits.rs", "socket.rs", "misc.rs"] {
         let text = &files[name];
         assert!(
             text.contains("Copyright © 2005-2020 Rich Felker, et al."),
@@ -112,6 +112,32 @@ fn musl_group_files_carry_the_notice_and_revision() {
             "{name}"
         );
         assert!(text.contains("Permission is hereby granted"), "{name}");
+    }
+}
+
+#[test]
+fn freebsd_group_files_carry_the_reviewed_notice_and_revision() {
+    let Some(files) = files() else {
+        return;
+    };
+    for (name, donor) in [
+        ("errno.rs", "freebsd:sys/sys/errno.h"),
+        ("signal.rs", "freebsd:sys/sys/signal.h"),
+    ] {
+        let text = &files[name];
+        assert!(
+            text.contains("SPDX-License-Identifier: BSD-3-Clause"),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("RavenBSD: derived from {donor}")),
+            "{text}"
+        );
+        assert!(
+            text.contains("@ 133344405f532bd54ff3629a77d4c4e062f01fdb"),
+            "{text}"
+        );
+        assert!(!text.contains("Permission is hereby granted"), "{text}");
     }
 }
 
@@ -154,8 +180,8 @@ fn structs_contains_records_zeros_and_assertions() {
     assert!(text.contains("pub struct Stat {"));
     assert!(text.contains("impl Stat {"));
     assert!(text.contains("pub const ZERO: Self"));
-    assert!(text.contains("core::mem::size_of::<Stat>() == 128"));
-    assert!(text.contains("core::mem::offset_of!(Stat, st_size) == 48"));
+    assert!(text.contains("core::mem::size_of::<Stat>() == 224"));
+    assert!(text.contains("core::mem::offset_of!(Stat, st_size) == 112"));
     assert!(text.contains("pub struct UcontextT"));
     assert!(text.contains("#[repr(C, align(16))]"));
 }
@@ -191,19 +217,19 @@ fn group_file_has_constants_and_all() {
     };
     let text = &files["errno.rs"];
     assert!(text.contains("pub const EPERM: i32 = 1;"));
-    assert!(text.contains("pub const EWOULDBLOCK: i32 = EAGAIN;"));
+    assert!(text.contains("pub const EWOULDBLOCK: i32 = 35;"));
     assert!(text.contains("pub const ALL: &[(&str, i128)]"));
     assert!(text.contains("(\"EPERM\", 1i128),"));
 }
 
 #[test]
-fn arch_gated_constants_get_a_cfg() {
+fn map_32bit_has_the_freebsd_value() {
     let Some(files) = files() else {
         return;
     };
     let text = &files["mman.rs"];
-    assert!(text.contains("#[cfg(target_arch = \"x86_64\")]"));
-    assert!(text.contains("pub const MAP_32BIT: i32 = 0x40;"));
+    assert!(text.contains("pub const MAP_32BIT: i32 = 0x80000;"));
+    assert!(!text.contains("#[cfg(target_arch = \"x86_64\")]"));
 }
 
 #[test]
@@ -213,7 +239,7 @@ fn visible_constants_get_a_doc_line() {
     };
     let text = &files["fcntl.rs"];
     assert!(text.contains("/// visible: bsd"));
-    assert!(text.contains("pub const O_EXLOCK: i32 = 0x10000000;"));
+    assert!(text.contains("pub const O_EXLOCK: i32 = 0x20;"));
 }
 
 #[test]

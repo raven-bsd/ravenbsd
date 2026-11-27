@@ -5,7 +5,7 @@ fn main() {
         android: { target_os = "android" },
         dragonfly: { target_os = "dragonfly" },
         ios: { target_os = "ios" },
-        freebsd: { target_os = "freebsd" },
+        freebsd: { any(target_os = "freebsd", target_os = "ravenbsd") },
         illumos: { target_os = "illumos" },
         linux: { target_os = "linux" },
         ravenbsd: { target_os = "ravenbsd" },
@@ -22,7 +22,13 @@ fn main() {
         apple_targets: { any(ios, macos, watchos, tvos, visionos) },
         bsd: { any(freebsd, dragonfly, netbsd, openbsd, apple_targets) },
         bsd_without_apple: { any(freebsd, dragonfly, netbsd, openbsd) },
-        linux_android: { any(android, linux, ravenbsd) },
+        linux_android: { any(android, linux) },
+        // `ravenbsd` uses the merged FreeBSD-shaped native ABI, so it selects the
+        // freebsd-like paths (signals, records, flags). Its errno domain is the FreeBSD
+        // table (DR-69); the errno aliases remain explicit.
+        linux_errno: { any(android, linux) },
+        bsd_errno: { any(bsd, ravenbsd) },
+        freebsdlike_errno: { any(freebsdlike, ravenbsd) },
         freebsdlike: { any(dragonfly, freebsd) },
         netbsdlike: { any(netbsd, openbsd) },
         solarish: { any(illumos, solaris) },

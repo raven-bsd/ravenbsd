@@ -145,7 +145,7 @@ pub(crate) fn canonicalize(ops: &mut impl PathOps, input: &[u8]) -> Result<Vec<u
     let result = finish(&work)?;
     if trailing_slash {
         let stat = ops.stat(&result)?;
-        if stat.st_mode & S_IFMT != S_IFDIR {
+        if u32::from(stat.st_mode) & S_IFMT != S_IFDIR {
             return Err(Errno::ENOTDIR);
         }
     }

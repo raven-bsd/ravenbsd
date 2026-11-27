@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Settled frame-window probe: wait for the late boot services that allocate resident frames
+# (resolvd and vfsd) before the exit-90 baseline, so the measured delta is the lock/time churn.
+
+name = "smp-lock-time-leak"
+exec = "/bin/smp-lock-time"
+args = ["/bin/smp-lock-time", "leak"]
+needs = ["scheme:file", "scheme:resolv"]
+readiness = "none"
+restart = "never"
+max_restarts = 0
+required = false

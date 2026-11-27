@@ -32,22 +32,18 @@ pub unsafe extern "C" fn nanosleep(request: *const Timespec, remaining: *mut Tim
             .saturating_mul(1_000_000_000)
             .saturating_add(time.tv_nsec.max(0) as u64)
     };
-    let start =
-        raven_libc_platform::time::clock_gettime(platform, raven_libc_abi::time::CLOCK_MONOTONIC)
-            .map(monotonic)
-            .unwrap_or(0);
+    let start = crate::time::sys::monotonic_now()
+        .map(monotonic)
+        .unwrap_or(0);
     match raven_libc_platform::time::nanosleep(platform, ns) {
         Ok(_) => 0,
         Err(error) => {
             // POSIX/FreeBSD kern_nanosleep: an interrupted sleep returns -1/EINTR and writes the
             // true unslept remainder from the elapsed monotonic interval.
             if error.0 == raven_abi::errno::Errno::EINTR.0 {
-                let end = raven_libc_platform::time::clock_gettime(
-                    platform,
-                    raven_libc_abi::time::CLOCK_MONOTONIC,
-                )
-                .map(monotonic)
-                .unwrap_or(start);
+                let end = crate::time::sys::monotonic_now()
+                    .map(monotonic)
+                    .unwrap_or(start);
                 let left = ns.saturating_sub(end.saturating_sub(start));
                 if !remaining.is_null() {
                     // SAFETY: the C contract says `remaining` is writable when non-NULL.

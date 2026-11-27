@@ -52,7 +52,7 @@ use alloc::vec::Vec;
 
 use raven_libc_abi::generated::errno::{EINVAL, ENOMEM};
 use raven_libc_abi::generated::fcntl::{
-    O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_TRUNC, O_WRONLY,
+    O_ACCMODE, O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_TRUNC, O_WRONLY,
 };
 
 use crate::file::{Buffer, F_APP, F_LAZYBUF, F_NORD, F_NOWR, F_PERM, File, UNGET};
@@ -193,7 +193,7 @@ pub fn fopen<E: Env>(state: &'static State<E>, path: &[u8], mode: &[u8]) -> R<*m
 pub fn fdopen<E: Env>(state: &'static State<E>, fd: i32, mode: &[u8]) -> R<*mut File<E>> {
     let parsed = parse_mode(mode)?;
     let access = match state.env().getfl(fd) {
-        Ok(flags) => flags & 3,
+        Ok(flags) => flags & O_ACCMODE,
         Err(error) => return Err(Fail::Errno(error)),
     };
     let readable = access != O_WRONLY;
