@@ -245,3 +245,21 @@ fn packet_status_decoding() {
     assert_eq!(xlat::packet_status(4095), Err(Errno(4095)));
     assert_eq!(xlat::packet_status(4096), Err(Errno::EPROTO));
 }
+
+/// S742: terminal requests use the FreeBSD `_IOC` size/direction/group/num encoding.
+///
+/// The literal values are the measured FreeBSD `133344405f53` encodings, not the implementation's
+/// own output; the Linux `0x54xx` numbers are the rejected domain.
+#[test]
+fn freebsd_terminal_request_encodings() {
+    assert_eq!(xlat::TCGETS, 0x402c_7413);
+    assert_eq!(xlat::TCSETS, 0x802c_7414);
+    assert_eq!(xlat::TCSETSW, 0x802c_7415);
+    assert_eq!(xlat::TCSETSF, 0x802c_7416);
+    assert_eq!(xlat::TIOCGWINSZ, 0x4008_7468);
+    assert_eq!(xlat::TIOCSWINSZ, 0x8008_7467);
+    assert_eq!(xlat::FIONREAD, 0x4004_667f);
+    assert_eq!(xlat::FIONBIO, 0x8004_667e);
+    assert_eq!(xlat::FIONCLEX, 0x2000_6602);
+    assert_eq!(xlat::FIOCLEX, 0x2000_6601);
+}

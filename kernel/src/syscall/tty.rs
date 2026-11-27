@@ -154,11 +154,22 @@ pub fn get_pgrp(frame: &SyscallFrame) -> Result<usize, Errno> {
 }
 
 /// `tcsetpgrp`: set the foreground process group of the handle's tty.
+///
+/// FreeBSD `ttydev_ioctl_spgrp` rejects a group that is not part of the caller's session with
+/// `EPERM` (`pgfind` returns NULL) and a non-controlling tty with `ENOTTY`. The kernel, not libc,
+/// owns this decision.
 pub fn set_pgrp(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let pgrp = frame.rsi as u32 as i32;
+    if pgrp < 0 {
+        return Err(Errno::EINVAL);
+    }
     let file = file_from_handle(&caller, handle)?;
+    let sid = caller.ids.lock().sid;
+    if pgrp == 0 || !process::group_in_session(pgrp as u64, sid) {
+        return Err(Errno::EPERM);
+    }
     tty::set_fg(&caller, &file, pgrp)?;
     Ok(0)
 }

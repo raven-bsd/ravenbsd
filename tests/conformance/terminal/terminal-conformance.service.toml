@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# S175 test-only service: run the terminal conformance probe once at boot and print the rows to
-# the serial console. No SSH and no network are needed, so the probe is independent of the
-# ssh-hostkeys/tmpfs ordering. `readiness = "exit"` and `required = false` keep a red row from
-# stopping the boot; the runner reads the rows from the serial log.
+# S742 test-only service: run the terminal conformance probe once at boot and print the rows to
+# the serial console. Signal rows run for real (`--signals`); the deliberate termios mutation
+# proves the termios row is not vacuous. `readiness = "exit"` and `required = false` keep a red
+# row from stopping the boot; the runner reads the rows from the serial log.
 
 name = "terminal-conformance"
-exec = "/bin/rsh"
-args = ["/bin/rsh", "-c", "/bin/terminal-conformance --all; echo S175-TERM-MUTATION-BEGIN; /bin/terminal-conformance --mutation-termios"]
-needs = ["vfsd", "tmpfs", "ptyd", "devd", "consd"]
+exec = "/bin/terminal-conformance"
+args = ["/bin/terminal-conformance", "--signals", "--both"]
+needs = ["vfsd", "ptyd", "consd"]
 readiness = "exit"
 restart = "never"
 max_restarts = 0

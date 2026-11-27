@@ -53,16 +53,19 @@ pub struct RamfsHandler {
 }
 
 impl RamfsHandler {
+    #[cfg(test)]
     /// Create a handler over a fresh ramfs.
     pub fn new(now: fn() -> i64) -> Self {
         Self::with_trace(now, false)
     }
 
+    #[cfg(test)]
     /// Create a handler with an explicit root directory mode.
     pub fn with_root_mode(now: fn() -> i64, root_mode: u16) -> Self {
         Self::with_trace_root_mode(now, false, root_mode)
     }
 
+    #[cfg(test)]
     /// Create a handler with the optional request trace enabled.
     pub fn with_trace(now: fn() -> i64, trace: bool) -> Self {
         Self::with_trace_root_mode(now, trace, 0o755)

@@ -116,13 +116,15 @@ fn termios_constants_match_the_header() {
         "VEOF",
         "VTIME",
         "VMIN",
-        "VSWTC",
+        "VERASE2",
         "VSTART",
         "VSTOP",
         "VSUSP",
         "VEOL",
         "VREPRINT",
         "VDISCARD",
+        "VDSUSP",
+        "VSTATUS",
         "VWERASE",
         "VLNEXT",
         "VEOL2",
@@ -200,26 +202,62 @@ fn scalar_types_match_the_abi() {
 
 #[test]
 fn stat_layout_matches_the_abi() {
+    // FreeBSD 133344405 `struct stat` (224 bytes): nlink is 64-bit, mode 16-bit, the
+    // birth timespec follows ctim, and the tail is blksize/flags/gen/filerev/spare.
     const FIELDS: &[&str] = &[
-        "u64", "u64", "u32", "u32", "u32", "u32", "u64", "u64", "i64", "i32", "i32", "i64", "i64",
-        "i64", "i64", "i64", "i64", "i64", "[u32; 2]",
+        "u64", "u64", "u64", "u16", "i16", "u32", "u32", "i32", "u64", "i64", "i64", "i64", "i64",
+        "i64", "i64", "i64", "i64", "i64", "i64", "i32", "u32", "u64", "u64", "[u64; 9]",
     ];
     assert_clean(compare_struct("stat", FIELDS), "stat");
 }
 
 #[test]
 fn statvfs_layout_matches_the_abi() {
+    // FreeBSD `struct statvfs` is eleven 64-bit words (88 bytes); the old snapshot
+    // carried two extra padding words.
     const FIELDS: &[&str] = &[
-        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u32",
-        "[i32; 5]",
+        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64",
     ];
     assert_clean(compare_struct("statvfs", FIELDS), "statvfs");
 }
 
 #[test]
+fn termios_ioctl_values_are_the_pinned_freebsd_encodings() {
+    // Pinned FreeBSD `sys/sys/ttycom.h` with the 44-byte termios record:
+    // `_IOR('t', 19, struct termios)` / `_IOW('t', 20..22, struct termios)`.
+    let toolchain = evaluate(TOOLCHAIN_LIBC);
+    for (name, value) in [
+        ("TIOCGETA", 0x402c_7413_i128),
+        ("TIOCSETA", 0x802c_7414_i128),
+        ("TIOCSETAW", 0x802c_7415_i128),
+        ("TIOCSETAF", 0x802c_7416_i128),
+    ] {
+        assert_eq!(toolchain.get(name).copied(), Some(value), "{name}");
+    }
+}
+
+#[test]
 fn termios_layout_matches_the_abi() {
-    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "u8", "[u8; 32]", "u32", "u32"];
+    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "[u8; 20]", "u32", "u32"];
     assert_clean(compare_struct("termios", FIELDS), "termios");
+}
+
+#[test]
+fn termios_public_header_is_the_pinned_freebsd_record() {
+    let header = strip_comments(TERMIOS_HEADER);
+    assert!(header.contains("struct termios"), "termios record");
+    assert!(header.contains("#define NCCS 20"), "NCCS=20");
+    assert!(header.contains("c_cc[NCCS]"), "c_cc[NCCS]");
+    assert!(header.contains("c_ispeed"), "c_ispeed");
+    assert!(header.contains("c_ospeed"), "c_ospeed");
+    assert!(!header.contains("c_line"), "no c_line in the public record");
+    assert!(header.contains("VERASE2"), "FreeBSD VERASE2");
+    assert!(
+        !header.contains("VSWTC"),
+        "VSWTC is not a FreeBSD public name"
+    );
+    assert!(header.contains("VDSUSP") && header.contains("VSTATUS"));
+    assert!(header.contains("_POSIX_VDISABLE 0xff"));
 }
 
 #[test]

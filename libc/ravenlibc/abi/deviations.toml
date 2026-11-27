@@ -31,6 +31,13 @@ theirs = { x86_64 = "112/8", aarch64 = "112/8", riscv64 = "112/8" }
 reason = "DR-69: the public struct statvfs is the FreeBSD 133344405 field order (88 bytes); musl's 112-byte order is the Linux one and stays confined to linuxd"
 
 [[deviation]]
+name = "termios"
+against = "musl"
+ours = "44/4"
+theirs = { x86_64 = "60/4", aarch64 = "60/4", riscv64 = "60/4" }
+reason = "DR-71/C20: the public struct termios is the FreeBSD 133344405 record (NCCS=20, no c_line, c_cc[20] at 16, c_ispeed/c_ospeed at 36/40); the 60-byte musl record is not the public ABI"
+
+[[deviation]]
 name = "nlink_t"
 against = "musl"
 ours = "4/4"

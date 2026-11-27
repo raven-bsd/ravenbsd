@@ -31,7 +31,7 @@ mod program {
         fn open(
             &mut self,
             _path: &str,
-            flags: u32,
+            _flags: u32,
             _mode: u32,
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {

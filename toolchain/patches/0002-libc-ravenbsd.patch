@@ -120397,10 +120397,10 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
+index 0000000..cc838a44d9c1af034ad066adfe43344e0f85dc19
 --- /dev/null
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
-@@ -0,0 +1,2497 @@
+@@ -0,0 +1,2581 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -120496,6 +120496,16 @@ index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
 +        pub events: u32,
 +        pub u64: u64,
 +        pub _pad: u64,
++    }
++
++    pub struct kevent {
++        pub ident: crate::uintptr_t,
++        pub filter: c_short,
++        pub flags: c_ushort,
++        pub fflags: c_uint,
++        pub data: crate::intptr_t,
++        pub udata: *mut c_void,
++        pub ext: [u64; 4],
 +    }
 +
 +    pub struct fd_set {
@@ -120857,6 +120867,7 @@ index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
 +
 +// limits.h
 +pub const PATH_MAX: c_int = 4096;
++pub const IOV_MAX: c_int = 1024;
 +
 +// fcntl.h
 +
@@ -121642,13 +121653,13 @@ index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
 +pub const NOFLSH: crate::tcflag_t = 0x8000_0000;
 +pub const XCASE: crate::tcflag_t = 0o000_004;
 +
-+pub const TCOOFF: c_int = 0;
-+pub const TCOON: c_int = 1;
-+pub const TCIOFF: c_int = 2;
-+pub const TCION: c_int = 3;
-+pub const TCIFLUSH: c_int = 0;
-+pub const TCOFLUSH: c_int = 1;
-+pub const TCIOFLUSH: c_int = 2;
++pub const TCOOFF: c_int = 1;
++pub const TCOON: c_int = 2;
++pub const TCIOFF: c_int = 3;
++pub const TCION: c_int = 4;
++pub const TCIFLUSH: c_int = 1;
++pub const TCOFLUSH: c_int = 2;
++pub const TCIOFLUSH: c_int = 3;
 +pub const TCSANOW: c_int = 0;
 +pub const TCSADRAIN: c_int = 1;
 +pub const TCSAFLUSH: c_int = 2;
@@ -122396,6 +122407,79 @@ index 0000000..d020665c2066ee8acc5fb2bc15c9199ea66d6a2c
 +    pub fn login_tty(fd: c_int) -> c_int;
 +}
 +
++// sys/event.h (S743 declared kqueue subset: READ, WRITE, TIMER, USER, PROC with NOTE_EXIT).
++pub const EVFILT_READ: c_short = -1;
++pub const EVFILT_WRITE: c_short = -2;
++pub const EVFILT_AIO: c_short = -3;
++pub const EVFILT_VNODE: c_short = -4;
++pub const EVFILT_PROC: c_short = -5;
++pub const EVFILT_SIGNAL: c_short = -6;
++pub const EVFILT_TIMER: c_short = -7;
++pub const EVFILT_PROCDESC: c_short = -8;
++pub const EVFILT_FS: c_short = -9;
++pub const EVFILT_LIO: c_short = -10;
++pub const EVFILT_USER: c_short = -11;
++pub const EVFILT_SENDFILE: c_short = -12;
++pub const EVFILT_EMPTY: c_short = -13;
++pub const EVFILT_JAIL: c_short = -14;
++pub const EVFILT_JAILDESC: c_short = -15;
++pub const EVFILT_SYSCOUNT: c_short = 15;
++
++pub const EV_ADD: c_ushort = 0x0001;
++pub const EV_DELETE: c_ushort = 0x0002;
++pub const EV_ENABLE: c_ushort = 0x0004;
++pub const EV_DISABLE: c_ushort = 0x0008;
++pub const EV_ONESHOT: c_ushort = 0x0010;
++pub const EV_CLEAR: c_ushort = 0x0020;
++pub const EV_RECEIPT: c_ushort = 0x0040;
++pub const EV_DISPATCH: c_ushort = 0x0080;
++pub const EV_FORCEONESHOT: c_ushort = 0x0100;
++pub const EV_KEEPUDATA: c_ushort = 0x0200;
++pub const EV_SYSFLAGS: c_ushort = 0xf000;
++pub const EV_DROP: c_ushort = 0x1000;
++pub const EV_FLAG1: c_ushort = 0x2000;
++pub const EV_FLAG2: c_ushort = 0x4000;
++pub const EV_EOF: c_ushort = 0x8000;
++pub const EV_ERROR: c_ushort = 0x4000;
++
++pub const NOTE_FFNOP: c_uint = 0x0000_0000;
++pub const NOTE_FFAND: c_uint = 0x4000_0000;
++pub const NOTE_FFOR: c_uint = 0x8000_0000;
++pub const NOTE_FFCOPY: c_uint = 0xc000_0000;
++pub const NOTE_FFCTRLMASK: c_uint = 0xc000_0000;
++pub const NOTE_FFLAGSMASK: c_uint = 0x00ff_ffff;
++pub const NOTE_TRIGGER: c_uint = 0x0100_0000;
++
++pub const NOTE_LOWAT: c_uint = 0x0001;
++pub const NOTE_FILE_POLL: c_uint = 0x0002;
++
++pub const NOTE_EXIT: c_uint = 0x8000_0000;
++pub const NOTE_FORK: c_uint = 0x4000_0000;
++pub const NOTE_EXEC: c_uint = 0x2000_0000;
++pub const NOTE_TRACK: c_uint = 0x0000_0001;
++pub const NOTE_TRACKERR: c_uint = 0x0000_0002;
++pub const NOTE_CHILD: c_uint = 0x0000_0004;
++
++pub const NOTE_SECONDS: c_uint = 0x0000_0001;
++pub const NOTE_MSECONDS: c_uint = 0x0000_0002;
++pub const NOTE_USECONDS: c_uint = 0x0000_0004;
++pub const NOTE_NSECONDS: c_uint = 0x0000_0008;
++pub const NOTE_ABSTIME: c_uint = 0x0000_0010;
++
++pub const KQUEUE_CLOEXEC: c_uint = 0x0000_0001;
++pub const KQUEUE_CPONFORK: c_uint = 0x0000_0002;
++
++extern "C" {
++    pub fn kqueue() -> c_int;
++    pub fn kqueue1(flags: c_int) -> c_int;
++    pub fn kevent(
++        kq: c_int,
++        changelist: *const crate::kevent,
++        nchanges: c_int,
++        eventlist: *mut crate::kevent,
++        nevents: c_int,
++        timeout: *const crate::timespec,
++    ) -> c_int;
 +// ---------------------------------------------------------------------------
 +// C64h: Linux-compatible surface required by the brush dependency graph.
 +//

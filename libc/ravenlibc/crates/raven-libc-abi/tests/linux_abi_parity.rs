@@ -496,8 +496,8 @@ typedef struct { void *sa_handler; __ab_sigset_t sa_mask; int sa_flags; void *sa
 typedef struct { void *ss_sp; int ss_flags; unsigned long ss_size; } __ab_stack_t;
 typedef struct { int si_signo; int si_errno; int si_code; int __pad; unsigned long __si_fields[14]; } __ab_siginfo_t;
 typedef struct { unsigned int c_iflag; unsigned int c_oflag; unsigned int c_cflag;
-  unsigned int c_lflag; unsigned char c_line; unsigned char c_cc[32];
-  unsigned int __c_ispeed; unsigned int __c_ospeed; } __ab_termios;
+  unsigned int c_lflag; unsigned char c_cc[20];
+  unsigned int c_ispeed; unsigned int c_ospeed; } __ab_termios;
 typedef struct { unsigned long f_bavail, f_bfree, f_blocks, f_favail, f_ffree, f_files,
   f_bsize, f_flag, f_frsize, f_fsid, f_namemax; } __ab_statvfs;
 typedef struct { void *pw_name; void *pw_passwd; unsigned int pw_uid; unsigned int pw_gid;
@@ -533,7 +533,7 @@ OFF(siginfo_t, si_signo) OFF(siginfo_t, si_errno) OFF(siginfo_t, si_code) OFF(si
 OFF(sockaddr_in6, sin6_addr) OFF(sockaddr_in6, sin6_scope_id)
 OFF(tm, tm_gmtoff) OFF(tm, tm_zone)
 OFF(rusage, __reserved)
-OFF(termios, c_cc) OFF(termios, __c_ispeed)
+OFF(termios, c_cc) OFF(termios, c_ispeed) OFF(termios, c_ospeed)
 "#;
 
 fn clang_available() -> bool {

@@ -9,6 +9,8 @@ use alloc::vec::Vec;
 use raven_abi::errno::Errno;
 use raven_tty_core::{Discipline, Event, Output, Settings, Termios, Winsize};
 
+/// POSIX SIGHUP.
+pub const SIGHUP: u32 = 1;
 /// POSIX SIGINT.
 pub const SIGINT: u32 = 2;
 /// POSIX SIGQUIT.
@@ -164,7 +166,13 @@ impl<S: SignalSink> Pty<S> {
     }
 
     /// Hang up the pty; empty reads return zero from now on.
+    ///
+    /// FreeBSD `tty_pty.c` sends `SIGHUP` to the foreground group when the master side
+    /// closes. Signal once, before the EOF state makes a repeated hangup a no-op.
     pub fn hangup(&mut self) {
+        if !self.eof && self.fg_pgrp > 0 {
+            let _ = self.sink.signal(-self.fg_pgrp, SIGHUP);
+        }
         self.eof = true;
     }
 

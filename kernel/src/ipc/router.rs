@@ -1261,6 +1261,7 @@ pub(crate) fn on_process_exit(process: &Arc<Process>) {
 }
 
 /// K449 diagnostic: deferred last-close notices still queued.
+#[cfg(target_arch = "x86_64")]
 pub(crate) fn close_notice_count() -> usize {
     CLOSE_NOTICES.lock().len()
 }
