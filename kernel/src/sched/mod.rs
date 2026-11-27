@@ -126,7 +126,7 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 /// User threads are scheduled on application processors by default. `smp_user=off` is the
 /// emergency disable (bringing a machine up while a default-on failure is being fixed);
 /// `smp_user=on` remains accepted as an explicit default.
-static USER_SMP: AtomicBool = AtomicBool::new(false);
+static USER_SMP: AtomicBool = AtomicBool::new(true);
 /// `smp-user-trace`: print the first user thread on each CPU and cross-CPU wakeups.
 static USER_TRACE: AtomicBool = AtomicBool::new(false);
 /// `smp-user-first`: print only the per-CPU first-user marker (quiet soak evidence).
