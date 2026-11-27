@@ -278,6 +278,24 @@ fn closing_an_fd_releases_its_doorbell_with_handle_close() {
 }
 
 #[test]
+fn link_reaches_the_root_call_and_resolves_against_the_cwd() {
+    let platform = platform();
+    let before = platform.backend().open_handles();
+    assert_eq!(platform.link(b"/a", b"/b"), Ok(()));
+    assert_eq!(
+        platform.backend().open_handles(),
+        before + 1,
+        "the first Link opens the cached file:/ root"
+    );
+
+    // A cwd-relative pair resolves before the call; the resolver rejects an empty path and a NUL.
+    platform.set_cwd(b"/a");
+    assert_eq!(platform.link(b"old", b"new"), Ok(()));
+    assert_eq!(platform.link(b"", b"/b"), Err(Errno::ENOENT));
+    assert_eq!(platform.link(b"a\0b", b"/b"), Err(Errno::EINVAL));
+}
+
+#[test]
 fn fork_child_keeps_the_inherited_pty_master_handle() {
     let platform = platform();
     let file = platform.open(b"/a", 0, 0).expect("file");
