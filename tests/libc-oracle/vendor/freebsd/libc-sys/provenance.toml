@@ -6,6 +6,9 @@
 # by that module. Each embedded body is verified against its historical Git blob SHA-256 before
 # the single documented build transformation. The `path` fields name the historical repository
 # paths; they are no longer tracked so the structural C/C++ scaffold gate stays closed.
+#
+# README.md in this directory maps each suite source to its carrier and historical SHA-256 and
+# records how the manifest root resolves to the staged tree.
 
 [[import]]
 path = "tests/libc-oracle/vendor/freebsd/libc-sys/sys/h_macros.h"

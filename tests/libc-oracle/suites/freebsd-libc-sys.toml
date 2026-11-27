@@ -6,6 +6,9 @@ schema = 1
 suite = "freebsd-libc-sys"
 donor = "freebsd"
 framework = "atf"
+# Historical FreeBSD tree, materialised at run time: the C bodies are embedded test-only text in
+# tests/libc/atf/src/port_sources.rs and staged under this root (see the README in that tree).
+# No .c file is tracked under the root, and no donor body is lost.
 root = "vendor/freebsd/libc-sys"
 srcdir_for_tests = true
 
