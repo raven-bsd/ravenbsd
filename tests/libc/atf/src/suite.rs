@@ -564,6 +564,11 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
     Ok(run)
 }
 
+/// Cases per guest boot. Each case owns a run/read service pair; the bootstrap services take
+/// eight of the manifest's 256 slots, so 20 cases (48 services) leave ample headroom and stop one
+/// stalled body from consuming a whole matrix boot.
+const BATCH_CHUNK: usize = 20;
+
 /// Target+qemu ATF: build every program, then run all eligible bodies in batched boots.
 fn run_atf_qemu(
     builder: &Builder,
@@ -676,8 +681,10 @@ fn run_atf_qemu(
     let guest = qemu::Guest::new(&config.root);
     let mut results = Vec::with_capacity(batch.len());
     // `raven-svc-manifest` caps a graph at 256 services; each case uses a run/read pair and the
-    // bootstrap services take eight slots, so 100 cases (208 services) stay under the cap.
-    for (chunk_index, chunk) in batch.chunks(100).enumerate() {
+    // bootstrap services take eight slots. A chunk is 20 cases (48 services) so one body that
+    // stalls the guest costs one chunk, not the whole matrix. The faulting memory programs run
+    // last (suite order); earlier required rows are recorded from the finished chunks.
+    for (chunk_index, chunk) in batch.chunks(BATCH_CHUNK).enumerate() {
         let chunk_work = work.join(format!("chunk-{chunk_index}"));
         results.extend(qemu::run_atf_batch(
             &qemu,

@@ -235,6 +235,13 @@ fn case(ident: &str) -> TpCase {
 }
 
 #[test]
+fn the_batch_chunk_stays_below_the_service_graph_cap() {
+    assert!(BATCH_CHUNK > 0);
+    assert!(BATCH_CHUNK * 2 + 8 <= 256);
+    assert!(BATCH_CHUNK < 58, "a 58-body suite must span more than one boot");
+}
+
+#[test]
 fn a_usable_oracle_cache_skips_the_target_listing() {
     let listed = std::cell::Cell::new(false);
     let cases = resolve_batch_cases(vec![case("body")], || {
