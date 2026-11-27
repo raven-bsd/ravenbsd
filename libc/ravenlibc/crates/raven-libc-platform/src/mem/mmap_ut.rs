@@ -38,6 +38,23 @@ fn anonymous_private_is_zero_filled() {
 }
 
 #[test]
+fn anonymous_mapping_with_a_real_fd_is_einval() {
+    let platform = Platform::new(FakeSys::new());
+    assert_eq!(
+        mmap(
+            &platform,
+            0,
+            PAGE,
+            1,
+            mman::MAP_PRIVATE | mman::MAP_ANONYMOUS,
+            i32::MAX,
+            0
+        ),
+        Err(Errno::EINVAL)
+    );
+}
+
+#[test]
 fn anonymous_shared_goes_through_memobj_create() {
     let fake = FakeSys::new();
     let platform = Platform::new(fake);
