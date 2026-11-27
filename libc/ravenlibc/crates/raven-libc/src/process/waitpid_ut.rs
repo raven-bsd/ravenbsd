@@ -12,7 +12,10 @@ fn positive_pid_selects_one_child() {
 
 #[test]
 fn minus_one_selects_any_child() {
-    assert_eq!(wait_target(-1), (KERNEL_P_ALL, 0));
+    // FreeBSD `sys/sys/wait.h`: P_ALL = 7, and the kernel `children_for` P_ALL arm accepts 7
+    // only (`kernel/src/process/status.rs:16`). The old private value 3 hits the EINVAL arm.
+    assert_eq!(raven_libc_proc::consts::P_ALL, 7);
+    assert_eq!(wait_target(-1), (raven_libc_proc::consts::P_ALL, 0));
 }
 
 #[test]

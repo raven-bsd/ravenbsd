@@ -233,6 +233,60 @@ impl<B: SysBackend, L: Lock> NetBackend for PlatformBackend<'_, B, L> {
             .close(raven_libc_platform::Handle(handle.0));
         Ok(decoded)
     }
+
+    fn iface_list(&self) -> Result<Vec<IfaceResponse>, Errno> {
+        // netd answers `OP_LIST` with one Call reply containing `Count` followed by that
+        // many `Iface` records. `IfaceResponse::decode` validates exactly one record, so the
+        // stream is split by the shortest valid prefix; the canonical decoder owns the
+        // framing and no tag layout is duplicated here.
+        let handle = open_scheme_path(self.platform.backend(), b"net:", WIRE_READ_WRITE)
+            .map_err(|error| Errno(error.0))?;
+        let mut request = [0u8; 64];
+        let used = IfaceRequest::List
+            .encode(&mut request)
+            .map_err(|_| Errno::EINVAL)?;
+        let mut response = [0u8; 2048];
+        let count = self
+            .platform
+            .backend()
+            .call(handle, request.get(..used).unwrap_or(&[]), &mut response)
+            .map_err(|error| Errno(error.0))?;
+        let _ = self
+            .platform
+            .backend()
+            .close(raven_libc_platform::Handle(handle.0));
+        split_responses(response.get(..count).unwrap_or(&[]))
+    }
+}
+
+/// Split a `Call` reply into its `IfaceResponse` records.
+fn split_responses(buffer: &[u8]) -> Result<Vec<IfaceResponse>, Errno> {
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    while start < buffer.len() {
+        let mut end = None;
+        let mut candidate = start.saturating_add(6);
+        while candidate <= buffer.len() {
+            let Some(prefix) = buffer.get(start..candidate) else {
+                return Err(Errno::EPROTO);
+            };
+            if IfaceResponse::decode(prefix).is_ok() {
+                end = Some(candidate);
+                break;
+            }
+            candidate = candidate.saturating_add(1);
+        }
+        let Some(end) = end else {
+            return Err(Errno::EPROTO);
+        };
+        let record = buffer
+            .get(start..end)
+            .ok_or(Errno::EPROTO)
+            .and_then(|record| IfaceResponse::decode(record).map_err(|_| Errno::EPROTO))?;
+        out.push(record);
+        start = end;
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

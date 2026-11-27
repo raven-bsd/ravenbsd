@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S745 interface discovery: the normal `server` image with a QEMU user-mode
+# virtio-net NIC; netd gets a DHCP lease for eth0 and the one-shot probe checks
+# getifaddrs/if_nameindex/if_nametoindex/if_indextoname and the explicit
+# AF_ROUTE non-support against that live provider.
+name = "interfaces-conformance"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 240
+pre = ["sh tests/conformance/interfaces/build.sh"]
+initfs = "build/fixtures/interfaces-conformance/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^CONFORM interfaces begin$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=layout status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=live status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=address status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=flags status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=families status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=nameindex status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=invalid status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=ownership status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces row=route status=PASS .*$'
+
+[[expect]]
+regex = '^CONFORM interfaces summary passed=9 total=9 failures=0$'
+
+[[expect]]
+regex = '^CONFORM interfaces done failures=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = 'CONFORM interfaces row=\S+ status=FAIL|(?i)panic|EXCEPTION'

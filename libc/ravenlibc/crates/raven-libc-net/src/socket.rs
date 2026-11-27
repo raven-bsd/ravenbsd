@@ -49,13 +49,15 @@ pub struct SendErr {
 impl<B: NetBackend, F: SocketFds, E: NetEnv, U: UnixBackend> Net<B, F, E, U> {
     /// `socket`.
     pub fn socket(&self, domain: i32, ty: i32, proto: i32) -> Result<i32, Errno> {
-        let (base, cloexec, nonblock) = flags::split_type(ty)?;
+        // FreeBSD kern_socket() strips the descriptor flags and then lets socreate() look
+        // up the domain; an unknown family is EAFNOSUPPORT before any type validation.
         if domain != AF_INET && domain != AF_INET6 {
             return Err(Errno::EAFNOSUPPORT);
         }
         if domain == AF_INET6 && !self.backend.caps().ipv6 {
             return Err(Errno::EAFNOSUPPORT);
         }
+        let (base, cloexec, nonblock) = flags::split_type(ty)?;
         validate_proto(base, proto)?;
         let caps = self.backend.caps();
         let mptcp = proto == crate::mptcp::IPPROTO_MPTCP;

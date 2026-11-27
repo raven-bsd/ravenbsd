@@ -3,6 +3,12 @@
 
 //! `SIOC*` ioctls belong to the network area (C63); this module only classifies them so the
 //! shell routes them without duplicating the numbers.
+//!
+//! The request values are the pinned FreeBSD `sys/sys/sockio.h` encodings:
+//! `_IOW`/`_IOWR('i', number, struct ifreq)` for a 32-byte `struct ifreq` and
+//! `_IOWR('i', 36, struct ifconf)` for the 16-byte `struct ifconf`. The 32-bit request word
+//! carries the 13-bit parameter length and the `i` command group exactly as `sys/sys/ioccom.h`
+//! defines them.
 
 use raven_abi::errno::Errno;
 
@@ -27,17 +33,40 @@ pub enum NetIoctl {
     Other,
 }
 
+/// `sizeof(struct ifreq)`, the FreeBSD public record (`net/if.h`).
+const IFREQ_LEN: u32 = 32;
+/// `sizeof(struct ifconf)`.
+const IFCONF_LEN: u32 = 16;
+/// `IOC_INOUT`: copy parameters in and out.
+const IOC_INOUT: u32 = 0xc000_0000;
+/// `IOC_IN`: copy parameters in.
+const IOC_IN: u32 = 0x8000_0000;
+/// Build a FreeBSD ioctl request (`sys/sys/ioccom.h` `_IOC`).
+const fn ioc(direction: u32, number: u32, len: u32) -> u32 {
+    direction | ((len & 0x1fff) << 16) | ((b'i' as u32) << 8) | number
+}
+
+const SIOCGIFCONF: u32 = ioc(IOC_INOUT, 36, IFCONF_LEN);
+const SIOCGIFFLAGS: u32 = ioc(IOC_INOUT, 17, IFREQ_LEN);
+const SIOCSIFFLAGS: u32 = ioc(IOC_IN, 16, IFREQ_LEN);
+const SIOCGIFADDR: u32 = ioc(IOC_INOUT, 33, IFREQ_LEN);
+const SIOCSIFADDR: u32 = ioc(IOC_IN, 12, IFREQ_LEN);
+const SIOCGIFNETMASK: u32 = ioc(IOC_INOUT, 37, IFREQ_LEN);
+const SIOCGIFMTU: u32 = ioc(IOC_INOUT, 51, IFREQ_LEN);
+/// The `i` command group assigned to the interface ioctls.
+const IFACE_GROUP: u32 = b'i' as u32;
+
 /// Classify a request; `None` is not a network ioctl.
 pub const fn classify(request: u32) -> Option<NetIoctl> {
     let action = match request {
-        0x8912 => NetIoctl::GetIfConf,
-        0x8913 => NetIoctl::GetIfFlags,
-        0x8914 => NetIoctl::SetIfFlags,
-        0x8915 => NetIoctl::GetIfAddr,
-        0x8916 => NetIoctl::SetIfAddr,
-        0x891b => NetIoctl::GetIfNetmask,
-        0x8921 => NetIoctl::GetIfMtu,
-        value if value & 0xffff_ff00 == 0x8900_0000 => NetIoctl::Other,
+        SIOCGIFCONF => NetIoctl::GetIfConf,
+        SIOCGIFFLAGS => NetIoctl::GetIfFlags,
+        SIOCSIFFLAGS => NetIoctl::SetIfFlags,
+        SIOCGIFADDR => NetIoctl::GetIfAddr,
+        SIOCSIFADDR => NetIoctl::SetIfAddr,
+        SIOCGIFNETMASK => NetIoctl::GetIfNetmask,
+        SIOCGIFMTU => NetIoctl::GetIfMtu,
+        value if (value >> 8) & 0xff == IFACE_GROUP => NetIoctl::Other,
         _ => return None,
     };
     Some(action)
