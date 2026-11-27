@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S173c PG-26 copyout-destination source: a `pollfd` array inside the user window whose
+# destination page cannot receive `revents` must return -1/EFAULT and the calling child must
+# exit normally, never die from a page fault. Two destinations are exercised: a page made
+# read-only with mprotect (input readable, revents not writable) and a page unmapped while the
+# ppoll wait is in progress. The mapped writable control (fd=-1, events=0) returns 0.
+#
+# Standalone test: it builds its own fixture against build/x86_64/sysroot and boots QEMU
+# directly; it does not require the S750 freebsd-libc-sys manifest or suite tree.
+
+name = "pg26-copyout"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pg26-copyout/build.sh"]
+initfs = "build/fixtures/pg26-copyout/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pg26-copyout: mapped ok$'
+
+[[expect]]
+regex = '^pg26-copyout: read-only EFAULT$'
+
+[[expect]]
+regex = '^pg26-copyout: concurrent-unmap EFAULT$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pg26-copyout: fail'
