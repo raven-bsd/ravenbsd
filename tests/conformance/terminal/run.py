@@ -299,6 +299,8 @@ def collect_serial(
     *,
     completion_grace: float = QEMU_COMPLETION_GRACE,
     on_capture=None,
+    now=time.monotonic,
+    poll_interval: float = 0.2,
 ) -> tuple[str, str | None]:
     """Read the serial log until both runs finish or the deadline expires.
 
@@ -311,7 +313,8 @@ def collect_serial(
     """
     text = ""
     complete = False
-    while time.monotonic() < deadline:
+    expired = False
+    while now() < deadline:
         if qemu.poll() is not None:
             break
         text = serial.read_text(encoding="utf-8", errors="replace")
@@ -320,10 +323,13 @@ def collect_serial(
         if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
             complete = True
             break
-        time.sleep(0.2)
+        time.sleep(poll_interval)
+    else:
+        expired = True
 
-    if not complete and qemu.poll() is None:
-        terminate_qemu(qemu)
+    if expired:
+        if qemu.poll() is None:
+            terminate_qemu(qemu)
         return read_serial(serial, text), "serial:deadline"
 
     if complete and qemu.poll() is None:

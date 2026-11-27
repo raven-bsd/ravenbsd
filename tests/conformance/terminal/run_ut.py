@@ -237,5 +237,73 @@ class FinalSerialTests(unittest.TestCase):
         self.assertIsNone(run.qemu_exit_failure(33))
 
 
+BOUNDARY_CHILD = r"""
+import os, sys
+serial, control, code = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+os.read(control, 1)
+with open(serial, "a", encoding="utf-8") as handle:
+    handle.write("S175-TERM done failures=1\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+sys.exit(code)
+"""
+
+
+class BoundaryClock:
+    def __init__(self, child, deadline):
+        self.child = child
+        self.deadline = deadline
+        self.calls = 0
+
+    def now(self):
+        self.calls += 1
+        if self.calls == 1:
+            return 0.0
+        # The child writes the missing marker and exits before the collector's post-loop poll.
+        self.child.wait(timeout=2)
+        return self.deadline + 1
+
+
+class DeadlineBoundaryTests(unittest.TestCase):
+    def test_deadline_boundary_child_exit_is_still_deadline_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            serial = Path(directory) / "serial.log"
+            serial.write_text(
+                "S175-TERM-MUTATION-BEGIN\nS175-TERM done failures=0\n",
+                encoding="utf-8",
+            )
+            read_fd, write_fd = os.pipe()
+            child = subprocess.Popen(
+                [sys.executable, "-c", BOUNDARY_CHILD, str(serial), str(read_fd), "33"],
+                pass_fds=(read_fd,),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            os.close(read_fd)
+            sent = False
+
+            def after_capture(text: str) -> None:
+                nonlocal sent
+                if not sent and "S175-TERM-MUTATION-BEGIN" in text:
+                    sent = True
+                    os.write(write_fd, b"x")
+                    os.close(write_fd)
+
+            deadline = 1.0
+            text, failure = run.collect_serial(
+                serial,
+                child,
+                deadline,
+                completion_grace=5,
+                on_capture=after_capture,
+                now=BoundaryClock(child, deadline).now,
+                poll_interval=0,
+            )
+            child.wait(timeout=5)
+            self.assertEqual(failure, "serial:deadline")
+            self.assertIn("S175-TERM done failures=1", text)
+            self.assertEqual(child.returncode, 33)
+
 if __name__ == "__main__":
     unittest.main()
