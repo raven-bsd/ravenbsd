@@ -817,22 +817,6 @@ pub fn signal_due() -> Option<SignalEntry> {
     })
 }
 
-/// Resolve a fault delivery target; the kick bits are not part of a fault.
-pub fn signal_fault_due() -> Option<SignalEntry> {
-    let thread = sched::current_thread()?;
-    if thread.signal_entry.load(Ordering::Acquire) == 0 {
-        return None;
-    }
-    let (entry, ctx, flags) = signal_target(&thread, true)?;
-    Some(SignalEntry {
-        bits: 0,
-        entry,
-        ctx,
-        flags,
-        mask: thread.signal_mask.load(Ordering::Acquire),
-    })
-}
-
 /// Resolve a `SIGRESEND` re-entry, which is allowed while already in a signal.
 pub fn signal_resend_due() -> Option<SignalEntry> {
     let thread = sched::current_thread()?;
