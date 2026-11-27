@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S173b PG-26 pointer source: the mapped control is a valid pollfd[1] with fd=-1,
+# events=0 and returns 0; the boundary is the exact in-window address 0x1000
+# (`USER_MIN`) in a forked child, which must return -1/EFAULT and exit normally,
+# never die from signal 11. Source only in this revision: QEMU is guarded until the
+# S750 freebsd-libc-sys manifest/source root and a fresh exec-canary are present.
+
+name = "pg26-pointer"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pg26-pointer/build.sh"]
+initfs = "build/fixtures/pg26-pointer/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pg26-pointer: mapped ok$'
+
+[[expect]]
+regex = '^pg26-pointer: in-window EFAULT$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pg26-pointer: fail'
