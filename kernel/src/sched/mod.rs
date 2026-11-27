@@ -1421,11 +1421,11 @@ pub fn exit_thread(code: i32) -> ! {
         .any(|token| token == "s36-holders")
     {
         crate::kprintln!(
-            "s170: switch pid={} process_refs={} thread_refs={}",
+            "s170: switch pid={} thread_refs={}",
             thread.process.id,
-            Arc::strong_count(&thread.process),
             Arc::strong_count(&thread)
         );
+        crate::process::report_process_refs(&thread.process);
     }
     // The frame that switches away is abandoned on the dead stack, so its `Arc` local can never
     // be dropped. Hand the owning reference to the incoming context; publishing it to `REAP`

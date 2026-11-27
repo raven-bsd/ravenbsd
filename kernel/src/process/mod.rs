@@ -475,6 +475,73 @@ fn print_leaked_process_holders() {
     }
 }
 
+/// Name the objects that still hold `target` (`s36-holders`).
+///
+/// Runs at the thread switch, when the exit path is about to abandon its frame: the print names
+/// the surviving strong references by object kind so the leak is attributable before the switch.
+pub fn report_process_refs(target: &Arc<Process>) {
+    let processes: Vec<Arc<Process>> = ALL_PROCESSES
+        .lock()
+        .iter()
+        .filter_map(Weak::upgrade)
+        .collect();
+    let mut stats = [0u64; 8];
+    for holder in &processes {
+        holder.handles.lock().for_each_live(|_, object, _, _| match object {
+            crate::process::handle::Object::Process(process) if Arc::ptr_eq(process, target) => {
+                stats[0] = stats[0].saturating_add(1);
+            }
+            crate::process::handle::Object::Thread(thread)
+                if Arc::ptr_eq(&thread.process, target) =>
+            {
+                stats[1] = stats[1].saturating_add(1);
+            }
+            crate::process::handle::Object::SchemeFile(file)
+                if Arc::ptr_eq(&file.server, target) =>
+            {
+                stats[2] = stats[2].saturating_add(1);
+            }
+            crate::process::handle::Object::SchemeRequest(request) => {
+                if Arc::ptr_eq(&request.client, target) {
+                    stats[3] = stats[3].saturating_add(1);
+                }
+                if Arc::ptr_eq(&request.server, target) {
+                    stats[4] = stats[4].saturating_add(1);
+                }
+                if request
+                    .file
+                    .as_ref()
+                    .is_some_and(|file| Arc::ptr_eq(&file.server, target))
+                {
+                    stats[5] = stats[5].saturating_add(1);
+                }
+            }
+            _ => {}
+        });
+        stats[6] = stats[6].saturating_add(
+            holder
+                .client_requests
+                .lock()
+                .iter()
+                .filter(|request| Arc::ptr_eq(&request.client, target))
+                .count() as u64,
+        );
+    }
+    stats[7] = Arc::strong_count(target) as u64;
+    kprintln!(
+        "s170: refs pid={} total={} handle={} thread={} file={} req-client={} req-server={} req-file={} client-queue={}",
+        target.id,
+        stats[7],
+        stats[0],
+        stats[1],
+        stats[2],
+        stats[3],
+        stats[4],
+        stats[5],
+        stats[6]
+    );
+}
+
 impl Drop for Process {
     fn drop(&mut self) {
         LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
