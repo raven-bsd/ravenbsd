@@ -474,6 +474,186 @@ fn s173b_ppoll_rejects_an_unmapped_in_window_record_pointer_with_efault() {
     );
 }
 
+/// The input `USER_COPY` failure must return `-1`/`EFAULT` before the shell forms a slice over
+/// the caller's array. The double fails the copy, so the in-window but unmapped `0x1000` source
+/// is only ever handed to the copy function; a read by the wrapper would fault. Forked so a
+/// missing propagation is a child signal or exit code, never the test process.
+#[test]
+fn s173b_ppoll_input_copy_failure_is_efault_without_reading_the_caller_array() {
+    // SAFETY: plain host libc declarations with the C signatures.
+    unsafe extern "C" {
+        fn fork() -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        fn _exit(status: i32) -> !;
+    }
+
+    let _guard = TestLock::acquire();
+    // SAFETY: fork takes no pointers; the child only calls the wrapper and `_exit`.
+    let pid = unsafe { fork() };
+    assert!(pid >= 0, "fork failed: {pid}");
+    if pid == 0 {
+        errno::set_raw(0);
+        let pointer = 0x1000usize as *mut Pollfd;
+        assert!(
+            raven_libc_platform::poll::validate_user_range(
+                pointer as u64,
+                core::mem::size_of::<Pollfd>() as u64
+            )
+            .is_ok(),
+            "0x1000 passes the window check; only the copy can reject it"
+        );
+        let mut calls = 0u32;
+        let mut request_matched = false;
+        let mut snapshot_distinct = false;
+        let result = ppoll_with_copy(
+            pointer,
+            1,
+            core::ptr::null(),
+            core::ptr::null(),
+            |destination, source, length| {
+                calls += 1;
+                request_matched =
+                    source == pointer.cast::<u8>() && length == core::mem::size_of::<Pollfd>();
+                snapshot_distinct = !core::ptr::eq(destination.cast_const(), source);
+                Err(raven_libc_platform::Errno(EFAULT as u16))
+            },
+        );
+        let code = if result == -1 && errno::get() == EFAULT {
+            if calls == 1 && request_matched && snapshot_distinct {
+                0
+            } else {
+                1
+            }
+        } else {
+            2
+        };
+        // SAFETY: ends the forked child without running the parent's test harness.
+        unsafe { _exit(code) };
+    }
+    let mut status = 0;
+    // SAFETY: `pid` is the child forked above and `status` is a live out pointer.
+    let reaped = unsafe { waitpid(pid, &mut status, 0) };
+    assert_eq!(reaped, pid, "waitpid did not reap the ppoll child");
+    let signal = status & 0x7f;
+    assert_eq!(
+        signal, 0,
+        "the input-copy failure died from signal {signal}; the wrapper must not read the caller array"
+    );
+    let code = (status >> 8) & 0xff;
+    assert_eq!(
+        code, 0,
+        "input copy: 0 = -1/EFAULT with one snapshot copy and no read, 1 = wrong call shape, 2 = not -1/EFAULT"
+    );
+}
+
+/// A failed `revents` copy-out happens after a successful input snapshot and readiness. The
+/// caller's record must stay untouched and the call must return `-1`/`EFAULT`.
+#[test]
+fn s173b_ppoll_revents_copy_failure_is_efault_after_readiness() {
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    let mut records = [Pollfd {
+        fd: -1,
+        events: 0,
+        revents: 0,
+    }];
+    let caller = records.as_mut_ptr();
+    let mut calls = 0u32;
+    let mut copy_out_requested = false;
+    let mut snapshot_source = core::ptr::null::<u8>();
+    let result = ppoll_with_copy(
+        caller,
+        1,
+        core::ptr::null(),
+        core::ptr::null(),
+        |destination, source, length| {
+            calls += 1;
+            if calls == 1 {
+                return raven_libc_sys::sys::user_copy(destination, source, length);
+            }
+            copy_out_requested =
+                destination == caller.cast::<u8>() && length == core::mem::size_of::<Pollfd>();
+            snapshot_source = source;
+            Err(raven_libc_platform::Errno(EFAULT as u16))
+        },
+    );
+    assert_eq!(result, -1, "a failed revents copy-out is -1");
+    assert_eq!(errno::get(), EFAULT, "a failed revents copy-out is EFAULT");
+    assert_eq!(
+        calls, 2,
+        "the input copy and the revents copy-out both ran; the poll was reached"
+    );
+    assert!(
+        copy_out_requested,
+        "the copy-out must name the caller's record array"
+    );
+    assert!(
+        !snapshot_source.is_null(),
+        "the copy-out source is the snapshot"
+    );
+    assert_eq!(
+        records[0].revents, 0,
+        "a failed copy-out must leave the caller's record untouched"
+    );
+}
+
+/// A copy double that succeeds for both operations still yields the normal poll result, so the
+/// seam does not change the success path.
+#[test]
+fn s173b_ppoll_successful_copy_double_returns_the_normal_result() {
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    let mut records = [Pollfd {
+        fd: -1,
+        events: 0,
+        revents: 0,
+    }];
+    let mut calls = 0u32;
+    let result = ppoll_with_copy(
+        records.as_mut_ptr(),
+        1,
+        core::ptr::null(),
+        core::ptr::null(),
+        |destination, source, length| {
+            calls += 1;
+            raven_libc_sys::sys::user_copy(destination, source, length)
+        },
+    );
+    assert_eq!(
+        result, 0,
+        "an ignored descriptor with no events is not ready"
+    );
+    assert_eq!(errno::get(), 0, "success does not set errno");
+    assert_eq!(calls, 2, "the input copy and the revents copy-out both ran");
+    assert_eq!(records[0].fd, -1, "the caller's record is unchanged");
+}
+
+/// Negative control for the no-production-mutation requirement: a copy that reports success
+/// without copying is what an ignored-error helper does to this call. It must not look like
+/// `-1`/`EFAULT`, which is what the pair above asserts when the error is propagated.
+#[test]
+fn s173b_ppoll_a_swallowed_copy_error_does_not_look_like_efault() {
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    let mut records = [Pollfd {
+        fd: -1,
+        events: 0,
+        revents: 0,
+    }];
+    let result = ppoll_with_copy(
+        records.as_mut_ptr(),
+        1,
+        core::ptr::null(),
+        core::ptr::null(),
+        |_destination, _source, _length| Ok(()),
+    );
+    assert!(
+        !(result == -1 && errno::get() == EFAULT),
+        "a copy that silently succeeds must not produce EFAULT; result={result} errno={}",
+        errno::get()
+    );
+}
+
 /// A mapped, in-window range is copied exactly. The `pselect` masked-wait test this increment
 /// replaces remains in `tickets/evidence/artifacts/S173b/separating-tests.patch` and commit
 /// `55c3e247f`; it is not part of the independent `USER_COPY` pointer fix.

@@ -62,6 +62,31 @@ pub unsafe extern "C" fn ppoll(
     timeout: *const Timespec,
     sigmask: *const SigsetT,
 ) -> c_int {
+    ppoll_with_copy(
+        fds,
+        nfds,
+        timeout,
+        sigmask,
+        raven_libc_sys::sys::user_copy,
+    )
+}
+
+/// The `ppoll` shell with its two `USER_COPY` operations supplied by `copy`.
+///
+/// Production `ppoll` passes [`raven_libc_sys::sys::user_copy`], so the behaviour is the
+/// production behaviour by construction; the host tests pass a test-local double to drive the
+/// input-snapshot and `revents` copy-out failures. `copy` is the only way this shell touches the
+/// caller's record array: the wrapper itself never forms a slice over `fds`.
+pub(crate) fn ppoll_with_copy<C>(
+    fds: *mut Pollfd,
+    nfds: u64,
+    timeout: *const Timespec,
+    sigmask: *const SigsetT,
+    mut copy: C,
+) -> c_int
+where
+    C: FnMut(*mut u8, *const u8, usize) -> Result<(), raven_libc_platform::Errno>,
+{
     let count = usize::try_from(nfds).unwrap_or(usize::MAX);
     // FreeBSD `kern_poll`/`kern_poll_kfds` copies the record array and the timespec in, and the
     // sigmask through `kern_sigprocmask`; each bad pointer is EFAULT. This shell copies the
@@ -112,11 +137,7 @@ pub unsafe extern "C" fn ppoll(
                 revents: 0,
             },
         );
-        if let Err(error) = raven_libc_sys::sys::user_copy(
-            snapshot.as_mut_ptr().cast(),
-            fds.cast(),
-            bytes,
-        ) {
+        if let Err(error) = copy(snapshot.as_mut_ptr().cast(), fds.cast(), bytes) {
             return ret::int(Err(map_error(error)));
         }
     }
@@ -127,11 +148,7 @@ pub unsafe extern "C" fn ppoll(
     let result = poll_with_mask(&mut snapshot, timeout, mask);
     if result.is_ok() && count != 0 {
         // FreeBSD `pollout` copies the `revents` array back; a failed copy-out is EFAULT.
-        if let Err(error) = raven_libc_sys::sys::user_copy(
-            fds.cast(),
-            snapshot.as_ptr().cast(),
-            bytes,
-        ) {
+        if let Err(error) = copy(fds.cast(), snapshot.as_ptr().cast(), bytes) {
             return ret::int(Err(map_error(error)));
         }
     }
