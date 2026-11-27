@@ -30,8 +30,8 @@ entry!(main);
 const PAGE: usize = 4096;
 const SIGUSR1: usize = 10;
 const SIGUSR2: usize = 12;
-const SIG_BLOCK: usize = 0;
-const SIG_SETMASK: usize = 2;
+const SIG_BLOCK: usize = 1;
+const SIG_SETMASK: usize = 3;
 const SIGPROCMASK: usize = raven_abi::syscall::SIGPROCMASK;
 const SIGACTION: usize = raven_abi::syscall::SIGACTION;
 /// `proc_signal(target, signo)` raw number (`kernel/src/syscall/process_ctl.rs:186`); the lead
