@@ -9732,3 +9732,36 @@ tier = "A"
 copied = "2026-11-23"
 modified = true
 notes = "Per-CPU wheel selection ported from softclock_pcpu_ary (per-CPU wheels and locks) and callout_reset_bycpu (target-CPU add) into the kernel time integration; the cyclic heap itself is original Raven Rust. No C expression copied."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/disklabel.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/disklabel.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-27"
+modified = true
+notes = "S746 rev393: verbatim FreeBSD disklabel interface; only the RavenBSD provenance comment was prepended; dependencies sys/ioccom.h and sys/disk/bsd.h copied at the same revision."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/ioccom.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/ioccom.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-27"
+modified = true
+notes = "S746 rev393: verbatim FreeBSD ioctl-command encoding required by sys/disklabel.h; only the RavenBSD provenance comment was prepended."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/disk/bsd.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/disk/bsd.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-27"
+modified = true
+notes = "S746 rev393: verbatim FreeBSD on-disk BSD label record required by sys/disklabel.h; only the SPDX/RavenBSD provenance comment was prepended."

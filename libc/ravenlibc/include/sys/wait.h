@@ -54,6 +54,10 @@ int waitid (idtype_t, id_t, siginfo_t *, int);
 #endif
 
 #include <sys/resource.h>
+#if __BSD_VISIBLE
+/* FreeBSD sys/sys/wait.h:167 (BSD-3-Clause, donor 133344405). */
+pid_t wait6 (idtype_t, id_t, int *, int, struct __wrusage *, siginfo_t *);
+#endif
 pid_t wait3 (int *, int, struct rusage *);
 pid_t wait4 (pid_t, int *, int, struct rusage *);
 
