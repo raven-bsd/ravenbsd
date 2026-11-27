@@ -217,6 +217,96 @@ fn ppoll_reports_the_poll_result() {
     assert_eq!(fds[0].revents, POLLNVAL as i16);
 }
 
+/// The fake clock advances by the wait duration, so `now_ns` is the converted timeout.
+fn ppoll_wait_ns(timeout: Option<&raven_libc_abi::structs::Timespec>) -> u64 {
+    let (platform, fd) = tty_platform();
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(ppoll(&platform, &mut fds, timeout, None), Ok(0));
+    platform.backend().now_ns()
+}
+
+#[test]
+fn ppoll_null_timeout_does_not_convert_to_an_error() {
+    // A null timespec is an infinite wait; a ready descriptor proves the call accepts it without
+    // touching the deadline. An idle descriptor would block forever by contract.
+    let platform = regular_file_platform();
+    let mut fds = [Pollfd {
+        fd: 0,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    assert_eq!(ppoll(&platform, &mut fds, None, None), Ok(1));
+    assert_eq!(fds[0].revents, POLLNVAL as i16);
+    assert_eq!(platform.backend().now_ns(), 0);
+}
+
+#[test]
+fn ppoll_zero_timeout_is_a_nonblocking_probe() {
+    let timeout = raven_libc_abi::structs::Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    assert_eq!(ppoll_wait_ns(Some(&timeout)), 1);
+}
+
+#[test]
+fn ppoll_sub_millisecond_timeout_rounds_up() {
+    let timeout = raven_libc_abi::structs::Timespec {
+        tv_sec: 0,
+        tv_nsec: 1,
+    };
+    assert_eq!(ppoll_wait_ns(Some(&timeout)), 1_000_000);
+}
+
+#[test]
+fn ppoll_whole_seconds_convert_to_milliseconds() {
+    let timeout = raven_libc_abi::structs::Timespec {
+        tv_sec: 2,
+        tv_nsec: 0,
+    };
+    assert_eq!(ppoll_wait_ns(Some(&timeout)), 2_000_000_000);
+}
+
+#[test]
+fn ppoll_rejects_a_negative_seconds_timeout() {
+    let (platform, fd) = tty_platform();
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    let timeout = raven_libc_abi::structs::Timespec {
+        tv_sec: -1,
+        tv_nsec: 0,
+    };
+    assert_eq!(
+        ppoll(&platform, &mut fds, Some(&timeout), None),
+        Err(Errno::EINVAL)
+    );
+}
+
+#[test]
+fn ppoll_rejects_a_nanosecond_field_at_one_second() {
+    let (platform, fd) = tty_platform();
+    let mut fds = [Pollfd {
+        fd,
+        events: POLLIN as i16,
+        revents: 0,
+    }];
+    let timeout = raven_libc_abi::structs::Timespec {
+        tv_sec: 0,
+        tv_nsec: 1_000_000_000,
+    };
+    assert_eq!(
+        ppoll(&platform, &mut fds, Some(&timeout), None),
+        Err(Errno::EINVAL)
+    );
+}
+
 fn tty_platform() -> (Platform<FakeSys>, i32) {
     let fake = FakeSys::new();
     fake.tty(b"/dev/tty");

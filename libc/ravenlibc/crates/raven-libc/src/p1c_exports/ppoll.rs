@@ -57,7 +57,14 @@ pub unsafe extern "C" fn ppoll(
     sigmask: *const SigsetT,
 ) -> c_int {
     let count = usize::try_from(nfds).unwrap_or(usize::MAX);
-    let records = if fds.is_null() || count == 0 {
+    if fds.is_null() && count != 0 {
+        // FreeBSD `kern_poll` copyin of a nonzero record array fails with EFAULT; `poll` in this
+        // shell makes the same check before it forms a slice.
+        return ret::int(Err(raven_libc_abi::errno::Errno(
+            raven_libc_abi::errno::EFAULT as u16,
+        )));
+    }
+    let records = if count == 0 {
         &mut []
     } else {
         // SAFETY: the caller supplied `count` writable pollfd records.
