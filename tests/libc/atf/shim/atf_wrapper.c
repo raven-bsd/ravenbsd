@@ -6,40 +6,32 @@
  * The G1 image has no login process, so a spawned test inherits the read-only initfs root as
  * its working directory and an empty supplementary-group set. A login shell does two things
  * before it runs a program: it changes to the user's working directory and installs the group
- * list with initgroups(3). This wrapper does the same two steps, then starts the donor program
- * through posix_spawn(3) with a chdir file action and waits for it.
+ * list with initgroups(3). This wrapper does the same two steps, then replaces itself with the
+ * donor program through execv(3).
  *
- * execve(2) is not used: the current `PROC_EXEC` request carries no working directory, so the
- * replacement image would fall back to `/`. The spawn path carries the cwd and publishes it to
- * the new image.
+ * The current `PROC_EXEC` request carries no working directory, so the replacement image would
+ * start in `/`. The wrapper publishes the work directory as `ATF_CWD`, and the target prelude
+ * (`rl_target_prelude.h`) chdirs to it from a constructor before `main`. The C library keeps the
+ * path as process state, so a plain execv is enough once the constructor has run.
  *
  * Usage: atf-wrapper WORKDIR PROGRAM [ARG...]
  */
 
 #include <sys/types.h>
-#include <sys/wait.h>
 
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include <signal.h>
-#include <spawn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-extern char **environ;
-
 int
 main(int argc, char **argv)
 {
-	posix_spawn_file_actions_t actions;
 	const char *workdir;
 	const char *program;
-	pid_t pid;
-	int status;
-	int error;
 
 	if (argc < 3) {
 		fprintf(stderr, "atf-wrapper: usage: atf-wrapper WORKDIR PROGRAM [ARG...]\n");
@@ -67,31 +59,12 @@ main(int argc, char **argv)
 		fprintf(stderr, "atf-wrapper: mkdir %s: %s\n", workdir, strerror(errno));
 		return 2;
 	}
-
-	error = posix_spawn_file_actions_init(&actions);
-	if (error != 0) {
-		fprintf(stderr, "atf-wrapper: file actions init: %s\n", strerror(error));
-		return 2;
-	}
-	error = posix_spawn_file_actions_addchdir_np(&actions, workdir);
-	if (error == 0) {
-		error = posix_spawn(&pid, program, &actions, NULL, &argv[2], environ);
-	}
-	(void)posix_spawn_file_actions_destroy(&actions);
-	if (error != 0) {
-		fprintf(stderr, "atf-wrapper: spawn %s: %s\n", program, strerror(error));
+	if (setenv("ATF_CWD", workdir, 1) != 0) {
+		fprintf(stderr, "atf-wrapper: setenv ATF_CWD: %s\n", strerror(errno));
 		return 2;
 	}
 
-	if (waitpid(pid, &status, 0) != pid) {
-		fprintf(stderr, "atf-wrapper: waitpid %ld: %s\n", (long)pid, strerror(errno));
-		return 2;
-	}
-	if (WIFEXITED(status)) {
-		return WEXITSTATUS(status);
-	}
-	if (WIFSIGNALED(status)) {
-		return 128 + WTERMSIG(status);
-	}
-	return 2;
+	execv(program, &argv[2]);
+	fprintf(stderr, "atf-wrapper: execv %s: %s\n", program, strerror(errno));
+	return 127;
 }
