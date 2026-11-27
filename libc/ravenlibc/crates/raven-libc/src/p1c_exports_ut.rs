@@ -474,10 +474,27 @@ fn s173b_ppoll_rejects_an_unmapped_in_window_record_pointer_with_efault() {
     );
 }
 
+/// Test-local mutation switch for the input-copy failure test.
+///
+/// `S173B_MUTATION_IGNORE_COPY=1` makes the copy double report success without copying, which is
+/// exactly what an ignored-error helper does to `ppoll`. The test must then fail its EFAULT
+/// assertion. The switch only selects the test double; no production source is touched.
+fn s173b_mutation_ignores_input_copy() -> bool {
+    matches!(
+        std::env::var("S173B_MUTATION_IGNORE_COPY").as_deref(),
+        Ok("1")
+    )
+}
+
 /// The input `USER_COPY` failure must return `-1`/`EFAULT` before the shell forms a slice over
 /// the caller's array. The double fails the copy, so the in-window but unmapped `0x1000` source
 /// is only ever handed to the copy function; a read by the wrapper would fault. Forked so a
 /// missing propagation is a child signal or exit code, never the test process.
+///
+/// Under `S173B_MUTATION_IGNORE_COPY=1` the same double returns `Ok(())` without copying, so the
+/// shell walks past the failed snapshot and the call is no longer `-1`/`EFAULT`; the EFAULT
+/// assertion fails. That is the compliant mutation, selected test-locally, not by editing the
+/// production `ppoll`/seam.
 #[test]
 fn s173b_ppoll_input_copy_failure_is_efault_without_reading_the_caller_array() {
     // SAFETY: plain host libc declarations with the C signatures.
@@ -488,6 +505,7 @@ fn s173b_ppoll_input_copy_failure_is_efault_without_reading_the_caller_array() {
     }
 
     let _guard = TestLock::acquire();
+    let mutation = s173b_mutation_ignores_input_copy();
     // SAFETY: fork takes no pointers; the child only calls the wrapper and `_exit`.
     let pid = unsafe { fork() };
     assert!(pid >= 0, "fork failed: {pid}");
@@ -515,7 +533,13 @@ fn s173b_ppoll_input_copy_failure_is_efault_without_reading_the_caller_array() {
                 request_matched =
                     source == pointer.cast::<u8>() && length == core::mem::size_of::<Pollfd>();
                 snapshot_distinct = !core::ptr::eq(destination.cast_const(), source);
-                Err(raven_libc_platform::Errno(EFAULT as u16))
+                if mutation {
+                    // The ignored-error mutation: report success without copying, leaving the
+                    // zeroed snapshot in place, so the wrapper must not return EFAULT.
+                    Ok(())
+                } else {
+                    Err(raven_libc_platform::Errno(EFAULT as u16))
+                }
             },
         );
         let code = if result == -1 && errno::get() == EFAULT {
