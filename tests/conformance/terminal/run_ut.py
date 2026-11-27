@@ -23,12 +23,46 @@ serial, control, code, hang, write = sys.argv[1], int(sys.argv[2]), int(sys.argv
 os.read(control, 1)
 if write:
     with open(serial, "a", encoding="utf-8") as handle:
+        handle.write("S175-TERM done failures=0\n")
         handle.write("S175-TERM done failures=1\n")
         handle.flush()
         os.fsync(handle.fileno())
 if hang:
     time.sleep(hang)
 sys.exit(code)
+"""
+
+EXIT_DURING_GRACE_CHILD = r"""
+import os, sys
+serial, first, second, code, tail = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
+os.read(first, 1)
+with open(serial, "a", encoding="utf-8") as handle:
+    handle.write("S175-TERM-MUTATION-BEGIN\nS175-TERM done failures=0\nS175-TERM done failures=1\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+os.read(second, 1)
+with open(serial, "a", encoding="utf-8") as handle:
+    handle.write(tail + "\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+sys.exit(code)
+"""
+
+DEADLINE_CHILD = r"""
+import os, signal, sys, time
+serial, first, second, code, tail = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
+
+def cleanup(_signum, _frame):
+    with open(serial, "a", encoding="utf-8") as handle:
+        handle.write("S175-TERM-MUTATION-BEGIN\nS175-TERM done failures=0\nS175-TERM done failures=1\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    sys.exit(code)
+
+signal.signal(signal.SIGTERM, cleanup)
+os.read(first, 1)
+while True:
+    time.sleep(0.05)
 """
 
 
@@ -75,6 +109,83 @@ class FinalSerialTests(unittest.TestCase):
         )
         child.wait(timeout=5)
         return text, failure, captures
+
+    def _start_with_controls(
+        self, script: str, serial: Path, exit_code: int, *, tail: str = ""
+    ) -> tuple[subprocess.Popen[bytes], int, int]:
+        first_read, first_write = os.pipe()
+        second_read, second_write = os.pipe()
+        child = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                script,
+                str(serial),
+                str(first_read),
+                str(second_read),
+                str(exit_code),
+                tail,
+            ],
+            pass_fds=(first_read, second_read),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        os.close(first_read)
+        os.close(second_read)
+        return child, first_write, second_write
+
+    def test_tail_written_during_grace_is_read_after_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            serial = Path(directory) / "serial.log"
+            serial.write_text("", encoding="utf-8")
+            child, first_write, second_write = self._start_with_controls(
+                EXIT_DURING_GRACE_CHILD, serial, 33, tail="S175-TERM-TAIL"
+            )
+            released = False
+            captures: list[str] = []
+
+            def after_capture(text: str) -> None:
+                nonlocal released
+                captures.append(text)
+                if not released and text.count("S175-TERM done failures=") >= 2:
+                    released = True
+                    os.write(second_write, b"x")
+                    os.close(second_write)
+
+            os.write(first_write, b"x")
+            os.close(first_write)
+            text, failure = run.collect_serial(
+                serial,
+                child,
+                time.monotonic() + 5,
+                completion_grace=5,
+                on_capture=after_capture,
+            )
+            child.wait(timeout=5)
+            self.assertTrue(captures)
+            self.assertNotIn("S175-TERM-TAIL", captures[-1])
+            self.assertIn("S175-TERM-TAIL", text)
+            self.assertIsNone(failure)
+            self.assertEqual(child.returncode, 33)
+
+    def test_deadline_before_complete_output_fails_despite_cleanup_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            serial = Path(directory) / "serial.log"
+            serial.write_text("", encoding="utf-8")
+            child, first_write, second_write = self._start_with_controls(
+                DEADLINE_CHILD, serial, 33
+            )
+            os.close(second_write)
+            os.write(first_write, b"x")
+            os.close(first_write)
+            text, failure = run.collect_serial(
+                serial, child, time.monotonic() + 0.6, completion_grace=5
+            )
+            child.wait(timeout=5)
+            self.assertEqual(failure, "serial:deadline")
+            self.assertIn("S175-TERM done failures=1", text)
+            self.assertIsNotNone(child.poll())
 
     def test_final_marker_after_capture_and_nonzero_exit_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

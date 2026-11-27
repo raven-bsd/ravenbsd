@@ -276,6 +276,22 @@ def qemu_exit_failure(returncode: int | None) -> str | None:
     return f"qemu:exit={returncode}"
 
 
+def terminate_qemu(qemu: subprocess.Popen[bytes]) -> None:
+    """Terminate the child explicitly and reap it, escalating to SIGKILL."""
+    qemu.terminate()
+    try:
+        qemu.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        qemu.kill()
+        qemu.wait()
+
+
+def read_serial(serial: Path, fallback: str) -> str:
+    """Read the serial file, keeping the last captured text only if the file is empty."""
+    final = serial.read_text(encoding="utf-8", errors="replace")
+    return final or fallback
+
+
 def collect_serial(
     serial: Path,
     qemu: subprocess.Popen[bytes],
@@ -286,12 +302,15 @@ def collect_serial(
 ) -> tuple[str, str | None]:
     """Read the serial log until both runs finish or the deadline expires.
 
-    QEMU can exit between the poll and the next capture read, so the final bytes are read once
-    more after the loop. After complete output the child gets a bounded completion grace; if it
-    is still alive it is terminated explicitly and that is a failure, never an accepted unknown
-    exit. This does not extend the deadline or relax the marker requirement.
+    A child can exit between the poll and the next capture read, so the serial is read once more
+    after it exits. When both completion markers were seen before the deadline the child gets a
+    bounded completion grace and the serial is read again after that exit, so bytes written while
+    the child shuts down are kept. When the deadline expires first the child is terminated at once
+    and the result is an explicit deadline failure: late output written during cleanup is never
+    accepted, and the deadline is never extended.
     """
     text = ""
+    complete = False
     while time.monotonic() < deadline:
         if qemu.poll() is not None:
             break
@@ -299,23 +318,22 @@ def collect_serial(
         if on_capture is not None:
             on_capture(text)
         if MUTATION_MARKER in text and text.count("S175-TERM done failures=") >= 2:
+            complete = True
             break
         time.sleep(0.2)
-    final = serial.read_text(encoding="utf-8", errors="replace")
-    if final:
-        text = final
-    if qemu.poll() is None:
+
+    if not complete and qemu.poll() is None:
+        terminate_qemu(qemu)
+        return read_serial(serial, text), "serial:deadline"
+
+    if complete and qemu.poll() is None:
         try:
             qemu.wait(timeout=completion_grace)
         except subprocess.TimeoutExpired:
-            qemu.terminate()
-            try:
-                qemu.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                qemu.kill()
-                qemu.wait()
-            return text, "qemu:terminated"
-    return text, qemu_exit_failure(qemu.returncode)
+            terminate_qemu(qemu)
+            return read_serial(serial, text), "qemu:terminated"
+
+    return read_serial(serial, text), qemu_exit_failure(qemu.returncode)
 
 
 def mutation_incomplete(text: str) -> bool:
