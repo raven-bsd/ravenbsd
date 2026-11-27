@@ -351,6 +351,88 @@ pub fn leaked_process_stats() -> [u64; 16] {
     stats
 }
 
+/// Name every leaked process and the handle that still holds it (`s36-holders`).
+///
+/// The histogram in [`leaked_process_stats`] covers the request queues, process and scheme-file
+/// handles, threads and controlling-terminal files. A reference kept by a *server-side* request
+/// handle is none of those, so this row prints the leaked pid and scans every handle table for
+/// each object that can carry a `Process` reference. It runs only in the diagnostic image.
+fn print_leaked_process_holders() {
+    let self_process = current();
+    let processes: Vec<Arc<Process>> = ALL_PROCESSES
+        .lock()
+        .iter()
+        .filter_map(Weak::upgrade)
+        .collect();
+    for process in &processes {
+        if !process.torn_down.load(Ordering::Acquire) {
+            continue;
+        }
+        if self_process
+            .as_ref()
+            .is_some_and(|own| Arc::ptr_eq(own, process))
+        {
+            continue;
+        }
+        if ZOMBIES
+            .lock()
+            .iter()
+            .any(|zombie| Arc::ptr_eq(zombie, process))
+        {
+            continue;
+        }
+        let ppid = process.ids.lock().ppid;
+        kprintln!(
+            "s36: leak pid={} ppid={} cmd={} refs={} threads={}",
+            process.id,
+            ppid,
+            process.command.lock(),
+            Arc::strong_count(process),
+            process.threads.load(Ordering::Acquire)
+        );
+        for holder in &processes {
+            holder.handles.lock().for_each_live(|_, object, _, _| {
+                let kind = match object {
+                    crate::process::handle::Object::Process(target)
+                        if Arc::ptr_eq(target, process) =>
+                    {
+                        Some("process")
+                    }
+                    crate::process::handle::Object::Thread(thread)
+                        if Arc::ptr_eq(&thread.process, process) =>
+                    {
+                        Some("thread")
+                    }
+                    crate::process::handle::Object::SchemeFile(file)
+                        if Arc::ptr_eq(&file.server, process) =>
+                    {
+                        Some("file-server")
+                    }
+                    crate::process::handle::Object::SchemeRequest(request) => {
+                        if Arc::ptr_eq(&request.client, process) {
+                            Some("request-client")
+                        } else if Arc::ptr_eq(&request.server, process) {
+                            Some("request-server")
+                        } else if request
+                            .file
+                            .as_ref()
+                            .is_some_and(|file| Arc::ptr_eq(&file.server, process))
+                        {
+                            Some("request-file")
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+                if let Some(kind) = kind {
+                    kprintln!("s36: leak-holder pid={} kind={kind}", holder.id);
+                }
+            });
+        }
+    }
+}
+
 impl Drop for Process {
     fn drop(&mut self) {
         LIVE_PROCESSES.fetch_sub(1, Ordering::AcqRel);
@@ -3001,6 +3083,10 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             thread_holders[10],
             thread_holders[11]
         );
+
+        if leaked[0] > 0 && cmdline_has("s36-holders") {
+            print_leaked_process_holders();
+        }
 
         let holders = request_holder_stats();
         kprintln!(
