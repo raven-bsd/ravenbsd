@@ -380,3 +380,111 @@ fn ttyname_returns_null_for_an_unknown_descriptor() {
     assert!(unsafe { ttyname(0) }.is_null());
     assert_eq!(errno::get(), EBADF);
 }
+
+// --- S173b separating tests (experiment; see tickets/evidence/artifacts/S173b) ---------------
+
+/// Control: a mapped record array inside the user window is accepted.
+#[test]
+fn s173b_ppoll_accepts_a_mapped_in_window_record_pointer() {
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    let mut records = [Pollfd {
+        fd: -1,
+        events: 0,
+        revents: 0,
+    }];
+    let address = records.as_mut_ptr() as usize;
+    assert!(
+        raven_libc_platform::poll::validate_user_range(address as u64, core::mem::size_of::<Pollfd>() as u64)
+            .is_ok(),
+        "the stack record array is inside the user window"
+    );
+    // SAFETY: `records` is a live writable in-window array.
+    let result = unsafe { ppoll(records.as_mut_ptr(), 1, core::ptr::null(), core::ptr::null()) };
+    assert_eq!(result, 0);
+    assert_eq!(errno::get(), 0);
+}
+
+/// The S173a gap: `0x1000` is inside `USER_MIN..=USER_END` but unmapped. The wrapper must copy
+/// it in (or otherwise fail safely) and return `-1`/`EFAULT`, not fault.
+#[test]
+fn s173b_ppoll_rejects_an_unmapped_in_window_record_pointer_with_efault() {
+    // SAFETY: plain host libc declarations with the C signatures.
+    unsafe extern "C" {
+        fn fork() -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        fn _exit(status: i32) -> !;
+    }
+
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    // SAFETY: fork takes no pointers; the child only calls `ppoll` and `_exit`.
+    let pid = unsafe { fork() };
+    assert!(pid >= 0, "fork failed: {pid}");
+    if pid == 0 {
+        let pointer = 0x1000usize as *mut Pollfd;
+        assert!(
+            raven_libc_platform::poll::validate_user_range(
+                pointer as u64,
+                core::mem::size_of::<Pollfd>() as u64
+            )
+            .is_ok(),
+            "0x1000 is inside the user window; the range check alone cannot reject it"
+        );
+        // SAFETY: `0x1000` is the documented unmapped in-window address; the call must reject it
+        // before it reads the record.
+        let result = unsafe { ppoll(pointer, 1, core::ptr::null(), core::ptr::null()) };
+        let code = if result == -1 && errno::get() == EFAULT {
+            0
+        } else if result == -1 {
+            1
+        } else {
+            2
+        };
+        // SAFETY: ends the forked child without running the parent's test harness.
+        unsafe { _exit(code) };
+    }
+    let mut status = 0;
+    // SAFETY: `pid` is the child forked above and `status` is a live out pointer.
+    let reaped = unsafe { waitpid(pid, &mut status, 0) };
+    assert_eq!(reaped, pid, "waitpid did not reap the ppoll child");
+    let signal = status & 0x7f;
+    assert_eq!(
+        signal, 0,
+        "ppoll(0x1000, 1) died from signal {signal}; an unmapped in-window pointer must return -1/EFAULT"
+    );
+    let code = (status >> 8) & 0xff;
+    assert_eq!(
+        code, 0,
+        "ppoll(0x1000): 0 = -1/EFAULT, 1 = wrong errno, 2 = non-negative return"
+    );
+}
+
+/// `pselect` must not be `ENOSYS`: a zero timeout with a temporary mask returns 0.
+#[test]
+fn s173b_pselect_is_not_enosys_and_accepts_a_temporary_mask() {
+    let _guard = TestLock::acquire();
+    errno::set_raw(0);
+    let timeout = Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    let mask = SigsetT::ZERO;
+    // SAFETY: NULL sets are empty, the timeout and mask are live values.
+    let result = unsafe {
+        pselect(
+            0,
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            &timeout,
+            &mask,
+        )
+    };
+    assert_eq!(
+        result,
+        0,
+        "pselect with a zero timeout must return 0, not ENOSYS; errno={}",
+        errno::get()
+    );
+}
