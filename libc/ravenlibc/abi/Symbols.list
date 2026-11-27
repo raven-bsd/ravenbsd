@@ -1664,6 +1664,7 @@ vwscanf
 wait
 wait3
 wait4
+wait6
 waitid
 waitpid
 wcrtomb

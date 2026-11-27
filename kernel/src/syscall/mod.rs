@@ -212,6 +212,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_WAIT_EX {
         return process_ctl::wait_ex(frame);
     }
+    if number == raven_abi::syscall::PROC_WAIT6 {
+        return process_ctl::wait6(frame);
+    }
     if number == process_ctl::PROC_GETPGID {
         return process_ctl::getpgid(frame);
     }
