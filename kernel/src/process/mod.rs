@@ -2051,8 +2051,9 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         .map_err(ProcessError::Handle)?;
     register_pid(&process);
     crate::sched::init().map_err(ProcessError::Sched)?;
-    // C8: `sp0` is both the initial stack pointer and the value in the argument register
-    // (`rdi`/`x0`/`a0`), which `_start` passes to `__raven_start` untouched.
+    // C8: the fresh thread gets `sp0` in both the stack register and the argument register
+    // (`rdi`/`x0`/`a0`). `_start` loads it from the stack register because `exec` keeps the
+    // thread and clears the GPRs, leaving only the stack register at the new C8 stack.
     let (stack_top, arg) = (user_stack, user_stack);
     let thread = crate::sched::new_user_thread(&process, elf.entry(), stack_top, arg)
         .map_err(ProcessError::Sched)?;

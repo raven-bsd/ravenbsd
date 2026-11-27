@@ -1451,24 +1451,27 @@ fn a_short_read_is_an_io_error() {
     assert_eq!(calls, 2);
 }
 
-/// CONTRACTS C8: `_start` receives `sp0` in `rdi` (x86-64), `x0` (aarch64) or `a0` (riscv64).
+/// CONTRACTS C8 and the exec path: the stack register is the carrier `_start` can rely on.
 ///
-/// The trampoline may align the stack register before the Rust entry, but it must not write the
-/// argument register, or the C8 carrier is lost before `__raven_start` reads it. This asserts the
-/// real trampoline source, the same way the C4 kernel-entry conformance test pins its `rdi`.
+/// A fresh thread receives `sp0` in the argument register, but `exec` replaces the image on the
+/// same thread, clears every GPR (`kernel/src/syscall/mod.rs` `apply_exec_context`) and leaves
+/// only `rsp`/`sp` at the new C8 stack. The trampoline therefore loads `sp0` from the stack
+/// register and passes it to `__raven_start`; loading it from the argument register instead
+/// breaks every exec'd static program (`proc-exec: child error Errno(22)`). This asserts the real
+/// trampoline source, the same way the C4 kernel-entry conformance test pins its `rdi`.
 #[test]
-fn c8_start_keeps_the_argument_register() {
+fn c8_start_derives_sp0_from_the_stack_register() {
     let source = include_str!("../../../userland/rt/src/entry.rs");
-    for (arch, branch, register) in [
-        ("x86_64", "call __raven_start", "rdi"),
-        ("aarch64", "bl __raven_start", "x0"),
-        ("riscv64", "call __raven_start", "a0"),
+    for (arch, branch, move_instruction) in [
+        ("x86_64", "call __raven_start", "mov %rsp, %rdi"),
+        ("aarch64", "bl __raven_start", "mov x0, sp"),
+        ("riscv64", "call __raven_start", "mv a0, sp"),
     ] {
         let trampoline = start_trampoline(source, arch, branch);
         assert!(
-            !trampoline.contains(register),
-            "C8: the {arch} `_start` must pass {register} through to __raven_start, but the \
-             trampoline writes it: {trampoline}"
+            trampoline.contains(move_instruction),
+            "C8/exec: the {arch} `_start` must load sp0 with {move_instruction:?}, got: \
+             {trampoline}"
         );
     }
 }
