@@ -288,15 +288,15 @@ name = "utsname"
 rust = "Utsname"
 c = "struct utsname"
 musl = "struct utsname"
-size = 390
+size = 1280
 align = 1
+doc = "S746: FreeBSD 133344405 struct utsname, SYS_NMLN 256, five fields; musl's domainname field is not part of the FreeBSD record"
 fields = [
-  { name = "sysname", ty = "[c_char; 65]", off = 0 },
-  { name = "nodename", ty = "[c_char; 65]", off = 65 },
-  { name = "release", ty = "[c_char; 65]", off = 130 },
-  { name = "version", ty = "[c_char; 65]", off = 195 },
-  { name = "machine", ty = "[c_char; 65]", off = 260 },
-  { name = "domainname", ty = "[c_char; 65]", off = 325 },
+  { name = "sysname", ty = "[c_char; 256]", off = 0 },
+  { name = "nodename", ty = "[c_char; 256]", off = 256 },
+  { name = "release", ty = "[c_char; 256]", off = 512 },
+  { name = "version", ty = "[c_char; 256]", off = 768 },
+  { name = "machine", ty = "[c_char; 256]", off = 1024 },
 ]
 
 [[record]]
@@ -346,17 +346,18 @@ name = "termios"
 rust = "Termios"
 c = "struct termios"
 musl = "struct termios"
-size = 60
+size = 44
 align = 4
+deviates = { x86_64 = { size = 60, align = 4 }, aarch64 = { size = 60, align = 4 }, riscv64 = { size = 60, align = 4 } }
+doc = "DR-71: FreeBSD 133344405f53 struct termios, NCCS=20, no c_line, c_cc[20] at 16, c_ispeed/c_ospeed at 36/40"
 fields = [
   { name = "c_iflag", ty = "u32", off = 0 },
   { name = "c_oflag", ty = "u32", off = 4 },
   { name = "c_cflag", ty = "u32", off = 8 },
   { name = "c_lflag", ty = "u32", off = 12 },
-  { name = "c_line", ty = "u8", off = 16 },
-  { name = "c_cc", ty = "[u8; 32]", off = 17 },
-  { name = "__c_ispeed", ty = "u32", off = 52 },
-  { name = "__c_ospeed", ty = "u32", off = 56 },
+  { name = "c_cc", ty = "[u8; 20]", off = 16 },
+  { name = "c_ispeed", ty = "u32", off = 36 },
+  { name = "c_ospeed", ty = "u32", off = 40 },
 ]
 
 [[record]]
@@ -386,16 +387,22 @@ name = "passwd"
 rust = "Passwd"
 c = "struct passwd"
 musl = "struct passwd"
-size = 48
+size = 80
 align = 8
+doc = "S746: FreeBSD 133344405 struct passwd, eleven fields; musl has only the seven 7-field /etc/passwd members"
+deviates = { x86_64 = { size = 48, align = 8 }, aarch64 = { size = 48, align = 8 }, riscv64 = { size = 48, align = 8 } }
 fields = [
   { name = "pw_name", ty = "ptr", off = 0 },
   { name = "pw_passwd", ty = "ptr", off = 8 },
   { name = "pw_uid", ty = "u32", off = 16 },
   { name = "pw_gid", ty = "u32", off = 20 },
-  { name = "pw_gecos", ty = "ptr", off = 24 },
-  { name = "pw_dir", ty = "ptr", off = 32 },
-  { name = "pw_shell", ty = "ptr", off = 40 },
+  { name = "pw_change", ty = "i64", off = 24 },
+  { name = "pw_class", ty = "ptr", off = 32 },
+  { name = "pw_gecos", ty = "ptr", off = 40 },
+  { name = "pw_dir", ty = "ptr", off = 48 },
+  { name = "pw_shell", ty = "ptr", off = 56 },
+  { name = "pw_expire", ty = "i64", off = 64 },
+  { name = "pw_fields", ty = "i32", off = 72 },
 ]
 
 [[record]]

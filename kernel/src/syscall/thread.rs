@@ -517,7 +517,7 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
         copy_from_user(bytes, source)?;
         let handler = value.handler;
-        let flags = value.flags as u32;
+        let flags = value.flags;
         if handler != process::SIG_DFL
             && handler != process::SIG_IGN
             && flags & !process::SA_SUPPORTED != 0
@@ -553,7 +553,7 @@ pub fn sigaction(frame: &SyscallFrame) -> Result<usize, Errno> {
                 process::SigAction {
                     handler: value.handler,
                     mask,
-                    flags: value.flags as u32,
+                    flags: value.flags,
                 },
             );
             if value.handler == process::SIG_IGN {

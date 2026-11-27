@@ -202,8 +202,13 @@ pub(crate) mod shm;
 #[cfg(not(any(windows, target_os = "wasi")))]
 pub(crate) mod ugid;
 
-#[cfg(bsd)]
+#[cfg(all(bsd, not(target_os = "ravenbsd")))]
 const MAX_IOV: usize = c::IOV_MAX as usize;
+
+// The RavenBSD target libc exposes FreeBSD's `UIO_MAXIOV` (1024, sys/uio.h);
+// its `IOV_MAX` alias is not in the vendored target libc yet.
+#[cfg(target_os = "ravenbsd")]
+const MAX_IOV: usize = c::UIO_MAXIOV as usize;
 
 #[cfg(any(linux_kernel, target_os = "emscripten", target_os = "nto"))]
 const MAX_IOV: usize = c::UIO_MAXIOV as usize;

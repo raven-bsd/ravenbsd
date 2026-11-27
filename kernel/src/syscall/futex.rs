@@ -177,13 +177,7 @@ pub fn remove_thread(thread_id: u64) {
     FALLBACK.remove_thread(thread_id);
 }
 
-/// True when `thread_id` still has a futex entry (S36 holder diagnostic).
-pub fn contains_thread(thread_id: u64) -> bool {
-    QUEUES.iter().any(|queue| queue.contains_thread(thread_id))
-        || FALLBACK.contains_thread(thread_id)
-}
-
-/// Non-blocking [`contains_thread`] for the metrics-thread census.
+/// Non-blocking holder check for the metrics-thread census.
 pub fn try_contains_thread(thread_id: u64) -> Option<bool> {
     let mut busy = false;
     for queue in QUEUES.iter() {

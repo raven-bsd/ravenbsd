@@ -116,13 +116,15 @@ fn termios_constants_match_the_header() {
         "VEOF",
         "VTIME",
         "VMIN",
-        "VSWTC",
+        "VERASE2",
         "VSTART",
         "VSTOP",
         "VSUSP",
         "VEOL",
         "VREPRINT",
         "VDISCARD",
+        "VDSUSP",
+        "VSTATUS",
         "VWERASE",
         "VLNEXT",
         "VEOL2",
@@ -200,26 +202,62 @@ fn scalar_types_match_the_abi() {
 
 #[test]
 fn stat_layout_matches_the_abi() {
+    // FreeBSD 133344405 `struct stat` (224 bytes): nlink is 64-bit, mode 16-bit, the
+    // birth timespec follows ctim, and the tail is blksize/flags/gen/filerev/spare.
     const FIELDS: &[&str] = &[
-        "u64", "u64", "u32", "u32", "u32", "u32", "u64", "u64", "i64", "i32", "i32", "i64", "i64",
-        "i64", "i64", "i64", "i64", "i64", "[u32; 2]",
+        "u64", "u64", "u64", "u16", "i16", "u32", "u32", "i32", "u64", "i64", "i64", "i64", "i64",
+        "i64", "i64", "i64", "i64", "i64", "i64", "i32", "u32", "u64", "u64", "[u64; 9]",
     ];
     assert_clean(compare_struct("stat", FIELDS), "stat");
 }
 
 #[test]
 fn statvfs_layout_matches_the_abi() {
+    // FreeBSD `struct statvfs` is eleven 64-bit words (88 bytes); the old snapshot
+    // carried two extra padding words.
     const FIELDS: &[&str] = &[
-        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u32",
-        "[i32; 5]",
+        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64",
     ];
     assert_clean(compare_struct("statvfs", FIELDS), "statvfs");
 }
 
 #[test]
+fn termios_ioctl_values_are_the_pinned_freebsd_encodings() {
+    // Pinned FreeBSD `sys/sys/ttycom.h` with the 44-byte termios record:
+    // `_IOR('t', 19, struct termios)` / `_IOW('t', 20..22, struct termios)`.
+    let toolchain = evaluate(TOOLCHAIN_LIBC);
+    for (name, value) in [
+        ("TIOCGETA", 0x402c_7413_i128),
+        ("TIOCSETA", 0x802c_7414_i128),
+        ("TIOCSETAW", 0x802c_7415_i128),
+        ("TIOCSETAF", 0x802c_7416_i128),
+    ] {
+        assert_eq!(toolchain.get(name).copied(), Some(value), "{name}");
+    }
+}
+
+#[test]
 fn termios_layout_matches_the_abi() {
-    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "u8", "[u8; 32]", "u32", "u32"];
+    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "[u8; 20]", "u32", "u32"];
     assert_clean(compare_struct("termios", FIELDS), "termios");
+}
+
+#[test]
+fn termios_public_header_is_the_pinned_freebsd_record() {
+    let header = strip_comments(TERMIOS_HEADER);
+    assert!(header.contains("struct termios"), "termios record");
+    assert!(header.contains("#define NCCS 20"), "NCCS=20");
+    assert!(header.contains("c_cc[NCCS]"), "c_cc[NCCS]");
+    assert!(header.contains("c_ispeed"), "c_ispeed");
+    assert!(header.contains("c_ospeed"), "c_ospeed");
+    assert!(!header.contains("c_line"), "no c_line in the public record");
+    assert!(header.contains("VERASE2"), "FreeBSD VERASE2");
+    assert!(
+        !header.contains("VSWTC"),
+        "VSWTC is not a FreeBSD public name"
+    );
+    assert!(header.contains("VDSUSP") && header.contains("VSTATUS"));
+    assert!(header.contains("_POSIX_VDISABLE 0xff"));
 }
 
 #[test]
@@ -256,6 +294,49 @@ fn c64i_exports_are_in_the_abi_list() {
     }
 }
 
+const SPAWN_PATCH: &str =
+    include_str!("../../../../toolchain/patches/0003-posix-spawn-ravenbsd.patch");
+
+/// Apply the 0003 module hunks to the module produced by 0002, using the same
+/// `patch -p1` tool the toolchain build uses. The 0002 body is the pre-0003
+/// source; the vendor module is the post-0003 source, so the oracle must apply
+/// 0003 before comparing. Only the ravenbsd module section is applied.
+fn apply_spawn_patch(module: &str) -> String {
+    use std::io::Write as _;
+    let marker = "--- a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs\n";
+    let start = SPAWN_PATCH.find(marker).expect("0003 module section");
+    let body_start = start + marker.len();
+    let body_end = SPAWN_PATCH[body_start..]
+        .find("\n--- a/")
+        .map_or(SPAWN_PATCH.len(), |offset| body_start + offset);
+    let section = &SPAWN_PATCH[start..body_end];
+    let dir = std::env::temp_dir().join(format!("raven-s759-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let file = dir.join("library/libc-ravenbsd/src/unix/ravenbsd/mod.rs");
+    std::fs::create_dir_all(file.parent().expect("parent")).expect("temp tree");
+    std::fs::write(&file, module).expect("write module");
+    let mut child = std::process::Command::new("patch")
+        .args(["-p1", "-d"])
+        .arg(&dir)
+        .arg("--batch")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("run patch");
+    child
+        .stdin
+        .as_mut()
+        .expect("patch stdin")
+        .write_all(section.as_bytes())
+        .expect("write patch");
+    let status = child.wait().expect("patch status");
+    assert!(status.success(), "patch 0003 failed: {status}");
+    let patched = std::fs::read_to_string(&file).expect("read patched module");
+    let _ = std::fs::remove_dir_all(&dir);
+    patched
+}
+
 #[test]
 fn vendored_module_is_the_patched_toolchain_module() {
     let marker = "+++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs\n";
@@ -270,10 +351,12 @@ fn vendored_module_is_the_patched_toolchain_module() {
             module.push('\n');
         }
     }
-    let mut vendor = String::new();
-    for line in TOOLCHAIN_LIBC.lines().skip(3) {
-        vendor.push_str(line);
-        vendor.push('\n');
-    }
+    let patched = apply_spawn_patch(&module);
+    let module: String = patched.lines().map(|line| format!("{line}\n")).collect();
+    let vendor: String = TOOLCHAIN_LIBC
+        .lines()
+        .skip(3)
+        .map(|line| format!("{line}\n"))
+        .collect();
     assert_eq!(module, vendor, "toolchain patch and vendored module differ");
 }

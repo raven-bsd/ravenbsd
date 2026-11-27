@@ -151,18 +151,20 @@ pub fn thread_holder_stats() -> [u64; 12] {
         let sched = crate::sched::holder_state(thread.id);
         for (index, count) in sched.iter().enumerate() {
             if *count != 0 {
-                stats[index.saturating_add(1)] = stats[index.saturating_add(1)].saturating_add(1);
+                if let Some(entry) = stats.get_mut(index.saturating_add(1)) {
+                    *entry = entry.saturating_add(1);
+                }
                 holders = holders.saturating_add(1);
             }
         }
-        if let Some(live) = thread.process.threads_live.try_lock() {
-            if live.iter().any(|weak| {
+        if let Some(live) = thread.process.threads_live.try_lock()
+            && live.iter().any(|weak| {
                 weak.upgrade()
                     .is_some_and(|entry| Arc::ptr_eq(&entry, thread))
-            }) {
-                stats[5] = stats[5].saturating_add(1);
-                holders = holders.saturating_add(1);
-            }
+            })
+        {
+            stats[5] = stats[5].saturating_add(1);
+            holders = holders.saturating_add(1);
         }
         // Handles before queues: the process teardown path holds a process's handle table and then
         // takes wait-queue locks, so the census must not invert that order.
@@ -236,7 +238,7 @@ impl ThreadSlot {
         if live >= MAX_THREADS {
             LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
             let denied = SLOT_DENIES.fetch_add(1, Ordering::AcqRel).saturating_add(1);
-            if denied == 1 || denied % 1_000 == 0 {
+            if denied == 1 || denied.is_multiple_of(1_000) {
                 crate::kprintln!(
                     "slot: deny n={denied} live={live} max={MAX_THREADS} dropped={}",
                     SLOTS_DROPPED.load(Ordering::Acquire)
@@ -295,15 +297,6 @@ pub fn all_thread_census() -> [u64; 4] {
     stats
 }
 
-/// Thread slots released since boot (K530 churn diagnostic).
-pub fn slot_drops() -> usize {
-    SLOTS_DROPPED.load(Ordering::Acquire)
-}
-
-/// Thread admission denials since boot (K530 churn diagnostic).
-pub fn slot_denies() -> usize {
-    SLOT_DENIES.load(Ordering::Acquire)
-}
 /// Mask keeping a tid in the musl lock-word / PG-2 30-bit range.
 const TID_MASK: u32 = 0x3fff_ffff;
 
@@ -1011,19 +1004,4 @@ pub fn stack_fresh() -> u64 {
 /// Stacks currently cached for reuse (diagnostic).
 pub fn stack_cached() -> u64 {
     u64::try_from(STACK_CACHE.lock().len()).unwrap_or(0)
-}
-
-/// Frames reserved by every kernel stack carved so far (K449 test-only metric).
-///
-/// Stack heap blocks are never returned to the heap (the guard-page mapping cannot be restored),
-/// so every fresh stack keeps its reserved page count. Cached stacks are included.
-pub fn stack_frames() -> u64 {
-    STACK_FRESH
-        .load(Ordering::Relaxed)
-        .saturating_mul(STACK_RESERVED_PAGES)
-}
-
-/// Stacks dropped because the cache was full (diagnostic).
-pub fn stack_drops() -> u64 {
-    STACK_DROPS.load(Ordering::Relaxed)
 }

@@ -640,3 +640,18 @@ index ef13ce44..04b83667 100644
          target_os = "l4re",
          target_env = "sgx",
          target_os = "solid_asp3",
+diff --git a/library/std/src/sys/fs/unix.rs b/library/std/src/sys/fs/unix.rs
+--- a/library/std/src/sys/fs/unix.rs
++++ b/library/std/src/sys/fs/unix.rs
+@@ -918,9 +918,9 @@
+                 // only access those bytes.
+                 #[cfg(not(target_os = "vita"))]
+                 let entry = dirent64_min {
+-                    #[cfg(target_os = "freebsd")]
++                    #[cfg(any(target_os = "freebsd", target_os = "ravenbsd"))]
+                     d_ino: (*entry_ptr).d_fileno,
+-                    #[cfg(not(target_os = "freebsd"))]
++                    #[cfg(not(any(target_os = "freebsd", target_os = "ravenbsd")))]
+                     d_ino: (*entry_ptr).d_ino as u64,
+                     #[cfg(not(any(
+                         target_os = "solaris",

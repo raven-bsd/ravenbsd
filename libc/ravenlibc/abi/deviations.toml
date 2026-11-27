@@ -31,6 +31,13 @@ theirs = { x86_64 = "112/8", aarch64 = "112/8", riscv64 = "112/8" }
 reason = "DR-69: the public struct statvfs is the FreeBSD 133344405 field order (88 bytes); musl's 112-byte order is the Linux one and stays confined to linuxd"
 
 [[deviation]]
+name = "termios"
+against = "musl"
+ours = "44/4"
+theirs = { x86_64 = "60/4", aarch64 = "60/4", riscv64 = "60/4" }
+reason = "DR-71/C20: the public struct termios is the FreeBSD 133344405 record (NCCS=20, no c_line, c_cc[20] at 16, c_ispeed/c_ospeed at 36/40); the 60-byte musl record is not the public ABI"
+
+[[deviation]]
 name = "nlink_t"
 against = "musl"
 ours = "4/4"
@@ -108,6 +115,83 @@ against = "musl"
 ours = 4096
 theirs = 128
 reason = "01 B.8/RD-78: the header backlog value is 4096; the runtime cap is a sysctl"
+
+[[deviation]]
+name = "utsname"
+against = "musl"
+ours = "1280/1"
+theirs = { x86_64 = "390/1", aarch64 = "390/1", riscv64 = "390/1" }
+reason = "S746: the public struct utsname is the FreeBSD 133344405 record (SYS_NMLN 256, five fields, no domainname, 1280 bytes); musl's six 65-byte fields are the Linux record"
+
+[[deviation]]
+name = "passwd"
+against = "musl"
+ours = "80/8"
+theirs = { x86_64 = "48/8", aarch64 = "48/8", riscv64 = "48/8" }
+reason = "S746: the public struct passwd is the FreeBSD 133344405 eleven-field record (80 bytes); musl has the seven-field 48-byte record"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_NORMAL"
+against = "musl"
+ours = 3
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h enum pthread_mutextype, PTHREAD_MUTEX_NORMAL = 3"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_RECURSIVE"
+against = "musl"
+ours = 2
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h enum pthread_mutextype, PTHREAD_MUTEX_RECURSIVE = 2"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_ERRORCHECK"
+against = "musl"
+ours = 1
+theirs = 2
+reason = "S746: FreeBSD include/pthread.h enum pthread_mutextype, PTHREAD_MUTEX_ERRORCHECK = 1"
+
+[[deviation]]
+name = "PTHREAD_MUTEX_DEFAULT"
+against = "musl"
+ours = 1
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h defines PTHREAD_MUTEX_DEFAULT as PTHREAD_MUTEX_ERRORCHECK (1)"
+
+[[deviation]]
+name = "PTHREAD_SCOPE_SYSTEM"
+against = "musl"
+ours = 2
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h PTHREAD_SCOPE_SYSTEM = 0x2"
+
+[[deviation]]
+name = "PTHREAD_SCOPE_PROCESS"
+against = "musl"
+ours = 0
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h PTHREAD_SCOPE_PROCESS = 0"
+
+[[deviation]]
+name = "PTHREAD_INHERIT_SCHED"
+against = "musl"
+ours = 4
+theirs = 0
+reason = "S746: FreeBSD include/pthread.h PTHREAD_INHERIT_SCHED = 0x4"
+
+[[deviation]]
+name = "PTHREAD_EXPLICIT_SCHED"
+against = "musl"
+ours = 0
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h PTHREAD_EXPLICIT_SCHED = 0"
+
+[[deviation]]
+name = "PTHREAD_CANCEL_ASYNCHRONOUS"
+against = "musl"
+ours = 2
+theirs = 1
+reason = "S746: FreeBSD include/pthread.h PTHREAD_CANCEL_ASYNCHRONOUS = 2"
 
 # --- Against raven-linux-abi (T4b parity) --------------------------------------------------
 

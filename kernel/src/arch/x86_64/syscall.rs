@@ -488,7 +488,7 @@ fn frame_address(stack_top: u64) -> Option<u64> {
     } else {
         (base & !0xf).checked_sub(8)?
     };
-    let end = fp.checked_add(core::mem::size_of::<SigFrame>() as u64 - 1)?;
+    let end = fp.checked_add((core::mem::size_of::<SigFrame>() as u64).saturating_sub(1))?;
     if fp & 0xf != 8 || end >= below || !is_user_address(fp) || !is_user_address(end) {
         return None;
     }
@@ -599,8 +599,8 @@ fn deliver_kernel_signal(frame: &mut TrapFrame) -> bool {
         thread.sig_on_altstack.store(true, Ordering::Release);
     }
     frame.rdi = u64::from(record.signo);
-    frame.rsi = fp + core::mem::offset_of!(SigFrame, sf_si) as u64;
-    frame.rdx = fp + core::mem::offset_of!(SigFrame, sf_uc) as u64;
+    frame.rsi = fp.saturating_add(core::mem::offset_of!(SigFrame, sf_si) as u64);
+    frame.rdx = fp.saturating_add(core::mem::offset_of!(SigFrame, sf_uc) as u64);
     frame.rip = action.handler;
     frame.rsp = fp;
     true

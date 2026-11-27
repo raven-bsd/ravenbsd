@@ -595,9 +595,7 @@ impl<D: Device> Netd<D> {
             // QEMU user-mode has an immediate fixed address but is not `Static`; resolvd still
             // asks for `net:`'s DHCP lease. Publish the synthetic lease with slirp's DNS so the
             // resolver starts instead of reporting ENOENT for a configured interface.
-            let mut dns = Vec::new();
-            dns.push(QEMU_USER_DNS);
-            self.set_nic_dns(dns);
+            self.set_nic_dns(vec![QEMU_USER_DNS]);
         }
     }
 

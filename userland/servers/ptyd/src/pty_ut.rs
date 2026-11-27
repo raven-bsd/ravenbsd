@@ -224,13 +224,14 @@ fn a_winsize_change_after_hangup_signals_nothing() {
     let mut pty = pty();
     pty.set_fg(42);
     pty.hangup();
+    assert_eq!(pty.sys().signals, vec![(-42, SIGHUP)]);
     pty.set_winsize(raven_tty_core::Winsize {
         row: 43,
         col: 120,
         xpixel: 0,
         ypixel: 0,
     });
-    assert!(pty.sys().signals.is_empty());
+    assert_eq!(pty.sys().signals, vec![(-42, SIGHUP)]);
 }
 
 #[test]

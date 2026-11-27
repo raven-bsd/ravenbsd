@@ -120397,10 +120397,10 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
+index 0000000..cc838a44d9c1af034ad066adfe43344e0f85dc19
 --- /dev/null
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
-@@ -0,0 +1,1484 @@
+@@ -0,0 +1,2498 @@
 +use crate::prelude::*;
 +
 +pub type wchar_t = i32;
@@ -120420,7 +120420,9 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub type pthread_t = *mut c_void;
 +// Must be usize due to library/std/sys_common/thread_local.rs,
 +// should technically be *mut c_void
-+pub type pthread_key_t = usize;
++pub type pthread_key_t = c_int;
++#[doc = "FreeBSD pthread_spinlock_t is a pointer to the opaque struct"]
++pub type pthread_spinlock_t = *mut c_void;
 +pub type rlim_t = c_ulonglong;
 +pub type sa_family_t = u16;
 +pub type sem_t = *mut c_void;
@@ -120431,6 +120433,8 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub type tcflag_t = u32;
 +pub type time_t = c_longlong;
 +pub type id_t = c_uint;
++pub type nl_item = c_int;
++pub type timer_t = *mut c_void;
 +pub type uid_t = u32;
 +pub type gid_t = u32;
 +
@@ -120446,7 +120450,6 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +        pub release: [c_char; UTSLENGTH],
 +        pub version: [c_char; UTSLENGTH],
 +        pub machine: [c_char; UTSLENGTH],
-+        pub domainname: [c_char; UTSLENGTH],
 +    }
 +
 +    pub struct dirent {
@@ -120550,18 +120553,22 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +        pub pw_passwd: *mut c_char,
 +        pub pw_uid: crate::uid_t,
 +        pub pw_gid: crate::gid_t,
++        pub pw_change: crate::time_t,
++        pub pw_class: *mut c_char,
 +        pub pw_gecos: *mut c_char,
 +        pub pw_dir: *mut c_char,
 +        pub pw_shell: *mut c_char,
++        pub pw_expire: crate::time_t,
++        pub pw_fields: c_int,
 +    }
 +
 +    // FIXME(1.0): This should not implement `PartialEq`
 +    #[allow(unpredictable_function_pointer_comparisons)]
 +    pub struct sigaction {
 +        pub sa_sigaction: crate::sighandler_t,
++        pub sa_mask: crate::sigset_t,
 +        pub sa_flags: c_int,
 +        pub sa_restorer: Option<extern "C" fn()>,
-+        pub sa_mask: crate::sigset_t,
 +    }
 +
 +    pub struct siginfo_t {
@@ -120641,7 +120648,6 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +        pub c_oflag: crate::tcflag_t,
 +        pub c_cflag: crate::tcflag_t,
 +        pub c_lflag: crate::tcflag_t,
-+        pub c_line: crate::cc_t,
 +        pub c_cc: [crate::cc_t; crate::NCCS],
 +        pub c_ispeed: crate::speed_t,
 +        pub c_ospeed: crate::speed_t,
@@ -120717,10 +120723,64 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +    pub struct pthread_once_t {
 +        bytes: [u8; _PTHREAD_ONCE_SIZE],
 +    }
-+    #[repr(C)]
-+    #[repr(align(4))]
-+    pub struct pthread_spinlock_t {
-+        bytes: [u8; _PTHREAD_SPINLOCK_SIZE],
++
++    #[allow(dead_code)] // std does not construct rlimit through this crate yet.
++    pub struct rlimit {
++        pub rlim_cur: crate::rlim_t,
++        pub rlim_max: crate::rlim_t,
++    }
++
++    pub struct itimerspec {
++        pub it_interval: crate::timespec,
++        pub it_value: crate::timespec,
++    }
++
++    pub struct flock {
++        pub l_type: c_short,
++        pub l_whence: c_short,
++        pub l_start: off_t,
++        pub l_len: off_t,
++        pub l_pid: crate::pid_t,
++    }
++
++    pub struct fsid_t {
++        pub __val: [c_int; 2],
++    }
++
++    pub struct statfs {
++        pub f_version: u32,
++        pub f_type: u32,
++        pub f_flags: u64,
++        pub f_bsize: u64,
++        pub f_iosize: u64,
++        pub f_blocks: u64,
++        pub f_bfree: u64,
++        pub f_bavail: i64,
++        pub f_files: u64,
++        pub f_ffree: i64,
++        pub f_syncwrites: u64,
++        pub f_asyncwrites: u64,
++        pub f_syncreads: u64,
++        pub f_asyncreads: u64,
++        f_spare: [u64; 10],
++        pub f_namemax: u32,
++        pub f_owner: crate::uid_t,
++        pub f_fsid: crate::fsid_t,
++        f_charspare: [c_char; 80],
++        pub f_fstypename: [c_char; 16],
++        pub f_mntfromname: [c_char; 1024],
++        pub f_mntonname: [c_char; 1024],
++    }
++
++    pub struct sigevent {
++        pub sigev_value: crate::sigval,
++        pub sigev_signo: c_int,
++        pub sigev_notify: c_int,
++        pub sigev_notify_thread_id: c_int,
++        #[cfg(target_pointer_width = "64")]
++        __unused1: Padding<[c_int; 11]>,
++        #[cfg(target_pointer_width = "32")]
++        __unused1: Padding<[c_int; 12]>,
 +    }
 +}
 +const _PTHREAD_ATTR_SIZE: usize = 56;
@@ -120733,9 +120793,56 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +const _PTHREAD_MUTEX_SIZE: usize = 40;
 +const _PTHREAD_MUTEXATTR_SIZE: usize = 4;
 +const _PTHREAD_ONCE_SIZE: usize = 4;
-+const _PTHREAD_SPINLOCK_SIZE: usize = 4;
 +
-+pub const UTSLENGTH: usize = 65;
++#[repr(C)]
++#[derive(Copy, Clone)]
++struct sifields_sigchld {
++    pub si_pid: crate::pid_t,
++    pub si_uid: crate::uid_t,
++    pub si_status: c_int,
++    pub si_utime: c_long,
++    pub si_stime: c_long,
++}
++
++#[repr(C)]
++union sifields {
++    _align_pointer: *mut c_void,
++    sigchld: sifields_sigchld,
++}
++
++#[repr(C)]
++struct siginfo_f {
++    _siginfo_base: [c_int; 3],
++    sifields: sifields,
++}
++
++impl siginfo_t {
++    unsafe fn sifields(&self) -> &sifields {
++        unsafe { &(*(self as *const siginfo_t as *const siginfo_f)).sifields }
++    }
++
++    pub unsafe fn si_pid(&self) -> crate::pid_t {
++        unsafe { self.sifields().sigchld.si_pid }
++    }
++
++    pub unsafe fn si_uid(&self) -> crate::uid_t {
++        unsafe { self.sifields().sigchld.si_uid }
++    }
++
++    pub unsafe fn si_status(&self) -> c_int {
++        unsafe { self.sifields().sigchld.si_status }
++    }
++
++    pub unsafe fn si_utime(&self) -> c_long {
++        unsafe { self.sifields().sigchld.si_utime }
++    }
++
++    pub unsafe fn si_stime(&self) -> c_long {
++        unsafe { self.sifields().sigchld.si_stime }
++    }
++}
++
++pub const UTSLENGTH: usize = 256;
 +
 +// intentionally not public, only used for fd_set
 +cfg_if! {
@@ -120750,51 +120857,66 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +
 +// limits.h
 +pub const PATH_MAX: c_int = 4096;
++pub const IOV_MAX: c_int = 1024;
 +
 +// fcntl.h
 +
 +pub const AT_FDCWD: c_int = -100;
-+pub const AT_EACCESS: c_int = 512;
-+pub const AT_EMPTY_PATH: c_int = 4096;
-+pub const AT_NO_AUTOMOUNT: c_int = 2048;
-+pub const AT_RECURSIVE: c_int = 32768;
-+pub const AT_REMOVEDIR: c_int = 512;
-+pub const AT_RESOLVE_BENEATH: c_int = 65536;
-+pub const AT_STATX_DONT_SYNC: c_int = 16384;
-+pub const AT_STATX_FORCE_SYNC: c_int = 8192;
++pub const AT_EACCESS: c_int = 0x0100;
++pub const AT_EMPTY_PATH: c_int = 0x4000;
++pub const AT_NO_AUTOMOUNT: c_int = 0x10000;
++pub const AT_RECURSIVE: c_int = 0x100000;
++pub const AT_RENAME_EXCHANGE: c_int = 0x0002;
++pub const AT_RENAME_NOREPLACE: c_int = 0x0001;
++pub const AT_REMOVEDIR: c_int = 0x0800;
++pub const AT_RESOLVE_BENEATH: c_int = 0x2000;
++pub const AT_STATX_DONT_SYNC: c_int = 0x80000;
++pub const AT_STATX_FORCE_SYNC: c_int = 0x40000;
 +pub const AT_STATX_SYNC_AS_STAT: c_int = 0;
-+pub const AT_STATX_SYNC_TYPE: c_int = 24576;
-+pub const AT_SYMLINK_FOLLOW: c_int = 1024;
-+pub const AT_SYMLINK_NOFOLLOW: c_int = 256;
++pub const AT_STATX_SYNC_TYPE: c_int = 0x20000;
++pub const AT_SYMLINK_FOLLOW: c_int = 0x0400;
++pub const AT_SYMLINK_NOFOLLOW: c_int = 0x0200;
 +
-+pub const F_ADD_SEALS: i32 = 1033;
-+pub const F_CANCELLK: i32 = 1029;
++pub const F_ADD_SEALS: i32 = 19;
++pub const F_CANCELLK: i32 = 33;
++pub const F_DUP2FD: i32 = 10;
++pub const F_DUP2FD_CLOEXEC: i32 = 18;
++pub const F_DUP3FD: i32 = 24;
++pub const F_DUP3FD_SHIFT: i32 = 16;
 +pub const F_DUPFD: i32 = 0;
-+pub const F_DUPFD_CLOEXEC: i32 = 1030;
++pub const F_DUPFD_CLOEXEC: i32 = 17;
++pub const F_DUPFD_CLOFORK: i32 = 23;
 +pub const F_GETFD: i32 = 1;
 +pub const F_GETFL: i32 = 3;
-+pub const F_GETLEASE: i32 = 1025;
-+pub const F_GETLK: i32 = 5;
++pub const F_GETLEASE: i32 = 35;
++pub const F_GETLK: i32 = 11;
 +pub const F_GETLK64: i32 = F_GETLK;
-+pub const F_GETOWN: i32 = 9;
-+pub const F_GETOWNER_UIDS: i32 = 17;
-+pub const F_GETOWN_EX: i32 = 16;
-+pub const F_GETPIPE_SZ: i32 = 1032;
-+pub const F_GETSIG: i32 = 11;
-+pub const F_GET_FILE_RW_HINT: i32 = 1037;
-+pub const F_GET_RW_HINT: i32 = 1035;
-+pub const F_GET_SEALS: i32 = 1034;
++pub const F_GETOWN: i32 = 5;
++pub const F_GETOWNER_UIDS: i32 = 29;
++pub const F_GETOWN_EX: i32 = 28;
++pub const F_GETPIPE_SZ: i32 = 38;
++pub const F_GETSIG: i32 = 25;
++pub const F_GET_FILE_RW_HINT: i32 = 41;
++pub const F_GET_RW_HINT: i32 = 39;
++pub const F_GET_SEALS: i32 = 20;
++pub const F_ISUNIONSTACK: i32 = 21;
++pub const F_KINFO: i32 = 22;
 +pub const F_LOCK: i32 = 1;
-+pub const F_NOTIFY: i32 = 1026;
-+pub const F_OFD_GETLK: i32 = 36;
-+pub const F_OFD_SETLK: i32 = 37;
-+pub const F_OFD_SETLKW: i32 = 38;
++pub const F_NOTIFY: i32 = 36;
++pub const F_OFD_GETLK: i32 = 30;
++pub const F_OFD_SETLK: i32 = 31;
++pub const F_OFD_SETLKW: i32 = 32;
++pub const F_OGETLK: i32 = 7;
 +pub const F_OK: i32 = 0;
++pub const F_OSETLK: i32 = 8;
++pub const F_OSETLKW: i32 = 9;
 +pub const F_OWNER_GID: i32 = 2;
 +pub const F_OWNER_PGRP: i32 = 2;
 +pub const F_OWNER_PID: i32 = 1;
 +pub const F_OWNER_TID: i32 = 0;
-+pub const F_RDLCK: i32 = 0;
++pub const F_RDAHEAD: i32 = 16;
++pub const F_READAHEAD: i32 = 15;
++pub const F_RDLCK: i32 = 1;
 +pub const F_SEAL_FUTURE_WRITE: i32 = 16;
 +pub const F_SEAL_GROW: i32 = 4;
 +pub const F_SEAL_SEAL: i32 = 1;
@@ -120802,22 +120924,37 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const F_SEAL_WRITE: i32 = 8;
 +pub const F_SETFD: i32 = 2;
 +pub const F_SETFL: i32 = 4;
-+pub const F_SETLEASE: i32 = 1024;
-+pub const F_SETLK: i32 = 6;
++pub const F_SETLEASE: i32 = 34;
++pub const F_SETLK: i32 = 12;
 +pub const F_SETLK64: i32 = F_SETLK;
-+pub const F_SETLKW: i32 = 7;
++pub const F_SETLKW: i32 = 13;
 +pub const F_SETLKW64: i32 = F_SETLKW;
-+pub const F_SETOWN: i32 = 8;
-+pub const F_SETOWN_EX: i32 = 15;
-+pub const F_SETPIPE_SZ: i32 = 1031;
-+pub const F_SETSIG: i32 = 10;
-+pub const F_SET_FILE_RW_HINT: i32 = 1038;
-+pub const F_SET_RW_HINT: i32 = 1036;
++pub const F_SETLK_REMOTE: i32 = 14;
++pub const F_SETOWN: i32 = 6;
++pub const F_SETOWN_EX: i32 = 27;
++pub const F_SETPIPE_SZ: i32 = 37;
++pub const F_SETSIG: i32 = 26;
++pub const F_SET_FILE_RW_HINT: i32 = 42;
++pub const F_SET_RW_HINT: i32 = 40;
 +pub const F_TEST: i32 = 3;
 +pub const F_TLOCK: i32 = 2;
 +pub const F_ULOCK: i32 = 0;
 +pub const F_UNLCK: i32 = 2;
-+pub const F_WRLCK: i32 = 1;
++pub const F_WRLCK: i32 = 3;
++
++pub const POSIX_FADV_NORMAL: c_int = 0;
++pub const POSIX_FADV_RANDOM: c_int = 1;
++pub const POSIX_FADV_SEQUENTIAL: c_int = 2;
++pub const POSIX_FADV_WILLNEED: c_int = 3;
++pub const POSIX_FADV_DONTNEED: c_int = 4;
++pub const POSIX_FADV_NOREUSE: c_int = 5;
++pub const FALLOC_FL_KEEP_SIZE: c_int = 0x01;
++pub const FALLOC_FL_PUNCH_HOLE: c_int = 0x02;
++pub const FALLOC_FL_NO_HIDE_STALE: c_int = 0x04;
++pub const FALLOC_FL_COLLAPSE_RANGE: c_int = 0x08;
++pub const FALLOC_FL_ZERO_RANGE: c_int = 0x10;
++pub const FALLOC_FL_INSERT_RANGE: c_int = 0x20;
++pub const FALLOC_FL_UNSHARE_RANGE: c_int = 0x40;
 +
 +// FIXME(redox): relibc {
 +pub const RTLD_DEFAULT: *mut c_void = ptr::null_mut();
@@ -120935,42 +121072,50 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
 +pub const FD_CLOEXEC: c_int = 1;
 +pub const O_RDONLY: c_int = 0;
-+pub const O_WRONLY: c_int = 0o1;
-+pub const O_RDWR: c_int = 0o2;
-+pub const O_ACCMODE: c_int = 0o3 | O_PATH;
-+pub const O_NONBLOCK: c_int = 0o4000;
++pub const O_WRONLY: c_int = 0x1;
++pub const O_RDWR: c_int = 0x2;
++pub const O_ACCMODE: c_int = 0x3;
++pub const O_NONBLOCK: c_int = 0x4;
 +pub const O_NDELAY: c_int = O_NONBLOCK;
-+pub const O_APPEND: c_int = 0o2000;
-+pub const O_SHLOCK: c_int = 0x20000000;
-+pub const O_EXLOCK: c_int = 0x10000000;
-+pub const O_ASYNC: c_int = 0o20000;
-+pub const O_CLOEXEC: c_int = 0o2000000;
-+pub const O_CREAT: c_int = 0o100;
-+pub const O_TRUNC: c_int = 0o1000;
-+pub const O_EXCL: c_int = 0o200;
-+pub const O_DIRECTORY: c_int = 0o200000;
-+pub const O_PATH: c_int = 0o10000000;
-+pub const O_NOFOLLOW: c_int = 0o400000;
-+pub const O_NOCTTY: c_int = 0o400;
-+pub const O_DIRECT: c_int = 0o40000;
-+pub const O_DSYNC: c_int = 0o10000;
++pub const O_APPEND: c_int = 0x8;
++pub const O_SHLOCK: c_int = 0x10;
++pub const O_EXLOCK: c_int = 0x20;
++pub const O_ASYNC: c_int = 0x40;
++pub const O_CLOEXEC: c_int = 0x00100000;
++pub const O_CREAT: c_int = 0x00000200;
++pub const O_TRUNC: c_int = 0x00000400;
++pub const O_EXCL: c_int = 0x00000800;
++pub const O_DIRECTORY: c_int = 0x00020000;
++pub const O_PATH: c_int = 0x00400000;
++pub const O_NOFOLLOW: c_int = 0x00000100;
++pub const O_NOCTTY: c_int = 0x00008000;
++pub const O_DIRECT: c_int = 0x00010000;
++pub const O_DSYNC: c_int = 0x01000000;
 +pub const O_LARGEFILE: c_int = 0;
-+pub const O_NOATIME: c_int = 0o1000000;
++pub const O_NOATIME: c_int = 0x20000000;
 +pub const O_RSYNC: c_int = O_SYNC;
-+pub const O_SYNC: c_int = 0o4010000;
-+pub const O_TMPFILE: c_int = 0o20200000;
-+pub const O_EXEC: c_int = O_PATH;
-+pub const O_SEARCH: c_int = O_PATH;
-+pub const O_RESOLVE_BENEATH: c_int = 0x40000000;
-+pub const O_TTY_INIT: c_int = 0;
++pub const O_SYNC: c_int = 0x00000080;
++pub const O_TMPFILE: c_int = 0x10000000;
++pub const O_EXEC: c_int = 0x00040000;
++pub const O_SEARCH: c_int = O_EXEC;
++pub const O_RESOLVE_BENEATH: c_int = 0x00800000;
++pub const O_TTY_INIT: c_int = 0x00080000;
++pub const O_VERIFY: c_int = 0x00200000;
++pub const O_EMPTY_PATH: c_int = 0x02000000;
++pub const O_NAMEDATTR: c_int = 0x04000000;
++pub const O_XATTR: c_int = O_NAMEDATTR;
++pub const O_SYMLINK: c_int = O_PATH | O_NOFOLLOW;
++pub const O_CLOFORK: c_int = 0x08000000;
++
++pub const O_FSYNC: c_int = O_SYNC;
 +
 +// locale.h
-+pub const LC_COLLATE: c_int = 0;
-+pub const LC_CTYPE: c_int = 1;
-+pub const LC_MESSAGES: c_int = 2;
-+pub const LC_MONETARY: c_int = 3;
-+pub const LC_NUMERIC: c_int = 4;
-+pub const LC_TIME: c_int = 5;
++pub const LC_CTYPE: c_int = 0;
++pub const LC_NUMERIC: c_int = 1;
++pub const LC_TIME: c_int = 2;
++pub const LC_COLLATE: c_int = 3;
++pub const LC_MONETARY: c_int = 4;
++pub const LC_MESSAGES: c_int = 5;
 +pub const LC_ALL: c_int = 6;
 +
 +// netdb.h
@@ -121036,7 +121181,7 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const IPPROTO_PUP: c_int = 12;
 +pub const IPPROTO_IDP: c_int = 22;
 +pub const IPPROTO_RAW: c_int = 255;
-+pub const IPPROTO_MAX: c_int = 255;
++pub const IPPROTO_MAX: c_int = 263;
 +// }
 +
 +// netinet/tcp.h
@@ -121055,17 +121200,20 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const POLLNVAL: c_short = 0x020;
 +pub const POLLRDNORM: c_short = 0x040;
 +pub const POLLRDBAND: c_short = 0x080;
-+pub const POLLWRNORM: c_short = 0x100;
-+pub const POLLWRBAND: c_short = 0x200;
++pub const POLLWRNORM: c_short = POLLOUT;
++pub const POLLWRBAND: c_short = 0x100;
++pub const POLLMSG: c_short = 0x400;
++pub const POLLINIGNEOF: c_short = 0x2000;
++pub const POLLRDHUP: c_short = 0x4000;
 +
 +// pthread.h
-+pub const PTHREAD_MUTEX_DEFAULT: c_int = 0;
++pub const PTHREAD_MUTEX_DEFAULT: c_int = 1;
++pub const PTHREAD_MUTEX_NORMAL: c_int = 3;
++pub const PTHREAD_MUTEX_RECURSIVE: c_int = 2;
 +pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 1;
-+pub const PTHREAD_MUTEX_NORMAL: c_int = 2;
-+pub const PTHREAD_MUTEX_RECURSIVE: c_int = 3;
 +
-+pub const PTHREAD_MUTEX_ROBUST: c_int = 0;
-+pub const PTHREAD_MUTEX_STALLED: c_int = 1;
++pub const PTHREAD_MUTEX_STALLED: c_int = 0;
++pub const PTHREAD_MUTEX_ROBUST: c_int = 1;
 +
 +pub const PTHREAD_MUTEX_INITIALIZER: crate::pthread_mutex_t = crate::pthread_mutex_t {
 +    bytes: [0; _PTHREAD_MUTEX_SIZE],
@@ -121076,53 +121224,59 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const PTHREAD_RWLOCK_INITIALIZER: crate::pthread_rwlock_t = crate::pthread_rwlock_t {
 +    bytes: [0; _PTHREAD_RWLOCK_SIZE],
 +};
-+pub const PTHREAD_STACK_MIN: size_t = 4096;
++pub const PTHREAD_STACK_MIN: size_t = 16384;
 +
 +// signal.h
-+pub const SIG_BLOCK: c_int = 0;
-+pub const SIG_UNBLOCK: c_int = 1;
-+pub const SIG_SETMASK: c_int = 2;
++pub const SIG_BLOCK: c_int = 1;
++pub const SIG_UNBLOCK: c_int = 2;
++pub const SIG_SETMASK: c_int = 3;
 +pub const SIGHUP: c_int = 1;
 +pub const SIGINT: c_int = 2;
 +pub const SIGQUIT: c_int = 3;
 +pub const SIGILL: c_int = 4;
 +pub const SIGTRAP: c_int = 5;
 +pub const SIGABRT: c_int = 6;
-+pub const SIGBUS: c_int = 7;
++#[allow(dead_code)] // FreeBSD alias of SIGABRT; kept for the donor surface.
++pub const SIGIOT: c_int = 6;
++pub const SIGEMT: c_int = 7;
 +pub const SIGFPE: c_int = 8;
 +pub const SIGKILL: c_int = 9;
-+pub const SIGUSR1: c_int = 10;
++pub const SIGBUS: c_int = 10;
 +pub const SIGSEGV: c_int = 11;
-+pub const SIGUSR2: c_int = 12;
++pub const SIGSYS: c_int = 12;
 +pub const SIGPIPE: c_int = 13;
 +pub const SIGALRM: c_int = 14;
 +pub const SIGTERM: c_int = 15;
-+pub const SIGSTKFLT: c_int = 16;
-+pub const SIGCHLD: c_int = 17;
-+pub const SIGCONT: c_int = 18;
-+pub const SIGSTOP: c_int = 19;
-+pub const SIGTSTP: c_int = 20;
++pub const SIGURG: c_int = 16;
++pub const SIGSTOP: c_int = 17;
++pub const SIGTSTP: c_int = 18;
++pub const SIGCONT: c_int = 19;
++pub const SIGCHLD: c_int = 20;
 +pub const SIGTTIN: c_int = 21;
 +pub const SIGTTOU: c_int = 22;
-+pub const SIGURG: c_int = 23;
++pub const SIGIO: c_int = 23;
 +pub const SIGXCPU: c_int = 24;
 +pub const SIGXFSZ: c_int = 25;
 +pub const SIGVTALRM: c_int = 26;
 +pub const SIGPROF: c_int = 27;
 +pub const SIGWINCH: c_int = 28;
-+pub const SIGIO: c_int = 29;
-+pub const SIGPWR: c_int = 30;
-+pub const SIGSYS: c_int = 31;
++pub const SIGINFO: c_int = 29;
++pub const SIGUSR1: c_int = 30;
++pub const SIGUSR2: c_int = 31;
++pub const SIGTHR: c_int = 32;
++pub const SIGLWP: c_int = 32;
++pub const SIGLIBRT: c_int = 33;
++pub const SIGRTMIN: c_int = 35;
++pub const SIGRTMAX: c_int = 64;
 +pub const NSIG: c_int = 32;
 +
-+pub const SA_NOCLDWAIT: c_int = 0x0000_0002;
-+pub const SA_RESTORER: c_int = 0x0000_0004; // FIXME(redox): remove after relibc removes it
-+pub const SA_SIGINFO: c_int = 0x0200_0000;
-+pub const SA_ONSTACK: c_int = 0x0400_0000;
-+pub const SA_RESTART: c_int = 0x0800_0000;
-+pub const SA_NODEFER: c_int = 0x1000_0000;
-+pub const SA_RESETHAND: c_int = 0x2000_0000;
-+pub const SA_NOCLDSTOP: c_int = 0x4000_0000;
++pub const SA_ONSTACK: c_int = 0x0001;
++pub const SA_RESTART: c_int = 0x0002;
++pub const SA_RESETHAND: c_int = 0x0004;
++pub const SA_NOCLDSTOP: c_int = 0x0008;
++pub const SA_NODEFER: c_int = 0x0010;
++pub const SA_NOCLDWAIT: c_int = 0x0020;
++pub const SA_SIGINFO: c_int = 0x0040;
 +
 +// sys/file.h
 +pub const LOCK_SH: c_int = 1;
@@ -121131,7 +121285,7 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const LOCK_UN: c_int = 8;
 +
 +// sys/epoll.h
-+pub const EPOLL_CLOEXEC: c_int = 0x0100_0000;
++pub const EPOLL_CLOEXEC: c_int = crate::O_CLOEXEC;
 +pub const EPOLL_CTL_ADD: c_int = 1;
 +pub const EPOLL_CTL_DEL: c_int = 2;
 +pub const EPOLL_CTL_MOD: c_int = 3;
@@ -121174,50 +121328,78 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const S_IWOTH: crate::mode_t = 0o0002;
 +pub const S_IXOTH: crate::mode_t = 0o0001;
 +
++pub const ST_RDONLY: c_ulong = 1;
++pub const ST_NOSUID: c_ulong = 2;
++
 +// stdlib.h
 +pub const EXIT_SUCCESS: c_int = 0;
 +pub const EXIT_FAILURE: c_int = 1;
 +
 +// sys/ioctl.h
 +// FIXME(redox): relibc {
-+pub const FIONREAD: c_ulong = 0x541B;
-+pub const FIONBIO: c_ulong = 0x5421;
-+pub const FIOCLEX: c_ulong = 0x5451;
++pub const FIONREAD: c_ulong = 0x4004_667f;
++pub const FIONBIO: c_ulong = 0x8004_667e;
++pub const FIOASYNC: c_ulong = 0x8004_667d;
++pub const FIOCLEX: c_ulong = 0x2000_6601;
++pub const FIONCLEX: c_ulong = 0x2000_6602;
 +// }
 +pub const TCGETS: c_ulong = 0x5401;
 +pub const TCSETS: c_ulong = 0x5402;
 +pub const TCFLSH: c_ulong = 0x540B;
-+pub const TIOCSCTTY: c_ulong = 0x540E;
-+pub const TIOCGPGRP: c_ulong = 0x540F;
-+pub const TIOCSPGRP: c_ulong = 0x5410;
-+pub const TIOCGWINSZ: c_ulong = 0x5413;
-+pub const TIOCSWINSZ: c_ulong = 0x5414;
++pub const TIOCGETA: c_ulong = 0x402c_7413;
++pub const TIOCSETA: c_ulong = 0x802c_7414;
++pub const TIOCSETAW: c_ulong = 0x802c_7415;
++pub const TIOCSETAF: c_ulong = 0x802c_7416;
++pub const TIOCSCTTY: c_ulong = 0x2000_7461;
++pub const TIOCGPGRP: c_ulong = 0x4004_7477;
++pub const TIOCSPGRP: c_ulong = 0x8004_7476;
++pub const TIOCGWINSZ: c_ulong = 0x4008_7468;
++pub const TIOCSWINSZ: c_ulong = 0x8008_7467;
++pub const TIOCEXCL: c_ulong = 0x2000_740d;
++pub const TIOCNXCL: c_ulong = 0x2000_740e;
++pub const TIOCNOTTY: c_ulong = 0x2000_7471;
++pub const TCSBRK: c_ulong = 0x5409;
++pub const TCXONC: c_ulong = 0x540A;
 +
 +// sys/mman.h
 +pub const PROT_NONE: c_int = 0x0000;
-+pub const PROT_READ: c_int = 0x0004;
++pub const PROT_READ: c_int = 0x0001;
 +pub const PROT_WRITE: c_int = 0x0002;
-+pub const PROT_EXEC: c_int = 0x0001;
++pub const PROT_EXEC: c_int = 0x0004;
 +
 +pub const MADV_NORMAL: c_int = 0;
 +pub const MADV_RANDOM: c_int = 1;
 +pub const MADV_SEQUENTIAL: c_int = 2;
 +pub const MADV_WILLNEED: c_int = 3;
 +pub const MADV_DONTNEED: c_int = 4;
++pub const MADV_FREE: c_int = 5;
++pub const MADV_NOSYNC: c_int = 6;
++pub const MADV_AUTOSYNC: c_int = 7;
++pub const MADV_NOCORE: c_int = 8;
++pub const MADV_CORE: c_int = 9;
++pub const MADV_PROTECT: c_int = 10;
 +
 +pub const MAP_SHARED: c_int = 0x0001;
 +pub const MAP_PRIVATE: c_int = 0x0002;
-+pub const MAP_ANON: c_int = 0x0020;
++pub const MAP_FIXED: c_int = 0x0010;
++pub const MAP_FILE: c_int = 0;
++pub const MAP_ANON: c_int = 0x1000;
 +pub const MAP_ANONYMOUS: c_int = MAP_ANON;
-+pub const MAP_FIXED: c_int = 0x0004;
++pub const MAP_GUARD: c_int = 0x2000;
++pub const MAP_EXCL: c_int = 0x4000;
++pub const MAP_STACK: c_int = 0x0400;
++pub const MAP_NOSYNC: c_int = 0x0800;
++pub const MAP_NOCORE: c_int = 0x00020000;
++pub const MAP_PREFAULT_READ: c_int = 0x00040000;
++pub const MAP_32BIT: c_int = 0x00080000;
 +pub const MAP_FAILED: *mut c_void = !0 as _;
 +
 +pub const MS_ASYNC: c_int = 0x0001;
 +pub const MS_INVALIDATE: c_int = 0x0002;
-+pub const MS_SYNC: c_int = 0x0004;
++pub const MS_SYNC: c_int = 0x0000;
 +
 +// sys/resource.h
-+pub const RLIM_INFINITY: rlim_t = !0;
++pub const RLIM_INFINITY: rlim_t = 0x7fff_ffff_ffff_ffff;
 +pub const RLIM_SAVED_CUR: rlim_t = RLIM_INFINITY;
 +pub const RLIM_SAVED_MAX: rlim_t = RLIM_INFINITY;
 +pub const RLIMIT_CPU: c_int = 0;
@@ -121226,16 +121408,26 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const RLIMIT_STACK: c_int = 3;
 +pub const RLIMIT_CORE: c_int = 4;
 +pub const RLIMIT_RSS: c_int = 5;
-+pub const RLIMIT_NPROC: c_int = 6;
-+pub const RLIMIT_NOFILE: c_int = 7;
-+pub const RLIMIT_MEMLOCK: c_int = 8;
-+pub const RLIMIT_AS: c_int = 9;
-+pub const RLIMIT_LOCKS: c_int = 10;
-+pub const RLIMIT_SIGPENDING: c_int = 11;
-+pub const RLIMIT_MSGQUEUE: c_int = 12;
-+pub const RLIMIT_NICE: c_int = 13;
-+pub const RLIMIT_RTPRIO: c_int = 14;
-+pub const RLIMIT_NLIMITS: c_int = 15;
++pub const RLIMIT_MEMLOCK: c_int = 6;
++pub const RLIMIT_NPROC: c_int = 7;
++pub const RLIMIT_NOFILE: c_int = 8;
++pub const RLIMIT_SBSIZE: c_int = 9;
++pub const RLIMIT_VMEM: c_int = 10;
++pub const RLIMIT_AS: c_int = RLIMIT_VMEM;
++pub const RLIMIT_NPTS: c_int = 11;
++pub const RLIMIT_SWAP: c_int = 12;
++pub const RLIMIT_KQUEUES: c_int = 13;
++pub const RLIMIT_UMTXP: c_int = 14;
++pub const RLIMIT_PIPEBUF: c_int = 15;
++pub const RLIMIT_VMM: c_int = 16;
++pub const RLIMIT_NLIMITS: c_int = 17;
++pub const RLIM_NLIMITS: c_int = RLIMIT_NLIMITS;
++pub const RLIMIT_LOCKS: c_int = 18;
++pub const RLIMIT_SIGPENDING: c_int = 19;
++pub const RLIMIT_MSGQUEUE: c_int = 20;
++pub const RLIMIT_NICE: c_int = 21;
++pub const RLIMIT_RTPRIO: c_int = 22;
++pub const RLIMIT_RTTIME: c_int = 23;
 +
 +pub const RUSAGE_SELF: c_int = 0;
 +pub const RUSAGE_CHILDREN: c_int = -1;
@@ -121300,136 +121492,197 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const SOCK_CLOEXEC: c_int = 0o2_000_000;
 +pub const SOCK_SEQPACKET: c_int = 5;
 +pub const SOL_SOCKET: c_int = 1;
-+pub const SOMAXCONN: c_int = 128;
++pub const SOMAXCONN: c_int = 4096;
 +
 +// sys/termios.h
-+pub const VEOF: usize = 4;
-+pub const VEOL: usize = 11;
-+pub const VEOL2: usize = 16;
-+pub const VERASE: usize = 2;
-+pub const VWERASE: usize = 14;
-+pub const VKILL: usize = 3;
-+pub const VREPRINT: usize = 12;
-+pub const VSWTC: usize = 7;
-+pub const VINTR: usize = 0;
-+pub const VQUIT: usize = 1;
++pub const VEOF: usize = 0;
++pub const VEOL: usize = 1;
++pub const VEOL2: usize = 2;
++pub const VERASE: usize = 3;
++pub const VWERASE: usize = 4;
++pub const VKILL: usize = 5;
++pub const VREPRINT: usize = 6;
++pub const VERASE2: usize = 7;
++pub const VINTR: usize = 8;
++pub const VQUIT: usize = 9;
 +pub const VSUSP: usize = 10;
-+pub const VSTART: usize = 8;
-+pub const VSTOP: usize = 9;
-+pub const VLNEXT: usize = 15;
-+pub const VDISCARD: usize = 13;
-+pub const VMIN: usize = 6;
-+pub const VTIME: usize = 5;
-+pub const NCCS: usize = 32;
++pub const VDSUSP: usize = 11;
++pub const VSTART: usize = 12;
++pub const VSTOP: usize = 13;
++pub const VLNEXT: usize = 14;
++pub const VDISCARD: usize = 15;
++pub const VMIN: usize = 16;
++pub const VTIME: usize = 17;
++pub const VSTATUS: usize = 18;
++pub const NCCS: usize = 20;
 +
-+pub const IGNBRK: crate::tcflag_t = 0o000_001;
-+pub const BRKINT: crate::tcflag_t = 0o000_002;
-+pub const IGNPAR: crate::tcflag_t = 0o000_004;
-+pub const PARMRK: crate::tcflag_t = 0o000_010;
-+pub const INPCK: crate::tcflag_t = 0o000_020;
-+pub const ISTRIP: crate::tcflag_t = 0o000_040;
-+pub const INLCR: crate::tcflag_t = 0o000_100;
-+pub const IGNCR: crate::tcflag_t = 0o000_200;
-+pub const ICRNL: crate::tcflag_t = 0o000_400;
-+pub const IXON: crate::tcflag_t = 0o002_000;
-+pub const IXANY: crate::tcflag_t = 0o004_000;
-+pub const IXOFF: crate::tcflag_t = 0o010_000;
++pub const IGNBRK: crate::tcflag_t = 0x0000_0001;
++pub const BRKINT: crate::tcflag_t = 0x0000_0002;
++pub const IGNPAR: crate::tcflag_t = 0x0000_0004;
++pub const PARMRK: crate::tcflag_t = 0x0000_0008;
++pub const INPCK: crate::tcflag_t = 0x0000_0010;
++pub const ISTRIP: crate::tcflag_t = 0x0000_0020;
++pub const INLCR: crate::tcflag_t = 0x0000_0040;
++pub const IGNCR: crate::tcflag_t = 0x0000_0080;
++pub const ICRNL: crate::tcflag_t = 0x0000_0100;
++pub const IXON: crate::tcflag_t = 0x0000_0200;
++pub const IXOFF: crate::tcflag_t = 0x0000_0400;
++pub const IXANY: crate::tcflag_t = 0x0000_0800;
++pub const IMAXBEL: crate::tcflag_t = 0x0000_2000;
++pub const IUTF8: crate::tcflag_t = 0x0000_4000;
 +
-+pub const OPOST: crate::tcflag_t = 0o000_001;
-+pub const ONLCR: crate::tcflag_t = 0o000_004;
-+pub const OLCUC: crate::tcflag_t = 0o000_004;
-+pub const OCRNL: crate::tcflag_t = 0o000_010;
-+pub const ONOCR: crate::tcflag_t = 0o000_020;
-+pub const ONLRET: crate::tcflag_t = 0o000_040;
-+pub const OFILL: crate::tcflag_t = 0o0000_100;
-+pub const OFDEL: crate::tcflag_t = 0o0000_200;
++pub const OPOST: crate::tcflag_t = 0x0000_0001;
++pub const ONLCR: crate::tcflag_t = 0x0000_0002;
++pub const ONOEOT: crate::tcflag_t = 0x0000_0008;
++pub const OCRNL: crate::tcflag_t = 0x0000_0010;
++pub const ONOCR: crate::tcflag_t = 0x0000_0020;
++pub const ONLRET: crate::tcflag_t = 0x0000_0040;
++pub const OFILL: crate::tcflag_t = 0o000_100;
++pub const OFDEL: crate::tcflag_t = 0o000_200;
++pub const NLDLY: crate::tcflag_t = 0o000_400;
++pub const NL0: crate::tcflag_t = 0o000_000;
++pub const NL1: crate::tcflag_t = 0o000_400;
++pub const CRDLY: crate::tcflag_t = 0o003_000;
++pub const CR0: crate::tcflag_t = 0o000_000;
++pub const CR1: crate::tcflag_t = 0o001_000;
++pub const CR2: crate::tcflag_t = 0o002_000;
++pub const CR3: crate::tcflag_t = 0o003_000;
++pub const TABDLY: crate::tcflag_t = 0x0000_0004;
++pub const TAB0: crate::tcflag_t = 0o000_000;
++pub const TAB1: crate::tcflag_t = 0o004_000;
++pub const TAB2: crate::tcflag_t = 0o010_000;
++pub const TAB3: crate::tcflag_t = 0x0000_0004;
++pub const BSDLY: crate::tcflag_t = 0o020_000;
++pub const BS0: crate::tcflag_t = 0o000_000;
++pub const BS1: crate::tcflag_t = 0o020_000;
++pub const FFDLY: crate::tcflag_t = 0o100_000;
++pub const FF0: crate::tcflag_t = 0o000_000;
++pub const FF1: crate::tcflag_t = 0o100_000;
++pub const VTDLY: crate::tcflag_t = 0o040_000;
++pub const VT0: crate::tcflag_t = 0o000_000;
++pub const VT1: crate::tcflag_t = 0o040_000;
++pub const XTABS: crate::tcflag_t = 0o014_000;
 +
-+pub const B0: speed_t = 0o000_000;
-+pub const B50: speed_t = 0o000_001;
-+pub const B75: speed_t = 0o000_002;
-+pub const B110: speed_t = 0o000_003;
-+pub const B134: speed_t = 0o000_004;
-+pub const B150: speed_t = 0o000_005;
-+pub const B200: speed_t = 0o000_006;
-+pub const B300: speed_t = 0o000_007;
-+pub const B600: speed_t = 0o000_010;
-+pub const B1200: speed_t = 0o000_011;
-+pub const B1800: speed_t = 0o000_012;
-+pub const B2400: speed_t = 0o000_013;
-+pub const B4800: speed_t = 0o000_014;
-+pub const B9600: speed_t = 0o000_015;
-+pub const B19200: speed_t = 0o000_016;
-+pub const B38400: speed_t = 0o000_017;
++pub const B0: speed_t = 0;
++pub const B50: speed_t = 50;
++pub const B75: speed_t = 75;
++pub const B110: speed_t = 110;
++pub const B134: speed_t = 134;
++pub const B150: speed_t = 150;
++pub const B200: speed_t = 200;
++pub const B300: speed_t = 300;
++pub const B600: speed_t = 600;
++pub const B1200: speed_t = 1200;
++pub const B1800: speed_t = 1800;
++pub const B2400: speed_t = 2400;
++pub const B4800: speed_t = 4800;
++pub const B9600: speed_t = 9600;
++pub const B19200: speed_t = 19200;
++pub const B38400: speed_t = 38400;
++pub const B7200: speed_t = 7200;
++pub const B14400: speed_t = 14400;
++pub const B28800: speed_t = 28800;
++pub const B57600: speed_t = 57600;
++pub const B76800: speed_t = 76800;
++pub const B115200: speed_t = 115200;
++pub const B230400: speed_t = 230400;
++pub const B460800: speed_t = 460800;
++pub const B500000: speed_t = 500000;
++pub const B921600: speed_t = 921600;
++pub const B1000000: speed_t = 1000000;
++pub const B1500000: speed_t = 1500000;
++pub const B2000000: speed_t = 2000000;
++pub const B2500000: speed_t = 2500000;
++pub const B3000000: speed_t = 3000000;
++pub const B3500000: speed_t = 3500000;
++pub const B4000000: speed_t = 4000000;
 +
-+pub const B57600: speed_t = 0o0_020;
-+pub const B115200: speed_t = 0o0_021;
-+pub const B230400: speed_t = 0o0_022;
-+pub const B460800: speed_t = 0o0_023;
-+pub const B500000: speed_t = 0o0_024;
-+pub const B576000: speed_t = 0o0_025;
-+pub const B921600: speed_t = 0o0_026;
-+pub const B1000000: speed_t = 0o0_027;
-+pub const B1152000: speed_t = 0o0_030;
-+pub const B1500000: speed_t = 0o0_031;
-+pub const B2000000: speed_t = 0o0_032;
-+pub const B2500000: speed_t = 0o0_033;
-+pub const B3000000: speed_t = 0o0_034;
-+pub const B3500000: speed_t = 0o0_035;
-+pub const B4000000: speed_t = 0o0_036;
++pub const CIGNORE: crate::tcflag_t = 0x0000_0001;
++pub const CSIZE: crate::tcflag_t = 0x0000_0300;
++pub const CS5: crate::tcflag_t = 0x0000_0000;
++pub const CS6: crate::tcflag_t = 0x0000_0100;
++pub const CS7: crate::tcflag_t = 0x0000_0200;
++pub const CS8: crate::tcflag_t = 0x0000_0300;
 +
-+pub const CSIZE: crate::tcflag_t = 0o000_060;
-+pub const CS5: crate::tcflag_t = 0o000_000;
-+pub const CS6: crate::tcflag_t = 0o000_020;
-+pub const CS7: crate::tcflag_t = 0o000_040;
-+pub const CS8: crate::tcflag_t = 0o000_060;
++pub const CSTOPB: crate::tcflag_t = 0x0000_0400;
++pub const CREAD: crate::tcflag_t = 0x0000_0800;
++pub const PARENB: crate::tcflag_t = 0x0000_1000;
++pub const PARODD: crate::tcflag_t = 0x0000_2000;
++pub const HUPCL: crate::tcflag_t = 0x0000_4000;
++pub const CLOCAL: crate::tcflag_t = 0x0000_8000;
++pub const CCTS_OFLOW: crate::tcflag_t = 0x0001_0000;
++pub const CRTS_IFLOW: crate::tcflag_t = 0x0002_0000;
++pub const CRTSCTS: crate::tcflag_t = 0x0003_0000;
++pub const CDTR_IFLOW: crate::tcflag_t = 0x0004_0000;
++pub const CDSR_OFLOW: crate::tcflag_t = 0x0008_0000;
++pub const CCAR_OFLOW: crate::tcflag_t = 0x0010_0000;
++pub const CNO_RTSDTR: crate::tcflag_t = 0x0020_0000;
++pub const CBAUD: crate::tcflag_t = 0o010_017;
++pub const EXTA: speed_t = B19200;
++pub const EXTB: speed_t = B38400;
++pub const CBAUDEX: crate::tcflag_t = 0o010_000;
++pub const CIBAUD: crate::tcflag_t = 0o020_036_000_00;
++pub const CMSPAR: crate::tcflag_t = 0o100_000_000_00;
 +
-+pub const CSTOPB: crate::tcflag_t = 0o000_100;
-+pub const CREAD: crate::tcflag_t = 0o000_200;
-+pub const PARENB: crate::tcflag_t = 0o000_400;
-+pub const PARODD: crate::tcflag_t = 0o001_000;
-+pub const HUPCL: crate::tcflag_t = 0o002_000;
++pub const ECHOKE: crate::tcflag_t = 0x0000_0001;
++pub const ECHOE: crate::tcflag_t = 0x0000_0002;
++pub const ECHOK: crate::tcflag_t = 0x0000_0004;
++pub const ECHO: crate::tcflag_t = 0x0000_0008;
++pub const ECHONL: crate::tcflag_t = 0x0000_0010;
++pub const ECHOPRT: crate::tcflag_t = 0x0000_0020;
++pub const ECHOCTL: crate::tcflag_t = 0x0000_0040;
++pub const ISIG: crate::tcflag_t = 0x0000_0080;
++pub const ICANON: crate::tcflag_t = 0x0000_0100;
++pub const ALTWERASE: crate::tcflag_t = 0x0000_0200;
++pub const IEXTEN: crate::tcflag_t = 0x0000_0400;
++pub const EXTPROC: crate::tcflag_t = 0x0000_0800;
++pub const TOSTOP: crate::tcflag_t = 0x0040_0000;
++pub const FLUSHO: crate::tcflag_t = 0x0080_0000;
++pub const NOKERNINFO: crate::tcflag_t = 0x0200_0000;
++pub const PENDIN: crate::tcflag_t = 0x2000_0000;
++pub const NOFLSH: crate::tcflag_t = 0x8000_0000;
++pub const XCASE: crate::tcflag_t = 0o000_004;
 +
-+pub const CLOCAL: crate::tcflag_t = 0o004_000;
-+
-+pub const ISIG: crate::tcflag_t = 0o000_001;
-+pub const ICANON: crate::tcflag_t = 0o000_002;
-+pub const ECHO: crate::tcflag_t = 0o000_010;
-+pub const ECHOE: crate::tcflag_t = 0o000_020;
-+pub const ECHOK: crate::tcflag_t = 0o000_040;
-+pub const ECHONL: crate::tcflag_t = 0o000_100;
-+pub const NOFLSH: crate::tcflag_t = 0o000_200;
-+pub const TOSTOP: crate::tcflag_t = 0o000_400;
-+pub const IEXTEN: crate::tcflag_t = 0o100_000;
-+pub const ECHOCTL: crate::tcflag_t = 0o001_000;
-+pub const ECHOPRT: crate::tcflag_t = 0o002_000;
-+pub const ECHOKE: crate::tcflag_t = 0o004_000;
-+pub const FLUSHO: crate::tcflag_t = 0o010_000;
-+pub const PENDIN: crate::tcflag_t = 0o040_000;
-+pub const EXTPROC: crate::tcflag_t = 0o200_000;
-+
-+pub const TCOOFF: c_int = 0;
-+pub const TCOON: c_int = 1;
-+pub const TCIOFF: c_int = 2;
-+pub const TCION: c_int = 3;
-+
-+pub const TCIFLUSH: c_int = 0;
-+pub const TCOFLUSH: c_int = 1;
-+pub const TCIOFLUSH: c_int = 2;
-+
++pub const TCOOFF: c_int = 1;
++pub const TCOON: c_int = 2;
++pub const TCIOFF: c_int = 3;
++pub const TCION: c_int = 4;
++pub const TCIFLUSH: c_int = 1;
++pub const TCOFLUSH: c_int = 2;
++pub const TCIOFLUSH: c_int = 3;
 +pub const TCSANOW: c_int = 0;
 +pub const TCSADRAIN: c_int = 1;
 +pub const TCSAFLUSH: c_int = 2;
 +
-+pub const _POSIX_VDISABLE: crate::cc_t = 0;
++pub const _POSIX_VDISABLE: crate::cc_t = 0xff;
++
++
++// signal.h sigevent values
++pub const SIGEV_NONE: c_int = 0;
++pub const SIGEV_SIGNAL: c_int = 1;
++pub const SIGEV_THREAD: c_int = 2;
++pub const SIGEV_KEVENT: c_int = 3;
++pub const SIGEV_THREAD_ID: c_int = 4;
 +
 +// sys/wait.h
++pub type idtype_t = c_int;
++pub const P_ALL: idtype_t = 0;
++pub const P_PID: idtype_t = 1;
++pub const P_PGID: idtype_t = 2;
 +pub const WNOHANG: c_int = 1;
 +pub const WUNTRACED: c_int = 2;
 +
 +pub const WSTOPPED: c_int = 2;
-+pub const WEXITED: c_int = 4;
-+pub const WCONTINUED: c_int = 8;
-+pub const WNOWAIT: c_int = 0x0100_0000;
++pub const WEXITED: c_int = 16;
++pub const WCONTINUED: c_int = 4;
++pub const WNOWAIT: c_int = 8;
++
++pub const CLD_EXITED: c_int = 1;
++pub const CLD_KILLED: c_int = 2;
++pub const CLD_DUMPED: c_int = 3;
++pub const CLD_TRAPPED: c_int = 4;
++pub const CLD_STOPPED: c_int = 5;
++pub const CLD_CONTINUED: c_int = 6;
 +
 +pub const __WNOTHREAD: c_int = 0x2000_0000;
 +pub const __WALL: c_int = 0x4000_0000;
@@ -121437,81 +121690,248 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const __WCLONE: c_int = 0x8000_0000;
 +
 +// time.h
-+pub const CLOCK_REALTIME: c_int = 1;
++pub const UTIME_NOW: c_long = -1;
++pub const UTIME_OMIT: c_long = -2;
++pub const PIPE_BUF: usize = 4096;
++pub const CLOCK_REALTIME: c_int = 0;
++pub const CLOCK_VIRTUAL: c_int = 1;
++pub const CLOCK_PROF: c_int = 2;
 +pub const CLOCK_MONOTONIC: c_int = 4;
-+pub const CLOCK_PROCESS_CPUTIME_ID: crate::clockid_t = 2;
-+pub const CLOCKS_PER_SEC: crate::clock_t = 1_000_000;
++pub const CLOCK_UPTIME: crate::clockid_t = 5;
++pub const CLOCK_UPTIME_PRECISE: crate::clockid_t = 7;
++pub const CLOCK_UPTIME_FAST: crate::clockid_t = 8;
++pub const CLOCK_REALTIME_PRECISE: crate::clockid_t = 9;
++pub const CLOCK_REALTIME_FAST: crate::clockid_t = 10;
++pub const CLOCK_MONOTONIC_PRECISE: crate::clockid_t = 11;
++pub const CLOCK_MONOTONIC_FAST: crate::clockid_t = 12;
++pub const CLOCK_SECOND: crate::clockid_t = 13;
++pub const CLOCK_PROCESS_CPUTIME_ID: crate::clockid_t = 15;
++pub const CLOCK_THREAD_CPUTIME_ID: crate::clockid_t = 14;
++pub const CLOCK_TAI: crate::clockid_t = 16;
++pub const CLOCK_MONOTONIC_RAW: crate::clockid_t = 17;
++pub const CLOCK_REALTIME_ALARM: crate::clockid_t = 18;
++pub const CLOCK_BOOTTIME_ALARM: crate::clockid_t = 19;
++pub const CLOCK_SGI_CYCLE: crate::clockid_t = 20;
++pub const CLOCK_REALTIME_COARSE: crate::clockid_t = CLOCK_REALTIME_FAST;
++pub const CLOCK_MONOTONIC_COARSE: crate::clockid_t = CLOCK_MONOTONIC_FAST;
++pub const CLOCK_BOOTTIME: crate::clockid_t = CLOCK_MONOTONIC;
++pub const CLOCKS_PER_SEC: crate::clock_t = 128;
 +
 +// unistd.h
 +// POSIX.1 {
-+pub const _SC_ARG_MAX: c_int = 0;
-+pub const _SC_CHILD_MAX: c_int = 1;
-+pub const _SC_CLK_TCK: c_int = 2;
-+pub const _SC_NGROUPS_MAX: c_int = 3;
-+pub const _SC_OPEN_MAX: c_int = 4;
-+pub const _SC_STREAM_MAX: c_int = 5;
-+pub const _SC_TZNAME_MAX: c_int = 6;
++pub const _SC_ARG_MAX: c_int = 1;
++pub const _SC_CHILD_MAX: c_int = 2;
++pub const _SC_CLK_TCK: c_int = 3;
++pub const _SC_NGROUPS_MAX: c_int = 4;
++pub const _SC_OPEN_MAX: c_int = 5;
++pub const _SC_STREAM_MAX: c_int = 26;
++pub const _SC_TZNAME_MAX: c_int = 27;
 +// ...
-+pub const _SC_VERSION: c_int = 29;
-+pub const _SC_PAGESIZE: c_int = 30;
-+pub const _SC_PAGE_SIZE: c_int = 30;
++pub const _SC_VERSION: c_int = 8;
++pub const _SC_PAGESIZE: c_int = 47;
++pub const _SC_PAGE_SIZE: c_int = 47;
 +// ...
-+pub const _SC_RE_DUP_MAX: c_int = 44;
++pub const _SC_RE_DUP_MAX: c_int = 16;
 +
 +pub const _SC_NPROCESSORS_CONF: c_int = 57;
 +pub const _SC_NPROCESSORS_ONLN: c_int = 58;
 +
 +// ...
-+pub const _SC_GETGR_R_SIZE_MAX: c_int = 69;
-+pub const _SC_GETPW_R_SIZE_MAX: c_int = 70;
-+pub const _SC_LOGIN_NAME_MAX: c_int = 71;
-+pub const _SC_TTY_NAME_MAX: c_int = 72;
++pub const _SC_GETGR_R_SIZE_MAX: c_int = 70;
++pub const _SC_GETPW_R_SIZE_MAX: c_int = 71;
++pub const _SC_LOGIN_NAME_MAX: c_int = 73;
++pub const _SC_TTY_NAME_MAX: c_int = 101;
 +// ...
-+pub const _SC_SYMLOOP_MAX: c_int = 173;
++pub const _SC_SYMLOOP_MAX: c_int = 120;
 +// ...
-+pub const _SC_HOST_NAME_MAX: c_int = 180;
++pub const _SC_HOST_NAME_MAX: c_int = 72;
++
++
++// langinfo.h
++pub const ABMON_1: c_int = 0x2000E;
++pub const ABMON_2: c_int = 0x2000F;
++pub const ABMON_3: c_int = 0x20010;
++pub const ABMON_4: c_int = 0x20011;
++pub const ABMON_5: c_int = 0x20012;
++pub const ABMON_6: c_int = 0x20013;
++pub const ABMON_7: c_int = 0x20014;
++pub const ABMON_8: c_int = 0x20015;
++pub const ABMON_9: c_int = 0x20016;
++pub const ABMON_10: c_int = 0x20017;
++pub const ABMON_11: c_int = 0x20018;
++pub const ABMON_12: c_int = 0x20019;
++pub const AM_STR: c_int = 0x20026;
++pub const PM_STR: c_int = 0x20027;
++pub const D_T_FMT: c_int = 0x20028;
++pub const D_FMT: c_int = 0x20029;
++pub const T_FMT: c_int = 0x2002A;
++pub const T_FMT_AMPM: c_int = 0x2002B;
++
++// sysconf.h
++pub const _SC_2_CHAR_TERM: c_int = 20;
++pub const _SC_2_C_BIND: c_int = 18;
++pub const _SC_2_C_DEV: c_int = 19;
++pub const _SC_2_FORT_DEV: c_int = 21;
++pub const _SC_2_FORT_RUN: c_int = 22;
++pub const _SC_2_LOCALEDEF: c_int = 23;
++pub const _SC_2_PBS: c_int = 59;
++pub const _SC_2_PBS_ACCOUNTING: c_int = 60;
++pub const _SC_2_PBS_CHECKPOINT: c_int = 61;
++pub const _SC_2_PBS_LOCATE: c_int = 62;
++pub const _SC_2_PBS_MESSAGE: c_int = 63;
++pub const _SC_2_PBS_TRACK: c_int = 64;
++pub const _SC_2_SW_DEV: c_int = 24;
++pub const _SC_2_UPE: c_int = 25;
++pub const _SC_2_VERSION: c_int = 17;
++pub const _SC_ADVISORY_INFO: c_int = 65;
++pub const _SC_AIO_LISTIO_MAX: c_int = 42;
++pub const _SC_AIO_MAX: c_int = 43;
++pub const _SC_AIO_PRIO_DELTA_MAX: c_int = 44;
++pub const _SC_ASYNCHRONOUS_IO: c_int = 28;
++pub const _SC_ATEXIT_MAX: c_int = 107;
++pub const _SC_AVPHYS_PAGES: c_int = 1001;
++pub const _SC_BARRIERS: c_int = 66;
++pub const _SC_BC_BASE_MAX: c_int = 9;
++pub const _SC_BC_DIM_MAX: c_int = 10;
++pub const _SC_BC_SCALE_MAX: c_int = 11;
++pub const _SC_BC_STRING_MAX: c_int = 12;
++pub const _SC_CLOCK_SELECTION: c_int = 67;
++pub const _SC_COLL_WEIGHTS_MAX: c_int = 13;
++pub const _SC_CPUTIME: c_int = 68;
++pub const _SC_DELAYTIMER_MAX: c_int = 45;
++pub const _SC_EXPR_NEST_MAX: c_int = 14;
++pub const _SC_FSYNC: c_int = 38;
++pub const _SC_IOV_MAX: c_int = 56;
++pub const _SC_IPV6: c_int = 118;
++pub const _SC_JOB_CONTROL: c_int = 6;
++pub const _SC_LINE_MAX: c_int = 15;
++pub const _SC_MAPPED_FILES: c_int = 29;
++pub const _SC_MEMLOCK: c_int = 30;
++pub const _SC_MEMLOCK_RANGE: c_int = 31;
++pub const _SC_MEMORY_PROTECTION: c_int = 32;
++pub const _SC_MESSAGE_PASSING: c_int = 33;
++pub const _SC_MINSIGSTKSZ: c_int = 1023;
++pub const _SC_MONOTONIC_CLOCK: c_int = 74;
++pub const _SC_MQ_OPEN_MAX: c_int = 46;
++pub const _SC_MQ_PRIO_MAX: c_int = 75;
++pub const _SC_NZERO: c_int = 1006;
++pub const _SC_PASS_MAX: c_int = 1002;
++pub const _SC_PHYS_PAGES: c_int = 121;
++pub const _SC_PRIORITIZED_IO: c_int = 34;
++pub const _SC_PRIORITY_SCHEDULING: c_int = 35;
++pub const _SC_RAW_SOCKETS: c_int = 119;
++pub const _SC_READER_WRITER_LOCKS: c_int = 76;
++pub const _SC_REGEXP: c_int = 77;
++pub const _SC_RTSIG_MAX: c_int = 48;
++pub const _SC_SAVED_IDS: c_int = 7;
++pub const _SC_SEMAPHORES: c_int = 37;
++pub const _SC_SEM_NSEMS_MAX: c_int = 49;
++pub const _SC_SEM_VALUE_MAX: c_int = 50;
++pub const _SC_SHARED_MEMORY_OBJECTS: c_int = 39;
++pub const _SC_SHELL: c_int = 78;
++pub const _SC_SIGSTKSZ: c_int = 1024;
++pub const _SC_SPAWN: c_int = 79;
++pub const _SC_SPIN_LOCKS: c_int = 80;
++pub const _SC_SPORADIC_SERVER: c_int = 81;
++pub const _SC_SS_REPL_MAX: c_int = 1016;
++pub const _SC_STREAMS: c_int = 1011;
++pub const _SC_SYNCHRONIZED_IO: c_int = 40;
++pub const _SC_THREADS: c_int = 96;
++pub const _SC_THREAD_ATTR_STACKADDR: c_int = 82;
++pub const _SC_THREAD_ATTR_STACKSIZE: c_int = 83;
++pub const _SC_THREAD_CPUTIME: c_int = 84;
++pub const _SC_THREAD_DESTRUCTOR_ITERATIONS: c_int = 85;
++pub const _SC_THREAD_KEYS_MAX: c_int = 86;
++pub const _SC_THREAD_PRIORITY_SCHEDULING: c_int = 89;
++pub const _SC_THREAD_PRIO_INHERIT: c_int = 87;
++pub const _SC_THREAD_PRIO_PROTECT: c_int = 88;
++pub const _SC_THREAD_PROCESS_SHARED: c_int = 90;
++pub const _SC_THREAD_ROBUST_PRIO_INHERIT: c_int = 1021;
++pub const _SC_THREAD_ROBUST_PRIO_PROTECT: c_int = 1022;
++pub const _SC_THREAD_SAFE_FUNCTIONS: c_int = 91;
++pub const _SC_THREAD_SPORADIC_SERVER: c_int = 92;
++pub const _SC_THREAD_STACK_MIN: c_int = 93;
++pub const _SC_THREAD_THREADS_MAX: c_int = 94;
++pub const _SC_TIMEOUTS: c_int = 95;
++pub const _SC_TIMERS: c_int = 41;
++pub const _SC_TIMER_MAX: c_int = 52;
++pub const _SC_TRACE: c_int = 97;
++pub const _SC_TRACE_EVENT_FILTER: c_int = 98;
++pub const _SC_TRACE_EVENT_NAME_MAX: c_int = 1017;
++pub const _SC_TRACE_INHERIT: c_int = 99;
++pub const _SC_TRACE_LOG: c_int = 100;
++pub const _SC_TRACE_NAME_MAX: c_int = 1018;
++pub const _SC_TRACE_SYS_MAX: c_int = 1019;
++pub const _SC_TRACE_USER_EVENT_MAX: c_int = 1020;
++pub const _SC_TYPED_MEMORY_OBJECTS: c_int = 102;
++pub const _SC_UIO_MAXIOV: c_int = 1000;
++pub const _SC_V6_ILP32_OFF32: c_int = 103;
++pub const _SC_V6_ILP32_OFFBIG: c_int = 104;
++pub const _SC_V6_LP64_OFF64: c_int = 105;
++pub const _SC_V6_LPBIG_OFFBIG: c_int = 106;
++pub const _SC_V7_ILP32_OFF32: c_int = 1012;
++pub const _SC_V7_ILP32_OFFBIG: c_int = 1013;
++pub const _SC_V7_LP64_OFF64: c_int = 1014;
++pub const _SC_V7_LPBIG_OFFBIG: c_int = 1015;
++pub const _SC_XBS5_ILP32_OFF32: c_int = 1007;
++pub const _SC_XBS5_ILP32_OFFBIG: c_int = 1008;
++pub const _SC_XBS5_LP64_OFF64: c_int = 1009;
++pub const _SC_XBS5_LPBIG_OFFBIG: c_int = 1010;
++pub const _SC_XOPEN_CRYPT: c_int = 108;
++pub const _SC_XOPEN_ENH_I18N: c_int = 109;
++pub const _SC_XOPEN_LEGACY: c_int = 110;
++pub const _SC_XOPEN_REALTIME: c_int = 111;
++pub const _SC_XOPEN_REALTIME_THREADS: c_int = 112;
++pub const _SC_XOPEN_SHM: c_int = 113;
++pub const _SC_XOPEN_STREAMS: c_int = 114;
++pub const _SC_XOPEN_UNIX: c_int = 115;
++pub const _SC_XOPEN_VERSION: c_int = 116;
++pub const _SC_XOPEN_XCU_VERSION: c_int = 117;
++pub const _SC_XOPEN_XPG2: c_int = 1003;
++pub const _SC_XOPEN_XPG3: c_int = 1004;
++pub const _SC_XOPEN_XPG4: c_int = 1005;
 +// ...
-+pub const _SC_SIGQUEUE_MAX: c_int = 190;
-+pub const _SC_REALTIME_SIGNALS: c_int = 191;
++pub const _SC_SIGQUEUE_MAX: c_int = 51;
++pub const _SC_REALTIME_SIGNALS: c_int = 36;
 +// } POSIX.1
 +
 +// confstr
-+pub const _CS_PATH: c_int = 0;
-+pub const _CS_POSIX_V6_WIDTH_RESTRICTED_ENVS: c_int = 1;
-+pub const _CS_POSIX_V5_WIDTH_RESTRICTED_ENVS: c_int = 4;
-+pub const _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS: c_int = 5;
-+pub const _CS_POSIX_V6_ILP32_OFF32_CFLAGS: c_int = 1116;
-+pub const _CS_POSIX_V6_ILP32_OFF32_LDFLAGS: c_int = 1117;
-+pub const _CS_POSIX_V6_ILP32_OFF32_LIBS: c_int = 1118;
-+pub const _CS_POSIX_V6_ILP32_OFF32_LINTFLAGS: c_int = 1119;
-+pub const _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS: c_int = 1120;
-+pub const _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS: c_int = 1121;
-+pub const _CS_POSIX_V6_ILP32_OFFBIG_LIBS: c_int = 1122;
-+pub const _CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS: c_int = 1123;
-+pub const _CS_POSIX_V6_LP64_OFF64_CFLAGS: c_int = 1124;
-+pub const _CS_POSIX_V6_LP64_OFF64_LDFLAGS: c_int = 1125;
-+pub const _CS_POSIX_V6_LP64_OFF64_LIBS: c_int = 1126;
-+pub const _CS_POSIX_V6_LP64_OFF64_LINTFLAGS: c_int = 1127;
-+pub const _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS: c_int = 1128;
-+pub const _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS: c_int = 1129;
-+pub const _CS_POSIX_V6_LPBIG_OFFBIG_LIBS: c_int = 1130;
-+pub const _CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS: c_int = 1131;
-+pub const _CS_POSIX_V7_ILP32_OFF32_CFLAGS: c_int = 1132;
-+pub const _CS_POSIX_V7_ILP32_OFF32_LDFLAGS: c_int = 1133;
-+pub const _CS_POSIX_V7_ILP32_OFF32_LIBS: c_int = 1134;
-+pub const _CS_POSIX_V7_ILP32_OFF32_LINTFLAGS: c_int = 1135;
-+pub const _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS: c_int = 1136;
-+pub const _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS: c_int = 1137;
-+pub const _CS_POSIX_V7_ILP32_OFFBIG_LIBS: c_int = 1138;
-+pub const _CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS: c_int = 1139;
-+pub const _CS_POSIX_V7_LP64_OFF64_CFLAGS: c_int = 1140;
-+pub const _CS_POSIX_V7_LP64_OFF64_LDFLAGS: c_int = 1141;
-+pub const _CS_POSIX_V7_LP64_OFF64_LIBS: c_int = 1142;
-+pub const _CS_POSIX_V7_LP64_OFF64_LINTFLAGS: c_int = 1143;
-+pub const _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS: c_int = 1144;
-+pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: c_int = 1145;
-+pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: c_int = 1146;
-+pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: c_int = 1147;
++pub const _CS_PATH: c_int = 1;
++pub const _CS_POSIX_V6_WIDTH_RESTRICTED_ENVS: c_int = 14;
++pub const _CS_POSIX_V5_WIDTH_RESTRICTED_ENVS: c_int = 2002;
++pub const _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS: c_int = 2003;
++pub const _CS_POSIX_V6_ILP32_OFF32_CFLAGS: c_int = 2;
++pub const _CS_POSIX_V6_ILP32_OFF32_LDFLAGS: c_int = 3;
++pub const _CS_POSIX_V6_ILP32_OFF32_LIBS: c_int = 4;
++pub const _CS_POSIX_V6_ILP32_OFF32_LINTFLAGS: c_int = 2004;
++pub const _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS: c_int = 5;
++pub const _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS: c_int = 6;
++pub const _CS_POSIX_V6_ILP32_OFFBIG_LIBS: c_int = 7;
++pub const _CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS: c_int = 2005;
++pub const _CS_POSIX_V6_LP64_OFF64_CFLAGS: c_int = 8;
++pub const _CS_POSIX_V6_LP64_OFF64_LDFLAGS: c_int = 9;
++pub const _CS_POSIX_V6_LP64_OFF64_LIBS: c_int = 10;
++pub const _CS_POSIX_V6_LP64_OFF64_LINTFLAGS: c_int = 2006;
++pub const _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS: c_int = 11;
++pub const _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS: c_int = 12;
++pub const _CS_POSIX_V6_LPBIG_OFFBIG_LIBS: c_int = 13;
++pub const _CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS: c_int = 2007;
++pub const _CS_POSIX_V7_ILP32_OFF32_CFLAGS: c_int = 2008;
++pub const _CS_POSIX_V7_ILP32_OFF32_LDFLAGS: c_int = 2009;
++pub const _CS_POSIX_V7_ILP32_OFF32_LIBS: c_int = 2010;
++pub const _CS_POSIX_V7_ILP32_OFF32_LINTFLAGS: c_int = 2011;
++pub const _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS: c_int = 2012;
++pub const _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS: c_int = 2013;
++pub const _CS_POSIX_V7_ILP32_OFFBIG_LIBS: c_int = 2014;
++pub const _CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS: c_int = 2015;
++pub const _CS_POSIX_V7_LP64_OFF64_CFLAGS: c_int = 2016;
++pub const _CS_POSIX_V7_LP64_OFF64_LDFLAGS: c_int = 2017;
++pub const _CS_POSIX_V7_LP64_OFF64_LIBS: c_int = 2018;
++pub const _CS_POSIX_V7_LP64_OFF64_LINTFLAGS: c_int = 2019;
++pub const _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS: c_int = 2020;
++pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: c_int = 2021;
++pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: c_int = 2022;
++pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: c_int = 2023;
 +
 +pub const R_OK: c_int = 4;
 +pub const W_OK: c_int = 2;
@@ -121526,27 +121946,27 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +pub const SEEK_CUR: c_int = 1;
 +pub const SEEK_END: c_int = 2;
 +
-+pub const _PC_LINK_MAX: c_int = 0;
-+pub const _PC_MAX_CANON: c_int = 1;
-+pub const _PC_MAX_INPUT: c_int = 2;
-+pub const _PC_NAME_MAX: c_int = 3;
-+pub const _PC_PATH_MAX: c_int = 4;
-+pub const _PC_PIPE_BUF: c_int = 5;
-+pub const _PC_CHOWN_RESTRICTED: c_int = 6;
-+pub const _PC_NO_TRUNC: c_int = 7;
-+pub const _PC_VDISABLE: c_int = 8;
-+pub const _PC_SYNC_IO: c_int = 9;
-+pub const _PC_ASYNC_IO: c_int = 10;
-+pub const _PC_PRIO_IO: c_int = 11;
-+pub const _PC_SOCK_MAXBUF: c_int = 12;
-+pub const _PC_FILESIZEBITS: c_int = 13;
++pub const _PC_LINK_MAX: c_int = 1;
++pub const _PC_MAX_CANON: c_int = 2;
++pub const _PC_MAX_INPUT: c_int = 3;
++pub const _PC_NAME_MAX: c_int = 4;
++pub const _PC_PATH_MAX: c_int = 5;
++pub const _PC_PIPE_BUF: c_int = 6;
++pub const _PC_CHOWN_RESTRICTED: c_int = 7;
++pub const _PC_NO_TRUNC: c_int = 8;
++pub const _PC_VDISABLE: c_int = 9;
++pub const _PC_SYNC_IO: c_int = 55;
++pub const _PC_ASYNC_IO: c_int = 53;
++pub const _PC_PRIO_IO: c_int = 54;
++pub const _PC_SOCK_MAXBUF: c_int = 3000;
++pub const _PC_FILESIZEBITS: c_int = 12;
 +pub const _PC_REC_INCR_XFER_SIZE: c_int = 14;
 +pub const _PC_REC_MAX_XFER_SIZE: c_int = 15;
 +pub const _PC_REC_MIN_XFER_SIZE: c_int = 16;
 +pub const _PC_REC_XFER_ALIGN: c_int = 17;
-+pub const _PC_ALLOC_SIZE_MIN: c_int = 18;
-+pub const _PC_SYMLINK_MAX: c_int = 19;
-+pub const _PC_2_SYMLINKS: c_int = 20;
++pub const _PC_ALLOC_SIZE_MIN: c_int = 10;
++pub const _PC_SYMLINK_MAX: c_int = 18;
++pub const _PC_2_SYMLINKS: c_int = 3001;
 +
 +pub const PRIO_PROCESS: c_int = 0;
 +pub const PRIO_PGRP: c_int = 1;
@@ -121653,10 +122073,66 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +    }
 +}
 +
++#[allow(dead_code)] // std does not call every declared entry point yet.
++// FreeBSD file flags, line-discipline/termios constants and the pathconf row that
++// nix's FreeBSD-compatible code expects. Values and types are taken from the
++// permissive FreeBSD libc definitions in this same crate (`unix/bsd` and
++// `unix/bsd/freebsdlike`); the native ABI model does not list them because no
++// S746 record or canonical constant group owns them yet.
++pub const UF_NODUMP: c_ulong = 0x00000001;
++pub const UF_IMMUTABLE: c_ulong = 0x00000002;
++pub const UF_APPEND: c_ulong = 0x00000004;
++pub const UF_OPAQUE: c_ulong = 0x00000008;
++pub const UF_NOUNLINK: c_ulong = 0x00000010;
++pub const UF_SETTABLE: c_ulong = 0x0000ffff;
++pub const SF_ARCHIVED: c_ulong = 0x00010000;
++pub const SF_IMMUTABLE: c_ulong = 0x00020000;
++pub const SF_APPEND: c_ulong = 0x00040000;
++pub const SF_NOUNLINK: c_ulong = 0x00100000;
++pub const SF_SETTABLE: c_ulong = 0xffff0000;
++
++pub const OXTABS: crate::tcflag_t = 0x4;
++pub const MDMBUF: crate::tcflag_t = 0x00100000;
++pub const _PC_MIN_HOLE_SIZE: c_int = 21;
++
 +extern "C" {
 +    // errno.h
 +    pub fn __errno_location() -> *mut c_int;
 +    pub fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
++
++    // langinfo.h
++    pub fn nl_langinfo(item: nl_item) -> *mut c_char;
++
++    // time.h timers
++    pub fn timer_create(
++        clockid: crate::clockid_t,
++        sevp: *mut sigevent,
++        timerid: *mut crate::timer_t,
++    ) -> c_int;
++    pub fn timer_delete(timerid: crate::timer_t) -> c_int;
++    pub fn timer_settime(
++        timerid: crate::timer_t,
++        flags: c_int,
++        new_value: *const itimerspec,
++        old_value: *mut itimerspec,
++    ) -> c_int;
++    pub fn timer_gettime(timerid: crate::timer_t, curr_value: *mut itimerspec) -> c_int;
++    pub fn timer_getoverrun(timerid: crate::timer_t) -> c_int;
++
++    // signal.h
++    pub fn sigsuspend(mask: *const sigset_t) -> c_int;
++
++    // unistd.h
++    pub fn daemon(nochdir: c_int, noclose: c_int) -> c_int;
++
++    // grp.h
++    pub fn setgroups(ngroups: c_int, ptr: *const crate::gid_t) -> c_int;
++    pub fn eaccess(path: *const c_char, mode: c_int) -> c_int;
++    pub fn chflags(path: *const c_char, flags: c_ulong) -> c_int;
++    pub fn initgroups(user: *const c_char, group: crate::gid_t) -> c_int;
++
++    // sys/stat.h
++    pub fn mkfifoat(dirfd: c_int, pathname: *const c_char, mode: mode_t) -> c_int;
 +
 +    // dirent.h
 +    pub fn dirfd(dirp: *mut crate::DIR) -> c_int;
@@ -121882,8 +122358,546 @@ index 0000000..eece6e2288f3e562d3c908518c7502018b5d51e9
 +        tm: *const crate::tm,
 +    ) -> size_t;
 +
++    // sys/statfs.h
++    pub fn statfs(path: *const c_char, buf: *mut statfs) -> c_int;
++    pub fn fstatfs(fd: c_int, buf: *mut statfs) -> c_int;
++
++    // sys/stat.h and fcntl.h extras
++    pub fn lutimes(filename: *const c_char, times: *const crate::timeval) -> c_int;
++    pub fn utimensat(
++        dirfd: c_int,
++        pathname: *const c_char,
++        times: *const crate::timespec,
++        flags: c_int,
++    ) -> c_int;
++    pub fn mknodat(dirfd: c_int, pathname: *const c_char, mode: mode_t, dev: crate::dev_t)
++        -> c_int;
++    pub fn faccessat(dirfd: c_int, pathname: *const c_char, mode: c_int, flags: c_int) -> c_int;
++    pub fn dup3(oldfd: c_int, newfd: c_int, flags: c_int) -> c_int;
++    pub fn fdatasync(fd: c_int) -> c_int;
++    pub fn posix_fadvise(fd: c_int, offset: off_t, len: off_t, advice: c_int) -> c_int;
++    pub fn posix_fallocate(fd: c_int, offset: off_t, len: off_t) -> c_int;
++    #[allow(dead_code)] // std does not call flock yet; the public ABI keeps it declared.
++    pub fn flock(fd: c_int, operation: c_int) -> c_int;
++    pub fn sync();
++    pub fn sethostname(name: *const c_char, len: size_t) -> c_int;
++    pub fn setdomainname(name: *const c_char, len: size_t) -> c_int;
++
++    // time.h extras
++    pub fn clock_getres(clk_id: crate::clockid_t, tp: *mut crate::timespec) -> c_int;
++    pub fn clock_settime(clk_id: crate::clockid_t, tp: *const crate::timespec) -> c_int;
++
++    // sys/wait.h
++    pub fn waitid(idtype: idtype_t, id: id_t, infop: *mut siginfo_t, options: c_int) -> c_int;
++
++    // dirent.h
++    pub fn seekdir(dirp: *mut crate::DIR, loc: c_long);
++
 +    // utmp.h
 +    pub fn login_tty(fd: c_int) -> c_int;
++}
++
++// ---------------------------------------------------------------------------
++// C64h: Linux-compatible surface required by the brush dependency graph.
++//
++// The types and constants follow the Raven ABI headers under
++// `libc/ravenlibc/include`; the Linux-only values that the ABI does not name
++// (DCCP, `SO_ORIGINAL_DST`, the MFD huge-page sizes and RWF flags) are the
++// documented Linux UAPI facts. The dependency crates select their Linux
++// branches for `target_os = "ravenbsd"`, so the names must exist here.
++
++
++pub type __fsword_t = c_long;
++pub type off64_t = off_t;
++pub type ino64_t = ino_t;
++pub type blkcnt64_t = blkcnt_t;
++pub type rlim64_t = rlim_t;
++pub type fsblkcnt64_t = fsblkcnt_t;
++pub type fsfilcnt64_t = fsfilcnt_t;
++pub type statfs64 = statfs;
++pub type statvfs64 = statvfs;
++pub type termios2 = termios;
++
++s! {
++
++
++    #[allow(dead_code)] // declared for the donor surface; std has its own poll path.
++    pub struct pollfd {
++        pub fd: c_int,
++        pub events: c_short,
++        pub revents: c_short,
++    }
++
++
++
++    pub struct signalfd_siginfo {
++        pub ssi_signo: u32,
++        pub ssi_errno: i32,
++        pub ssi_code: i32,
++        pub ssi_pid: u32,
++        pub ssi_uid: u32,
++        pub ssi_fd: i32,
++        pub ssi_tid: u32,
++        pub ssi_band: u32,
++        pub ssi_overrun: u32,
++        pub ssi_trapno: u32,
++        pub ssi_status: i32,
++        pub ssi_int: i32,
++        pub ssi_ptr: u64,
++        pub ssi_utime: u64,
++        pub ssi_stime: u64,
++        pub ssi_addr: u64,
++        pub ssi_addr_lsb: u16,
++        _pad2: Padding<u16>,
++        pub ssi_syscall: i32,
++        pub ssi_call_addr: u64,
++        pub ssi_arch: u32,
++        _pad: Padding<[u8; 28]>,
++    }
++
++    pub struct sockaddr_vm {
++        pub svm_family: crate::sa_family_t,
++        pub svm_reserved1: c_ushort,
++        pub svm_port: c_uint,
++        pub svm_cid: c_uint,
++        pub svm_zero: [u8; 4],
++    }
++
++    pub struct ip_mreqn {
++        pub imr_multiaddr: crate::in_addr,
++        pub imr_address: crate::in_addr,
++        pub imr_ifindex: c_int,
++    }
++
++    pub struct ip_mreq_source {
++        pub imr_multiaddr: crate::in_addr,
++        pub imr_interface: crate::in_addr,
++        pub imr_sourceaddr: crate::in_addr,
++    }
++
++    pub struct sock_filter {
++        pub code: c_ushort,
++        pub jt: c_uchar,
++        pub jf: c_uchar,
++        pub k: c_uint,
++    }
++
++    pub struct sock_fprog {
++        pub len: c_ushort,
++        pub filter: *mut crate::sock_filter,
++    }
++
++    pub struct sysinfo {
++        pub uptime: i64,
++        pub loads: [u64; 3],
++        pub totalram: u64,
++        pub freeram: u64,
++        pub sharedram: u64,
++        pub bufferram: u64,
++        pub totalswap: u64,
++        pub freeswap: u64,
++        pub procs: c_ushort,
++        pub pad: c_ushort,
++        pub totalhigh: u64,
++        pub freehigh: u64,
++        pub mem_unit: c_uint,
++        pub _f: [c_char; 0],
++    }
++}
++
++
++// sys/socket.h and netinet/in.h (Raven ABI).
++pub const SOCK_RDM: c_int = 4;
++pub const SOCK_DCCP: c_int = 6;
++pub const AF_PACKET: c_int = 17;
++pub const AF_VSOCK: c_int = 40;
++pub const IPPROTO_DCCP: c_int = 33;
++pub const IPPROTO_MPTCP: c_int = 262;
++pub const IPPROTO_SCTP: c_int = 132;
++pub const IPPROTO_UDPLITE: c_int = 136;
++pub const SOL_IP: c_int = 0;
++pub const SOL_IPV6: c_int = 41;
++pub const SOL_DCCP: c_int = 269;
++pub const SO_MARK: c_int = 36;
++pub const SO_BINDTODEVICE: c_int = 25;
++pub const SO_BINDTOIFINDEX: c_int = 62;
++pub const SO_BUSY_POLL: c_int = 46;
++pub const SO_INCOMING_CPU: c_int = 49;
++pub const SO_ATTACH_FILTER: c_int = 26;
++pub const SO_DETACH_FILTER: c_int = 27;
++pub const SO_COOKIE: c_int = 57;
++pub const SO_ORIGINAL_DST: c_int = 80;
++pub const IP_TRANSPARENT: c_int = 19;
++pub const IP_FREEBIND: c_int = 15;
++pub const IP_MULTICAST_ALL: c_int = 49;
++pub const IPV6_TRANSPARENT: c_int = 75;
++pub const IPV6_FREEBIND: c_int = 78;
++pub const IPV6_MULTICAST_ALL: c_int = 29;
++pub const IPV6_TCLASS: c_int = 67;
++pub const IP6T_SO_ORIGINAL_DST: c_int = 80;
++pub const TCP_CONGESTION: c_int = 13;
++pub const TCP_CORK: c_int = 3;
++pub const TCP_NOTSENT_LOWAT: c_int = 25;
++pub const TCP_QUICKACK: c_int = 12;
++pub const TCP_THIN_LINEAR_TIMEOUTS: c_int = 16;
++pub const TCP_USER_TIMEOUT: c_int = 18;
++pub const MSG_CONFIRM: c_int = 2048;
++pub const IP_HDRINCL: c_int = 3;
++pub const IPV6_HDRINCL: c_int = 36;
++pub const IPV6_RECVHOPLIMIT: c_int = 51;
++pub const IPV6_RECVTCLASS: c_int = 66;
++pub const IP_ADD_SOURCE_MEMBERSHIP: c_int = 39;
++pub const IP_DROP_SOURCE_MEMBERSHIP: c_int = 40;
++
++pub const DCCP_SOCKOPT_SERVICE: c_int = 2;
++pub const DCCP_SOCKOPT_SERVER_TIMEWAIT: c_int = 6;
++pub const DCCP_SOCKOPT_SEND_CSCOV: c_int = 10;
++pub const DCCP_SOCKOPT_RECV_CSCOV: c_int = 11;
++pub const DCCP_SOCKOPT_QPOLICY_TXQLEN: c_int = 17;
++pub const DCCP_SOCKOPT_AVAILABLE_CCIDS: c_int = 12;
++pub const DCCP_SOCKOPT_CCID: c_int = 13;
++pub const DCCP_SOCKOPT_GET_CUR_MPS: c_int = 5;
++pub const DCCP_SOCKOPT_RX_CCID: c_int = 15;
++pub const DCCP_SOCKOPT_TX_CCID: c_int = 14;
++
++// sys/termios.h and sys/ioctl.h (Raven ABI).
++pub const TCGETS2: c_ulong = 0x802c542a;
++pub const TCSETS2: c_ulong = 0x402c542b;
++pub const TCSETSW2: c_ulong = 0x402c542c;
++pub const TCSETSF2: c_ulong = 0x402c542d;
++pub const UIO_MAXIOV: usize = 1024;
++pub const BOTHER: crate::speed_t = 0o010_000;
++pub const IBSHIFT: crate::tcflag_t = 16;
++
++// sys/statvfs.h, sys/uio.h, sys/mman.h, sys/signalfd.h.
++pub const ST_NODEV: c_ulong = 4;
++pub const ST_NOEXEC: c_ulong = 8;
++pub const ST_SYNCHRONOUS: c_ulong = 16;
++pub const ST_MANDLOCK: c_ulong = 64;
++pub const ST_NOATIME: c_ulong = 1024;
++pub const ST_NODIRATIME: c_ulong = 2048;
++pub const SFD_CLOEXEC: c_int = 0o200_0000;
++pub const SFD_NONBLOCK: c_int = 0o4_000;
++pub const MFD_CLOEXEC: c_uint = 0x1;
++pub const MFD_ALLOW_SEALING: c_uint = 0x2;
++pub const MFD_HUGETLB: c_uint = 0x4;
++pub const RWF_HIPRI: c_int = 0x0000_0001;
++pub const RWF_DSYNC: c_int = 0x0000_0002;
++pub const RWF_SYNC: c_int = 0x0000_0004;
++pub const RWF_NOWAIT: c_int = 0x0000_0008;
++pub const RWF_APPEND: c_int = 0x0000_0010;
++pub const RWF_NOAPPEND: c_int = 0x0000_0020;
++pub const RWF_ATOMIC: c_int = 0x0000_0040;
++pub const RWF_DONTCACHE: c_int = 0x0000_0080;
++
++// bits/signum.h and sys/wait.h.
++pub const P_PIDFD: idtype_t = 3;
++pub const SYS_pidfd_open: c_long = 434;
++pub const PIDFD_NONBLOCK: c_int = 0o4_000;
++
++#[allow(dead_code)] // std does not call every declared entry point yet.
++extern "C" {
++    // sys/socket.h
++    pub fn accept4(
++        socket: c_int,
++        address: *mut crate::sockaddr,
++        address_len: *mut crate::socklen_t,
++        flags: c_int,
++    ) -> c_int;
++    pub fn eventfd(count: c_uint, flags: c_int) -> c_int;
++    pub fn sendfile(out_fd: c_int, in_fd: c_int, offset: *mut off_t, count: size_t) -> ssize_t;
++
++    // sys/statfs.h
++    pub fn statfs64(path: *const c_char, sz: size_t, buf: *mut crate::statfs64) -> c_int;
++    pub fn fstatfs64(fd: c_int, sz: size_t, buf: *mut crate::statfs64) -> c_int;
++
++    // unistd.h / sys/syscall.h
++    pub fn syscall(num: c_long, ...) -> c_long;
++    pub fn lseek64(fd: c_int, offset: off64_t, whence: c_int) -> off64_t;
++    pub fn syncfs(fd: c_int) -> c_int;
++    pub fn fsync(fd: c_int) -> c_int;
++    pub fn setfsuid(uid: crate::uid_t) -> c_int;
++    pub fn setfsgid(gid: crate::gid_t) -> c_int;
++    pub fn fexecve(
++        fd: c_int,
++        argv: *const *const c_char,
++        envp: *const *const c_char,
++    ) -> c_int;
++    pub fn forkpty(
++        amaster: *mut c_int,
++        name: *mut c_char,
++        termp: *const crate::termios,
++        winp: *const crate::winsize,
++    ) -> crate::pid_t;
++    pub fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
++    pub fn sysinfo(info: *mut crate::sysinfo) -> c_int;
++    pub fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t;
++    pub fn gethostname(name: *mut c_char, len: size_t) -> c_int;
++    pub fn ttyname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
++    pub fn tcgetattr(fd: c_int, termios_p: *mut crate::termios) -> c_int;
++    pub fn tcsetattr(
++        fd: c_int,
++        optional_actions: c_int,
++        termios_p: *const crate::termios,
++    ) -> c_int;
++    pub fn tcgetpgrp(fd: c_int) -> crate::pid_t;
++    pub fn tcsetpgrp(fd: c_int, pgrp: crate::pid_t) -> c_int;
++    pub fn killpg(pgrp: crate::pid_t, sig: c_int) -> c_int;
++    pub fn cfmakeraw(termios_p: *mut crate::termios);
++    pub fn truncate(path: *const c_char, length: off_t) -> c_int;
++    pub fn readlink(path: *const c_char, buf: *mut c_char, bufsiz: size_t) -> ssize_t;
++    pub fn chdir(path: *const c_char) -> c_int;
++    pub fn chroot(path: *const c_char) -> c_int;
++    pub fn umask(mask: crate::mode_t) -> crate::mode_t;
++    pub fn ppoll(
++        fds: *mut crate::pollfd,
++        nfds: crate::nfds_t,
++        timeout: *const crate::timespec,
++        sigmask: *const crate::sigset_t,
++    ) -> c_int;
++    pub fn signalfd(fd: c_int, mask: *const crate::sigset_t, flags: c_int) -> c_int;
++}
++
++// bits/sysconf.h values used by nix.
++
++// Linux filesystem magic values used by nix `statfs` (UAPI facts).
++pub const ADFS_SUPER_MAGIC: c_long = 0x0000adf5;
++pub const AFFS_SUPER_MAGIC: c_long = 0x0000adff;
++pub const AFS_SUPER_MAGIC: c_long = 0x5346414f;
++pub const AUTOFS_SUPER_MAGIC: c_long = 0x0187;
++pub const BPF_FS_MAGIC: c_long = 0xcafe4a11;
++pub const BTRFS_SUPER_MAGIC: c_long = 0x9123683e;
++pub const CGROUP2_SUPER_MAGIC: c_long = 0x63677270;
++pub const CGROUP_SUPER_MAGIC: c_long = 0x27e0eb;
++pub const CODA_SUPER_MAGIC: c_long = 0x73757245;
++pub const CRAMFS_MAGIC: c_long = 0x28cd3d45;
++pub const DEBUGFS_MAGIC: c_long = 0x64626720;
++pub const DEVPTS_SUPER_MAGIC: c_long = 0x1cd1;
++pub const ECRYPTFS_SUPER_MAGIC: c_long = 0xf15f;
++pub const EFS_SUPER_MAGIC: c_long = 0x00414a53;
++pub const EXT2_SUPER_MAGIC: c_long = 0x0000ef53;
++pub const EXT3_SUPER_MAGIC: c_long = 0x0000ef53;
++pub const EXT4_SUPER_MAGIC: c_long = 0x0000ef53;
++pub const F2FS_SUPER_MAGIC: c_long = 0xf2f52010;
++pub const FUSE_SUPER_MAGIC: c_long = 0x65735546;
++pub const FUTEXFS_SUPER_MAGIC: c_long = 0xbad1dea;
++pub const HOSTFS_SUPER_MAGIC: c_long = 0x00c0ffee;
++pub const HPFS_SUPER_MAGIC: c_long = 0xf995e849;
++pub const HUGETLBFS_MAGIC: c_long = 0x958458f6;
++pub const ISOFS_SUPER_MAGIC: c_long = 0x00009660;
++pub const JFFS2_SUPER_MAGIC: c_long = 0x000072b6;
++pub const MINIX2_SUPER_MAGIC2: c_long = 0x00002478;
++pub const MINIX2_SUPER_MAGIC: c_long = 0x00002468;
++pub const MINIX3_SUPER_MAGIC: c_long = 0x4d5a;
++pub const MINIX_SUPER_MAGIC2: c_long = 0x0000138f;
++pub const MINIX_SUPER_MAGIC: c_long = 0x0000137f;
++pub const MSDOS_SUPER_MAGIC: c_long = 0x00004d44;
++pub const NCP_SUPER_MAGIC: c_long = 0x0000564c;
++pub const NFS_SUPER_MAGIC: c_long = 0x00006969;
++pub const NILFS_SUPER_MAGIC: c_long = 0x3434;
++pub const NSFS_MAGIC: c_long = 0x6e736673;
++pub const OCFS2_SUPER_MAGIC: c_long = 0x7461636f;
++pub const OPENPROM_SUPER_MAGIC: c_long = 0x00009fa1;
++pub const OVERLAYFS_SUPER_MAGIC: c_long = 0x794c7630;
++pub const PROC_SUPER_MAGIC: c_long = 0x00009fa0;
++pub const QNX4_SUPER_MAGIC: c_long = 0x0000002f;
++pub const QNX6_SUPER_MAGIC: c_long = 0x68191122;
++pub const RDTGROUP_SUPER_MAGIC: c_long = 0x7655821;
++pub const REISERFS_SUPER_MAGIC: c_long = 0x52654973;
++pub const SECURITYFS_MAGIC: c_long = 0x73636673;
++pub const SELINUX_MAGIC: c_long = 0xf97cff8c;
++pub const SMACK_MAGIC: c_long = 0x43415d53;
++pub const SMB_SUPER_MAGIC: c_long = 0x0000517b;
++pub const SYSFS_MAGIC: c_long = 0x62656572;
++pub const TMPFS_MAGIC: c_long = 0x01021994;
++pub const TRACEFS_MAGIC: c_long = 0x74726163;
++pub const UDF_SUPER_MAGIC: c_long = 0x15013346;
++pub const USBDEVICE_SUPER_MAGIC: c_long = 0x00009fa2;
++pub const XENFS_SUPER_MAGIC: c_long = 0xabba1974;
++pub const XFS_SUPER_MAGIC: c_long = 0x58465342;
++
++// sys/mman.h huge-page flags (Linux UAPI).
++pub const MFD_HUGE_64KB: c_uint = 0x4000_0000;
++pub const MFD_HUGE_512KB: c_uint = 0x4c00_0000;
++pub const MFD_HUGE_1MB: c_uint = 0x5000_0000;
++pub const MFD_HUGE_2MB: c_uint = 0x5400_0000;
++pub const MFD_HUGE_8MB: c_uint = 0x5c00_0000;
++pub const MFD_HUGE_16MB: c_uint = 0x6000_0000;
++pub const MFD_HUGE_32MB: c_uint = 0x6400_0000;
++pub const MFD_HUGE_256MB: c_uint = 0x7000_0000;
++pub const MFD_HUGE_512MB: c_uint = 0x7400_0000;
++pub const MFD_HUGE_1GB: c_uint = 0x7800_0000;
++pub const MFD_HUGE_2GB: c_uint = 0x7c00_0000;
++pub const MFD_HUGE_16GB: c_uint = 0x8800_0000;
++pub const MFD_HUGE_MASK: c_uint = 63;
++pub const MFD_HUGE_SHIFT: c_uint = 26;
++
++// sys/eventfd.h, errno and sys/sysinfo.h.
++pub const EFD_CLOEXEC: c_int = crate::O_CLOEXEC;
++pub const EFD_NONBLOCK: c_int = crate::O_NONBLOCK;
++pub const SI_LOAD_SHIFT: c_uint = 16;
++
++// x86_64 syscall numbers used by the brush dependency graph.
++pub const SYS_gettid: c_long = 186;
++pub const SYS_memfd_create: c_long = 319;
++pub const SYS_execveat: c_long = 322;
++pub const SYS_pivot_root: c_long = 155;
++
++// ---------------------------------------------------------------------------
++// K26a merge: Linux-compatible surface needed by the current rustix/nix
++// dependency graph after the C64h/P2 merge. The values are the documented
++// Linux UAPI facts; the Raven ABI does not name these yet.
++
++pub type stat64 = stat;
++pub type dirent64 = dirent;
++pub type loff_t = c_longlong;
++
++// inotify.h
++pub const IN_ACCESS: c_uint = 0x0000_0001;
++pub const IN_MODIFY: c_uint = 0x0000_0002;
++pub const IN_ATTRIB: c_uint = 0x0000_0004;
++pub const IN_CLOSE_WRITE: c_uint = 0x0000_0008;
++pub const IN_CLOSE_NOWRITE: c_uint = 0x0000_0010;
++pub const IN_OPEN: c_uint = 0x0000_0020;
++pub const IN_MOVED_FROM: c_uint = 0x0000_0040;
++pub const IN_MOVED_TO: c_uint = 0x0000_0080;
++pub const IN_CREATE: c_uint = 0x0000_0100;
++pub const IN_DELETE: c_uint = 0x0000_0200;
++pub const IN_DELETE_SELF: c_uint = 0x0000_0400;
++pub const IN_MOVE_SELF: c_uint = 0x0000_0800;
++pub const IN_UNMOUNT: c_uint = 0x0000_2000;
++pub const IN_Q_OVERFLOW: c_uint = 0x0000_4000;
++pub const IN_IGNORED: c_uint = 0x0000_8000;
++pub const IN_ONLYDIR: c_uint = 0x0100_0000;
++pub const IN_DONT_FOLLOW: c_uint = 0x0200_0000;
++pub const IN_EXCL_UNLINK: c_uint = 0x0400_0000;
++pub const IN_MASK_CREATE: c_uint = 0x1000_0000;
++pub const IN_MASK_ADD: c_uint = 0x2000_0000;
++pub const IN_ISDIR: c_uint = 0x4000_0000;
++pub const IN_ONESHOT: c_uint = 0x8000_0000;
++pub const IN_CLOEXEC: c_int = O_CLOEXEC;
++pub const IN_NONBLOCK: c_int = O_NONBLOCK;
++pub const IN_CLOSE: c_uint = IN_CLOSE_WRITE | IN_CLOSE_NOWRITE;
++pub const IN_MOVE: c_uint = IN_MOVED_FROM | IN_MOVED_TO;
++pub const IN_ALL_EVENTS: c_uint = 0x0000_0fff;
++
++// fcntl.h seals and memfd_create(2) flags.
++pub const F_SEAL_EXEC: c_int = 0x0020;
++pub const MFD_EXEC: c_uint = 0x0010;
++pub const MFD_NOEXEC_SEAL: c_uint = 0x0008;
++
++// renameat2(2) flags.
++pub const RENAME_EXCHANGE: c_uint = 2;
++pub const RENAME_WHITEOUT: c_uint = 4;
++
++// lseek(2) extensions.
++pub const SEEK_DATA: c_int = 3;
++pub const SEEK_HOLE: c_int = 4;
++
++// statx(2).
++pub const STATX_TYPE: c_uint = 0x0000_0001;
++pub const STATX_MODE: c_uint = 0x0000_0002;
++pub const STATX_NLINK: c_uint = 0x0000_0004;
++pub const STATX_UID: c_uint = 0x0000_0008;
++pub const STATX_GID: c_uint = 0x0000_0010;
++pub const STATX_ATIME: c_uint = 0x0000_0020;
++pub const STATX_MTIME: c_uint = 0x0000_0040;
++pub const STATX_CTIME: c_uint = 0x0000_0080;
++pub const STATX_INO: c_uint = 0x0000_0100;
++pub const STATX_SIZE: c_uint = 0x0000_0200;
++pub const STATX_BLOCKS: c_uint = 0x0000_0400;
++pub const STATX_BASIC_STATS: c_uint = 0x0000_07ff;
++pub const STATX_BTIME: c_uint = 0x0000_0800;
++pub const STATX_MNT_ID: c_uint = 0x0000_1000;
++pub const STATX_DIOALIGN: c_uint = 0x0000_2000;
++pub const STATX_ALL: c_uint = 0x0000_0fff;
++pub const STATX__RESERVED: c_uint = 0x8000_0000;
++pub const STATX_ATTR_COMPRESSED: c_uint = 0x0000_0004;
++pub const STATX_ATTR_IMMUTABLE: c_uint = 0x0000_0010;
++pub const STATX_ATTR_APPEND: c_uint = 0x0000_0020;
++pub const STATX_ATTR_NODUMP: c_uint = 0x0000_0040;
++pub const STATX_ATTR_ENCRYPTED: c_uint = 0x0000_0800;
++pub const STATX_ATTR_AUTOMOUNT: c_uint = 0x0000_1000;
++pub const STATX_ATTR_MOUNT_ROOT: c_uint = 0x0000_2000;
++pub const STATX_ATTR_VERITY: c_uint = 0x0010_0000;
++pub const STATX_ATTR_DAX: c_uint = 0x0020_0000;
++
++// xattr flags.
++pub const XATTR_CREATE: c_int = 1;
++pub const XATTR_REPLACE: c_int = 2;
++
++// block device ioctls.
++pub const BLKSSZGET: c_ulong = 0x1268;
++pub const BLKPBSZGET: c_ulong = 0x127b;
++
++// FICLONE.
++pub const FICLONE: c_ulong = 0x4004_9409;
++
++// x86_64 syscall numbers used by the current rustix/nix graph.
++pub const SYS_getdents64: c_long = 217;
++pub const SYS_fchmod: c_long = 91;
++pub const SYS_fchown: c_long = 93;
++pub const SYS_fchmodat: c_long = 268;
++pub const SYS_renameat2: c_long = 316;
++pub const SYS_syncfs: c_long = 306;
++pub const SYS_copy_file_range: c_long = 326;
++pub const SYS_statx: c_long = 332;
++
++extern "C" {
++    pub fn inotify_init1(flags: c_int) -> c_int;
++    pub fn inotify_add_watch(fd: c_int, pathname: *const c_char, mask: c_uint) -> c_int;
++    pub fn inotify_rm_watch(fd: c_int, wd: c_int) -> c_int;
++    pub fn sendfile64(
++        out_fd: c_int,
++        in_fd: c_int,
++        offset: *mut loff_t,
++        count: size_t,
++    ) -> ssize_t;
++    pub fn getxattr(
++        path: *const c_char,
++        name: *const c_char,
++        value: *mut c_void,
++        size: size_t,
++    ) -> ssize_t;
++    pub fn lgetxattr(
++        path: *const c_char,
++        name: *const c_char,
++        value: *mut c_void,
++        size: size_t,
++    ) -> ssize_t;
++    pub fn fgetxattr(
++        fd: c_int,
++        name: *const c_char,
++        value: *mut c_void,
++        size: size_t,
++    ) -> ssize_t;
++    pub fn setxattr(
++        path: *const c_char,
++        name: *const c_char,
++        value: *const c_void,
++        size: size_t,
++        flags: c_int,
++    ) -> c_int;
++    pub fn lsetxattr(
++        path: *const c_char,
++        name: *const c_char,
++        value: *const c_void,
++        size: size_t,
++        flags: c_int,
++    ) -> c_int;
++    pub fn fsetxattr(
++        fd: c_int,
++        name: *const c_char,
++        value: *const c_void,
++        size: size_t,
++        flags: c_int,
++    ) -> c_int;
++    pub fn listxattr(path: *const c_char, list: *mut c_char, size: size_t) -> ssize_t;
++    pub fn llistxattr(path: *const c_char, list: *mut c_char, size: size_t) -> ssize_t;
++    pub fn flistxattr(fd: c_int, list: *mut c_char, size: size_t) -> ssize_t;
++    pub fn removexattr(path: *const c_char, name: *const c_char) -> c_int;
++    pub fn lremovexattr(path: *const c_char, name: *const c_char) -> c_int;
++    pub fn fremovexattr(fd: c_int, name: *const c_char) -> c_int;
 +}
 diff --git a/library/libc-ravenbsd/src/unix/redox/mod.rs b/library/libc-ravenbsd/src/unix/redox/mod.rs
 new file mode 100644
