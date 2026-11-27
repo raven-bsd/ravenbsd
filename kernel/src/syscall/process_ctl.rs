@@ -1275,56 +1275,55 @@ fn take_event(child: &Process, event: WaitEvent) {
     }
 }
 
-/// Consume one ready child event, if any.
+/// One ready child event, not yet consumed.
+struct ReadyChild {
+    child: Arc<Process>,
+    event: WaitEvent,
+}
+
+/// Select one ready child event without consuming it.
 ///
 /// The caller's selection is re-checked at every pass: a child exit may race a signal kick
 /// (`SIGCHLD`), and the status must win over `EINTR` when both are ready. This mirrors the
 /// FreeBSD `kern_wait6` loop, which re-scans the child list after `msleep` before returning the
 /// interrupted error.
-fn take_ready_event(
+fn ready_child(
     caller: &Arc<Process>,
     idtype: u32,
     id: i32,
     options: u32,
-    destination: UserSlice,
-) -> Result<Option<usize>, Errno> {
+) -> Result<Option<ReadyChild>, Errno> {
     let children = children_for(caller, idtype, id)?;
     if children.is_empty() {
         return Err(Errno::ECHILD);
     }
-    for child in &children {
-        if let Some(event) = peek_event(child, options) {
-            let status = event.status();
-            take_event(child, event);
-            let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
-            copy_to_user(destination, &status.to_le_bytes())?;
-            return Ok(Some(pid));
+    for child in children {
+        if let Some(event) = peek_event(&child, options) {
+            return Ok(Some(ReadyChild { child, event }));
         }
     }
     Ok(None)
 }
 
-/// `proc_wait_ex(idtype, id, options, out_status) -> pid`.
+/// Blocking wait loop shared by `PROC_WAIT_EX` and `PROC_WAIT6`.
 ///
-/// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
-/// event is ready. Exit, stop and continue statuses use the POSIX encoding from
-/// [`crate::process::status`]. A blocking wait sleeps on the caller's child queue
-/// and is woken by exit/stop/continue notifications. A caught signal that
-/// interrupts the sleep returns `EINTR` (FreeBSD `kern_wait6` `msleep(... PCATCH)`,
-/// NetBSD `find_stopped_child`); the caller retries and the status stays queued.
-pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
-    let caller = process::current().ok_or(Errno::ESRCH)?;
-    let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
-    let id = frame.rsi as u32 as i32;
-    let options = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
-    if options & !WAIT_OPTIONS != 0 {
-        return Err(Errno::EINVAL);
-    }
-    let destination = UserSlice::new(frame.r10, 4)?;
-
+/// `deliver` consumes the selected event and returns the child pid. The loop sleeps on the
+/// caller's child queue and is woken by exit/stop/continue notifications; a caught signal that
+/// interrupts the sleep returns `EINTR` (FreeBSD `kern_wait6` `msleep(... PCATCH)`, NetBSD
+/// `find_stopped_child`), and the status stays queued.
+fn wait_loop<F>(
+    caller: &Arc<Process>,
+    idtype: u32,
+    id: i32,
+    options: u32,
+    mut deliver: F,
+) -> Result<usize, Errno>
+where
+    F: FnMut(Arc<Process>, WaitEvent) -> Result<usize, Errno>,
+{
     loop {
-        if let Some(pid) = take_ready_event(&caller, idtype, id, options, destination)? {
-            return Ok(pid);
+        if let Some(ready) = ready_child(caller, idtype, id, options)? {
+            return deliver(ready.child, ready.event);
         }
         if options & WNOHANG != 0 {
             return Ok(0);
@@ -1336,7 +1335,7 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
             return Err(Errno::EINTR);
         }
         let queued = caller.child_waiters.enqueue_if(caller.id, 0, || {
-            let children = children_for(&caller, idtype, id)?;
+            let children = children_for(caller, idtype, id)?;
             if children.is_empty() {
                 return Ok(false);
             }
@@ -1362,12 +1361,109 @@ pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
             // A child-exit notification is a plain wake, but its `SIGCHLD` queue entry kicks
             // this thread through the PG-7 bridge. If the status is already ready, return it;
             // only a signal with no child event is an interruption.
-            if let Some(pid) = take_ready_event(&caller, idtype, id, options, destination)? {
-                return Ok(pid);
+            if let Some(ready) = ready_child(caller, idtype, id, options)? {
+                return deliver(ready.child, ready.event);
             }
             return Err(Errno::EINTR);
         }
     }
+}
+
+/// `proc_wait_ex(idtype, id, options, out_status) -> pid`.
+///
+/// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
+/// event is ready. Exit, stop and continue statuses use the POSIX encoding from
+/// [`crate::process::status`]. A blocking wait sleeps on the caller's child queue
+/// and is woken by exit/stop/continue notifications. A caught signal that
+/// interrupts the sleep returns `EINTR` (FreeBSD `kern_wait6` `msleep(... PCATCH)`,
+/// NetBSD `find_stopped_child`); the caller retries and the status stays queued.
+pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    let id = frame.rsi as u32 as i32;
+    let options = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if options & !WAIT_OPTIONS != 0 {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(frame.r10, 4)?;
+
+    wait_loop(&caller, idtype, id, options, |child, event| {
+        let status = event.status();
+        take_event(&child, event);
+        let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
+        copy_to_user(destination, &status.to_le_bytes())?;
+        Ok(pid)
+    })
+}
+
+/// Validate one optional `PROC_WAIT6` output pointer.
+fn wait6_output(pointer: u64, length: u64) -> Result<Option<UserSlice>, Errno> {
+    if pointer == 0 {
+        Ok(None)
+    } else {
+        UserSlice::new(pointer, length).map(Some)
+    }
+}
+
+/// Zero the outputs of a `WNOHANG` miss as contract C21 requires.
+fn write_wait6_miss(
+    status_out: Option<UserSlice>,
+    wrusage_out: Option<UserSlice>,
+    siginfo_out: Option<UserSlice>,
+) -> Result<(), Errno> {
+    if let Some(destination) = status_out {
+        copy_to_user(destination, &0i32.to_le_bytes())?;
+    }
+    if let Some(destination) = siginfo_out {
+        copy_to_user(destination, &[0u8; status::SIGINFO_SIZE])?;
+    }
+    if let Some(destination) = wrusage_out {
+        copy_to_user(destination, &[0u8; status::WAIT6_WRUSAGE_SIZE])?;
+    }
+    Ok(())
+}
+
+/// `proc_wait6(idtype, id, options, status, wrusage, siginfo) -> pid` (contract C21).
+///
+/// The option word is validated before any child scan (`options == 0`, an unknown bit or no
+/// `WEXITED`/`WUNTRACED`/`WCONTINUED` selector is `EINVAL`). Each non-null output pointer is
+/// written with the fault-safe copyout; a null pointer skips that output. `WNOWAIT` reports the
+/// event without reaping it, and a `WNOHANG` miss returns 0 with zeroed outputs.
+pub fn wait6(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    let id = frame.rsi as u32 as i32;
+    let options = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if !status::wait6_options_valid(options) {
+        return Err(Errno::EINVAL);
+    }
+    let status_out = wait6_output(frame.r10, 4)?;
+    let wrusage_out = wait6_output(frame.r8, status::WAIT6_WRUSAGE_SIZE)?;
+    let siginfo_out = wait6_output(frame.r9, status::SIGINFO_SIZE)?;
+
+    let pid = wait_loop(&caller, idtype, id, options, |child, event| {
+        let pid = i32::try_from(child.id).map_err(|_| Errno::EOVERFLOW)?;
+        let uid = child.ids.lock().uid;
+        if let Some(destination) = status_out {
+            copy_to_user(destination, &event.status().to_le_bytes())?;
+        }
+        if let Some(destination) = siginfo_out {
+            copy_to_user(destination, &status::wait6_siginfo(event, pid, uid))?;
+        }
+        if let Some(destination) = wrusage_out {
+            // Resource accounting is not wired yet; the 288-byte product record is a documented
+            // zero gap, not a stub of the wait itself.
+            copy_to_user(destination, &[0u8; status::WAIT6_WRUSAGE_SIZE])?;
+        }
+        if options & status::WNOWAIT == 0 {
+            take_event(&child, event);
+        }
+        usize::try_from(pid).map_err(|_| Errno::EINVAL)
+    })?;
+    if pid == 0 {
+        write_wait6_miss(status_out, wrusage_out, siginfo_out)?;
+    }
+    Ok(pid)
 }
 
 /// `proc_getpgid(pid) -> pgid`. Zero means the caller.

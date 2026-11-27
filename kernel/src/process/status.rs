@@ -300,15 +300,47 @@ pub const CLD_STOPPED: i32 = 5;
 pub const CLD_CONTINUED: i32 = 6;
 
 /// True when a `PROC_WAIT6` option word is acceptable (FreeBSD `wait6_checkopt`).
+///
+/// `wait6_checkopt` rejects an unknown bit and an option word that selects none of
+/// `WEXITED`/`WUNTRACED`/`WCONTINUED`; `options == 0` is therefore `EINVAL` before any child is
+/// scanned.
 #[must_use]
 pub const fn wait6_options_valid(options: u32) -> bool {
-    options & !WAIT6_OPTIONS == 0
+    if options & !WAIT6_OPTIONS != 0 {
+        return false;
+    }
+    options & (WEXITED | WUNTRACED | WCONTINUED) != 0
 }
 
 /// Build the product `siginfo_t` bytes for one child event.
+///
+/// The record is the musl-layout `siginfo_t` at the C21 offsets: signo 0, errno 4, code 8,
+/// pid 16, uid 20, status 24, utime 32 and stime 40. `si_status` carries the full exit code,
+/// the terminating signal, the stop signal or `SIGCONT`; the time fields stay zero until the
+/// rusage accounting ticket (FreeBSD `wait_fill_siginfo`, `sys/kern/kern_exit.c:1141`).
 #[must_use]
-pub fn wait6_siginfo(_event: WaitEvent, _pid: i32, _uid: u32) -> [u8; SIGINFO_SIZE] {
-    [0u8; SIGINFO_SIZE]
+pub fn wait6_siginfo(event: WaitEvent, pid: i32, uid: u32) -> [u8; SIGINFO_SIZE] {
+    let (code, status) = match event {
+        WaitEvent::Exited(code) if code < 0 => {
+            let raw = code.unsigned_abs();
+            let signo = i32::try_from(raw & 0x7f).unwrap_or(0);
+            if raw & 0x80 != 0 {
+                (CLD_DUMPED, signo)
+            } else {
+                (CLD_KILLED, signo)
+            }
+        }
+        WaitEvent::Exited(code) => (CLD_EXITED, code),
+        WaitEvent::Stopped(signo) => (CLD_STOPPED, i32::try_from(signo).unwrap_or(0)),
+        WaitEvent::Continued => (CLD_CONTINUED, i32::try_from(SIGCONT).unwrap_or(0)),
+    };
+    let mut info = [0u8; SIGINFO_SIZE];
+    info[0..4].copy_from_slice(&i32::try_from(SIGCHLD).unwrap_or(0).to_le_bytes());
+    info[8..12].copy_from_slice(&code.to_le_bytes());
+    info[16..20].copy_from_slice(&pid.to_le_bytes());
+    info[20..24].copy_from_slice(&uid.to_le_bytes());
+    info[24..28].copy_from_slice(&status.to_le_bytes());
+    info
 }
 
 /// What the kernel does with one generated signal for a target.

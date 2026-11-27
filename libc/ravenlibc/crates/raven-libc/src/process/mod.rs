@@ -93,6 +93,7 @@ pub(crate) mod vfork;
 pub(crate) mod wait;
 pub(crate) mod wait3;
 pub(crate) mod wait4;
+pub(crate) mod wait6;
 pub(crate) mod waitid;
 pub(crate) mod waitpid;
 

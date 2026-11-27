@@ -25,7 +25,8 @@ fn stop_and_continue_statuses_match_posix() {
 fn wait_events_encode_once() {
     assert_eq!(WaitEvent::Exited(7).status(), 7 << 8);
     assert_eq!(WaitEvent::Stopped(SIGSTOP).status(), (17 << 8) | 0x7f);
-    assert_eq!(WaitEvent::Continued.status(), 0xffff);
+    // FreeBSD `sys/sys/wait.h`: `WIFCONTINUED(x)` is `x == 0x13`, matching the product header.
+    assert_eq!(WaitEvent::Continued.status(), 0x13);
 }
 
 #[test]

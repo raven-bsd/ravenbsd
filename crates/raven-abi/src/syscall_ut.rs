@@ -66,3 +66,9 @@ fn signal_syscalls_are_frozen() {
     assert_eq!(PROC_SIGQUEUE, 0x86);
     assert_eq!(PROC_SIGRECV_DELIVERABLE, 2);
 }
+
+#[test]
+fn wait6_raw_seam_is_frozen() {
+    // Contract C21: the raw `PROC_WAIT6` number and the six-argument FreeBSD order.
+    assert_eq!(PROC_WAIT6, 0x8E);
+}
