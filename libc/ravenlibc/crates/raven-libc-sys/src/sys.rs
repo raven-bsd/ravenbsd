@@ -58,6 +58,253 @@ pub fn proc_exec(request: &[u8; 88]) -> Result<usize, Errno> {
     crate::errno::ret(raw)
 }
 
+/// Raw `USER_COPY` (`0x8E`): fault-safe copy between two ranges of the caller's address space.
+///
+/// The kernel validates both `UserSlice` ranges, rejects overlapping ranges and a length above
+/// 64 KiB with `EINVAL`, and copies through the assembly fixups so an unmapped page is `EFAULT`
+/// and never a kernel fault. The destination is unspecified on `EFAULT`; no partial count is
+/// returned. The host build has no kernel, so the same contract is served by a fault-safe copy
+/// of the calling process (`process_vm_readv`/`process_vm_writev`), which is what the host tests
+/// exercise.
+pub fn user_copy(dst: *mut u8, src: *const u8, len: usize) -> Result<(), Errno> {
+    #[cfg(target_os = "none")]
+    {
+        // SAFETY: `dst`/`src` are the caller's ranges. The kernel validates both against the
+        // user window before it copies, and every page fault inside the copy is fixed up to
+        // EFAULT.
+        crate::errno::ret(unsafe {
+            arch::syscall3(
+                raven_abi::syscall::USER_COPY,
+                dst as usize,
+                src as usize,
+                len,
+            )
+        })
+        .map(|_| ())
+    }
+    #[cfg(not(target_os = "none"))]
+    {
+        host_copy::user_copy(dst, src, len)
+    }
+}
+
+/// The host stand-in for the kernel `USER_COPY` fixup path.
+///
+/// A host test process has no Raven kernel, so the current-address-space copy is done by the
+/// host kernel's own fault-safe primitive. The contract is identical: zero length succeeds
+/// without touching a pointer, a length above 64 KiB and an overlapping range are `EINVAL`
+/// before any byte, and an unmapped, protected or kernel-half range is `EFAULT`.
+///
+/// The host syscalls are issued directly rather than through [`crate::arch`]: with the
+/// `host-fake` feature those stubs dispatch into the in-memory kernel, which has no real
+/// address space and cannot model an unmapped page.
+#[cfg(not(target_os = "none"))]
+mod host_copy {
+    use raven_abi::errno::Errno;
+
+    /// Largest accepted `USER_COPY` length (the kernel contract).
+    const MAX_USER_COPY: usize = 64 * 1024;
+
+    /// Bytes per fault-safe round trip; the kernel uses a bounded chunk loop too.
+    const CHUNK: usize = 512;
+
+    /// One host `struct iovec`.
+    #[repr(C)]
+    struct IoVec {
+        base: *mut u8,
+        len: usize,
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    const GETPID: usize = 39;
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    const GETPID: usize = 172;
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    const PROCESS_VM_READV: usize = 310;
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    const PROCESS_VM_READV: usize = 270;
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    const PROCESS_VM_WRITEV: usize = 311;
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    const PROCESS_VM_WRITEV: usize = 271;
+
+    /// Linux `syscall` with six arguments, independent of the `host-fake` dispatch.
+    ///
+    /// # Safety
+    ///
+    /// `number` must be a Linux system-call number and the arguments must satisfy that call.
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    unsafe fn host_syscall6(
+        number: usize,
+        a0: usize,
+        a1: usize,
+        a2: usize,
+        a3: usize,
+        a4: usize,
+        a5: usize,
+    ) -> isize {
+        let result: isize;
+        // SAFETY: the register convention is the Linux x86-64 `syscall` ABI: number in `rax`,
+        // arguments in `rdi`, `rsi`, `rdx`, `r10`, `r8`, `r9`, result in `rax`.
+        unsafe {
+            core::arch::asm!(
+                "syscall",
+                inlateout("rax") number as isize => result,
+                in("rdi") a0,
+                in("rsi") a1,
+                in("rdx") a2,
+                in("r10") a3,
+                in("r8") a4,
+                in("r9") a5,
+                clobber_abi("C"),
+                options(nostack),
+            );
+        }
+        result
+    }
+
+    /// Linux `svc 0` with six arguments, independent of the `host-fake` dispatch.
+    ///
+    /// # Safety
+    ///
+    /// `number` must be a Linux system-call number and the arguments must satisfy that call.
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    unsafe fn host_syscall6(
+        number: usize,
+        a0: usize,
+        a1: usize,
+        a2: usize,
+        a3: usize,
+        a4: usize,
+        a5: usize,
+    ) -> isize {
+        let result: usize;
+        // SAFETY: the register convention is the Linux aarch64 `svc 0` ABI: number in `x8`,
+        // arguments in `x0..x5`, result in `x0`.
+        unsafe {
+            core::arch::asm!(
+                "svc 0",
+                inlateout("x0") a0 => result,
+                in("x1") a1,
+                in("x2") a2,
+                in("x3") a3,
+                in("x4") a4,
+                in("x5") a5,
+                in("x8") number,
+                options(nostack),
+            );
+        }
+        result as isize
+    }
+
+    pub(super) fn user_copy(dst: *mut u8, src: *const u8, len: usize) -> Result<(), Errno> {
+        #[cfg(all(
+            target_os = "linux",
+            any(target_arch = "x86_64", target_arch = "aarch64")
+        ))]
+        {
+            linux_user_copy(dst, src, len)
+        }
+        #[cfg(not(all(
+            target_os = "linux",
+            any(target_arch = "x86_64", target_arch = "aarch64")
+        )))]
+        {
+            let _ = (dst, src, len);
+            // The fault-safe host primitive is implemented for the Linux gate hosts.
+            Err(Errno::ENOSYS)
+        }
+    }
+
+    #[cfg(all(
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    ))]
+    fn linux_user_copy(dst: *mut u8, src: *const u8, len: usize) -> Result<(), Errno> {
+        if len == 0 {
+            return Ok(());
+        }
+        if len > MAX_USER_COPY {
+            return Err(Errno::EINVAL);
+        }
+        let source = src as usize;
+        let destination = dst as usize;
+        let Some(source_end) = source.checked_add(len) else {
+            return Err(Errno::EFAULT);
+        };
+        let Some(destination_end) = destination.checked_add(len) else {
+            return Err(Errno::EFAULT);
+        };
+        // The kernel rejects overlap (this is not `memmove`); do not let the host copy hide it.
+        if source < destination_end && destination < source_end {
+            return Err(Errno::EINVAL);
+        }
+        // SAFETY: `getpid` takes no arguments and has no side effects.
+        let pid = unsafe { host_syscall6(GETPID, 0, 0, 0, 0, 0, 0) };
+        if pid < 0 {
+            return Err(Errno::EFAULT);
+        }
+        let mut buffer = [0u8; CHUNK];
+        let mut offset = 0usize;
+        while offset < len {
+            let chunk = len.saturating_sub(offset).min(CHUNK);
+            let mut local = IoVec {
+                base: buffer.as_mut_ptr(),
+                len: chunk,
+            };
+            let remote = IoVec {
+                base: src.wrapping_add(offset).cast_mut(),
+                len: chunk,
+            };
+            // SAFETY: `local` names the kernel-side stack buffer and `remote` the caller's
+            // source range; `process_vm_readv` returns EFAULT for an unmapped source.
+            let read = unsafe {
+                host_syscall6(
+                    PROCESS_VM_READV,
+                    pid as usize,
+                    &mut local as *mut IoVec as usize,
+                    1,
+                    &remote as *const IoVec as usize,
+                    1,
+                    0,
+                )
+            };
+            if read < 0 || read as usize != chunk {
+                return Err(Errno::EFAULT);
+            }
+            let local = IoVec {
+                base: buffer.as_mut_ptr(),
+                len: chunk,
+            };
+            let mut remote = IoVec {
+                base: dst.wrapping_add(offset),
+                len: chunk,
+            };
+            // SAFETY: `local` names the kernel-side stack buffer and `remote` the caller's
+            // destination range; `process_vm_writev` returns EFAULT for an unmapped or
+            // read-only destination.
+            let written = unsafe {
+                host_syscall6(
+                    PROCESS_VM_WRITEV,
+                    pid as usize,
+                    &local as *const IoVec as usize,
+                    1,
+                    &mut remote as *mut IoVec as usize,
+                    1,
+                    0,
+                )
+            };
+            if written < 0 || written as usize != chunk {
+                return Err(Errno::EFAULT);
+            }
+            offset = offset.saturating_add(chunk);
+        }
+        Ok(())
+    }
+}
+
 /// User-visible event record written by `EVQ_WAIT`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

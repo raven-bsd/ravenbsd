@@ -19,6 +19,10 @@
 use super::*;
 use crate::ffi::{TestLock, errno};
 use core::ffi::{c_char, c_void};
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::USER_END;
+#[cfg(target_arch = "x86_64")]
+use raven_abi::layout::x86_64::USER_END;
 use raven_libc_abi::errno::{EBADF, EFAULT, EINVAL, ENOSYS};
 use raven_libc_abi::mman::MADV_NORMAL;
 use raven_libc_abi::structs::{Pollfd, SigsetT, Timespec};
@@ -395,12 +399,22 @@ fn s173b_ppoll_accepts_a_mapped_in_window_record_pointer() {
     }];
     let address = records.as_mut_ptr() as usize;
     assert!(
-        raven_libc_platform::poll::validate_user_range(address as u64, core::mem::size_of::<Pollfd>() as u64)
-            .is_ok(),
+        raven_libc_platform::poll::validate_user_range(
+            address as u64,
+            core::mem::size_of::<Pollfd>() as u64
+        )
+        .is_ok(),
         "the stack record array is inside the user window"
     );
     // SAFETY: `records` is a live writable in-window array.
-    let result = unsafe { ppoll(records.as_mut_ptr(), 1, core::ptr::null(), core::ptr::null()) };
+    let result = unsafe {
+        ppoll(
+            records.as_mut_ptr(),
+            1,
+            core::ptr::null(),
+            core::ptr::null(),
+        )
+    };
     assert_eq!(result, 0);
     assert_eq!(errno::get(), 0);
 }
@@ -460,31 +474,129 @@ fn s173b_ppoll_rejects_an_unmapped_in_window_record_pointer_with_efault() {
     );
 }
 
-/// `pselect` must not be `ENOSYS`: a zero timeout with a temporary mask returns 0.
+/// A mapped, in-window range is copied exactly. The `pselect` masked-wait test this increment
+/// replaces remains in `tickets/evidence/artifacts/S173b/separating-tests.patch` and commit
+/// `55c3e247f`; it is not part of the independent `USER_COPY` pointer fix.
 #[test]
-fn s173b_pselect_is_not_enosys_and_accepts_a_temporary_mask() {
+fn s173b_user_copy_snapshots_a_mapped_range() {
     let _guard = TestLock::acquire();
-    errno::set_raw(0);
-    let timeout = Timespec {
-        tv_sec: 0,
-        tv_nsec: 0,
-    };
-    let mask = SigsetT::ZERO;
-    // SAFETY: NULL sets are empty, the timeout and mask are live values.
-    let result = unsafe {
-        pselect(
-            0,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
-            &timeout,
-            &mask,
-        )
-    };
+    let mut source = [0u8; 32];
+    for (index, byte) in source.iter_mut().enumerate() {
+        *byte = index as u8;
+    }
+    let mut destination = [0u8; 32];
+    let result =
+        raven_libc_sys::sys::user_copy(destination.as_mut_ptr(), source.as_ptr(), source.len());
+    assert_eq!(result, Ok(()));
+    assert_eq!(destination, source);
+}
+
+/// A zero-length copy succeeds without touching either pointer, including NULL.
+#[test]
+fn s173b_user_copy_zero_length_needs_no_pointer() {
+    // SAFETY: the contract says `len == 0` dereferences neither pointer.
+    let result = raven_libc_sys::sys::user_copy(core::ptr::null_mut(), core::ptr::null(), 0);
+    assert_eq!(result, Ok(()));
+    // SAFETY: same contract, all-ones pointers.
+    let result = raven_libc_sys::sys::user_copy(usize::MAX as *mut u8, usize::MAX as *const u8, 0);
+    assert_eq!(result, Ok(()));
+}
+
+/// Overlap is `EINVAL` (this is a copy, not a `memmove`); adjacent ranges are accepted.
+#[test]
+fn s173b_user_copy_rejects_overlap_and_accepts_adjacent_ranges() {
+    let mut bytes = [0u8; 32];
+    let base = bytes.as_mut_ptr();
+    // SAFETY: every range below is inside the live `bytes` array.
+    unsafe {
+        assert_eq!(
+            raven_libc_sys::sys::user_copy(base.add(1), base, 8),
+            Err(raven_libc_platform::Errno(EINVAL as u16))
+        );
+        assert_eq!(
+            raven_libc_sys::sys::user_copy(base, base.add(1), 8),
+            Err(raven_libc_platform::Errno(EINVAL as u16))
+        );
+        assert_eq!(
+            raven_libc_sys::sys::user_copy(base, base, 8),
+            Err(raven_libc_platform::Errno(EINVAL as u16))
+        );
+        // Adjacent both directions succeed.
+        assert_eq!(raven_libc_sys::sys::user_copy(base.add(8), base, 8), Ok(()));
+        assert_eq!(raven_libc_sys::sys::user_copy(base, base.add(8), 8), Ok(()));
+    }
+}
+
+/// The 64 KiB bound is enforced before any byte is copied.
+#[test]
+fn s173b_user_copy_max_length_succeeds_and_max_plus_one_is_einval() {
+    let _guard = TestLock::acquire();
+    let source = vec![0x5Au8; 64 * 1024];
+    let mut destination = vec![0u8; 64 * 1024];
+    let result =
+        raven_libc_sys::sys::user_copy(destination.as_mut_ptr(), source.as_ptr(), source.len());
+    assert_eq!(result, Ok(()));
+    assert_eq!(destination, source);
+
+    let mut guarded = [0xA5u8; 8];
+    let result =
+        raven_libc_sys::sys::user_copy(guarded.as_mut_ptr(), source.as_ptr(), 64 * 1024 + 1);
+    assert_eq!(result, Err(raven_libc_platform::Errno(EINVAL as u16)));
+    assert_eq!(guarded, [0xA5u8; 8], "no byte may be written on EINVAL");
+}
+
+/// The fault cases must return `-1`/`EFAULT` without dying: an unmapped in-window page, a
+/// kernel-half address, the donor `(void *)-1` and the end of the user window. Forked so a
+/// missing fault-safe copy is a signal in the child, never the test process.
+#[test]
+fn s173b_user_copy_rejects_unmapped_kernel_half_and_out_of_window_with_efault() {
+    // SAFETY: plain host libc declarations with the C signatures.
+    unsafe extern "C" {
+        fn fork() -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        fn _exit(status: i32) -> !;
+    }
+
+    let _guard = TestLock::acquire();
+    // SAFETY: fork takes no pointers; the child only calls `user_copy` and `_exit`.
+    let pid = unsafe { fork() };
+    assert!(pid >= 0, "fork failed: {pid}");
+    if pid == 0 {
+        let mut buffer = [0u8; 32];
+        let pointer = buffer.as_mut_ptr();
+        let source = buffer.as_ptr();
+        // Each case is a safe call over a live buffer on one side and the documented bad
+        // address on the other; the copy must reject the bad side without touching it.
+        let all_efault = {
+            let unmapped_source = raven_libc_sys::sys::user_copy(pointer, 0x1000 as *const u8, 8)
+                == Err(raven_libc_platform::Errno(EFAULT as u16));
+            let unmapped_destination = raven_libc_sys::sys::user_copy(0x1000 as *mut u8, source, 8)
+                == Err(raven_libc_platform::Errno(EFAULT as u16));
+            let kernel_source =
+                raven_libc_sys::sys::user_copy(pointer, 0xFFFF_8000_0000_0000usize as *const u8, 8)
+                    == Err(raven_libc_platform::Errno(EFAULT as u16));
+            let all_ones = raven_libc_sys::sys::user_copy(pointer, usize::MAX as *const u8, 8)
+                == Err(raven_libc_platform::Errno(EFAULT as u16));
+            let window_end = raven_libc_sys::sys::user_copy(pointer, USER_END as *const u8, 8)
+                == Err(raven_libc_platform::Errno(EFAULT as u16));
+            unmapped_source && unmapped_destination && kernel_source && all_ones && window_end
+        };
+        let code = if all_efault { 0 } else { 1 };
+        // SAFETY: ends the forked child without running the parent's test harness.
+        unsafe { _exit(code) };
+    }
+    let mut status = 0;
+    // SAFETY: `pid` is the child forked above and `status` is a live out pointer.
+    let reaped = unsafe { waitpid(pid, &mut status, 0) };
+    assert_eq!(reaped, pid, "waitpid did not reap the user_copy child");
+    let signal = status & 0x7f;
     assert_eq!(
-        result,
-        0,
-        "pselect with a zero timeout must return 0, not ENOSYS; errno={}",
-        errno::get()
+        signal, 0,
+        "user_copy bad pointers died from signal {signal}; they must return EFAULT"
+    );
+    let code = (status >> 8) & 0xff;
+    assert_eq!(
+        code, 0,
+        "user_copy bad pointer: 0 = every case EFAULT, 1 = a non-EFAULT result"
     );
 }

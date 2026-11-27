@@ -36,6 +36,8 @@ pub mod thread;
 /// `TRACE_SET` (R-OBS-6): the calling thread's current trace id.
 pub mod trace;
 pub mod tty;
+/// `USER_COPY` (S173b): fault-safe copy between two ranges of the caller's address space.
+pub mod user_copy;
 
 use core::sync::atomic::Ordering;
 
@@ -328,6 +330,10 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     // S51b: KLOG_READ (raw number 0x0E; not a Syscall variant).
     if number == raven_abi::syscall::KLOG_READ {
         return klog::read(frame);
+    }
+    // S173b: USER_COPY (raw number 0x8E; not a Syscall variant).
+    if number == raven_abi::syscall::USER_COPY {
+        return user_copy::user_copy(frame);
     }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.

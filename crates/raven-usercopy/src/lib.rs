@@ -86,6 +86,41 @@ impl<T> UserPtr<T> {
     }
 }
 
+/// Largest single `USER_COPY` request, in bytes (64 KiB).
+///
+/// The libc poll snapshot is 4096 records of 8 bytes (32 KiB), well inside this bound.
+pub const MAX_USER_COPY: u64 = 64 * 1024;
+
+/// Validate one `USER_COPY(dst, src, len)` request.
+///
+/// `USER_COPY` is a plain copy, not a `memmove`: overlapping ranges are `EINVAL` before any
+/// byte, and adjacent ranges are allowed. A zero-length request succeeds without touching
+/// either pointer. A length above [`MAX_USER_COPY`] is `EINVAL` before any byte; a range
+/// outside the caller's user window, an address/length overflow, a kernel-half address or a
+/// non-canonical pointer is `EFAULT`.
+pub fn validate_user_copy(dst: u64, src: u64, len: u64) -> Result<(), Errno> {
+    if len == 0 {
+        return Ok(());
+    }
+    if len > MAX_USER_COPY {
+        return Err(Errno::EINVAL);
+    }
+    let source = UserSlice::new(src, len)?;
+    let destination = UserSlice::new(dst, len)?;
+    let source_end = source
+        .address()
+        .checked_add(source.length())
+        .ok_or(Errno::EFAULT)?;
+    let destination_end = destination
+        .address()
+        .checked_add(destination.length())
+        .ok_or(Errno::EFAULT)?;
+    if source.address() < destination_end && destination.address() < source_end {
+        return Err(Errno::EINVAL);
+    }
+    Ok(())
+}
+
 /// Validate `address..address + length` against `start..end`.
 ///
 /// A zero-length range only needs an address inside `start..=end`; a non-zero range must end at or
@@ -115,123 +150,5 @@ pub fn is_user_address(address: u64) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const START: u64 = 0x1000;
-    const END: u64 = 0x4000;
-
-    #[test]
-    fn normal_range() {
-        assert!(UserSlice::new_in(0x2000, 0x100, START, END).is_ok());
-    }
-
-    #[test]
-    fn null_is_rejected() {
-        assert_eq!(UserSlice::new_in(0, 1, START, END), Err(Errno::EFAULT));
-    }
-
-    #[test]
-    fn below_start_is_rejected() {
-        assert_eq!(
-            UserSlice::new_in(START - 1, 1, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn kernel_half_is_rejected() {
-        assert_eq!(
-            UserSlice::new_in(0xFFFF_8000_0000_0000, 1, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn end_overflow_is_rejected() {
-        assert_eq!(
-            UserSlice::new_in(END - 1, 2, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn exact_end_with_zero_length_is_allowed() {
-        assert!(UserSlice::new_in(END, 0, START, END).is_ok());
-    }
-
-    #[test]
-    fn exact_end_with_data_is_rejected() {
-        assert_eq!(UserSlice::new_in(END, 1, START, END), Err(Errno::EFAULT));
-    }
-
-    #[test]
-    fn zero_length_inside_range_is_allowed() {
-        assert!(UserSlice::new_in(START, 0, START, END).is_ok());
-    }
-
-    #[test]
-    fn zero_length_below_range_is_rejected() {
-        assert_eq!(
-            UserSlice::new_in(START - 1, 0, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn length_above_isize_max_is_rejected() {
-        assert_eq!(
-            UserSlice::new_in(START, (isize::MAX as u64) + 1, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn max_length_is_rejected_without_overflow() {
-        assert_eq!(
-            UserSlice::new_in(START, u64::MAX, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn exact_boundary_is_accepted() {
-        assert!(UserSlice::new_in(START, END - START, START, END).is_ok());
-    }
-
-    #[test]
-    fn typed_pointer_checks_size() {
-        let pointer = UserPtr::<u64>::new_in(START, START, END).expect("aligned pointer");
-        assert_eq!(pointer.address(), START);
-    }
-
-    #[test]
-    fn typed_pointer_rejects_misalignment() {
-        assert_eq!(
-            UserPtr::<u32>::new_in(START + 1, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn typed_pointer_needs_full_object() {
-        assert_eq!(
-            UserPtr::<u64>::new_in(END - 4, START, END),
-            Err(Errno::EFAULT)
-        );
-    }
-
-    #[test]
-    fn user_address_helper() {
-        assert!(is_user_address(USER_MIN));
-        assert!(is_user_address(USER_END - 1));
-        assert!(!is_user_address(0));
-        assert!(!is_user_address(USER_END));
-        assert!(!is_user_address(0xFFFF_8000_0000_0000));
-    }
-
-    #[test]
-    fn invalid_range_is_rejected() {
-        assert_eq!(UserSlice::new_in(0x2000, 1, END, START), Err(Errno::EFAULT));
-    }
-}
+#[path = "lib_ut.rs"]
+mod tests;

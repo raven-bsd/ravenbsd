@@ -64,9 +64,10 @@ pub unsafe extern "C" fn ppoll(
 ) -> c_int {
     let count = usize::try_from(nfds).unwrap_or(usize::MAX);
     // FreeBSD `kern_poll`/`kern_poll_kfds` copies the record array and the timespec in, and the
-    // sigmask through `kern_sigprocmask`; each bad pointer is EFAULT. This shell reads them in
-    // user mode, so every pointer outside the user window is rejected before it forms a slice or
-    // dereferences the timespec/sigmask (the donor `(struct pollfd *)-1` case).
+    // sigmask through `kern_sigprocmask`; each bad pointer is EFAULT. This shell copies the
+    // record array through `USER_COPY`, so every pointer outside the user window is rejected
+    // before the syscall (the donor `(struct pollfd *)-1` case) and an in-window but unmapped
+    // page is EFAULT from the kernel fixup instead of a fault in this wrapper.
     let records_valid = count == 0
         || count
             .checked_mul(size_of::<Pollfd>())
@@ -79,20 +80,62 @@ pub unsafe extern "C" fn ppoll(
             raven_libc_abi::errno::EFAULT as u16,
         )));
     }
-    let records = if count == 0 {
-        &mut []
-    } else {
-        // SAFETY: `count` records at `fds` lie inside the user window (checked above) and the
-        // caller supplied them as writable pollfd values; an unmapped page inside the window is
-        // the kernel copyin gap, not something user mode can probe without faulting.
-        unsafe { core::slice::from_raw_parts_mut(fds, count) }
+    // The platform rejects more records than its event-queue limit; do it before allocating.
+    if count > raven_libc_platform::poll::MAX_POLL_FDS {
+        return ret::int(Err(raven_libc_abi::errno::Errno(
+            raven_libc_abi::errno::EINVAL as u16,
+        )));
+    }
+    let bytes = match count.checked_mul(size_of::<Pollfd>()) {
+        Some(bytes) => bytes,
+        None => {
+            return ret::int(Err(raven_libc_abi::errno::Errno(
+                raven_libc_abi::errno::EFAULT as u16,
+            )));
+        }
     };
+    // Snapshot the caller's array with the fault-safe copy before this shell forms any slice over
+    // the application pointer. `USER_COPY` is authoritative; the window check above is only a
+    // fast reject for pointers that can never be valid.
+    let mut snapshot: Vec<Pollfd> = Vec::new();
+    if count != 0 {
+        if snapshot.try_reserve_exact(count).is_err() {
+            return ret::int(Err(raven_libc_abi::errno::Errno(
+                raven_libc_abi::errno::ENOMEM as u16,
+            )));
+        }
+        snapshot.resize(
+            count,
+            Pollfd {
+                fd: 0,
+                events: 0,
+                revents: 0,
+            },
+        );
+        if let Err(error) = raven_libc_sys::sys::user_copy(
+            snapshot.as_mut_ptr().cast(),
+            fds.cast(),
+            bytes,
+        ) {
+            return ret::int(Err(map_error(error)));
+        }
+    }
     // SAFETY: NULL is `None`; otherwise the timespec address passed the user-window check above.
     let timeout = unsafe { timeout.as_ref() };
     // SAFETY: same contract as `timeout`.
     let mask = unsafe { sigmask.as_ref() }.copied();
+    let result = poll_with_mask(&mut snapshot, timeout, mask);
+    if result.is_ok() && count != 0 {
+        // FreeBSD `pollout` copies the `revents` array back; a failed copy-out is EFAULT.
+        if let Err(error) = raven_libc_sys::sys::user_copy(
+            fds.cast(),
+            snapshot.as_ptr().cast(),
+            bytes,
+        ) {
+            return ret::int(Err(map_error(error)));
+        }
+    }
     ret::platform_int(
-        poll_with_mask(records, timeout, mask)
-            .map(|ready| c_int::try_from(ready).unwrap_or(c_int::MAX)),
+        result.map(|ready| c_int::try_from(ready).unwrap_or(c_int::MAX)),
     )
 }
