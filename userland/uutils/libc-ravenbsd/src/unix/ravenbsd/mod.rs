@@ -56,10 +56,13 @@ s! {
     }
 
     pub struct dirent {
-        pub d_ino: crate::ino_t,
+        pub d_fileno: crate::ino_t,
         pub d_off: off_t,
-        pub d_reclen: c_ushort,
-        pub d_type: c_uchar,
+        pub d_reclen: u16,
+        pub d_type: u8,
+        d_pad0: Padding<u8>,
+        pub d_namlen: u16,
+        d_pad1: Padding<u16>,
         pub d_name: [c_char; 256],
     }
 
@@ -238,7 +241,6 @@ s! {
         pub c_oflag: crate::tcflag_t,
         pub c_cflag: crate::tcflag_t,
         pub c_lflag: crate::tcflag_t,
-        pub c_line: crate::cc_t,
         pub c_cc: [crate::cc_t; crate::NCCS],
         pub c_ispeed: crate::speed_t,
         pub c_ospeed: crate::speed_t,
@@ -536,13 +538,13 @@ pub const EPERM: c_int = 1; /* Operation not permitted */
 pub const ENOENT: c_int = 2; /* No such file or directory */
 pub const ESRCH: c_int = 3; /* No such process */
 pub const EINTR: c_int = 4; /* Interrupted system call */
-pub const EIO: c_int = 5; /* I/O error */
-pub const ENXIO: c_int = 6; /* No such device or address */
+pub const EIO: c_int = 5; /* Input/output error */
+pub const ENXIO: c_int = 6; /* Device not configured */
 pub const E2BIG: c_int = 7; /* Argument list too long */
 pub const ENOEXEC: c_int = 8; /* Exec format error */
-pub const EBADF: c_int = 9; /* Bad file number */
+pub const EBADF: c_int = 9; /* Bad file descriptor */
 pub const ECHILD: c_int = 10; /* No child processes */
-pub const EAGAIN: c_int = 11; /* Try again */
+pub const EAGAIN: c_int = 35; /* Resource temporarily unavailable */
 pub const ENOMEM: c_int = 12; /* Out of memory */
 pub const EACCES: c_int = 13; /* Permission denied */
 pub const EFAULT: c_int = 14; /* Bad address */
@@ -566,112 +568,71 @@ pub const EMLINK: c_int = 31; /* Too many links */
 pub const EPIPE: c_int = 32; /* Broken pipe */
 pub const EDOM: c_int = 33; /* Math argument out of domain of func */
 pub const ERANGE: c_int = 34; /* Math result not representable */
-pub const EDEADLK: c_int = 35; /* Resource deadlock would occur */
-pub const ENAMETOOLONG: c_int = 36; /* File name too long */
-pub const ENOLCK: c_int = 37; /* No record locks available */
-pub const ENOSYS: c_int = 38; /* Function not implemented */
-pub const ENOTEMPTY: c_int = 39; /* Directory not empty */
-pub const ELOOP: c_int = 40; /* Too many symbolic links encountered */
+pub const EDEADLK: c_int = 11; /* Resource deadlock avoided */
+pub const ENAMETOOLONG: c_int = 63; /* File name too long */
+pub const ENOLCK: c_int = 77; /* No locks available */
+pub const ENOSYS: c_int = 78; /* Function not implemented */
+pub const ENOTEMPTY: c_int = 66; /* Directory not empty */
+pub const ELOOP: c_int = 62; /* Too many levels of symbolic links */
 pub const EWOULDBLOCK: c_int = EAGAIN; /* Operation would block */
-pub const ENOMSG: c_int = 42; /* No message of desired type */
-pub const EIDRM: c_int = 43; /* Identifier removed */
-pub const ECHRNG: c_int = 44; /* Channel number out of range */
-pub const EL2NSYNC: c_int = 45; /* Level 2 not synchronized */
-pub const EL3HLT: c_int = 46; /* Level 3 halted */
-pub const EL3RST: c_int = 47; /* Level 3 reset */
-pub const ELNRNG: c_int = 48; /* Link number out of range */
-pub const EUNATCH: c_int = 49; /* Protocol driver not attached */
-pub const ENOCSI: c_int = 50; /* No CSI structure available */
-pub const EL2HLT: c_int = 51; /* Level 2 halted */
-pub const EBADE: c_int = 52; /* Invalid exchange */
-pub const EBADR: c_int = 53; /* Invalid request descriptor */
-pub const EXFULL: c_int = 54; /* Exchange full */
-pub const ENOANO: c_int = 55; /* No anode */
-pub const EBADRQC: c_int = 56; /* Invalid request code */
-pub const EBADSLT: c_int = 57; /* Invalid slot */
-pub const EDEADLOCK: c_int = EDEADLK; /* Resource deadlock would occur */
-pub const EBFONT: c_int = 59; /* Bad font file format */
-pub const ENOSTR: c_int = 60; /* Device not a stream */
-pub const ENODATA: c_int = 61; /* No data available */
-pub const ETIME: c_int = 62; /* Timer expired */
-pub const ENOSR: c_int = 63; /* Out of streams resources */
-pub const ENONET: c_int = 64; /* Machine is not on the network */
-pub const ENOPKG: c_int = 65; /* Package not installed */
-pub const EREMOTE: c_int = 66; /* Object is remote */
-pub const ENOLINK: c_int = 67; /* Link has been severed */
-pub const EADV: c_int = 68; /* Advertise error */
-pub const ESRMNT: c_int = 69; /* Srmount error */
-pub const ECOMM: c_int = 70; /* Communication error on send */
-pub const EPROTO: c_int = 71; /* Protocol error */
-pub const EMULTIHOP: c_int = 72; /* Multihop attempted */
-pub const EDOTDOT: c_int = 73; /* RFS specific error */
-pub const EBADMSG: c_int = 74; /* Not a data message */
-pub const EOVERFLOW: c_int = 75; /* Value too large for defined data type */
-pub const ENOTUNIQ: c_int = 76; /* Name not unique on network */
-pub const EBADFD: c_int = 77; /* File descriptor in bad state */
-pub const EREMCHG: c_int = 78; /* Remote address changed */
-pub const ELIBACC: c_int = 79; /* Can not access a needed shared library */
-pub const ELIBBAD: c_int = 80; /* Accessing a corrupted shared library */
-pub const ELIBSCN: c_int = 81; /* .lib section in a.out corrupted */
-/* Attempting to link in too many shared libraries */
-pub const ELIBMAX: c_int = 82;
-pub const ELIBEXEC: c_int = 83; /* Cannot exec a shared library directly */
-pub const EILSEQ: c_int = 84; /* Illegal byte sequence */
-/* Interrupted system call should be restarted */
-pub const ERESTART: c_int = 85;
-pub const ESTRPIPE: c_int = 86; /* Streams pipe error */
-pub const EUSERS: c_int = 87; /* Too many users */
-pub const ENOTSOCK: c_int = 88; /* Socket operation on non-socket */
-pub const EDESTADDRREQ: c_int = 89; /* Destination address required */
-pub const EMSGSIZE: c_int = 90; /* Message too long */
-pub const EPROTOTYPE: c_int = 91; /* Protocol wrong type for socket */
-pub const ENOPROTOOPT: c_int = 92; /* Protocol not available */
-pub const EPROTONOSUPPORT: c_int = 93; /* Protocol not supported */
-pub const ESOCKTNOSUPPORT: c_int = 94; /* Socket type not supported */
-/* Operation not supported on transport endpoint */
-pub const EOPNOTSUPP: c_int = 95;
-pub const ENOTSUP: c_int = EOPNOTSUPP;
-pub const EPFNOSUPPORT: c_int = 96; /* Protocol family not supported */
-/* Address family not supported by protocol */
-pub const EAFNOSUPPORT: c_int = 97;
-pub const EADDRINUSE: c_int = 98; /* Address already in use */
-pub const EADDRNOTAVAIL: c_int = 99; /* Cannot assign requested address */
-pub const ENETDOWN: c_int = 100; /* Network is down */
-pub const ENETUNREACH: c_int = 101; /* Network is unreachable */
-/* Network dropped connection because of reset */
-pub const ENETRESET: c_int = 102;
-pub const ECONNABORTED: c_int = 103; /* Software caused connection abort */
-pub const ECONNRESET: c_int = 104; /* Connection reset by peer */
-pub const ENOBUFS: c_int = 105; /* No buffer space available */
-pub const EISCONN: c_int = 106; /* Transport endpoint is already connected */
-pub const ENOTCONN: c_int = 107; /* Transport endpoint is not connected */
-/* Cannot send after transport endpoint shutdown */
-pub const ESHUTDOWN: c_int = 108;
-pub const ETOOMANYREFS: c_int = 109; /* Too many references: cannot splice */
-pub const ETIMEDOUT: c_int = 110; /* Connection timed out */
-pub const ECONNREFUSED: c_int = 111; /* Connection refused */
-pub const EHOSTDOWN: c_int = 112; /* Host is down */
-pub const EHOSTUNREACH: c_int = 113; /* No route to host */
-pub const EALREADY: c_int = 114; /* Operation already in progress */
-pub const EINPROGRESS: c_int = 115; /* Operation now in progress */
-pub const ESTALE: c_int = 116; /* Stale NFS file handle */
-pub const EUCLEAN: c_int = 117; /* Structure needs cleaning */
-pub const ENOTNAM: c_int = 118; /* Not a XENIX named type file */
-pub const ENAVAIL: c_int = 119; /* No XENIX semaphores available */
-pub const EISNAM: c_int = 120; /* Is a named type file */
-pub const EREMOTEIO: c_int = 121; /* Remote I/O error */
-pub const EDQUOT: c_int = 122; /* Quota exceeded */
-pub const ENOMEDIUM: c_int = 123; /* No medium found */
-pub const EMEDIUMTYPE: c_int = 124; /* Wrong medium type */
-pub const ECANCELED: c_int = 125; /* Operation Canceled */
-pub const ENOKEY: c_int = 126; /* Required key not available */
-pub const EKEYEXPIRED: c_int = 127; /* Key has expired */
-pub const EKEYREVOKED: c_int = 128; /* Key has been revoked */
-pub const EKEYREJECTED: c_int = 129; /* Key was rejected by service */
-pub const EOWNERDEAD: c_int = 130; /* Owner died */
-pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
-pub const ERFKILL: c_int = 132; /* Operation not possible due to RF-kill */
-pub const EHWPOISON: c_int = 133; /* Memory page has hardware error */
+pub const EINPROGRESS: c_int = 36; /* Operation now in progress */
+pub const EALREADY: c_int = 37; /* Operation already in progress */
+pub const ENOTSOCK: c_int = 38; /* Socket operation on non-socket */
+pub const EDESTADDRREQ: c_int = 39; /* Destination address required */
+pub const EMSGSIZE: c_int = 40; /* Message too long */
+pub const EPROTOTYPE: c_int = 41; /* Protocol wrong type for socket */
+pub const ENOPROTOOPT: c_int = 42; /* Protocol not available */
+pub const EPROTONOSUPPORT: c_int = 43; /* Protocol not supported */
+pub const ESOCKTNOSUPPORT: c_int = 44; /* Socket type not supported */
+pub const EOPNOTSUPP: c_int = 45; /* Operation not supported */
+pub const ENOTSUP: c_int = EOPNOTSUPP; /* Operation not supported */
+pub const EPFNOSUPPORT: c_int = 46; /* Protocol family not supported */
+pub const EAFNOSUPPORT: c_int = 47; /* Address family not supported by protocol family */
+pub const EADDRINUSE: c_int = 48; /* Address already in use */
+pub const EADDRNOTAVAIL: c_int = 49; /* Can't assign requested address */
+pub const ENETDOWN: c_int = 50; /* Network is down */
+pub const ENETUNREACH: c_int = 51; /* Network is unreachable */
+pub const ENETRESET: c_int = 52; /* Network dropped connection on reset */
+pub const ECONNABORTED: c_int = 53; /* Software caused connection abort */
+pub const ECONNRESET: c_int = 54; /* Connection reset by peer */
+pub const ENOBUFS: c_int = 55; /* No buffer space available */
+pub const EISCONN: c_int = 56; /* Socket is already connected */
+pub const ENOTCONN: c_int = 57; /* Socket is not connected */
+pub const ESHUTDOWN: c_int = 58; /* Can't send after socket shutdown */
+pub const ETOOMANYREFS: c_int = 59; /* Too many references: can't splice */
+pub const ETIMEDOUT: c_int = 60; /* Operation timed out */
+pub const ECONNREFUSED: c_int = 61; /* Connection refused */
+pub const EHOSTDOWN: c_int = 64; /* Host is down */
+pub const EHOSTUNREACH: c_int = 65; /* No route to host */
+pub const EPROCLIM: c_int = 67; /* Too many processes */
+pub const EUSERS: c_int = 68; /* Too many users */
+pub const EDQUOT: c_int = 69; /* Disc quota exceeded */
+pub const ESTALE: c_int = 70; /* Stale NFS file handle */
+pub const EREMOTE: c_int = 71; /* Too many levels of remote in path */
+pub const EBADRPC: c_int = 72; /* RPC struct is bad */
+pub const ERPCMISMATCH: c_int = 73; /* RPC version wrong */
+pub const EPROGUNAVAIL: c_int = 74; /* RPC prog. not avail */
+pub const EPROGMISMATCH: c_int = 75; /* Program version wrong */
+pub const EPROCUNAVAIL: c_int = 76; /* Bad procedure for program */
+pub const EFTYPE: c_int = 79; /* Inappropriate file type or format */
+pub const EAUTH: c_int = 80; /* Authentication error */
+pub const ENEEDAUTH: c_int = 81; /* Need authenticator */
+pub const EIDRM: c_int = 82; /* Identifier removed */
+pub const ENOMSG: c_int = 83; /* No message of desired type */
+pub const EOVERFLOW: c_int = 84; /* Value too large to be stored in data type */
+pub const ECANCELED: c_int = 85; /* Operation canceled */
+pub const EILSEQ: c_int = 86; /* Illegal byte sequence */
+pub const ENOATTR: c_int = 87; /* Attribute not found */
+pub const EDOOFUS: c_int = 88; /* Programming error */
+pub const EBADMSG: c_int = 89; /* Bad message */
+pub const EMULTIHOP: c_int = 90; /* Multihop attempted */
+pub const ENOLINK: c_int = 91; /* Link has been severed */
+pub const EPROTO: c_int = 92; /* Protocol error */
+pub const ENOTCAPABLE: c_int = 93; /* Capabilities insufficient */
+pub const ECAPMODE: c_int = 94; /* Not permitted in capability mode */
+pub const ENOTRECOVERABLE: c_int = 95; /* State not recoverable */
+pub const EOWNERDEAD: c_int = 96; /* Previous owner died */
+pub const EINTEGRITY: c_int = 97; /* Integrity check failed */
 
 // fcntl.h
 #[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
@@ -823,52 +784,56 @@ pub const PTHREAD_RWLOCK_INITIALIZER: crate::pthread_rwlock_t = crate::pthread_r
 pub const PTHREAD_STACK_MIN: size_t = 16384;
 
 // signal.h
-pub const SIG_BLOCK: c_int = 0;
-pub const SIG_UNBLOCK: c_int = 1;
-pub const SIG_SETMASK: c_int = 2;
+pub const SIG_BLOCK: c_int = 1;
+pub const SIG_UNBLOCK: c_int = 2;
+pub const SIG_SETMASK: c_int = 3;
 pub const SIGHUP: c_int = 1;
 pub const SIGINT: c_int = 2;
 pub const SIGQUIT: c_int = 3;
 pub const SIGILL: c_int = 4;
 pub const SIGTRAP: c_int = 5;
 pub const SIGABRT: c_int = 6;
-pub const SIGBUS: c_int = 7;
+#[allow(dead_code)] // FreeBSD alias of SIGABRT; kept for the donor surface.
+pub const SIGIOT: c_int = 6;
+pub const SIGEMT: c_int = 7;
 pub const SIGFPE: c_int = 8;
 pub const SIGKILL: c_int = 9;
-pub const SIGUSR1: c_int = 10;
+pub const SIGBUS: c_int = 10;
 pub const SIGSEGV: c_int = 11;
-pub const SIGUSR2: c_int = 12;
+pub const SIGSYS: c_int = 12;
 pub const SIGPIPE: c_int = 13;
 pub const SIGALRM: c_int = 14;
 pub const SIGTERM: c_int = 15;
-pub const SIGSTKFLT: c_int = 16;
-pub const SIGCHLD: c_int = 17;
-pub const SIGCONT: c_int = 18;
-pub const SIGSTOP: c_int = 19;
-pub const SIGTSTP: c_int = 20;
+pub const SIGURG: c_int = 16;
+pub const SIGSTOP: c_int = 17;
+pub const SIGTSTP: c_int = 18;
+pub const SIGCONT: c_int = 19;
+pub const SIGCHLD: c_int = 20;
 pub const SIGTTIN: c_int = 21;
 pub const SIGTTOU: c_int = 22;
-pub const SIGURG: c_int = 23;
+pub const SIGIO: c_int = 23;
 pub const SIGXCPU: c_int = 24;
 pub const SIGXFSZ: c_int = 25;
 pub const SIGVTALRM: c_int = 26;
 pub const SIGPROF: c_int = 27;
 pub const SIGWINCH: c_int = 28;
-pub const SIGIO: c_int = 29;
-pub const SIGPWR: c_int = 30;
-pub const SIGSYS: c_int = 31;
-pub const NSIG: c_int = 65;
+pub const SIGINFO: c_int = 29;
+pub const SIGUSR1: c_int = 30;
+pub const SIGUSR2: c_int = 31;
+pub const SIGTHR: c_int = 32;
+pub const SIGLWP: c_int = 32;
+pub const SIGLIBRT: c_int = 33;
+pub const SIGRTMIN: c_int = 35;
+pub const SIGRTMAX: c_int = 64;
+pub const NSIG: c_int = 32;
 
-pub const SA_NOCLDSTOP: c_int = 1;
-pub const SA_NOCLDWAIT: c_int = 2;
-pub const SA_SIGINFO: c_int = 4;
-pub const SA_RESTORER: c_int = 0x0400_0000;
-pub const SA_ONSTACK: c_int = 0x0800_0000;
-pub const SA_RESTART: c_int = 0x1000_0000;
-pub const SA_NODEFER: c_int = 0x4000_0000;
-pub const SA_RESETHAND: c_int = 0x8000_0000;
-pub const SA_NOMASK: c_int = SA_NODEFER;
-pub const SA_ONESHOT: c_int = SA_RESETHAND;
+pub const SA_ONSTACK: c_int = 0x0001;
+pub const SA_RESTART: c_int = 0x0002;
+pub const SA_RESETHAND: c_int = 0x0004;
+pub const SA_NOCLDSTOP: c_int = 0x0008;
+pub const SA_NODEFER: c_int = 0x0010;
+pub const SA_NOCLDWAIT: c_int = 0x0020;
+pub const SA_SIGINFO: c_int = 0x0040;
 
 // sys/file.h
 pub const LOCK_SH: c_int = 1;
@@ -1058,48 +1023,135 @@ pub const SOCK_SEQPACKET: c_int = 5;
 pub const SOL_SOCKET: c_int = 1;
 pub const SOMAXCONN: c_int = 4096;
 
-// sys/termios.h
-pub const VEOF: usize = 4;
-pub const VEOL: usize = 11;
-pub const VEOL2: usize = 16;
-pub const VERASE: usize = 2;
-pub const VWERASE: usize = 14;
-pub const VKILL: usize = 3;
-pub const VREPRINT: usize = 12;
-pub const VSWTC: usize = 7;
-pub const VINTR: usize = 0;
-pub const VQUIT: usize = 1;
+// sys/termios.h — the pinned FreeBSD 133344405 `sys/sys/_termios.h` record.
+pub const VEOF: usize = 0;
+pub const VEOL: usize = 1;
+pub const VEOL2: usize = 2;
+pub const VERASE: usize = 3;
+pub const VWERASE: usize = 4;
+pub const VKILL: usize = 5;
+pub const VREPRINT: usize = 6;
+pub const VERASE2: usize = 7;
+pub const VINTR: usize = 8;
+pub const VQUIT: usize = 9;
 pub const VSUSP: usize = 10;
-pub const VSTART: usize = 8;
-pub const VSTOP: usize = 9;
-pub const VLNEXT: usize = 15;
-pub const VDISCARD: usize = 13;
-pub const VMIN: usize = 6;
-pub const VTIME: usize = 5;
-pub const NCCS: usize = 32;
+pub const VDSUSP: usize = 11;
+pub const VSTART: usize = 12;
+pub const VSTOP: usize = 13;
+pub const VLNEXT: usize = 14;
+pub const VDISCARD: usize = 15;
+pub const VMIN: usize = 16;
+pub const VTIME: usize = 17;
+pub const VSTATUS: usize = 18;
+pub const NCCS: usize = 20;
 
-pub const IGNBRK: crate::tcflag_t = 0o000_001;
-pub const BRKINT: crate::tcflag_t = 0o000_002;
-pub const IGNPAR: crate::tcflag_t = 0o000_004;
-pub const PARMRK: crate::tcflag_t = 0o000_010;
-pub const INPCK: crate::tcflag_t = 0o000_020;
-pub const ISTRIP: crate::tcflag_t = 0o000_040;
-pub const INLCR: crate::tcflag_t = 0o000_100;
-pub const IGNCR: crate::tcflag_t = 0o000_200;
-pub const ICRNL: crate::tcflag_t = 0o000_400;
+pub const IGNBRK: crate::tcflag_t = 0x0_0001;
+pub const BRKINT: crate::tcflag_t = 0x0_0002;
+pub const IGNPAR: crate::tcflag_t = 0x0_0004;
+pub const PARMRK: crate::tcflag_t = 0x0_0008;
+pub const INPCK: crate::tcflag_t = 0x0_0010;
+pub const ISTRIP: crate::tcflag_t = 0x0_0020;
+pub const INLCR: crate::tcflag_t = 0x0_0040;
+pub const IGNCR: crate::tcflag_t = 0x0_0080;
+pub const ICRNL: crate::tcflag_t = 0x0_0100;
+pub const IXON: crate::tcflag_t = 0x0_0200;
+pub const IXOFF: crate::tcflag_t = 0x0_0400;
+pub const IXANY: crate::tcflag_t = 0x0_0800;
+pub const IMAXBEL: crate::tcflag_t = 0x0_2000;
+pub const IUTF8: crate::tcflag_t = 0x0_4000;
+
+pub const OPOST: crate::tcflag_t = 0x0_0001;
+pub const ONLCR: crate::tcflag_t = 0x0_0002;
+pub const TABDLY: crate::tcflag_t = 0x0_0004;
+pub const TAB0: crate::tcflag_t = 0x0_0000;
+pub const TAB3: crate::tcflag_t = 0x0_0004;
+pub const ONOEOT: crate::tcflag_t = 0x0_0008;
+pub const OCRNL: crate::tcflag_t = 0x0_0010;
+pub const ONOCR: crate::tcflag_t = 0x0_0020;
+pub const ONLRET: crate::tcflag_t = 0x0_0040;
+
+pub const CIGNORE: crate::tcflag_t = 0x0_0001;
+pub const CSIZE: crate::tcflag_t = 0x0_0300;
+pub const CS5: crate::tcflag_t = 0x0_0000;
+pub const CS6: crate::tcflag_t = 0x0_0100;
+pub const CS7: crate::tcflag_t = 0x0_0200;
+pub const CS8: crate::tcflag_t = 0x0_0300;
+pub const CSTOPB: crate::tcflag_t = 0x0_0400;
+pub const CREAD: crate::tcflag_t = 0x0_0800;
+pub const PARENB: crate::tcflag_t = 0x0_1000;
+pub const PARODD: crate::tcflag_t = 0x0_2000;
+pub const HUPCL: crate::tcflag_t = 0x0_4000;
+pub const CLOCAL: crate::tcflag_t = 0x0_8000;
+pub const CCTS_OFLOW: crate::tcflag_t = 0x1_0000;
+pub const CRTS_IFLOW: crate::tcflag_t = 0x2_0000;
+pub const CRTSCTS: crate::tcflag_t = 0x3_0000;
+pub const CDTR_IFLOW: crate::tcflag_t = 0x4_0000;
+pub const CDSR_OFLOW: crate::tcflag_t = 0x8_0000;
+pub const CCAR_OFLOW: crate::tcflag_t = 0x10_0000;
+pub const CNO_RTSDTR: crate::tcflag_t = 0x20_0000;
+
+pub const ECHOKE: crate::tcflag_t = 0x0_0001;
+pub const ECHOE: crate::tcflag_t = 0x0_0002;
+pub const ECHOK: crate::tcflag_t = 0x0_0004;
+pub const ECHO: crate::tcflag_t = 0x0_0008;
+pub const ECHONL: crate::tcflag_t = 0x0_0010;
+pub const ECHOPRT: crate::tcflag_t = 0x0_0020;
+pub const ECHOCTL: crate::tcflag_t = 0x0_0040;
+pub const ISIG: crate::tcflag_t = 0x0_0080;
+pub const ICANON: crate::tcflag_t = 0x0_0100;
+pub const ALTWERASE: crate::tcflag_t = 0x0_0200;
+pub const IEXTEN: crate::tcflag_t = 0x0_0400;
+pub const EXTPROC: crate::tcflag_t = 0x0_0800;
+pub const TOSTOP: crate::tcflag_t = 0x40_0000;
+pub const FLUSHO: crate::tcflag_t = 0x80_0000;
+pub const NOKERNINFO: crate::tcflag_t = 0x200_0000;
+pub const PENDIN: crate::tcflag_t = 0x2000_0000;
+pub const NOFLSH: crate::tcflag_t = 0x8000_0000;
+
+pub const B0: speed_t = 0;
+pub const B50: speed_t = 50;
+pub const B75: speed_t = 75;
+pub const B110: speed_t = 110;
+pub const B134: speed_t = 134;
+pub const B150: speed_t = 150;
+pub const B200: speed_t = 200;
+pub const B300: speed_t = 300;
+pub const B600: speed_t = 600;
+pub const B1200: speed_t = 1200;
+pub const B1800: speed_t = 1800;
+pub const B2400: speed_t = 2400;
+pub const B4800: speed_t = 4800;
+pub const B9600: speed_t = 9600;
+pub const B19200: speed_t = 19200;
+pub const B38400: speed_t = 38400;
+pub const B7200: speed_t = 7200;
+pub const B14400: speed_t = 14400;
+pub const B28800: speed_t = 28800;
+pub const B57600: speed_t = 57600;
+pub const B76800: speed_t = 76800;
+pub const B115200: speed_t = 115200;
+pub const B230400: speed_t = 230400;
+pub const B460800: speed_t = 460800;
+pub const B500000: speed_t = 500000;
+pub const B921600: speed_t = 921600;
+pub const B1000000: speed_t = 1000000;
+pub const B1500000: speed_t = 1500000;
+pub const B2000000: speed_t = 2000000;
+pub const B2500000: speed_t = 2500000;
+pub const B3000000: speed_t = 3000000;
+pub const B3500000: speed_t = 3500000;
+pub const B4000000: speed_t = 4000000;
+pub const EXTA: speed_t = B19200;
+pub const EXTB: speed_t = B38400;
+
+pub const OXTABS: crate::tcflag_t = TAB3;
+pub const MDMBUF: crate::tcflag_t = CCAR_OFLOW;
+
+// Linux-only names that the vendored rustix `linux_like` view of ravenbsd still
+// compiles (`rustix-ravenbsd/src/termios/types.rs`). They are extensions, not
+// part of the FreeBSD record or its flag set, and keep their Linux values.
 pub const IUCLC: crate::tcflag_t = 0o001_000;
-pub const IXON: crate::tcflag_t = 0o002_000;
-pub const IXANY: crate::tcflag_t = 0o004_000;
-pub const IXOFF: crate::tcflag_t = 0o010_000;
-pub const IMAXBEL: crate::tcflag_t = 0o020_000;
-pub const IUTF8: crate::tcflag_t = 0o040_000;
-
-pub const OPOST: crate::tcflag_t = 0o000_001;
 pub const OLCUC: crate::tcflag_t = 0o000_002;
-pub const ONLCR: crate::tcflag_t = 0o000_004;
-pub const OCRNL: crate::tcflag_t = 0o000_010;
-pub const ONOCR: crate::tcflag_t = 0o000_020;
-pub const ONLRET: crate::tcflag_t = 0o000_040;
 pub const OFILL: crate::tcflag_t = 0o000_100;
 pub const OFDEL: crate::tcflag_t = 0o000_200;
 pub const NLDLY: crate::tcflag_t = 0o000_400;
@@ -1110,11 +1162,8 @@ pub const CR0: crate::tcflag_t = 0o000_000;
 pub const CR1: crate::tcflag_t = 0o001_000;
 pub const CR2: crate::tcflag_t = 0o002_000;
 pub const CR3: crate::tcflag_t = 0o003_000;
-pub const TABDLY: crate::tcflag_t = 0o014_000;
-pub const TAB0: crate::tcflag_t = 0o000_000;
 pub const TAB1: crate::tcflag_t = 0o004_000;
 pub const TAB2: crate::tcflag_t = 0o010_000;
-pub const TAB3: crate::tcflag_t = 0o014_000;
 pub const BSDLY: crate::tcflag_t = 0o020_000;
 pub const BS0: crate::tcflag_t = 0o000_000;
 pub const BS1: crate::tcflag_t = 0o020_000;
@@ -1125,75 +1174,13 @@ pub const VTDLY: crate::tcflag_t = 0o040_000;
 pub const VT0: crate::tcflag_t = 0o000_000;
 pub const VT1: crate::tcflag_t = 0o040_000;
 pub const XTABS: crate::tcflag_t = 0o014_000;
-
-pub const B0: speed_t = 0o000_000;
-pub const B50: speed_t = 0o000_001;
-pub const B75: speed_t = 0o000_002;
-pub const B110: speed_t = 0o000_003;
-pub const B134: speed_t = 0o000_004;
-pub const B150: speed_t = 0o000_005;
-pub const B200: speed_t = 0o000_006;
-pub const B300: speed_t = 0o000_007;
-pub const B600: speed_t = 0o000_010;
-pub const B1200: speed_t = 0o000_011;
-pub const B1800: speed_t = 0o000_012;
-pub const B2400: speed_t = 0o000_013;
-pub const B4800: speed_t = 0o000_014;
-pub const B9600: speed_t = 0o000_015;
-pub const B19200: speed_t = 0o000_016;
-pub const B38400: speed_t = 0o000_017;
-pub const B57600: speed_t = 0o010_001;
-pub const B115200: speed_t = 0o010_002;
-pub const B230400: speed_t = 0o010_003;
-pub const B460800: speed_t = 0o010_004;
-pub const B500000: speed_t = 0o010_005;
-pub const B576000: speed_t = 0o010_006;
-pub const B921600: speed_t = 0o010_007;
-pub const B1000000: speed_t = 0o010_010;
-pub const B1152000: speed_t = 0o010_011;
-pub const B1500000: speed_t = 0o010_012;
-pub const B2000000: speed_t = 0o010_013;
-pub const B2500000: speed_t = 0o010_014;
-pub const B3000000: speed_t = 0o010_015;
-pub const B3500000: speed_t = 0o010_016;
-pub const B4000000: speed_t = 0o010_017;
-
-pub const CSIZE: crate::tcflag_t = 0o000_060;
-pub const CS5: crate::tcflag_t = 0o000_000;
-pub const CS6: crate::tcflag_t = 0o000_020;
-pub const CS7: crate::tcflag_t = 0o000_040;
-pub const CS8: crate::tcflag_t = 0o000_060;
-
-pub const CSTOPB: crate::tcflag_t = 0o000_100;
-pub const CREAD: crate::tcflag_t = 0o000_200;
-pub const PARENB: crate::tcflag_t = 0o000_400;
-pub const PARODD: crate::tcflag_t = 0o001_000;
-pub const HUPCL: crate::tcflag_t = 0o002_000;
-pub const CLOCAL: crate::tcflag_t = 0o004_000;
 pub const CBAUD: crate::tcflag_t = 0o010_017;
-pub const EXTA: speed_t = B19200;
-pub const EXTB: speed_t = B38400;
 pub const CBAUDEX: crate::tcflag_t = 0o010_000;
 pub const CIBAUD: crate::tcflag_t = 0o020_036_000_00;
 pub const CMSPAR: crate::tcflag_t = 0o100_000_000_00;
-pub const CRTSCTS: crate::tcflag_t = 0o200_000_000_00;
-
-pub const ISIG: crate::tcflag_t = 0o000_001;
-pub const ICANON: crate::tcflag_t = 0o000_002;
-pub const ECHO: crate::tcflag_t = 0o000_010;
-pub const ECHOE: crate::tcflag_t = 0o000_020;
-pub const ECHOK: crate::tcflag_t = 0o000_040;
-pub const ECHONL: crate::tcflag_t = 0o000_100;
-pub const NOFLSH: crate::tcflag_t = 0o000_200;
-pub const TOSTOP: crate::tcflag_t = 0o000_400;
-pub const IEXTEN: crate::tcflag_t = 0o100_000;
 pub const XCASE: crate::tcflag_t = 0o000_004;
-pub const ECHOCTL: crate::tcflag_t = 0o001_000;
-pub const ECHOPRT: crate::tcflag_t = 0o002_000;
-pub const ECHOKE: crate::tcflag_t = 0o004_000;
-pub const FLUSHO: crate::tcflag_t = 0o010_000;
-pub const PENDIN: crate::tcflag_t = 0o040_000;
-pub const EXTPROC: crate::tcflag_t = 0o200_000;
+pub const B576000: speed_t = 0o010_006;
+pub const B1152000: speed_t = 0o010_011;
 
 pub const TCOOFF: c_int = 0;
 pub const TCOON: c_int = 1;
@@ -1206,8 +1193,7 @@ pub const TCSANOW: c_int = 0;
 pub const TCSADRAIN: c_int = 1;
 pub const TCSAFLUSH: c_int = 2;
 
-pub const _POSIX_VDISABLE: crate::cc_t = 0;
-
+pub const _POSIX_VDISABLE: crate::cc_t = 0xff;
 
 // signal.h sigevent values
 pub const SIGEV_SIGNAL: c_int = 0;
@@ -1245,16 +1231,28 @@ pub const UTIME_NOW: c_long = 0x3fffffff;
 pub const UTIME_OMIT: c_long = 0x3ffffffe;
 pub const PIPE_BUF: usize = 4096;
 pub const CLOCK_REALTIME: c_int = 0;
-pub const CLOCK_MONOTONIC: c_int = 1;
-pub const CLOCK_PROCESS_CPUTIME_ID: crate::clockid_t = 2;
-pub const CLOCK_THREAD_CPUTIME_ID: crate::clockid_t = 3;
-pub const CLOCK_MONOTONIC_RAW: crate::clockid_t = 4;
-pub const CLOCK_REALTIME_COARSE: crate::clockid_t = 5;
-pub const CLOCK_MONOTONIC_COARSE: crate::clockid_t = 6;
-pub const CLOCK_BOOTTIME: crate::clockid_t = 7;
-pub const CLOCK_REALTIME_ALARM: crate::clockid_t = 8;
-pub const CLOCK_BOOTTIME_ALARM: crate::clockid_t = 9;
-pub const CLOCKS_PER_SEC: crate::clock_t = 1_000_000;
+pub const CLOCK_VIRTUAL: c_int = 1;
+pub const CLOCK_PROF: c_int = 2;
+pub const CLOCK_MONOTONIC: c_int = 4;
+pub const CLOCK_UPTIME: crate::clockid_t = 5;
+pub const CLOCK_UPTIME_PRECISE: crate::clockid_t = 7;
+pub const CLOCK_UPTIME_FAST: crate::clockid_t = 8;
+pub const CLOCK_REALTIME_PRECISE: crate::clockid_t = 9;
+pub const CLOCK_REALTIME_FAST: crate::clockid_t = 10;
+pub const CLOCK_MONOTONIC_PRECISE: crate::clockid_t = 11;
+pub const CLOCK_MONOTONIC_FAST: crate::clockid_t = 12;
+pub const CLOCK_SECOND: crate::clockid_t = 13;
+pub const CLOCK_PROCESS_CPUTIME_ID: crate::clockid_t = 15;
+pub const CLOCK_THREAD_CPUTIME_ID: crate::clockid_t = 14;
+pub const CLOCK_TAI: crate::clockid_t = 16;
+pub const CLOCK_MONOTONIC_RAW: crate::clockid_t = 17;
+pub const CLOCK_REALTIME_ALARM: crate::clockid_t = 18;
+pub const CLOCK_BOOTTIME_ALARM: crate::clockid_t = 19;
+pub const CLOCK_SGI_CYCLE: crate::clockid_t = 20;
+pub const CLOCK_REALTIME_COARSE: crate::clockid_t = CLOCK_REALTIME_FAST;
+pub const CLOCK_MONOTONIC_COARSE: crate::clockid_t = CLOCK_MONOTONIC_FAST;
+pub const CLOCK_BOOTTIME: crate::clockid_t = CLOCK_MONOTONIC;
+pub const CLOCKS_PER_SEC: crate::clock_t = 128;
 
 // unistd.h
 // POSIX.1 {
@@ -1284,7 +1282,6 @@ pub const _SC_TTY_NAME_MAX: c_int = 101;
 pub const _SC_SYMLOOP_MAX: c_int = 120;
 // ...
 pub const _SC_HOST_NAME_MAX: c_int = 72;
-
 
 // langinfo.h
 pub const ABMON_1: c_int = 0x2000E;
@@ -1615,6 +1612,8 @@ safe_f! {
 extern "C" {
     // errno.h
     pub fn __errno_location() -> *mut c_int;
+    // FreeBSD `errno.h`: the FreeBSD spelling of the errno cell address.
+    pub fn __error() -> *mut c_int;
     pub fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
 
     // langinfo.h
@@ -1654,6 +1653,8 @@ extern "C" {
 
     // unistd.h
     pub fn pipe2(fds: *mut c_int, flags: c_int) -> c_int;
+    // sys/procctl.h
+    pub fn procctl(idtype: idtype_t, id: id_t, option: c_int, data: *mut c_void) -> c_int;
     pub fn getdtablesize() -> c_int;
     pub fn getresgid(
         rgid: *mut crate::gid_t,
@@ -1920,7 +1921,6 @@ extern "C" {
 // documented Linux UAPI facts. The dependency crates select their Linux
 // branches for `target_os = "ravenbsd"`, so the names must exist here.
 
-
 pub type __fsword_t = c_long;
 pub type off64_t = off_t;
 pub type ino64_t = ino_t;
@@ -2018,7 +2018,6 @@ s! {
     }
 }
 
-
 // sys/socket.h and netinet/in.h (Raven ABI).
 pub const SOCK_RDM: c_int = 4;
 pub const SOCK_DCCP: c_int = 6;
@@ -2080,6 +2079,8 @@ pub const TCSETSW2: c_ulong = 0x402c542c;
 pub const TCSETSF2: c_ulong = 0x402c542d;
 pub const FIONCLEX: c_ulong = 0x5450;
 pub const UIO_MAXIOV: usize = 1024;
+// FreeBSD `sys/sys/syslimits.h`.
+pub const IOV_MAX: c_int = 1024;
 pub const BOTHER: crate::speed_t = 0o010_000;
 pub const IBSHIFT: crate::tcflag_t = 16;
 
@@ -2105,8 +2106,6 @@ pub const RWF_ATOMIC: c_int = 0x0000_0040;
 pub const RWF_DONTCACHE: c_int = 0x0000_0080;
 
 // bits/signum.h and sys/wait.h.
-pub const SIGRTMIN: c_int = 35;
-pub const SIGRTMAX: c_int = 64;
 pub const P_PIDFD: idtype_t = 3;
 pub const SYS_pidfd_open: c_long = 434;
 pub const PIDFD_NONBLOCK: c_int = 0o4_000;
@@ -2133,11 +2132,7 @@ extern "C" {
     pub fn fsync(fd: c_int) -> c_int;
     pub fn setfsuid(uid: crate::uid_t) -> c_int;
     pub fn setfsgid(gid: crate::gid_t) -> c_int;
-    pub fn fexecve(
-        fd: c_int,
-        argv: *const *const c_char,
-        envp: *const *const c_char,
-    ) -> c_int;
+    pub fn fexecve(fd: c_int, argv: *const *const c_char, envp: *const *const c_char) -> c_int;
     pub fn forkpty(
         amaster: *mut c_int,
         name: *mut c_char,
@@ -2150,11 +2145,8 @@ extern "C" {
     pub fn gethostname(name: *mut c_char, len: size_t) -> c_int;
     pub fn ttyname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
     pub fn tcgetattr(fd: c_int, termios_p: *mut crate::termios) -> c_int;
-    pub fn tcsetattr(
-        fd: c_int,
-        optional_actions: c_int,
-        termios_p: *const crate::termios,
-    ) -> c_int;
+    pub fn tcsetattr(fd: c_int, optional_actions: c_int, termios_p: *const crate::termios)
+        -> c_int;
     pub fn tcgetpgrp(fd: c_int) -> crate::pid_t;
     pub fn tcsetpgrp(fd: c_int, pgrp: crate::pid_t) -> c_int;
     pub fn killpg(pgrp: crate::pid_t, sig: c_int) -> c_int;
@@ -2362,12 +2354,7 @@ extern "C" {
     pub fn inotify_init1(flags: c_int) -> c_int;
     pub fn inotify_add_watch(fd: c_int, pathname: *const c_char, mask: c_uint) -> c_int;
     pub fn inotify_rm_watch(fd: c_int, wd: c_int) -> c_int;
-    pub fn sendfile64(
-        out_fd: c_int,
-        in_fd: c_int,
-        offset: *mut loff_t,
-        count: size_t,
-    ) -> ssize_t;
+    pub fn sendfile64(out_fd: c_int, in_fd: c_int, offset: *mut loff_t, count: size_t) -> ssize_t;
     pub fn getxattr(
         path: *const c_char,
         name: *const c_char,
@@ -2380,12 +2367,7 @@ extern "C" {
         value: *mut c_void,
         size: size_t,
     ) -> ssize_t;
-    pub fn fgetxattr(
-        fd: c_int,
-        name: *const c_char,
-        value: *mut c_void,
-        size: size_t,
-    ) -> ssize_t;
+    pub fn fgetxattr(fd: c_int, name: *const c_char, value: *mut c_void, size: size_t) -> ssize_t;
     pub fn setxattr(
         path: *const c_char,
         name: *const c_char,
