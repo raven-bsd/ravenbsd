@@ -843,6 +843,14 @@ impl raven_libc_personality_bsd::seams::SrcOps for RealSrc {
     ) -> Result<(), raven_libc_personality_bsd::seams::Errno> {
         raven_libc_sys::sys::event_signal(handle, value).map_err(sys_error)
     }
+
+    fn close_source(
+        &mut self,
+        handle: raven_libc_personality_bsd::seams::Handle,
+    ) -> Result<(), raven_libc_personality_bsd::seams::Errno> {
+        use raven_libc_platform::SysBackend;
+        platform().backend().handle_close(handle).map_err(sys_error)
+    }
 }
 
 /// The BSD system-information source.
