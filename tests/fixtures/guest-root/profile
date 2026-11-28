@@ -1,0 +1,6 @@
+# FreeBSD base root skeleton, `/root/.profile`.
+#
+# The FreeBSD base environment carries a non-empty `.profile` in `/root`; the
+# NetBSD `t_link` `link_perm` case links `/root/.profile` and requires the path
+# to exist.  This fixture is test input, not donor code.
+umask 022

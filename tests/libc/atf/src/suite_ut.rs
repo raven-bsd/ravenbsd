@@ -226,3 +226,28 @@ fn defaults_are_sane() {
     let suite = minimal();
     assert!(suite.srcdir_for_tests);
 }
+
+#[test]
+fn a_batch_case_carries_the_require_user_metadata() {
+    let mut meta = BTreeMap::new();
+    meta.insert("require.user".to_string(), "unprivileged".to_string());
+    let case = TpCase {
+        ident: "link_perm".to_string(),
+        meta,
+    };
+    let batch = batch_case(&case, Path::new("/out/t_link"), "sys/t_link");
+    assert_eq!(batch.user.as_deref(), Some("unprivileged"));
+    assert_eq!(batch.ident, "link_perm");
+    assert_eq!(batch.program_name, "sys/t_link");
+    assert_eq!(batch.program_path, Path::new("/out/t_link"));
+
+    let root = TpCase {
+        ident: "mkdir_err".to_string(),
+        meta: BTreeMap::new(),
+    };
+    assert!(
+        batch_case(&root, Path::new("/out/t_mkdir"), "sys/t_mkdir")
+            .user
+            .is_none()
+    );
+}

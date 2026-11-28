@@ -33,6 +33,12 @@ const CMDLINE: &str = "console=ttyS0 test-exit=1";
 const POLL: Duration = Duration::from_millis(50);
 /// Largest serial log kept; a batch of hundreds of ATF bodies can exceed a few megabytes.
 const SERIAL_LIMIT: usize = 32 * 1024 * 1024;
+/// The donor `nobody` uid/gid used for `require.user=unprivileged` ATF cases.
+const UNPRIVILEGED_UID: u32 = 65534;
+/// The ATF metadata value that requests the unprivileged identity.
+const UNPRIVILEGED_USER: &str = "unprivileged";
+/// The dedicated 1777 tmpfs mount the G1 wrapper creates for unprivileged ATF cases.
+const ATF_ROOT: &str = "/tmp/atf-root";
 
 /// Where the target kernel and the QEMU tools come from.
 #[derive(Clone, Debug)]
@@ -132,6 +138,8 @@ pub struct AtfBatchCase {
     pub program_name: String,
     /// The ATF case ident.
     pub ident: String,
+    /// The ATF `require.user` metadata value, when the case requests an identity.
+    pub user: Option<String>,
 }
 
 /// One batched ATF result, in the input case order.
@@ -232,7 +240,7 @@ pub fn run_guest(
         &service,
         reader_path,
         &svcd,
-    );
+    )?;
     run_tool(
         "cargo",
         &mkinitfs_with(&initfs, &specs),
@@ -449,15 +457,22 @@ pub fn run_atf_batch(
         image_paths.insert(case.program_path.clone(), format!("/tests/{unique}"));
     }
 
-    let mut specs = service_specs(config, guest);
+    let mut specs = service_specs(config, guest, workdir)?;
     for (index, case) in cases.iter().enumerate() {
         let image_path = image_paths
             .get(&case.program_path)
             .expect("program image was registered");
-        let result = format!("/tmp/result-{index}");
+        let result = if case.user.as_deref() == Some(UNPRIVILEGED_USER) {
+            format!("{ATF_ROOT}/result-{index}")
+        } else {
+            format!("/tmp/result-{index}")
+        };
         let manifest = workdir.join(format!("manifest-{index}"));
-        fs::write(&manifest, batch_manifest(&case.ident, image_path, &result))
-            .with_context(|| format!("cannot write {}", manifest.display()))?;
+        fs::write(
+            &manifest,
+            batch_manifest(&case.ident, image_path, &result, case.user.as_deref()),
+        )
+        .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
         let read = workdir.join(format!("g1-read-{index}.toml"));
         let needs = if index == 0 {
@@ -541,13 +556,13 @@ readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
     Ok(results)
 }
 
-fn service_specs(config: &QemuConfig, guest: &Guest) -> Vec<String> {
+fn service_specs(config: &QemuConfig, guest: &Guest, workdir: &Path) -> Result<Vec<String>> {
     let mut specs = vec![
         format!("/init={}", guest.path("init").display()),
         format!("/sbin/g1wrap={}", guest.path("g1wrap").display()),
     ];
     for name in [
-        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "vfsd",
+        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd",
     ] {
         specs.push(format!("/sbin/{name}={}", guest.path(name).display()));
         specs.push(format!(
@@ -558,7 +573,45 @@ fn service_specs(config: &QemuConfig, guest: &Guest) -> Vec<String> {
                 .display()
         ));
     }
-    specs
+    specs.push(format!("/sbin/vfsd={}", guest.path("vfsd").display()));
+    specs.extend(guest_root_services(workdir)?);
+    Ok(specs)
+}
+
+/// Guest services that carry the donor `/root` skeleton.
+///
+/// `initfsd` reports every synthesized directory as 0755, so the donor 0700 `/root` mode cannot
+/// come from the read-only initfs. A second ramfs instance is started with `--root-mode 700`;
+/// `vfsd` must be able to resolve that scheme, so its generated manifest depends on `rootfsd` and
+/// the start plan registers `rootfs` before `vfsd` takes its namespace snapshot. The G1 wrapper
+/// mounts it at `/root` and writes `.profile` before a test runs. Unprivileged ATF cases get a
+/// root-created 1777 work root under the mounted `/tmp`.
+fn guest_root_services(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let rootfsd = directory.join("services-rootfsd.toml");
+    fs::write(
+        &rootfsd,
+        "name = \"rootfsd\"\nexec = \"/sbin/ramfsd\"\n\
+args = [\"ramfsd\", \"--scheme\", \"rootfs\", \"--root-mode\", \"700\"]\n\
+needs = [\"logd\"]\nprovides = [\"scheme:rootfs\"]\n\
+readiness = \"scheme\"\nready_timeout_ms = 60_000\nrestart = \"on-failure\"\n",
+    )
+    .with_context(|| format!("cannot write {}", rootfsd.display()))?;
+    let vfsd = directory.join("services-vfsd.toml");
+    fs::write(
+        &vfsd,
+        "name = \"vfsd\"\nexec = \"/sbin/vfsd\"\n\
+needs = [\"logd\", \"initfsd\", \"ramfsd\", \"rootfsd\", \"nulld\", \"zerod\", \"randd\", \"scheme:pty\"]\n\
+provides = [\"scheme:file\"]\nreadiness = \"scheme\"\n\
+ready_timeout_ms = 60_000\nrestart = \"on-failure\"\n",
+    )
+    .with_context(|| format!("cannot write {}", vfsd.display()))?;
+    Ok(vec![
+        format!("/etc/services.d/rootfsd.toml={}", rootfsd.display()),
+        format!("/etc/services.d/vfsd.toml={}", vfsd.display()),
+    ])
 }
 
 fn strip_to(program: &Path, destination: &Path) -> Result<()> {
@@ -576,11 +629,12 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn batch_manifest(ident: &str, image_path: &str, result: &str) -> String {
+fn batch_manifest(ident: &str, image_path: &str, result: &str, user: Option<&str>) -> String {
     let mut text = format!(
         "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
 arg=-s\narg=/tests\narg={ident}\n"
     );
+    text.push_str(&user_manifest_line(user));
     for item in target_env() {
         text.push_str("env=");
         text.push_str(&item);
@@ -590,6 +644,15 @@ arg=-s\narg=/tests\narg={ident}\n"
     text.push_str(result);
     text.push('\n');
     text
+}
+
+/// Render the guest credential request for an ATF case that asks for a non-root identity.
+fn user_manifest_line(user: Option<&str>) -> String {
+    if user == Some(UNPRIVILEGED_USER) {
+        format!("user={UNPRIVILEGED_UID}\n")
+    } else {
+        String::new()
+    }
 }
 
 fn parse_batch(text: &str, count: usize) -> Vec<AtfBatchResult> {
@@ -744,8 +807,9 @@ fn guest_initfs_specs(
     service: &Path,
     reader: Option<&Path>,
     svcd: &Path,
-) -> Vec<String> {
-    let mut specs = service_specs(config, guest);
+) -> Result<Vec<String>> {
+    let workdir = manifest.parent().unwrap_or_else(|| Path::new("."));
+    let mut specs = service_specs(config, guest, workdir)?;
     specs.push(format!("/tests/program={}:0755", program.display()));
     specs.push(format!("/g1/manifest={}", manifest.display()));
     specs.push(format!("/etc/services.d/g1.toml={}", service.display()));
@@ -753,7 +817,7 @@ fn guest_initfs_specs(
         specs.push(format!("/etc/services.d/g1-read.toml={}", reader.display()));
     }
     specs.push(format!("/etc/svcd.conf={}", svcd.display()));
-    specs
+    Ok(specs)
 }
 
 fn mkinitfs_with(initfs: &Path, specs: &[String]) -> Vec<String> {

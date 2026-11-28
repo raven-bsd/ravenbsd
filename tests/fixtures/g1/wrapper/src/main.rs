@@ -19,8 +19,10 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_initfs::Initfs;
+use raven_proto_fs::{O_CREAT, O_TRUNC, O_WRONLY, S_IFDIR, S_IFMT};
 use raven_proto_svc::{State, Status};
 use raven_rt::entry;
 use raven_rt::spawn::{RtSys, SpawnOptions, spawn_image_with_fdmap};
@@ -34,6 +36,16 @@ const MANIFEST: &str = "/g1/manifest";
 const OPEN_READ: u32 = 1;
 /// Largest captured stream kept for the host.
 const CAPTURE_LIMIT: usize = 1024 * 1024;
+/// FreeBSD base root skeleton: `/root` is the 0700 root home; `.profile` is 0644.
+const ROOT_PATH: &str = "/root";
+const ROOT: &str = "file:/root";
+const PROFILE_PATH: &str = "file:/root/.profile";
+const PROFILE_ABSOLUTE: &str = "/root/.profile";
+const PROFILE: &[u8] = include_bytes!("../../../guest-root/profile");
+/// A second ramfs instance carries the donor `/root` mode; the default ramfs root is 0755.
+const ROOT_SCHEME: &str = "rootfs:";
+/// Root-created 1777 directory under the mounted `/tmp` for unprivileged ATF work and results.
+const ATF_ROOT: &str = "/tmp/atf-root";
 
 struct Manifest {
     mode: String,
@@ -41,6 +53,7 @@ struct Manifest {
     args: Vec<String>,
     env: Vec<String>,
     result: Option<String>,
+    user: Option<u32>,
 }
 
 impl Manifest {
@@ -51,6 +64,7 @@ impl Manifest {
             args: Vec::new(),
             env: Vec::new(),
             result: None,
+            user: None,
         };
         for line in text.lines() {
             let line = line.trim();
@@ -67,6 +81,13 @@ impl Manifest {
                 "arg" => manifest.args.push(value.to_string()),
                 "env" => manifest.env.push(value.to_string()),
                 "result" => manifest.result = Some(value.to_string()),
+                "user" => {
+                    manifest.user = Some(
+                        value
+                            .parse::<u32>()
+                            .map_err(|_| format!("bad user id: {value}"))?,
+                    );
+                }
                 other => return Err(format!("unknown manifest key: {other}")),
             }
         }
@@ -80,20 +101,109 @@ impl Manifest {
     }
 }
 
+/// Reproduce the FreeBSD base `/root` skeleton before a donor test runs.
+///
+/// The target guest root is the read-only initfs, whose synthesized directories are 0755, while
+/// the FreeBSD base environment has `/root` at 0700. A second ramfs instance started by the guest
+/// service set supplies the donor mode; this process is root, so it mounts that instance at
+/// `/root` and writes the base `.profile`. The steps are idempotent: the donor assertions are
+/// the `link("/root", ...)` / `link("/root/.profile", ...)` pair in NetBSD `t_link.c`.
+fn ensure_root_skeleton() -> Result<(), String> {
+    match raven_rt::fs::stat(ROOT) {
+        Ok(stat) if stat.mode & S_IFMT == S_IFDIR => {}
+        Ok(_) => return Err(format!("{ROOT} exists but is not a directory")),
+        Err(Errno::ENOENT) => match raven_rt::fs::mount(ROOT_PATH, ROOT_SCHEME) {
+            Ok(()) | Err(Errno::EEXIST) => {}
+            Err(error) => return Err(format!("mount {ROOT}: {error:?}")),
+        },
+        Err(error) => return Err(format!("stat {ROOT}: {error:?}")),
+    }
+    let root = raven_rt::fs::stat(ROOT).map_err(|error| format!("stat {ROOT}: {error:?}"))?;
+    if root.mode & S_IFMT != S_IFDIR {
+        return Err(format!("{ROOT} is not a directory"));
+    }
+    if root.mode & 0o7777 != 0o700 {
+        raven_rt::fs::chmod(ROOT_PATH, 0o700)
+            .map_err(|error| format!("chmod {ROOT_PATH}: {error:?}"))?;
+    }
+    // The open protocol carries no creation mode; set the donor 0644 explicitly after writing.
+    let mut profile = raven_rt::fs::open(PROFILE_PATH, O_WRONLY | O_CREAT | O_TRUNC)
+        .map_err(|error| format!("open {PROFILE_PATH}: {error:?}"))?;
+    profile
+        .write(PROFILE)
+        .map_err(|error| format!("write {PROFILE_PATH}: {error:?}"))?;
+    profile
+        .close()
+        .map_err(|error| format!("close {PROFILE_PATH}: {error:?}"))?;
+    raven_rt::fs::chmod(PROFILE_ABSOLUTE, 0o644)
+        .map_err(|error| format!("chmod {PROFILE_ABSOLUTE}: {error:?}"))?;
+    Ok(())
+}
+
+/// Drop to the donor unprivileged identity before the test program replaces this image.
+///
+/// The ATF result file and the wrapper work directory are created as root first, because the
+/// mounted `/tmp` root is not the donor 1777 directory and a `chmod` of a mount root is rejected.
+/// `setgroups` and the gid change still run with root credentials; the uid change is last.
+fn drop_credentials(manifest: &Manifest) -> Result<(), String> {
+    let Some(uid) = manifest.user else {
+        return Ok(());
+    };
+    match raven_rt::fs::mkdir(ATF_ROOT, 0o777) {
+        Ok(()) | Err(Errno::EEXIST) => {}
+        Err(error) => return Err(format!("mkdir {ATF_ROOT}: {error:?}")),
+    }
+    raven_rt::fs::chmod(ATF_ROOT, 0o1777)
+        .map_err(|error| format!("chmod {ATF_ROOT}: {error:?}"))?;
+    if let Some(result) = &manifest.result {
+        let open_path = format!("file:{result}");
+        let file = raven_rt::fs::open(&open_path, O_WRONLY | O_CREAT | O_TRUNC)
+            .map_err(|error| format!("open {open_path}: {error:?}"))?;
+        file.close()
+            .map_err(|error| format!("close {open_path}: {error:?}"))?;
+        raven_rt::fs::chmod(result, 0o666)
+            .map_err(|error| format!("chmod {result}: {error:?}"))?;
+    }
+    if manifest.program.ends_with("atf-wrapper") {
+        if let Some(workdir) = manifest.args.get(1) {
+            match raven_rt::fs::mkdir(workdir, 0o777) {
+                Ok(()) | Err(Errno::EEXIST) => {}
+                Err(error) => return Err(format!("mkdir {workdir}: {error:?}")),
+            }
+            raven_rt::fs::chmod(workdir, 0o777)
+                .map_err(|error| format!("chmod {workdir}: {error:?}"))?;
+        }
+    }
+    raven_rt::proc::setgroups(&[]).map_err(|error| format!("setgroups: {error:?}"))?;
+    raven_rt::proc::setresgid(uid).map_err(|error| format!("setresgid {uid}: {error:?}"))?;
+    raven_rt::proc::setresuid(uid).map_err(|error| format!("setresuid {uid}: {error:?}"))?;
+    Ok(())
+}
+
 fn main(args: raven_rt::Args) -> i32 {
     let mut read = false;
+    let mut root = false;
     let mut case = None;
     for index in 0..args.len() {
         if let Some(value) = args.get(index) {
             if value == "read" {
                 read = true;
             }
+            if value == "root" {
+                root = true;
+            }
             if let Ok(number) = value.parse::<usize>() {
                 case = Some(number);
             }
         }
     }
-    let result = if read { read_result(case) } else { run(case) };
+    let result = if root {
+        ensure_root_skeleton()
+    } else if read {
+        read_result(case)
+    } else {
+        run(case)
+    };
     match result {
         Ok(()) => 0,
         Err(error) => {
@@ -176,6 +286,10 @@ fn run(case: Option<usize>) -> Result<(), String> {
         .ok_or_else(|| format!("manifest missing: {path}"))?;
     let text = core::str::from_utf8(entry.data).map_err(|_| "manifest is not UTF-8".to_string())?;
     let manifest = Manifest::parse(text)?;
+    // The donor base environment has the `/root` skeleton; these guests have no login process,
+    // so the root wrapper materializes it before the test starts.
+    ensure_root_skeleton()?;
+    drop_credentials(&manifest)?;
     if manifest.mode == "exec" {
         // The kernel's `PROC_EXEC` loader copies the file tail; `raven-spawn`'s userland
         // image path is strict, so an EXEC wrapper is the portable way to pass argv/env.

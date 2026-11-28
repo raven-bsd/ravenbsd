@@ -606,11 +606,7 @@ fn run_atf_qemu(
                         bail!("program {} has no binary", program.name);
                     };
                     for case in &cases {
-                        batch.push(qemu::AtfBatchCase {
-                            program_path: binary.clone(),
-                            program_name: program.name.clone(),
-                            ident: case.ident.clone(),
-                        });
+                        batch.push(batch_case(case, &binary, &program.name));
                     }
                     cases_by_program.insert(program.name.clone(), cases.clone());
                     cases_for_outcomes = cases;
@@ -1130,6 +1126,15 @@ fn sync_skipped(
         missing_symbols: BTreeSet::new(),
         cases: None,
     })
+}
+
+fn batch_case(case: &TpCase, binary: &Path, program: &str) -> qemu::AtfBatchCase {
+    qemu::AtfBatchCase {
+        program_path: binary.to_path_buf(),
+        program_name: program.to_string(),
+        ident: case.ident.clone(),
+        user: case.meta.get("require.user").cloned(),
+    }
 }
 
 fn cached_cases(config: &RunConfig, suite: &SuiteFile, program: &Program) -> Vec<TpCase> {
