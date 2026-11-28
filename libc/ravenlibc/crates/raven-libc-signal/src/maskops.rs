@@ -80,10 +80,8 @@ pub fn pthread_sigmask<K: SigKernel>(
             Ok(previous) => previous,
             Err(error) => return number(error),
         };
-        if let Some(out) = old
-            && let Some(slot) = out.0.first_mut()
-        {
-            *slot = previous & APP_MASK;
+        if let Some(out) = old {
+            *out = mask::set_from_word(previous & APP_MASK);
         }
         let requested = requested.unwrap_or(0);
         let unblockable = crate::critical::signal_bit(signal::SIGKILL)
@@ -97,10 +95,8 @@ pub fn pthread_sigmask<K: SigKernel>(
         return 0;
     }
     let previous = raw::mask_load(tp);
-    if let Some(out) = old
-        && let Some(slot) = out.0.first_mut()
-    {
-        *slot = previous & APP_MASK;
+    if let Some(out) = old {
+        *out = mask::set_from_word(previous & APP_MASK);
     }
     let Some(request) = set else {
         return 0;
