@@ -33,6 +33,15 @@ regex = '^pipe-restart: child total=2097152$'
 regex = '^pipe-restart: child code=0$'
 
 [[expect]]
+regex = '^pipe-restart: restart signals=1$'
+
+[[expect]]
+regex = '^pipe-restart: restart write=4096$'
+
+[[expect]]
+regex = '^pipe-restart: restart ok$'
+
+[[expect]]
 regex = '^pipe-restart: ok$'
 
 [[expect]]

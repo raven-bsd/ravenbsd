@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 /* /init has no stdio fds; print through the kernel debug console (DEBUG_WRITE). */
@@ -68,6 +69,111 @@ static void handler(int sig) {
     } else if (sig == SIGUSR1) {
         child_signal_seen++;
     }
+}
+
+static volatile sig_atomic_t restart_signals;
+
+static void restart_handler(int sig) {
+    if (sig == SIGUSR2) {
+        restart_signals++;
+    }
+}
+
+/// The `SA_RESTART` row: the write blocks with no byte accepted, a caught signal interrupts the
+/// wait, and the call must restart instead of returning `EINTR`.
+static int restart_row(void) {
+    int pipefd[2];
+    int ready[2];
+    pid_t pid;
+    int status = 0;
+    char byte = 0;
+    ssize_t count;
+    long total;
+
+    if (signal(SIGUSR2, restart_handler) == SIG_ERR) {
+        say("pipe-restart: fail restart signal\n");
+        return 20;
+    }
+    if (pipe(pipefd) != 0 || pipe(ready) != 0) {
+        say("pipe-restart: fail restart pipe\n");
+        return 21;
+    }
+    pid = fork();
+    if (pid < 0) {
+        say("pipe-restart: fail restart fork\n");
+        return 22;
+    }
+    if (pid == 0) {
+        struct timespec pause = {1, 0};
+        char *drain;
+        long got = 0;
+        ssize_t part;
+
+        (void)close(pipefd[1]);
+        (void)close(ready[0]);
+        if (write(ready[1], &byte, 1) != 1) {
+            _exit(30);
+        }
+        if (nanosleep(&pause, NULL) != 0) {
+            _exit(31);
+        }
+        if (kill(getppid(), SIGUSR2) != 0) {
+            _exit(32);
+        }
+        if (nanosleep(&pause, NULL) != 0) {
+            _exit(33);
+        }
+        drain = malloc(65536 + 4096);
+        if (drain == NULL) {
+            _exit(34);
+        }
+        while ((part = read(pipefd[0], drain, 65536 + 4096)) > 0) {
+            got += part;
+        }
+        free(drain);
+        _exit(got == 65536 + 4096 ? 0 : 35);
+    }
+    (void)close(pipefd[0]);
+    (void)close(ready[1]);
+    if (read(ready[0], &byte, 1) != 1) {
+        say("pipe-restart: fail restart ready\n");
+        return 23;
+    }
+    (void)close(ready[0]);
+
+    char *fill = malloc(65536);
+    char *payload = malloc(4096);
+    if (fill == NULL || payload == NULL) {
+        say("pipe-restart: fail restart malloc\n");
+        return 24;
+    }
+    memset(fill, 0x5a, 65536);
+    memset(payload, 0x3c, 4096);
+    if (write(pipefd[1], fill, 65536) != 65536) {
+        say("pipe-restart: fail restart fill\n");
+        free(fill);
+        free(payload);
+        return 25;
+    }
+    free(fill);
+
+    restart_signals = 0;
+    count = write(pipefd[1], payload, 4096);
+    total = restart_signals;
+    free(payload);
+    say_count("pipe-restart: restart signals=", total);
+    say_count("pipe-restart: restart write=", (long)count);
+    (void)close(pipefd[1]);
+
+    if (waitpid(pid, &status, 0) != pid) {
+        say("pipe-restart: fail restart waitpid\n");
+        return 26;
+    }
+    if (count != 4096 || total != 1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        return 27;
+    }
+    say("pipe-restart: restart ok\n");
+    return 0;
 }
 
 static int reader(int read_fd) {
@@ -180,6 +286,11 @@ int main(void) {
     if (WEXITSTATUS(status) != 0 || todo != 0) {
         say("pipe-restart: fail\n");
         return 7;
+    }
+    int restart = restart_row();
+    if (restart != 0) {
+        say("pipe-restart: fail\n");
+        return restart;
     }
     say("pipe-restart: ok\n");
     return 0;
