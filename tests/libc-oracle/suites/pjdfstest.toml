@@ -20,16 +20,6 @@ expect_exit = 0
 args = []
 
 [[program]]
-name = "diag/steps"
-sources = ["diag/steps.t"]
-cflags = []
-ldadd = []
-status = "needs-fs"
-status_reason = "needs a mounted filesystem (FS lane)"
-expect_exit = 0
-args = []
-
-[[program]]
 name = "mkdir/00"
 sources = ["mkdir/00.t"]
 cflags = []
