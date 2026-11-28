@@ -405,11 +405,25 @@ impl Builder {
             .with_context(|| format!("cannot create {}", directory.display()))?;
         let object = directory.join("pjdfstest.o");
         let binary = directory.join("pjdfstest");
-        let source = self.vendor.join("vendor/pjdfstest/pjdfstest.c");
-        let include = self.vendor.join("vendor/pjdfstest");
-        if !source.is_file() {
-            bail!("vendored pjdfstest helper missing: {}", source.display());
+        // The donor sources are tracked as `.txt` so the tree carries no C scaffold; stage the
+        // exact bytes as `.c`/`.h` under the build directory and compile the staged copy.
+        let source_text = self.vendor.join("vendor/pjdfstest/pjdfstest.c.txt");
+        let config_text = self.vendor.join("vendor/pjdfstest/config.h.txt");
+        if !source_text.is_file() || !config_text.is_file() {
+            bail!(
+                "vendored pjdfstest sources missing: {} / {}",
+                source_text.display(),
+                config_text.display()
+            );
         }
+        let include = directory.join("src");
+        fs::create_dir_all(&include)
+            .with_context(|| format!("cannot create {}", include.display()))?;
+        let source = include.join("pjdfstest.c");
+        fs::copy(&source_text, &source)
+            .with_context(|| format!("cannot stage {}", source_text.display()))?;
+        fs::copy(&config_text, include.join("config.h"))
+            .with_context(|| format!("cannot stage {}", config_text.display()))?;
         let args = vec![
             "--target=x86_64-unknown-ravenbsd".to_string(),
             format!("--sysroot={}", sysroot.display()),
