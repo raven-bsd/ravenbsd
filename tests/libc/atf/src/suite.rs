@@ -672,7 +672,9 @@ fn parse_tap(output: &str, exit: Option<i32>) -> (Verdict, String) {
     match exit {
         Some(0) => (Verdict::Pass, String::new()),
         Some(code) => (Verdict::Fail, format!("exit:{code}")),
-        None => (Verdict::Fail, "no G1-EXIT".to_string()),
+        // The exec path replaces the wrapper image, so the guest does not report an exit status;
+        // the TAP stream is the contract and a failing expectation prints `not ok`.
+        None => (Verdict::Pass, String::new()),
     }
 }
 

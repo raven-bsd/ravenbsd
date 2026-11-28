@@ -249,6 +249,13 @@ fn tap_empty_stream_fails() {
 }
 
 #[test]
+fn tap_without_an_exit_status_passes_when_every_line_is_ok() {
+    let (verdict, reason) = parse_tap("1..1\nok 1\n", None);
+    assert_eq!(verdict, Verdict::Pass);
+    assert!(reason.is_empty());
+}
+
+#[test]
 fn tap_nonzero_exit_fails() {
     let (verdict, reason) = parse_tap("1..1\nok 1\n", Some(1));
     assert_eq!(verdict, Verdict::Fail);
