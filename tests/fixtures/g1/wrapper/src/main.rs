@@ -244,7 +244,9 @@ fn read_result(case: Option<usize>) -> Result<(), String> {
         raven_rt::println!("G1-RESULT-MISSING {case:?} no result path");
         return Ok(());
     };
-    for attempt in 0..1000 {
+    // 60 s reader window: `unlink_basic` performs 512 create/unlink pairs and was measured
+    // past the old 10 s window in the full batch; the program is slow, not missing.
+    for attempt in 0..6000 {
         match read_file(&result) {
             Ok(bytes) if !bytes.is_empty() => {
                 emit(case, "G1-RESULT", &bytes);
