@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone no_std fixture crate. It is linked against the ravenlibc sysroot by ../build.sh,
+# outside the product workspace, like the other libc-linked qtest fixtures.
+[workspace]
+
+[package]
+name = "raven-s779-plain-signal"
+version = "0.1.0"
+description = "S779 fixture: plain signal(2) fault delivery over the donor MAP_ANON mapping."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+publish = false
+
+[[bin]]
+name = "raven-s779-plain-signal"
+path = "src/main.rs"
+
+[features]
+default = []
+# The second qtest image maps with MAP_ANON|MAP_PRIVATE instead of the donor MAP_ANON alone.
+private-map = []
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-libc-abi = { path = "../../../../libc/ravenlibc/crates/raven-libc-abi" }
+
+[profile.release]
+panic = "abort"
