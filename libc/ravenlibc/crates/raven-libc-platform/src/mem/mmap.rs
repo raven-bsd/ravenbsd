@@ -42,11 +42,9 @@ fn validate(len: usize, offset: i64, protection: i32, flags: i32) -> Result<(), 
         // W^X: the kernel rejects the combination (A-sys-19).
         return Err(Errno::EACCES);
     }
+    // NetBSD `uvm_mmap.c`: only `MAP_SHARED|MAP_PRIVATE` together is EINVAL; a mapping
+    // without either type is private.
     if flags & mman::MAP_SHARED != 0 && flags & mman::MAP_PRIVATE != 0 {
-        return Err(Errno::EINVAL);
-    }
-    let map_type = flags & (mman::MAP_SHARED | mman::MAP_PRIVATE);
-    if map_type != mman::MAP_SHARED && map_type != mman::MAP_PRIVATE {
         return Err(Errno::EINVAL);
     }
     Ok(())
