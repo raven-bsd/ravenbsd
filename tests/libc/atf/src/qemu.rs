@@ -666,9 +666,14 @@ fn batch_manifest(
     user: Option<&str>,
 ) -> String {
     let (program, prefix) = if wrapper {
+        let workdir = if user == Some(UNPRIVILEGED_USER) {
+            "/tmp/atf-root/atf-work"
+        } else {
+            "/tmp/atf-work"
+        };
         (
             "/tests/atf-wrapper",
-            format!("arg=/tmp/atf-root/atf-work\narg={image_path}\n"),
+            format!("arg={workdir}\narg={image_path}\n"),
         )
     } else {
         (image_path, format!("arg={image_path}\n"))
