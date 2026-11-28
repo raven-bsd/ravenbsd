@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S779 plain signal(2) fault handler with an explicit private type
+# (`MAP_ANON | MAP_PRIVATE`). This is the same page/handler shape as `signal-fault-plain`; it
+# isolates the plain-handler delivery from the donor `MAP_ANON`-without-type mapping question,
+# so the C19 frame entry and `_exit(SIGSEGV)` status are exercised independently.
+
+name = "signal-fault-plain-private"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+pre = ["sh tests/qtest/cases/signal-fault-plain-fixture/build.sh"]
+initfs = "build/fixtures/signal-fault-plain-private/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal-fault: page handler=1 code=2 addr=0x[0-9a-f]+ addr-match=1$'
+
+[[expect]]
+regex = '^signal-fault: page resumed=1$'
+
+[[expect]]
+regex = '^signal-fault: caught status=11$'
+
+[[expect]]
+regex = '^signal-fault: default status=-11$'
+
+[[expect]]
+regex = '^signal-fault: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
