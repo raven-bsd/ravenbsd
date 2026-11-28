@@ -5,7 +5,7 @@
 # vfsd can stay disabled; this service is ordered after the UFS-aware one.
 name = "getty"
 exec = "/bin/getty"
-needs = ["consd", "vfsd-ufs", "ramfsd", "initfsd"]
+needs = ["consd", "vfsd-ufs", "ramfsd", "initfsd", "scheme:pty"]
 restart = "never"
 max_restarts = 0
 grants = ["initfs"]

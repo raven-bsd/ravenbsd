@@ -6,7 +6,7 @@
 # rc.conf; this service is the only file: provider.
 name = "vfsd-ufs"
 exec = "/sbin/vfsd"
-needs = ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "scheme:ufs"]
+needs = ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "scheme:ufs", "scheme:pty"]
 provides = ["scheme:file"]
 readiness = "scheme"
 ready_timeout_ms = 60_000

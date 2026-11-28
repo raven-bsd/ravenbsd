@@ -14,9 +14,18 @@ path = "/bin/getty"
 package = "login"
 path = "/bin/login"
 
+[[initfs.programs]]
+package = "raven-ptyd"
+path = "/sbin/ptyd"
+
 [[initfs.files]]
 src = "profiles/qemu-ufs.d/getty.manifest"
 path = "/etc/services.d/getty.toml"
+
+[[initfs.files]]
+src = "profiles/ssh.d/ptyd.service.manifest"
+path = "/etc/services.d/ptyd.toml"
+mode = 0o644
 
 [[initfs.files]]
 src = "etc/passwd"
