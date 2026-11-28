@@ -251,3 +251,61 @@ fn a_batch_case_carries_the_require_user_metadata() {
             .is_none()
     );
 }
+fn case(ident: &str) -> TpCase {
+    TpCase {
+        ident: ident.to_string(),
+        meta: Default::default(),
+    }
+}
+
+#[test]
+fn the_batch_chunk_stays_below_the_service_graph_cap() {
+    const { assert!(BATCH_CHUNK > 0) };
+    const { assert!(BATCH_CHUNK * 2 + 8 <= 256) };
+    const {
+        assert!(
+            BATCH_CHUNK < 58,
+            "a 58-body suite must span more than one boot"
+        )
+    };
+}
+
+#[test]
+fn a_usable_oracle_cache_skips_the_target_listing() {
+    let listed = std::cell::Cell::new(false);
+    let cases = resolve_batch_cases(vec![case("body")], || {
+        listed.set(true);
+        Ok(vec![case("other")])
+    })
+    .expect("cases");
+    assert!(!listed.get());
+    assert_eq!(cases[0].ident, "body");
+}
+
+#[test]
+fn a_missing_oracle_cache_is_replaced_by_the_target_listing() {
+    let cases = resolve_batch_cases(vec![case("unknown-bodies")], || {
+        Ok(vec![case("body-a"), case("body-b")])
+    })
+    .expect("cases");
+    assert_eq!(
+        cases
+            .iter()
+            .map(|case| case.ident.as_str())
+            .collect::<Vec<_>>(),
+        ["body-a", "body-b"]
+    );
+}
+
+#[test]
+fn an_empty_oracle_cache_is_replaced_by_the_target_listing() {
+    let cases = resolve_batch_cases(Vec::new(), || Ok(vec![case("body")])).expect("cases");
+    assert_eq!(cases.len(), 1);
+    assert_eq!(cases[0].ident, "body");
+}
+
+#[test]
+fn a_failed_target_listing_is_reported_to_the_caller() {
+    let result = resolve_batch_cases(Vec::new(), || Err(anyhow::anyhow!("guest listing failed")));
+    assert!(result.is_err());
+}

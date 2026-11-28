@@ -55,6 +55,7 @@ fn builder(root: &Path) -> Builder {
     Builder {
         root: repo(),
         vendor: root.join("vendor"),
+        port_root: root.join("port-sources"),
         out: root.join("out"),
         mode: Mode::Oracle,
         cc: "cc".to_string(),
