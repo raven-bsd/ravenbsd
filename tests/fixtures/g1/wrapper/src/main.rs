@@ -44,6 +44,8 @@ const PROFILE_ABSOLUTE: &str = "/root/.profile";
 const PROFILE: &[u8] = include_bytes!("../../../guest-root/profile");
 /// A second ramfs instance carries the donor `/root` mode; the default ramfs root is 0755.
 const ROOT_SCHEME: &str = "rootfs:";
+/// Root-created 1777 directory under the mounted `/tmp` for unprivileged ATF work and results.
+const ATF_ROOT: &str = "/tmp/atf-root";
 
 struct Manifest {
     mode: String,
@@ -51,6 +53,7 @@ struct Manifest {
     args: Vec<String>,
     env: Vec<String>,
     result: Option<String>,
+    user: Option<u32>,
 }
 
 impl Manifest {
@@ -61,6 +64,7 @@ impl Manifest {
             args: Vec::new(),
             env: Vec::new(),
             result: None,
+            user: None,
         };
         for line in text.lines() {
             let line = line.trim();
@@ -77,6 +81,13 @@ impl Manifest {
                 "arg" => manifest.args.push(value.to_string()),
                 "env" => manifest.env.push(value.to_string()),
                 "result" => manifest.result = Some(value.to_string()),
+                "user" => {
+                    manifest.user = Some(
+                        value
+                            .parse::<u32>()
+                            .map_err(|_| format!("bad user id: {value}"))?,
+                    );
+                }
                 other => return Err(format!("unknown manifest key: {other}")),
             }
         }
@@ -126,6 +137,46 @@ fn ensure_root_skeleton() -> Result<(), String> {
         .map_err(|error| format!("close {PROFILE_PATH}: {error:?}"))?;
     raven_rt::fs::chmod(PROFILE_ABSOLUTE, 0o644)
         .map_err(|error| format!("chmod {PROFILE_ABSOLUTE}: {error:?}"))?;
+    Ok(())
+}
+
+/// Drop to the donor unprivileged identity before the test program replaces this image.
+///
+/// The ATF result file and the wrapper work directory are created as root first, because the
+/// mounted `/tmp` root is not the donor 1777 directory and a `chmod` of a mount root is rejected.
+/// `setgroups` and the gid change still run with root credentials; the uid change is last.
+fn drop_credentials(manifest: &Manifest) -> Result<(), String> {
+    let Some(uid) = manifest.user else {
+        return Ok(());
+    };
+    match raven_rt::fs::mkdir(ATF_ROOT, 0o777) {
+        Ok(()) | Err(Errno::EEXIST) => {}
+        Err(error) => return Err(format!("mkdir {ATF_ROOT}: {error:?}")),
+    }
+    raven_rt::fs::chmod(ATF_ROOT, 0o1777)
+        .map_err(|error| format!("chmod {ATF_ROOT}: {error:?}"))?;
+    if let Some(result) = &manifest.result {
+        let open_path = format!("file:{result}");
+        let file = raven_rt::fs::open(&open_path, O_WRONLY | O_CREAT | O_TRUNC)
+            .map_err(|error| format!("open {open_path}: {error:?}"))?;
+        file.close()
+            .map_err(|error| format!("close {open_path}: {error:?}"))?;
+        raven_rt::fs::chmod(result, 0o666)
+            .map_err(|error| format!("chmod {result}: {error:?}"))?;
+    }
+    if manifest.program.ends_with("atf-wrapper") {
+        if let Some(workdir) = manifest.args.get(1) {
+            match raven_rt::fs::mkdir(workdir, 0o777) {
+                Ok(()) | Err(Errno::EEXIST) => {}
+                Err(error) => return Err(format!("mkdir {workdir}: {error:?}")),
+            }
+            raven_rt::fs::chmod(workdir, 0o777)
+                .map_err(|error| format!("chmod {workdir}: {error:?}"))?;
+        }
+    }
+    raven_rt::proc::setgroups(&[]).map_err(|error| format!("setgroups: {error:?}"))?;
+    raven_rt::proc::setresgid(uid).map_err(|error| format!("setresgid {uid}: {error:?}"))?;
+    raven_rt::proc::setresuid(uid).map_err(|error| format!("setresuid {uid}: {error:?}"))?;
     Ok(())
 }
 
@@ -238,6 +289,7 @@ fn run(case: Option<usize>) -> Result<(), String> {
     // The donor base environment has the `/root` skeleton; these guests have no login process,
     // so the root wrapper materializes it before the test starts.
     ensure_root_skeleton()?;
+    drop_credentials(&manifest)?;
     if manifest.mode == "exec" {
         // The kernel's `PROC_EXEC` loader copies the file tail; `raven-spawn`'s userland
         // image path is strict, so an EXEC wrapper is the portable way to pass argv/env.

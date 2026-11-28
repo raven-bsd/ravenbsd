@@ -35,6 +35,10 @@ const POLL: Duration = Duration::from_millis(50);
 const SERIAL_LIMIT: usize = 32 * 1024 * 1024;
 /// The donor `nobody` uid/gid used for `require.user=unprivileged` ATF cases.
 const UNPRIVILEGED_UID: u32 = 65534;
+/// The ATF metadata value that requests the unprivileged identity.
+const UNPRIVILEGED_USER: &str = "unprivileged";
+/// The dedicated 1777 tmpfs mount the G1 wrapper creates for unprivileged ATF cases.
+const ATF_ROOT: &str = "/tmp/atf-root";
 
 /// Where the target kernel and the QEMU tools come from.
 #[derive(Clone, Debug)]
@@ -458,10 +462,17 @@ pub fn run_atf_batch(
         let image_path = image_paths
             .get(&case.program_path)
             .expect("program image was registered");
-        let result = format!("/tmp/result-{index}");
+        let result = if case.user.as_deref() == Some(UNPRIVILEGED_USER) {
+            format!("{ATF_ROOT}/result-{index}")
+        } else {
+            format!("/tmp/result-{index}")
+        };
         let manifest = workdir.join(format!("manifest-{index}"));
-        fs::write(&manifest, batch_manifest(&case.ident, image_path, &result, case.user.as_deref()))
-            .with_context(|| format!("cannot write {}", manifest.display()))?;
+        fs::write(
+            &manifest,
+            batch_manifest(&case.ident, image_path, &result, case.user.as_deref()),
+        )
+        .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
         let read = workdir.join(format!("g1-read-{index}.toml"));
         let needs = if index == 0 {
@@ -573,7 +584,8 @@ fn service_specs(config: &QemuConfig, guest: &Guest, workdir: &Path) -> Result<V
 /// come from the read-only initfs. A second ramfs instance is started with `--root-mode 700`;
 /// `vfsd` must be able to resolve that scheme, so its generated manifest depends on `rootfsd` and
 /// the start plan registers `rootfs` before `vfsd` takes its namespace snapshot. The G1 wrapper
-/// mounts it at `/root` and writes `.profile` before a test runs.
+/// mounts it at `/root` and writes `.profile` before a test runs. Unprivileged ATF cases get a
+/// root-created 1777 work root under the mounted `/tmp`.
 fn guest_root_services(workdir: &Path) -> Result<Vec<String>> {
     let directory = workdir.join("etc");
     fs::create_dir_all(&directory)
@@ -622,7 +634,7 @@ fn batch_manifest(ident: &str, image_path: &str, result: &str, user: Option<&str
         "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
 arg=-s\narg=/tests\narg={ident}\n"
     );
-    text.push_str(user_manifest_line(user));
+    text.push_str(&user_manifest_line(user));
     for item in target_env() {
         text.push_str("env=");
         text.push_str(&item);
@@ -635,8 +647,12 @@ arg=-s\narg=/tests\narg={ident}\n"
 }
 
 /// Render the guest credential request for an ATF case that asks for a non-root identity.
-fn user_manifest_line(_user: Option<&str>) -> &'static str {
-    ""
+fn user_manifest_line(user: Option<&str>) -> String {
+    if user == Some(UNPRIVILEGED_USER) {
+        format!("user={UNPRIVILEGED_UID}\n")
+    } else {
+        String::new()
+    }
 }
 
 fn parse_batch(text: &str, count: usize) -> Vec<AtfBatchResult> {

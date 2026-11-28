@@ -245,5 +245,9 @@ fn a_batch_case_carries_the_require_user_metadata() {
         ident: "mkdir_err".to_string(),
         meta: BTreeMap::new(),
     };
-    assert!(batch_case(&root, Path::new("/out/t_mkdir"), "sys/t_mkdir").user.is_none());
+    assert!(
+        batch_case(&root, Path::new("/out/t_mkdir"), "sys/t_mkdir")
+            .user
+            .is_none()
+    );
 }
