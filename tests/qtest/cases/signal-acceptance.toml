@@ -19,10 +19,10 @@ qemu_extra = [
 expect_exit = "success"
 
 [[expect]]
-regex = '^signal: boundary guard ok flags=0x8000004 mask=1$'
+regex = '^signal: boundary guard ok flags=0x41 mask=1$'
 
 [[expect]]
-regex = '^signal: boundary canary ok flags=0x4 mask=1$'
+regex = '^signal: boundary canary ok flags=0x40 mask=1$'
 
 [[expect]]
 regex = '^signal: boundary procmask ok mask=1$'
