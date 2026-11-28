@@ -23,7 +23,7 @@ const SIGUSR1: usize = 10;
 const SIGUSR2: usize = 12;
 const SIG_DFL: u64 = 0;
 const SIG_IGN: u64 = 1;
-const SS_DISABLE: u32 = 2;
+const SS_DISABLE: u32 = 4;
 
 /// The Raven private 40-byte `SIGACTION` request (`kernel/src/syscall/thread.rs`).
 #[repr(C)]

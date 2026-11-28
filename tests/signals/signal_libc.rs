@@ -28,15 +28,15 @@ const CANARY: u8 = 0x5a;
 // `bits/signum.h` and `bits/abi_mman.h` from the installed sysroot.
 const SIGUSR1: c_int = 10;
 const SIGUSR2: c_int = 12;
-const SA_ONSTACK: c_int = 0x0800_0000;
-const SA_SIGINFO: c_int = 4;
-const SIG_BLOCK: c_int = 0;
-const SIG_UNBLOCK: c_int = 1;
+const SA_ONSTACK: c_int = 0x1;
+const SA_SIGINFO: c_int = 0x40;
+const SIG_BLOCK: c_int = 1;
+const SIG_UNBLOCK: c_int = 2;
 const PROT_NONE: c_int = 0x0;
 const PROT_READ: c_int = 0x1;
 const PROT_WRITE: c_int = 0x2;
 const MAP_PRIVATE: c_int = 0x2;
-const MAP_ANON: c_int = 0x20;
+const MAP_ANON: c_int = 0x1000;
 const MAP_FAILED: usize = usize::MAX;
 
 // `crates/raven-abi/src/syscall.rs`: DEBUG_WRITE = 0x03. Only the log sink; every signal call
