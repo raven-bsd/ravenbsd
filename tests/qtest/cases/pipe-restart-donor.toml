@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S781: the exact FreeBSD/NetBSD `t_pipe.c:pipe_restart` body in a fresh process: a 128 KiB
+# first read, SIGINFO wake, alarm(2), and a 1 MiB drain. It runs alone so no preceding alarm or
+# signal disposition from the other rows can mask the donor sequence.
+
+name = "pipe-restart-donor"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pipe-restart/build.sh"]
+initfs = "build/fixtures/pipe-restart/donor-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipe-restart: donor child first=[0-9]+$'
+
+[[expect]]
+regex = '^pipe-restart: donor child waiting$'
+
+[[expect]]
+regex = '^pipe-restart: donor alarm$'
+
+[[expect]]
+regex = '^pipe-restart: donor kill$'
+
+[[expect]]
+regex = '^pipe-restart: donor child signalled$'
+
+[[expect]]
+regex = '^pipe-restart: donor parent remaining=0$'
+
+[[expect]]
+regex = '^pipe-restart: donor child total=2097152$'
+
+[[expect]]
+regex = '^pipe-restart: donor child code=0$'
+
+[[expect]]
+regex = '^pipe-restart: donor ok$'
+
+[[expect]]
+regex = '^pipe-restart: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pipe-restart: fail'

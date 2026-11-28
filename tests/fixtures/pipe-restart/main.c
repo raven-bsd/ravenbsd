@@ -176,6 +176,109 @@ static int restart_row(void) {
     return 0;
 }
 
+#ifdef S781_DONOR_ONLY
+static volatile sig_atomic_t donor_nsiginfo;
+static pid_t donor_pid;
+
+/* The FreeBSD `contrib/netbsd-tests/lib/libc/sys/t_pipe.c` `pipe_restart` handler: the parent's
+ * SIGALRM signals the child with SIGINFO, which is the donor's "status request" wake. */
+static void donor_handler(int sig) {
+    if (sig == SIGALRM) {
+        say("pipe-restart: donor alarm\n");
+        (void)kill(donor_pid, SIGINFO);
+        say("pipe-restart: donor kill\n");
+    }
+    if (sig == SIGINFO) {
+        donor_nsiginfo++;
+    }
+}
+
+/// The donor row verbatim: 128 KiB first read, SIGINFO wake, alarm(2), 1 MiB drain. The marker
+/// after each step names the last completed stage if the body still hangs.
+static int donor_row(void) {
+    int pp[2];
+    int st = 0;
+    ssize_t sz;
+    ssize_t todo = TOTAL;
+    ssize_t done;
+    char *f;
+    sigset_t asigset, osigset, emptysigset;
+    pid_t pid;
+
+    f = malloc((size_t)TOTAL);
+    if (f == NULL) {
+        say("pipe-restart: donor fail malloc\n");
+        return 40;
+    }
+    memset(f, 0xa5, (size_t)TOTAL);
+    sigemptyset(&emptysigset);
+    sigemptyset(&asigset);
+    sigaddset(&asigset, SIGINFO);
+    if (signal(SIGINFO, donor_handler) == SIG_ERR) {
+        say("pipe-restart: donor fail signal SIGINFO\n");
+        return 41;
+    }
+    if (signal(SIGALRM, donor_handler) == SIG_ERR) {
+        say("pipe-restart: donor fail signal SIGALRM\n");
+        return 42;
+    }
+    if (pipe(pp) != 0) {
+        say("pipe-restart: donor fail pipe\n");
+        return 43;
+    }
+    pid = fork();
+    if (pid < 0) {
+        say("pipe-restart: donor fail fork\n");
+        return 44;
+    }
+    if (pid == 0) {
+        (void)close(pp[1]);
+        done = read(pp[0], f, 128L * 1024L);
+        say_count("pipe-restart: donor child first=", (long)done);
+        if (done < 0) {
+            _exit(50);
+        }
+        if (sigprocmask(SIG_BLOCK, &asigset, &osigset) != 0) {
+            _exit(51);
+        }
+        say("pipe-restart: donor child waiting\n");
+        while (donor_nsiginfo == 0) {
+            if (sigsuspend(&emptysigset) != -1 || errno != EINTR) {
+                _exit(52);
+            }
+        }
+        if (sigprocmask(SIG_SETMASK, &osigset, NULL) != 0) {
+            _exit(53);
+        }
+        say("pipe-restart: donor child signalled\n");
+        while ((sz = read(pp[0], f, 1024L * 1024L)) > 0) {
+            done += sz;
+        }
+        say_count("pipe-restart: donor child total=", (long)done);
+        _exit(done != todo ? 54 : 0);
+    }
+    donor_pid = pid;
+    (void)close(pp[0]);
+    alarm(2);
+    while (todo > 0 && (sz = write(pp[1], f, (size_t)todo)) > 0) {
+        todo -= sz;
+    }
+    say_count("pipe-restart: donor parent remaining=", (long)todo);
+    (void)close(pp[1]);
+    if (waitpid(pid, &st, 0) != pid) {
+        say("pipe-restart: donor fail waitpid\n");
+        return 45;
+    }
+    say_count("pipe-restart: donor child code=", WEXITSTATUS(st));
+    free(f);
+    if (todo != 0 || !WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+        return 46;
+    }
+    say("pipe-restart: donor ok\n");
+    return 0;
+}
+#endif
+
 static int reader(int read_fd) {
     sigset_t block, old, empty;
     long total = 0;
@@ -224,6 +327,19 @@ static int reader(int read_fd) {
     return total == TOTAL ? 0 : 16;
 }
 
+#ifdef S781_DONOR_ONLY
+/* The exact FreeBSD/NetBSD `pipe_restart` body in a fresh process: no preceding alarm may
+ * leave the ITIMER_REAL state or signal dispositions touching this run. */
+int main(void) {
+    int donor = donor_row();
+    if (donor != 0) {
+        say("pipe-restart: fail\n");
+        return donor;
+    }
+    say("pipe-restart: ok\n");
+    return 0;
+}
+#else
 int main(void) {
     int pipefd[2];
     pid_t pid;
@@ -295,3 +411,4 @@ int main(void) {
     say("pipe-restart: ok\n");
     return 0;
 }
+#endif

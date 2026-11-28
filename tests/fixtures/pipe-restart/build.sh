@@ -72,6 +72,32 @@ fi
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" "/init=$out/pipe-restart:0755"
 
+# Fresh-process donor row: the exact FreeBSD/NetBSD `pipe_restart` body with no preceding alarm
+# or signal state from the other rows.
+"$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
+    -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+    -D__ravenbsd__=1 -D__unix__=1 -DS781_DONOR_ONLY=1 -mno-sse -mno-mmx -msoft-float \
+    -c "$root/tests/fixtures/pipe-restart/main.c" -o "$out/donor.o"
+
+if [ -n "$builtins" ]; then
+    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+        -nostdlib -nostartfiles -static -T"$link_script" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/donor.o" \
+        -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+        "$sysroot/usr/lib/crtn.o" -o "$out/pipe-restart-donor"
+else
+    "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
+        -nostdlib -nostartfiles -static -T"$link_script" \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 \
+        "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$out/donor.o" \
+        -L"$sysroot/usr/lib" -lc \
+        "$sysroot/usr/lib/crtn.o" -o "$out/pipe-restart-donor"
+fi
+
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/donor-initfs.img" "/init=$out/pipe-restart-donor:0755"
+
 # Kernel-level rows: raw blocking pipe syscalls with a caught kernel signal, no libc in the path.
 target=x86_64-unknown-none
 rustflags="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld"
