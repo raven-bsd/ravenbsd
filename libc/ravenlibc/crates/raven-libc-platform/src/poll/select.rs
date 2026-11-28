@@ -6,6 +6,7 @@
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+use raven_libc_abi::generated::signal::SIG_SETMASK;
 use raven_libc_abi::poll::{POLLIN, POLLOUT, POLLPRI};
 use raven_libc_abi::structs::{Pollfd, Timeval};
 
@@ -108,15 +109,88 @@ pub fn select<B: SysBackend, L: Lock>(
     Ok(ready as i32)
 }
 
-/// `pselect`: the atomic mask swap needs PG-26; until then `ENOSYS`.
-pub fn pselect<B: SysBackend, L: Lock>(
-    _platform: &Platform<B, L>,
-    _nfds: i32,
-    _readfds: &mut [u64],
-    _writefds: &mut [u64],
-    _exceptfds: &mut [u64],
-    _timeout: Option<&raven_libc_abi::structs::Timespec>,
-    _sigmask: Option<&[u64]>,
+/// The signal-mask operations `pselect` needs from the kernel.
+///
+/// The poll layer owns the install/wait/restore order; the kernel owns the live mask. This keeps
+/// the C export free of mask state and lets a host test observe the exact swap sequence.
+pub trait MaskOps {
+    /// Install `set` as the calling thread's mask and return the previous mask word.
+    fn install(&mut self, set: u64) -> Result<u64, Errno>;
+    /// Restore the previous mask word.
+    fn restore(&mut self, old: u64) -> Result<(), Errno>;
+}
+
+/// The kernel `SIGPROCMASK` implementation of [`MaskOps`].
+///
+/// The kernel mask is one word; the high words of the caller's 128-byte `sigset_t` are ignored
+/// exactly as `sigprocmask` ignores them.
+pub struct KernelMasks;
+
+impl MaskOps for KernelMasks {
+    fn install(&mut self, set: u64) -> Result<u64, Errno> {
+        let mut old = 0u64;
+        raven_libc_sys::signal::sigprocmask(SIG_SETMASK, Some(set), Some(&mut old))?;
+        Ok(old)
+    }
+
+    fn restore(&mut self, old: u64) -> Result<(), Errno> {
+        raven_libc_sys::signal::sigprocmask(SIG_SETMASK, Some(old), None)
+    }
+}
+
+/// `pselect`: install the temporary mask, wait, and restore the caller mask on every return.
+///
+/// This is the non-atomic timeout path the S750 `t_select.c` row requires. A signal that arrives
+/// between the install and the `EVQ_WAIT` still sees the temporary mask; the atomic masked wait
+/// remains PG-26/S173b and is not claimed here. A restore failure after a successful wait is
+/// returned to the caller; after a failed wait the wait error wins.
+#[allow(clippy::too_many_arguments)] // mirrors the pselect C ABI and the select signature
+pub fn pselect<B: SysBackend, L: Lock, M: MaskOps>(
+    platform: &Platform<B, L>,
+    nfds: i32,
+    readfds: &mut [u64],
+    writefds: &mut [u64],
+    exceptfds: &mut [u64],
+    timeout: Option<&raven_libc_abi::structs::Timespec>,
+    sigmask: Option<&[u64]>,
+    masks: &mut M,
 ) -> Result<i32, Errno> {
-    Err(Errno::ENOSYS)
+    let saved = match sigmask {
+        Some(set) => Some(masks.install(set.first().copied().unwrap_or(0))?),
+        None => None,
+    };
+    let result = match timeout {
+        Some(value) if value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1_000_000_000 => {
+            Err(Errno::EINVAL)
+        }
+        Some(value) => {
+            // `select` takes microseconds; round up so the wait never ends before the caller's
+            // nanosecond deadline at the platform's microsecond granularity.
+            let mut seconds = value.tv_sec;
+            let mut micros = (value.tv_nsec + 999) / 1000;
+            if micros >= 1_000_000 {
+                seconds = seconds.saturating_add(1);
+                micros = 0;
+            }
+            let timeval = Timeval {
+                tv_sec: seconds,
+                tv_usec: micros,
+            };
+            select(platform, nfds, readfds, writefds, exceptfds, Some(&timeval))
+        }
+        None => select(platform, nfds, readfds, writefds, exceptfds, None),
+    };
+    let Some(old) = saved else {
+        return result;
+    };
+    match result {
+        Ok(ready) => {
+            masks.restore(old)?;
+            Ok(ready)
+        }
+        Err(error) => {
+            let _ = masks.restore(old);
+            Err(error)
+        }
+    }
 }

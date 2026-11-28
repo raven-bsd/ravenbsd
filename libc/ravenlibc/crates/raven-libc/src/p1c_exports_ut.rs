@@ -6,9 +6,8 @@
 //! The module is compiled on the host under `test` with the `no_mangle` attribute disabled, so
 //! these tests call the wrappers themselves rather than a copy of their argument checks. Every
 //! case here either validates a pointer/scalar argument before the platform is reached or uses a
-//! platform path that returns without a Raven system call (`select` with no descriptors,
-//! `ppoll`/`pselect`/`brk` returning `ENOSYS`, the documented `mlock` family no-ops and
-//! `sleep(0)`).
+//! platform path that returns without a Raven system call (`select`/`pselect` with no descriptors,
+//! `ppoll`/`brk` returning `ENOSYS`, the documented `mlock` family no-ops and `sleep(0)`).
 
 #![allow(
     clippy::indexing_slicing,
@@ -257,22 +256,26 @@ fn ppoll_rejects_invalid_timeout_and_sigmask_pointers_with_efault() {
 }
 
 #[test]
-fn pselect_empty_request_is_enosys_until_the_signal_swap_lands() {
+fn pselect_empty_request_returns_after_the_timeout() {
     let _guard = TestLock::acquire();
     errno::set_raw(0);
-    // SAFETY: NULL sets/timeout/mask are the empty request.
+    let timeout = Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: NULL sets/mask and a live zero timeout are the empty request.
     let result = unsafe {
         pselect(
             0,
             core::ptr::null_mut(),
             core::ptr::null_mut(),
             core::ptr::null_mut(),
-            core::ptr::null(),
+            &timeout,
             core::ptr::null(),
         )
     };
-    assert_eq!(result, -1);
-    assert_eq!(errno::get(), ENOSYS);
+    assert_eq!(result, 0);
+    assert_eq!(errno::get(), 0);
 }
 
 #[test]

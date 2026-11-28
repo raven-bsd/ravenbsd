@@ -71,3 +71,27 @@ fn sigpending_reports_thread_bits() {
     assert!(pending.is_member(3).unwrap());
     assert!(!pending.is_member(2).unwrap());
 }
+
+#[test]
+fn read_only_sigprocmask_describes_the_whole_sigset() {
+    let authoritative = crate::SigCaps {
+        authoritative: true,
+        ..crate::SigCaps::HOST
+    };
+    for kernel in [
+        HostSigKernel::new(),
+        HostSigKernel::with_caps(authoritative),
+    ] {
+        mask::set_mask(&kernel, 0x40);
+        let mut old = SigSet::empty();
+        for word in old.0.iter_mut() {
+            *word = 0xAAAA_AAAA_AAAA_AAAA;
+        }
+        sigprocmask(&kernel, signal::SIG_BLOCK, None, Some(&mut old)).unwrap();
+        assert_eq!(
+            old.0,
+            [0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "a read-only sigprocmask must write all 128 bytes of the caller's sigset_t"
+        );
+    }
+}
