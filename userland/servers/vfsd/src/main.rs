@@ -576,18 +576,37 @@ mod program {
             let (mount_id, suffix) = mount_suffix(&self.table, &path)?;
             let mut creating = false;
             match call {
-                Call::Mkdir { .. }
-                | Call::Symlink { .. }
-                | Call::Mkfifo { .. }
-                | Call::Mknod { .. } => {
+                Call::Mkdir { .. } => {
+                    self.check_parent(mount_id, &suffix, creds)?;
+                    // FreeBSD `kern_mkdirat` resolves the new name with
+                    // `CREATE|FAILIFEXISTS` before `VOP_MKDIR`, so an existing final
+                    // component is EEXIST before the backing filesystem's read-only
+                    // check. Forward only a genuinely new name.
+                    if stat_in(&self.table, mount_id, &suffix).is_ok() {
+                        return Err(Errno::EEXIST);
+                    }
+                    // Creation carries the original caller's credentials and mask to the
+                    // backing filesystem; the request capability is the authority.
+                    creating = true;
+                }
+                Call::Symlink { .. } | Call::Mkfifo { .. } | Call::Mknod { .. } => {
                     self.check_parent(mount_id, &suffix, creds)?;
                     // Creation carries the original caller's credentials and mask to the
                     // backing filesystem; the request capability is the authority.
                     creating = true;
                 }
                 Call::Unlink { .. } | Call::Rmdir { .. } => {
+                    // FreeBSD `kern_funlinkat`: the root of a mounted filesystem cannot
+                    // be deleted, and unlink(2) of a directory is EPERM; rmdir still
+                    // forwards so the backing filesystem decides ENOTEMPTY.
+                    if suffix.is_empty() {
+                        return Err(Errno::EBUSY);
+                    }
                     self.check_parent(mount_id, &suffix, creds)?;
                     let target = stat_in(&self.table, mount_id, &suffix)?;
+                    if matches!(call, Call::Unlink { .. }) && target.mode & S_IFMT == S_IFDIR {
+                        return Err(Errno::EPERM);
+                    }
                     let parent = stat_in(&self.table, mount_id, parent_bytes(&suffix))?;
                     if !creds.sticky_delete_allowed((parent.mode & 0o7777) as u16, target.uid) {
                         return Err(Errno::EPERM);
