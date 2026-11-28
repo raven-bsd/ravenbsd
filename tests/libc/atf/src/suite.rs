@@ -541,6 +541,7 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
     {
         run_tap_qemu(&builder, &suite, &program_jobs, config, &owners, &mut run)?;
         run.sort();
+        write_run(config, &run, &suite)?;
         return Ok(run);
     }
     if config.mode == Mode::Target

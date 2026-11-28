@@ -528,7 +528,13 @@ env=LANG=C.UTF-8\nenv=LC_ALL=C.UTF-8\n"
         specs.push(format!("/bin/{name}={}", path.display()));
     }
     for name in ["conf", "misc.sh"] {
-        let source = tree.join(name);
+        // Raven is not in the upstream conf's OS list; use the Raven filesystem configuration
+        // when it is present, but keep the upstream name the scripts source.
+        let source = if name == "conf" && tree.join("conf.raven").is_file() {
+            tree.join("conf.raven")
+        } else {
+            tree.join(name)
+        };
         let destination = stage.join("tests").join(name);
         fs::copy(&source, &destination)
             .with_context(|| format!("cannot stage {}", source.display()))?;
