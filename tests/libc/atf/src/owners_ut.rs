@@ -89,6 +89,18 @@ fn a_prefix_needs_a_colon() {
 }
 
 #[test]
+fn an_s_ticket_is_a_valid_owner() {
+    let mut table = owners();
+    table.entries.push(Owner {
+        prefix: "freebsd-libc-sys:".to_string(),
+        ticket: "S750".to_string(),
+        area: "required kernel bodies".to_string(),
+    });
+    assert!(table.validate().is_ok());
+    assert_eq!(table.ticket("freebsd-libc-sys", "sys/t_dup"), "S750");
+}
+
+#[test]
 fn an_empty_area_is_an_error() {
     let mut table = owners();
     table.entries[0].area.clear();

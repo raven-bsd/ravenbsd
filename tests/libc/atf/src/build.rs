@@ -29,6 +29,8 @@ pub struct Builder {
     pub root: PathBuf,
     /// Vendored donor root (`tests/libc-oracle/vendor`).
     pub vendor: PathBuf,
+    /// Build root of the exact embedded test-port sources (`out/port-sources/build`).
+    pub port_root: PathBuf,
     /// Output root (`build/libc-conformance`).
     pub out: PathBuf,
     /// Oracle or target.
@@ -171,7 +173,7 @@ impl Builder {
         framework: Framework,
         program: &Program,
     ) -> Result<BuildReport> {
-        let root = self.vendor.join(suite_root);
+        let root = self.suite_root(suite_root);
         let binary = self.out.join("oracle").join(suite_name).join(&program.name);
         let Some(parent) = binary.parent() else {
             bail!("program name has no parent: {}", program.name);
@@ -227,7 +229,7 @@ impl Builder {
         program: &Program,
     ) -> Result<BuildReport> {
         let sysroot = self.sysroot()?;
-        let root = self.vendor.join(suite_root);
+        let root = self.suite_root(suite_root);
         let directory = self.out.join("target").join(suite_name).join(&program.name);
         fs::create_dir_all(&directory)
             .with_context(|| format!("cannot create {}", directory.display()))?;
@@ -259,8 +261,7 @@ impl Builder {
                 "-include".to_string(),
                 shim.display().to_string(),
                 "-include".to_string(),
-                self.root
-                    .join("tests/libc/atf/shim/rl_target_prelude.h")
+                self.shim_source("rl_target_prelude.h")
                     .display()
                     .to_string(),
                 format!("-I{}", self.root.join("tests/libc/atf/shim").display()),
@@ -348,6 +349,130 @@ impl Builder {
             bail!("cannot compile the target shim: {line}");
         }
         Ok(object)
+    }
+
+    /// Build the target wrapper that runs a donor body from a writable directory with the login
+    /// group list. The wrapper is a host-side runner artifact, never part of a shipped image.
+    pub fn build_target_wrapper(&self) -> Result<PathBuf> {
+        let sysroot = self.sysroot()?;
+        let directory = self.out.join("target-shim");
+        fs::create_dir_all(&directory)
+            .with_context(|| format!("cannot create {}", directory.display()))?;
+        let object = directory.join("atf_wrapper.o");
+        let binary = directory.join("atf-wrapper");
+        let source = self.shim_source("atf_wrapper.c");
+        let output = run(
+            self.target_compiler(),
+            &target_shim_args(sysroot, &source, &object),
+            self.root(),
+        )?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot compile the target wrapper: {line}");
+        }
+        let args = target_link_args(
+            sysroot,
+            &binary,
+            &[object],
+            Framework::ExitStatus,
+            &self.out,
+            &[],
+        );
+        let output = run(self.linker()?, &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot link the target wrapper: {line}");
+        }
+        Ok(binary)
+    }
+
+    /// Build the vendored pjdfstest helper for the target.
+    ///
+    /// The helper is the donor `pjdfstest.c` plus the minimal `config.h` beside it. It needs no
+    /// ATF shim and is not an ATF program: `open/00.t` invokes it once per expectation.
+    pub fn build_tap_helper(&self) -> Result<PathBuf> {
+        let sysroot = self.sysroot()?;
+        let directory = self.out.join("tap");
+        fs::create_dir_all(&directory)
+            .with_context(|| format!("cannot create {}", directory.display()))?;
+        let object = directory.join("pjdfstest.o");
+        let binary = directory.join("pjdfstest");
+        // The donor sources are tracked as `.txt` so the tree carries no C scaffold; stage the
+        // exact bytes as `.c`/`.h` under the build directory and compile the staged copy.
+        let source_text = self.vendor.join("vendor/pjdfstest/pjdfstest.c.txt");
+        let config_text = self.vendor.join("vendor/pjdfstest/config.h.txt");
+        if !source_text.is_file() || !config_text.is_file() {
+            bail!(
+                "vendored pjdfstest sources missing: {} / {}",
+                source_text.display(),
+                config_text.display()
+            );
+        }
+        let include = directory.join("src");
+        fs::create_dir_all(&include)
+            .with_context(|| format!("cannot create {}", include.display()))?;
+        let source = include.join("pjdfstest.c");
+        fs::copy(&source_text, &source)
+            .with_context(|| format!("cannot stage {}", source_text.display()))?;
+        fs::copy(&config_text, include.join("config.h"))
+            .with_context(|| format!("cannot stage {}", config_text.display()))?;
+        let args = vec![
+            "--target=x86_64-unknown-ravenbsd".to_string(),
+            format!("--sysroot={}", sysroot.display()),
+            "-std=gnu11".to_string(),
+            "-O1".to_string(),
+            "-w".to_string(),
+            "-D_GNU_SOURCE".to_string(),
+            // ravenlibc declares __assert_fail but does not export it; the helper's two internal
+            // asserts are not on the open/create path.
+            "-DNDEBUG".to_string(),
+            format!("-I{}", include.display()),
+            "-c".to_string(),
+            source.display().to_string(),
+            "-o".to_string(),
+            object.display().to_string(),
+        ];
+        let output = run(self.target_compiler(), &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot compile the pjdfstest helper: {line}");
+        }
+        let mut args = target_link_args(
+            sysroot,
+            &binary,
+            &[object],
+            Framework::ExitStatus,
+            &self.out,
+            &[],
+        );
+        // The kernel's exec loader requires the page-aligned test layout (PT_PHDR in the first
+        // LOAD); lld's default layout is rejected with ENOEXEC.
+        args.push(format!(
+            "--script={}",
+            self.root.join("tests/libc/target/x86_64.ld").display()
+        ));
+        let output = run(self.linker()?, &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot link the pjdfstest helper: {line}");
+        }
+        Ok(binary)
     }
 
     fn report(&self, output: CommandOutput, binary: Option<PathBuf>) -> BuildReport {
@@ -444,6 +569,26 @@ impl Builder {
 
     fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// The source root for a suite: the staged exact port when present, else the vendored tree.
+    fn suite_root(&self, suite_root: &str) -> PathBuf {
+        let staged = self.port_root.join("tests/libc-oracle").join(suite_root);
+        if staged.is_dir() {
+            staged
+        } else {
+            self.vendor.join(suite_root)
+        }
+    }
+
+    /// A test-port shim source staged from the embedded text, else the tracked shim.
+    fn shim_source(&self, name: &str) -> PathBuf {
+        let staged = self.port_root.join("tests/libc/atf/shim").join(name);
+        if staged.is_file() {
+            staged
+        } else {
+            self.root.join("tests/libc/atf/shim").join(name)
+        }
     }
 
     fn sysroot(&self) -> Result<&Path> {

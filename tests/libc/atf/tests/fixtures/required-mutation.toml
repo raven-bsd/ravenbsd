@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Mutation fixture: two independent required rows plus one prerequisite body.
+
+schema = 1
+
+[[required]]
+id = "mutation-a"
+suite = "mutation"
+program = "a"
+case = "body"
+donor = "tests/libc/atf/tests/fixtures/required-all-pass.tsv"
+expect = "both mutation bodies pass"
+environment = "fixture"
+regression = "tests/libc/atf/tests/cli.rs"
+[[required.prerequisite]]
+suite = "mutation"
+program = "p"
+case = "body"
+
+[[required]]
+id = "mutation-b"
+suite = "mutation"
+program = "b"
+case = "body"
+donor = "tests/libc/atf/tests/fixtures/required-all-pass.tsv"
+expect = "both mutation bodies pass"
+environment = "fixture"
+regression = "tests/libc/atf/tests/cli.rs"

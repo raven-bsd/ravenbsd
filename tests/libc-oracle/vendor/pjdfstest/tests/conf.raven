@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD pjdfstest configuration. The upstream conf chooses the filesystem by running uname,
+# df, awk and mount; Raven is not in its OS list and those probes are not needed for the S750
+# writable-UFS2 work directory. misc.sh sources this file as `conf`.
+
+GREP=grep
+fs="UFS2"

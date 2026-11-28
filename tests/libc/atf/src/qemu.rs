@@ -232,7 +232,7 @@ pub fn run_guest(
         None => None,
     };
     fs::write(&svcd, svcd_text).with_context(|| format!("cannot write {}", svcd.display()))?;
-    let specs = guest_initfs_specs(
+    let mut specs = guest_initfs_specs(
         config,
         guest,
         &image_program,
@@ -241,6 +241,8 @@ pub fn run_guest(
         reader_path,
         &svcd,
     )?;
+    specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
     run_tool(
         "cargo",
         &mkinitfs_with(&initfs, &specs),
@@ -396,6 +398,193 @@ pub fn run_atf_case(
     }
 }
 
+/// One pjdfstest TAP program run in the guest.
+pub struct TapJob<'a> {
+    /// Absolute path to the vendored `.t` script.
+    pub script: &'a Path,
+    /// Program name (`open/00`), used for the staged path.
+    pub program: &'a str,
+    /// Vendored `tests` tree holding `conf` and `misc.sh`.
+    pub tree: &'a Path,
+    /// The built pjdfstest helper.
+    pub helper: &'a Path,
+    /// The built target wrapper (sets the work directory).
+    pub wrapper: &'a Path,
+    /// Per-run host work directory.
+    pub workdir: &'a Path,
+    /// Keep the initfs and boot image.
+    pub keep: bool,
+}
+
+/// The guest observation of one TAP program.
+pub struct TapObservation {
+    /// The program's exit status from `G1-EXIT`.
+    pub exit: Option<i32>,
+    /// Captured stdout/stderr.
+    pub output: String,
+    /// Whether the boot hit the deadline.
+    pub timed_out: bool,
+}
+
+/// Tools the pjdfstest shell bodies call. Each entry is `(guest name, host path)`.
+fn tap_tools(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut tools = Vec::new();
+    for name in [
+        "basename", "cat", "chmod", "chown", "cp", "cut", "date", "df", "dirname", "echo", "env",
+        "false", "head", "id", "ln", "ls", "mkdir", "mv", "pwd", "rm", "rmdir", "sleep", "sort",
+        "stat", "tail", "touch", "tr", "true", "wc",
+    ] {
+        tools.push((
+            name.to_string(),
+            root.join("build/x86_64/uutils").join(name),
+        ));
+    }
+    for (name, package) in [
+        ("grep", "raven-grep"),
+        ("awk", "raven-awk"),
+        ("uname", "raven-uname"),
+    ] {
+        tools.push((
+            name.to_string(),
+            root.join("build/x86_64/user").join(package),
+        ));
+    }
+    tools
+}
+
+/// Run one pjdfstest TAP program through the guest shell and capture its TAP output.
+pub fn run_tap(config: &QemuConfig, guest: &Guest, job: &TapJob<'_>) -> Result<TapObservation> {
+    let TapJob {
+        script,
+        program,
+        tree,
+        helper,
+        wrapper,
+        workdir,
+        keep,
+    } = *job;
+    guest.require()?;
+    fs::create_dir_all(workdir).with_context(|| format!("cannot create {}", workdir.display()))?;
+    let initfs = workdir.join("initfs.img");
+    let image = workdir.join("boot.img");
+    let vars = workdir.join("OVMF_VARS.fd");
+    let serial_path = workdir.join("serial.log");
+    let error_path = workdir.join("qemu.err");
+    for stale in [&initfs, &image, &vars, &serial_path, &error_path] {
+        let _ = fs::remove_file(stale);
+    }
+
+    let stage = workdir.join("stage");
+    fs::create_dir_all(stage.join("tests")).with_context(|| "cannot create tap stage")?;
+    let staged_helper = stage.join("pjdfstest");
+    strip_to(helper, &staged_helper)?;
+    let staged_wrapper = stage.join("atf-wrapper");
+    strip_to(wrapper, &staged_wrapper)?;
+
+    let wrap = workdir.join("manifest");
+    fs::write(
+        &wrap,
+        format!(
+            "mode=exec\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
+arg=/tmp/pjdfstest\narg=/bin/sh\narg=-c\n\
+arg=cd /tmp/pjdfstest && . \"$0\"\n\
+arg=/tests/pjdfstest/tests/{program}.t\n\
+env=PATH=/bin:/usr/bin\nenv=HOME=/tmp\nenv=TMPDIR=/tmp\nenv=TZ=UTC\n\
+env=LANG=C.UTF-8\nenv=LC_ALL=C.UTF-8\n"
+        ),
+    )
+    .with_context(|| format!("cannot write {}", wrap.display()))?;
+    let service = workdir.join("g1.toml");
+    let svcd = workdir.join("svcd.conf");
+    let (service_text, _reader_text, svcd_text) = guest_service(GuestMode::Exec);
+    fs::write(&service, service_text)
+        .with_context(|| format!("cannot write {}", service.display()))?;
+    fs::write(&svcd, svcd_text).with_context(|| format!("cannot write {}", svcd.display()))?;
+
+    let mut specs = service_specs(config, guest, workdir)?;
+    specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
+    specs.push(format!(
+        "/tests/atf-wrapper={}:0755",
+        staged_wrapper.display()
+    ));
+    specs.push(format!(
+        "/tests/pjdfstest/pjdfstest={}:0755",
+        staged_helper.display()
+    ));
+    specs.push(format!("/g1/manifest={}", wrap.display()));
+    specs.push(format!("/etc/services.d/g1.toml={}", service.display()));
+    specs.push(format!("/etc/svcd.conf={}", svcd.display()));
+    specs.push(format!(
+        "/bin/sh={}",
+        config.root.join("build/x86_64/brush").display()
+    ));
+    for (name, path) in tap_tools(&config.root) {
+        if !path.is_file() {
+            bail!(
+                "TAP tool missing: {} (build it with cargo xtask build user/uutils)",
+                path.display()
+            );
+        }
+        specs.push(format!("/bin/{name}={}", path.display()));
+    }
+    for name in ["conf", "misc.sh"] {
+        // Raven is not in the upstream conf's OS list; use the Raven filesystem configuration
+        // when it is present, but keep the upstream name the scripts source.
+        let source = if name == "conf" && tree.join("conf.raven").is_file() {
+            tree.join("conf.raven")
+        } else if name == "misc.sh" && tree.join("misc.raven.sh").is_file() {
+            tree.join("misc.raven.sh")
+        } else {
+            tree.join(name)
+        };
+        let destination = stage.join("tests").join(name);
+        fs::copy(&source, &destination)
+            .with_context(|| format!("cannot stage {}", source.display()))?;
+        specs.push(format!(
+            "/tests/pjdfstest/tests/{name}={}",
+            destination.display()
+        ));
+    }
+    let destination = stage.join("tests").join(format!("{program}.t"));
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    fs::copy(script, &destination).with_context(|| format!("cannot stage {}", script.display()))?;
+    specs.push(format!(
+        "/tests/pjdfstest/tests/{program}.t={}",
+        destination.display()
+    ));
+
+    run_tool(
+        "cargo",
+        &mkinitfs_with(&initfs, &specs),
+        &config.root,
+        "cannot build the TAP guest initfs",
+    )?;
+    make_image(config, &initfs, &image)?;
+    copy_firmware_vars(&vars)?;
+    let (_, timed_out) = boot(config, &image, &vars, &serial_path, &error_path)?;
+    let serial = read_prefix(&serial_path);
+    let text = String::from_utf8_lossy(&serial).into_owned();
+    // `mode=exec` replaces the wrapper image, so there is no G1-OUTPUT block; the program writes
+    // its TAP stream to the serial console. Use the marker block when present, else the serial.
+    let output = marker_block(&text, "G1-OUTPUT-BEGIN", "G1-OUTPUT-END")
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+        .unwrap_or_else(|| text.clone());
+    if !keep {
+        for transient in [&initfs, &image, &vars] {
+            let _ = fs::remove_file(transient);
+        }
+    }
+    Ok(TapObservation {
+        exit: marker_int(&text, "G1-EXIT "),
+        output,
+        timed_out,
+    })
+}
+
 /// Run a batch of ATF cases in one boot.
 ///
 /// Each case is a `g1-run-<i>` service that execs the test with `-r /tmp/result-<i>`, followed
@@ -405,6 +594,7 @@ pub fn run_atf_batch(
     config: &QemuConfig,
     guest: &Guest,
     cases: &[AtfBatchCase],
+    wrapper: Option<&Path>,
     workdir: &Path,
     keep: bool,
 ) -> Result<Vec<AtfBatchResult>> {
@@ -458,6 +648,13 @@ pub fn run_atf_batch(
     }
 
     let mut specs = service_specs(config, guest, workdir)?;
+    specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
+    if let Some(wrapper) = wrapper {
+        let destination = programs_dir.join("atf-wrapper");
+        strip_to(wrapper, &destination)?;
+        specs.push(format!("/tests/atf-wrapper={}:0755", destination.display()));
+    }
     for (index, case) in cases.iter().enumerate() {
         let image_path = image_paths
             .get(&case.program_path)
@@ -470,7 +667,13 @@ pub fn run_atf_batch(
         let manifest = workdir.join(format!("manifest-{index}"));
         fs::write(
             &manifest,
-            batch_manifest(&case.ident, image_path, &result, case.user.as_deref()),
+            batch_manifest(
+                &case.ident,
+                image_path,
+                &result,
+                wrapper.is_some(),
+                case.user.as_deref(),
+            ),
         )
         .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
@@ -536,7 +739,7 @@ readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
     make_image(config, &initfs, &image)?;
     copy_firmware_vars(&vars)?;
     let mut batch = config.clone();
-    batch.timeout_secs = batch.timeout_secs.max(1800);
+    batch.timeout_secs = batch.timeout_secs.max(180);
     let (_, timed_out) = boot(&batch, &image, &vars, &serial_path, &error_path)?;
     let serial = read_prefix(&serial_path);
     let text = String::from_utf8_lossy(&serial);
@@ -626,12 +829,41 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
         .arg("--strip-all")
         .arg(destination)
         .status();
+    // `raven-spawn` maps the image file tail and requires it to end on a page boundary; the
+    // kernel `PROC_EXEC` path does not. Pad the staged copy so a `posix_spawn` wrapper can start
+    // the same program from the initfs. Trailing zeros are outside every ELF segment.
+    let length = fs::metadata(destination)
+        .with_context(|| format!("cannot stat {}", destination.display()))?
+        .len();
+    let padded = length.saturating_add(4095) & !4095;
+    if padded > length {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(destination)
+            .with_context(|| format!("cannot open {}", destination.display()))?;
+        file.set_len(padded)
+            .with_context(|| format!("cannot pad {}", destination.display()))?;
+    }
     Ok(())
 }
 
-fn batch_manifest(ident: &str, image_path: &str, result: &str, user: Option<&str>) -> String {
+fn batch_manifest(
+    ident: &str,
+    image_path: &str,
+    result: &str,
+    wrapper: bool,
+    user: Option<&str>,
+) -> String {
+    let (program, prefix) = if wrapper {
+        (
+            "/tests/atf-wrapper",
+            format!("arg=/tmp/atf-work\narg={image_path}\n"),
+        )
+    } else {
+        (image_path, format!("arg={image_path}\n"))
+    };
     let mut text = format!(
-        "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
+        "mode=exec\nprogram={program}\narg={program}\n{prefix}arg=-r\narg={result}\n\
 arg=-s\narg=/tests\narg={ident}\n"
     );
     text.push_str(&user_manifest_line(user));
@@ -799,6 +1031,63 @@ fn strip_program(program: &Path, workdir: &Path) -> Result<PathBuf> {
     })
 }
 
+/// Stage the account files a login session provides. Donor bodies such as `t_dup` open
+/// `/etc/passwd`; `initgroups(3)` in the wrapper reads `/etc/group`. The G1 initfs is a service
+/// image with no account database, so the runner supplies the same minimal files the S179
+/// credential image uses.
+fn guest_credentials(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let passwd = directory.join("passwd");
+    let group = directory.join("group");
+    fs::write(
+        &passwd,
+        "root:x:0:0:root:/root:/bin/sh\n\
+         nobody:x:65534:65534:nobody:/nonexistent:/nonexistent\n\
+         raven:x:1000:1000:raven:/home/raven:/bin/sh\n",
+    )
+    .with_context(|| format!("cannot write {}", passwd.display()))?;
+    fs::write(
+        &group,
+        "wheel:*:0:root\n\
+         nobody:*:65534:\n\
+         raven:*:1000:raven\n",
+    )
+    .with_context(|| format!("cannot write {}", group.display()))?;
+    Ok(vec![
+        format!("/etc/passwd={}:0644", passwd.display()),
+        format!("/etc/group={}:0644", group.display()),
+    ])
+}
+
+/// Stage the G1 mount table.
+///
+/// The product default mounts `/dev/null` on `null:`, but `vfsd` resolves the parent `/dev` in
+/// the read-only initfs before it looks up the final component. The initfs has no `/dev`, so the
+/// open fails with `ENOENT` before the null mount is reached. Mounting a ramfs at `/dev` makes
+/// the parent a real directory; `/dev/null` itself stays the `null:` device mount and is never a
+/// regular file. This is a test-only namespace file inside the ATF/G1 image, not a product mount
+/// edit.
+fn guest_mounts(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let mounts = directory.join("mounts");
+    fs::write(
+        &mounts,
+        "/ initfs:\n\
+         /tmp ramfs:\n\
+         /dev ramfs:\n\
+         /dev/null null:\n\
+         /dev/zero zero:\n\
+         /dev/random rand:\n\
+         /dev/urandom rand:\n",
+    )
+    .with_context(|| format!("cannot write {}", mounts.display()))?;
+    Ok(vec![format!("/etc/mounts={}:0644", mounts.display())])
+}
+
 fn guest_initfs_specs(
     config: &QemuConfig,
     guest: &Guest,
@@ -924,6 +1213,9 @@ fn make_image(config: &QemuConfig, initfs: &Path, image: &Path) -> Result<()> {
             config.kernel.display()
         );
     }
+    // Refuse a cached kernel from another commit, a dirty tree or the debug profile. The G1
+    // runner does not rebuild the artifact, so booting a stale one would test the wrong ABI.
+    crate::freshness::verify_kernel(&config.root, &config.kernel)?;
     let args = image_args(&config.kernel, initfs, image);
     run_tool(
         "cargo",
