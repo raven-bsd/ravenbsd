@@ -8,4 +8,44 @@ donor = "pjdfstest"
 framework = "tap"
 root = "vendor/pjdfstest/tests"
 srcdir_for_tests = true
-program = []
+
+[[program]]
+name = "open/00"
+sources = ["open/00.t"]
+cflags = []
+ldadd = []
+status = "needs-fs"
+status_reason = "needs a mounted filesystem (FS lane)"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "mkdir/00"
+sources = ["mkdir/00.t"]
+cflags = []
+ldadd = []
+status = "needs-fs"
+status_reason = "needs a mounted filesystem (FS lane)"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "link/00"
+sources = ["link/00.t"]
+cflags = []
+ldadd = []
+status = "needs-fs"
+status_reason = "needs a mounted filesystem (FS lane)"
+expect_exit = 0
+args = []
+
+[[program]]
+name = "unlink/00"
+sources = ["unlink/00.t"]
+cflags = []
+ldadd = []
+status = "needs-fs"
+status_reason = "needs a mounted filesystem (FS lane)"
+expect_exit = 0
+args = []
+

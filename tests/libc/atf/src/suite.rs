@@ -510,9 +510,11 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
             .insert(shell.clone(), BuildStatus::Needs("needs-sh".to_string()));
     }
 
+    let port_root = crate::port_sources::stage(&config.out)?;
     let builder = Builder {
         root: config.root.clone(),
         vendor: oracle.clone(),
+        port_root,
         out: config.out.clone(),
         mode: config.mode,
         cc: config.cc.clone(),
@@ -564,6 +566,11 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
     Ok(run)
 }
 
+/// Cases per guest boot. Each case owns a run/read service pair; the bootstrap services take
+/// eight of the manifest's 256 slots, so 20 cases (48 services) leave ample headroom and stop one
+/// stalled body from consuming a whole matrix boot.
+const BATCH_CHUNK: usize = 20;
+
 /// Target+qemu ATF: build every program, then run all eligible bodies in batched boots.
 fn run_atf_qemu(
     builder: &Builder,
@@ -575,6 +582,11 @@ fn run_atf_qemu(
 ) -> Result<()> {
     let mut batch = Vec::new();
     let mut cases_by_program: BTreeMap<String, Vec<TpCase>> = BTreeMap::new();
+    let wrapper = if programs.is_empty() {
+        None
+    } else {
+        Some(builder.build_target_wrapper()?)
+    };
     for program in programs {
         let ticket = owners.ticket(&suite.suite, &program.name);
         let report = builder.build(&suite.suite, &suite.root, suite.framework, program)?;
@@ -598,9 +610,31 @@ fn run_atf_qemu(
                 cases_for_outcomes = cases;
             }
             BuildStatus::Built => {
-                let cases = cached_cases(config, suite, program);
-                let usable =
-                    !cases.is_empty() && !cases.iter().any(|case| case.ident == "unknown-bodies");
+                let cached = cached_cases(config, suite, program);
+                let listed = resolve_batch_cases(cached, || {
+                    let binary = report
+                        .binary
+                        .as_deref()
+                        .ok_or_else(|| anyhow::anyhow!("program {} has no binary", program.name))?;
+                    list_target_cases(config, suite, program, binary)
+                });
+                let cases = match listed {
+                    Ok(cases) => cases,
+                    Err(error) => {
+                        let case = TpCase {
+                            ident: "unknown-bodies".to_string(),
+                            meta: BTreeMap::new(),
+                        };
+                        run.outcomes.push(Outcome::new(
+                            Case::new(&suite.suite, &program.name, &case.ident),
+                            Verdict::NotRun,
+                            format!("target-listing-failed:{error}"),
+                            &ticket,
+                        ));
+                        vec![case]
+                    }
+                };
+                let usable = case_list_usable(&cases);
                 if usable {
                     let Some(binary) = report.binary.clone() else {
                         bail!("program {} has no binary", program.name);
@@ -615,10 +649,10 @@ fn run_atf_qemu(
                     cases_by_program.insert(program.name.clone(), cases.clone());
                     cases_for_outcomes = cases;
                 } else {
-                    let case = TpCase {
+                    let case = cases.into_iter().next().unwrap_or(TpCase {
                         ident: "unknown-bodies".to_string(),
                         meta: BTreeMap::new(),
-                    };
+                    });
                     run.outcomes.push(Outcome::new(
                         Case::new(&suite.suite, &program.name, &case.ident),
                         Verdict::NotRun,
@@ -649,13 +683,16 @@ fn run_atf_qemu(
     let guest = qemu::Guest::new(&config.root);
     let mut results = Vec::with_capacity(batch.len());
     // `raven-svc-manifest` caps a graph at 256 services; each case uses a run/read pair and the
-    // bootstrap services take eight slots, so 100 cases (208 services) stay under the cap.
-    for (chunk_index, chunk) in batch.chunks(100).enumerate() {
+    // bootstrap services take eight slots. A chunk is 20 cases (48 services) so one body that
+    // stalls the guest costs one chunk, not the whole matrix. The faulting memory programs run
+    // last (suite order); earlier required rows are recorded from the finished chunks.
+    for (chunk_index, chunk) in batch.chunks(BATCH_CHUNK).enumerate() {
         let chunk_work = work.join(format!("chunk-{chunk_index}"));
         results.extend(qemu::run_atf_batch(
             &qemu,
             &guest,
             chunk,
+            wrapper.as_deref(),
             &chunk_work,
             config.keep,
         )?);
@@ -682,6 +719,45 @@ fn run_atf_qemu(
         }
     }
     Ok(())
+}
+
+/// True when a case list names real donor bodies rather than the `unknown-bodies` placeholder.
+#[must_use]
+fn case_list_usable(cases: &[TpCase]) -> bool {
+    !cases.is_empty() && !cases.iter().any(|case| case.ident == "unknown-bodies")
+}
+
+/// Take the host-oracle case cache when it has real bodies; otherwise ask the target program.
+///
+/// The batch path used the oracle cache only, so a program the host compiler cannot build
+/// (a FreeBSD-only header or symbol) never ran on the target even when the target binary built.
+fn resolve_batch_cases<F>(cached: Vec<TpCase>, list: F) -> Result<Vec<TpCase>>
+where
+    F: FnOnce() -> Result<Vec<TpCase>>,
+{
+    if case_list_usable(&cached) {
+        return Ok(cached);
+    }
+    list()
+}
+
+/// List one built target program's bodies through the guest `-l` protocol.
+fn list_target_cases(
+    config: &RunConfig,
+    suite: &SuiteFile,
+    program: &Program,
+    binary: &Path,
+) -> Result<Vec<TpCase>> {
+    let work_root = config
+        .out
+        .join("work")
+        .join(&suite.suite)
+        .join(&program.name);
+    fs::create_dir_all(&work_root)
+        .with_context(|| format!("cannot create {}", work_root.display()))?;
+    let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
+    let guest = qemu::Guest::new(&config.root);
+    qemu::list_atf(&qemu, &guest, binary, &work_root, config.keep)
 }
 
 fn judge_batch(result: &qemu::AtfBatchResult, timeout: u64) -> runner::Observation {

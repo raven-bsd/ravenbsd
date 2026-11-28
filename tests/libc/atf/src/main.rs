@@ -15,6 +15,7 @@ use anyhow::{Context, Result, bail};
 use raven_atf_run::check::{self, CheckReport};
 use raven_atf_run::gate::{self, GateConfig};
 use raven_atf_run::report;
+use raven_atf_run::required;
 use raven_atf_run::runner::{self, RunOptions};
 use raven_atf_run::suite::{self, RunConfig};
 use raven_atf_run::table::{self, ConformanceTable, RawRow, TableRow};
@@ -555,11 +556,13 @@ fn command_gate(args: &[String]) -> Result<u8> {
     let mut g1 = false;
     let mut table_path = root.join("tests/libc/conformance.tsv");
     let mut config_path = root.join("tests/libc-oracle/g1.toml");
+    let mut required_path = root.join("tests/libc-oracle/required.toml");
     while let Some(flag) = parser.next() {
         match flag {
             "--g1" => g1 = true,
             "--table" => table_path = resolve(&root, parser.value("--table")?),
             "--config" => config_path = resolve(&root, parser.value("--config")?),
+            "--required" => required_path = resolve(&root, parser.value("--required")?),
             other => bail!("unknown gate flag `{other}`\n{USAGE}"),
         }
     }
@@ -587,7 +590,17 @@ fn command_gate(args: &[String]) -> Result<u8> {
     };
     let gate_rows = gate::evaluate(&config, &table);
     print!("{}", gate::render(&gate_rows));
-    Ok(if gate::met(&gate_rows) {
+    if !required_path.is_file() {
+        println!(
+            "required: FAIL (required matrix missing: {})",
+            required_path.display()
+        );
+        return Ok(EXIT_GATE_NOT_MET);
+    }
+    let required = required::RequiredConfig::load(&required_path)?;
+    let required_rows = required::evaluate(&required, &table);
+    print!("{}", required::render(&required_rows));
+    Ok(if gate::met(&gate_rows) && required::met(&required_rows) {
         EXIT_OK
     } else {
         EXIT_GATE_NOT_MET
