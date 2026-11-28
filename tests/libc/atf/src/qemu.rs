@@ -487,7 +487,8 @@ pub fn run_tap(config: &QemuConfig, guest: &Guest, job: &TapJob<'_>) -> Result<T
         format!(
             "mode=exec\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
 arg=/tmp/pjdfstest\narg=/bin/sh\narg=-c\n\
-arg=cd /tmp/pjdfstest && exec /bin/sh /tests/pjdfstest/tests/{program}.t\n\
+arg=cd /tmp/pjdfstest && . \"$0\"\n\
+arg=/tests/pjdfstest/tests/{program}.t\n\
 env=PATH=/bin:/usr/bin\nenv=HOME=/tmp\nenv=TMPDIR=/tmp\nenv=TZ=UTC\n\
 env=LANG=C.UTF-8\nenv=LC_ALL=C.UTF-8\n"
         ),
