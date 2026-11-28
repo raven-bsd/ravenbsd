@@ -485,7 +485,7 @@ pub fn run_tap(config: &QemuConfig, guest: &Guest, job: &TapJob<'_>) -> Result<T
     fs::write(
         &wrap,
         format!(
-            "mode=exec\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
+            "mode=spawn\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
 arg=/tmp/pjdfstest\narg=/bin/sh\narg=-c\n\
 arg=cd /tmp/pjdfstest && exec /bin/sh /tests/pjdfstest/tests/{program}.t\n\
 env=PATH=/bin:/usr/bin\nenv=HOME=/tmp\nenv=TMPDIR=/tmp\nenv=TZ=UTC\n\

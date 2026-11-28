@@ -435,7 +435,7 @@ impl Builder {
                 .unwrap_or("no output");
             bail!("cannot compile the pjdfstest helper: {line}");
         }
-        let args = target_link_args(
+        let mut args = target_link_args(
             sysroot,
             &binary,
             &[object],
@@ -443,6 +443,12 @@ impl Builder {
             &self.out,
             &[],
         );
+        // The kernel's exec loader requires the page-aligned test layout (PT_PHDR in the first
+        // LOAD); lld's default layout is rejected with ENOEXEC.
+        args.push(format!(
+            "--script={}",
+            self.root.join("tests/libc/target/x86_64.ld").display()
+        ));
         let output = run(self.linker()?, &args, self.root())?;
         if !output.success {
             let line = output
