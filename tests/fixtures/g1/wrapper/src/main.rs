@@ -145,6 +145,17 @@ fn ensure_root_skeleton() -> Result<(), String> {
 /// The ATF result file and the wrapper work directory are created as root first, because the
 /// mounted `/tmp` root is not the donor 1777 directory and a `chmod` of a mount root is rejected.
 /// `setgroups` and the gid change still run with root credentials; the uid change is last.
+/// Root-owned 1777 work root shared by root and unprivileged ATF wrapper cases.
+fn ensure_atf_root() -> Result<(), String> {
+    match raven_rt::fs::mkdir(ATF_ROOT, 0o777) {
+        Ok(()) | Err(Errno::EEXIST) => {}
+        Err(error) => return Err(format!("mkdir {ATF_ROOT}: {error:?}")),
+    }
+    raven_rt::fs::chmod(ATF_ROOT, 0o1777)
+        .map_err(|error| format!("chmod {ATF_ROOT}: {error:?}"))?;
+    Ok(())
+}
+
 fn drop_credentials(manifest: &Manifest) -> Result<(), String> {
     let Some(uid) = manifest.user else {
         return Ok(());
@@ -289,6 +300,9 @@ fn run(case: Option<usize>) -> Result<(), String> {
     // The donor base environment has the `/root` skeleton; these guests have no login process,
     // so the root wrapper materializes it before the test starts.
     ensure_root_skeleton()?;
+    if manifest.program.ends_with("atf-wrapper") {
+        ensure_atf_root()?;
+    }
     drop_credentials(&manifest)?;
     if manifest.mode == "exec" {
         // The kernel's `PROC_EXEC` loader copies the file tail; `raven-spawn`'s userland
