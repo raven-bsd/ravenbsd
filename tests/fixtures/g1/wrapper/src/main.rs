@@ -176,15 +176,9 @@ fn drop_credentials(manifest: &Manifest) -> Result<(), String> {
             .map_err(|error| format!("chmod {result}: {error:?}"))?;
     }
     if manifest.program.ends_with("atf-wrapper") {
-        raven_rt::println!(
-            "G1-DROP program={} workdir={:?}",
-            manifest.program,
-            manifest.args.get(1)
-        );
         if let Some(workdir) = manifest.args.get(1) {
             match raven_rt::fs::mkdir(workdir, 0o777) {
-                Ok(()) => raven_rt::println!("G1-DROP mkdir {workdir} ok"),
-                Err(Errno::EEXIST) => raven_rt::println!("G1-DROP mkdir {workdir} exists"),
+                Ok(()) | Err(Errno::EEXIST) => {}
                 Err(error) => return Err(format!("mkdir {workdir}: {error:?}")),
             }
             raven_rt::fs::chmod(workdir, 0o777)
