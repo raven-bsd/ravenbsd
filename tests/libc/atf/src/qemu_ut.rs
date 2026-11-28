@@ -132,15 +132,19 @@ fn the_guest_manifest_carries_argv_env_and_result() {
 fn the_guest_initfs_has_the_services_and_the_program() {
     let config = QemuConfig::new(Path::new("/repo"), 60);
     let guest = Guest::new(Path::new("/repo"));
+    let workdir = std::env::temp_dir().join(format!("raven-atf-qemu-ut-{}", std::process::id()));
+    let manifest = workdir.join("manifest");
     let specs = guest_initfs_specs(
         &config,
         &guest,
         Path::new("/out/program"),
-        Path::new("/work/manifest"),
+        &manifest,
         Path::new("/work/g1.toml"),
         None,
         Path::new("/work/svcd.conf"),
-    );
+    )
+    .expect("guest initfs specs");
+    let _ = std::fs::remove_dir_all(&workdir);
     assert!(
         specs
             .iter()
@@ -151,15 +155,16 @@ fn the_guest_initfs_has_the_services_and_the_program() {
             .iter()
             .any(|spec| spec == "/tests/program=/out/program:0755")
     );
+    assert!(specs.iter().any(|spec| {
+        spec == &format!(
+            "/etc/services.d/vfsd.toml={}",
+            workdir.join("etc/services-vfsd.toml").display()
+        )
+    }));
     assert!(
         specs
             .iter()
-            .any(|spec| spec == "/etc/services.d/vfsd.toml=/repo/etc/services.d/vfsd.toml")
-    );
-    assert!(
-        specs
-            .iter()
-            .any(|spec| spec == "/g1/manifest=/work/manifest")
+            .any(|spec| { spec == &format!("/g1/manifest={}", manifest.display()) })
     );
 }
 

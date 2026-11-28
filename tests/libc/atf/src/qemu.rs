@@ -232,7 +232,6 @@ pub fn run_guest(
         &service,
         reader_path,
         &svcd,
-        workdir,
     )?;
     run_tool(
         "cargo",
@@ -782,8 +781,8 @@ fn guest_initfs_specs(
     service: &Path,
     reader: Option<&Path>,
     svcd: &Path,
-    workdir: &Path,
 ) -> Result<Vec<String>> {
+    let workdir = manifest.parent().unwrap_or_else(|| Path::new("."));
     let mut specs = service_specs(config, guest, workdir)?;
     specs.push(format!("/tests/program={}:0755", program.display()));
     specs.push(format!("/g1/manifest={}", manifest.display()));
