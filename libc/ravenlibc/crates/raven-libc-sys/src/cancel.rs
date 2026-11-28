@@ -39,6 +39,19 @@ pub unsafe fn install_hooks(pending: Option<PendingCancel>, on_eintr: Option<OnE
     EINTR_HOOK.store(on_eintr.map_or(0, |hook| hook as usize), Ordering::Release);
 }
 
+/// Install only the `on_eintr()` hook, leaving the cancellation slot untouched.
+///
+/// The signal area owns the restart decision and installs this at libc start; the threads area
+/// may install the pending-cancel slot independently.
+///
+/// # Safety
+///
+/// The function pointer must stay valid for the life of the process and must not allocate or
+/// re-enter the wrapper it is called from.
+pub unsafe fn install_eintr_hook(hook: OnEintr) {
+    EINTR_HOOK.store(hook as usize, Ordering::Release);
+}
+
 /// Whether a cancellation request is pending; `false` without a hook.
 #[inline]
 pub fn pending_cancel() -> bool {

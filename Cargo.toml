@@ -122,6 +122,7 @@ members = [
     "tests/fixtures/random",
     "tests/fixtures/http-fetch/patch-initfs",
     "tests/fixtures/pipe",
+    "tests/fixtures/pipe-restart/kernel",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
     "tests/qtest/cases/linux-root-fixture",

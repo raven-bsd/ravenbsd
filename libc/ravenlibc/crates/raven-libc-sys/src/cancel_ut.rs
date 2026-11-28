@@ -126,3 +126,19 @@ fn raw_never_consults_a_hook() {
     assert_eq!(raw(|| Err::<(), _>(Errno::EINTR)), Err(Errno::EINTR));
     reset();
 }
+
+#[test]
+fn install_eintr_hook_keeps_the_pending_slot() {
+    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    reset();
+    // SAFETY: both hooks point at live test statics.
+    unsafe { install_hooks(Some(pending_hook), None) };
+    PENDING.store(true, Ordering::Relaxed);
+    RESTART.store(true, Ordering::Relaxed);
+    // SAFETY: the hook points at a live test static.
+    unsafe { install_eintr_hook(eintr_hook) };
+    assert!(pending_cancel());
+    assert_eq!(on_eintr(), RestartAction::Restart);
+    PENDING.store(false, Ordering::Relaxed);
+    reset();
+}

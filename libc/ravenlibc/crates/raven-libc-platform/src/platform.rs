@@ -954,12 +954,15 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             match result {
                 Ok(0) => break,
                 Ok(count) => done = done.saturating_add(count.min(remaining.len())),
-                Err(Errno::EAGAIN) => {
-                    let ready = crate::poll::wait_writable(self, fd, -1)?;
-                    if ready == 0 {
-                        continue;
-                    }
-                }
+                Err(Errno::EAGAIN) => match crate::poll::wait_writable(self, fd, -1) {
+                    Ok(_) => {}
+                    // A signal interrupted the wait. Never discard bytes the kernel already
+                    // accepted: return them (FreeBSD `dofilewrite`); restart with no bytes only
+                    // when every handler allows it (class R and `SA_RESTART`).
+                    Err(Errno::EINTR) if done == 0 && crate::intr::restart_wanted() => continue,
+                    Err(Errno::EINTR) if done != 0 => break,
+                    Err(error) => return Err(error),
+                },
                 Err(Errno::EINTR) if done == 0 && crate::intr::restart_wanted() => continue,
                 Err(error) => {
                     if done == 0 {

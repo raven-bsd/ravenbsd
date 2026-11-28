@@ -376,10 +376,32 @@ pub unsafe extern "C" fn __raven_libc_start(
 #[unsafe(no_mangle)]
 pub extern "C" fn __raven_libc_init() {
     crate::hooks::install_all();
+    // SAFETY: the restart hook is a static function that only reads the signal area's
+    // `__eintr_valid_flag`; it stays valid for the process lifetime.
+    unsafe { raven_libc_sys::cancel::install_eintr_hook(eintr_restart) };
     install_float_hook();
     // The C `stdin`/`stdout`/`stderr` data symbols must be valid before the program's
     // constructors run; attaching the static buffers does not allocate or open a file.
     crate::stdio::streams::init();
+}
+
+/// The class-R restart decision: retry after `EINTR` unless a handler was installed without
+/// `SA_RESTART`.
+///
+/// musl's `__eintr_valid_flag` and FreeBSD's `sigact_flag_test(act, SA_RESTART)` are the same
+/// decision at this boundary: a signal with only restarting handlers does not make a blocking
+/// call return `EINTR`.
+///
+/// # Safety
+///
+/// Installed as a `raven_libc_sys::cancel` function pointer and called from an interrupted
+/// wrapper; it only reads the signal area's static flag.
+unsafe fn eintr_restart() -> raven_libc_sys::cancel::RestartAction {
+    if raven_libc_signal::action::eintr_valid() {
+        raven_libc_sys::cancel::RestartAction::Return
+    } else {
+        raven_libc_sys::cancel::RestartAction::Restart
+    }
 }
 
 // The float-digit plug-in is an optional member (R-13, mechanism M2): a program requests it

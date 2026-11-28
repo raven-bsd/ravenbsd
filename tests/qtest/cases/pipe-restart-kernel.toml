@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S781 kernel-level pipe-restart rows: raw blocking pipe read/write syscalls interrupted by a
+# caught kernel SIGUSR1. The read must return EINTR with the handler run and still deliver later
+# bytes; the write must return the bytes already accepted instead of EINTR, and a read-back must
+# return them unchanged. This proves the owned kernel path independently of libc.
+
+name = "pipe-restart-kernel"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pipe-restart/build.sh"]
+initfs = "build/fixtures/pipe-restart/kernel-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipe-restart-kernel: read interrupt ok$'
+
+[[expect]]
+regex = '^pipe-restart-kernel: write partial ok$'
+
+[[expect]]
+regex = '^pipe-restart-kernel: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pipe-restart-kernel: fail'
