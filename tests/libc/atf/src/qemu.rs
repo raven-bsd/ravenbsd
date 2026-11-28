@@ -232,7 +232,8 @@ pub fn run_guest(
         &service,
         reader_path,
         &svcd,
-    );
+        workdir,
+    )?;
     run_tool(
         "cargo",
         &mkinitfs_with(&initfs, &specs),
@@ -449,8 +450,7 @@ pub fn run_atf_batch(
         image_paths.insert(case.program_path.clone(), format!("/tests/{unique}"));
     }
 
-    let mut specs = service_specs(config, guest);
-    specs.extend(root_skeleton_specs(config));
+    let mut specs = service_specs(config, guest, workdir)?;
     for (index, case) in cases.iter().enumerate() {
         let image_path = image_paths
             .get(&case.program_path)
@@ -542,13 +542,13 @@ readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
     Ok(results)
 }
 
-fn service_specs(config: &QemuConfig, guest: &Guest) -> Vec<String> {
+fn service_specs(config: &QemuConfig, guest: &Guest, workdir: &Path) -> Result<Vec<String>> {
     let mut specs = vec![
         format!("/init={}", guest.path("init").display()),
         format!("/sbin/g1wrap={}", guest.path("g1wrap").display()),
     ];
     for name in [
-        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "vfsd",
+        "logd", "consd", "initfsd", "ramfsd", "nulld", "zerod", "randd",
     ] {
         specs.push(format!("/sbin/{name}={}", guest.path(name).display()));
         specs.push(format!(
@@ -559,7 +559,44 @@ fn service_specs(config: &QemuConfig, guest: &Guest) -> Vec<String> {
                 .display()
         ));
     }
-    specs
+    specs.push(format!("/sbin/vfsd={}", guest.path("vfsd").display()));
+    specs.extend(guest_root_services(workdir)?);
+    Ok(specs)
+}
+
+/// Guest services that carry the donor `/root` skeleton.
+///
+/// `initfsd` reports every synthesized directory as 0755, so the donor 0700 `/root` mode cannot
+/// come from the read-only initfs. A second ramfs instance is started with `--root-mode 700`;
+/// `vfsd` must be able to resolve that scheme, so its generated manifest depends on `rootfsd` and
+/// the start plan registers `rootfs` before `vfsd` takes its namespace snapshot. The G1 wrapper
+/// mounts it at `/root` and writes `.profile` before a test runs.
+fn guest_root_services(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let rootfsd = directory.join("services-rootfsd.toml");
+    fs::write(
+        &rootfsd,
+        "name = \"rootfsd\"\nexec = \"/sbin/ramfsd\"\n\
+args = [\"ramfsd\", \"--scheme\", \"rootfs\", \"--root-mode\", \"700\"]\n\
+needs = [\"logd\"]\nprovides = [\"scheme:rootfs\"]\n\
+readiness = \"scheme\"\nready_timeout_ms = 60_000\nrestart = \"on-failure\"\n",
+    )
+    .with_context(|| format!("cannot write {}", rootfsd.display()))?;
+    let vfsd = directory.join("services-vfsd.toml");
+    fs::write(
+        &vfsd,
+        "name = \"vfsd\"\nexec = \"/sbin/vfsd\"\n\
+needs = [\"logd\", \"initfsd\", \"ramfsd\", \"rootfsd\", \"nulld\", \"zerod\", \"randd\", \"scheme:pty\"]\n\
+provides = [\"scheme:file\"]\nreadiness = \"scheme\"\n\
+ready_timeout_ms = 60_000\nrestart = \"on-failure\"\n",
+    )
+    .with_context(|| format!("cannot write {}", vfsd.display()))?;
+    Ok(vec![
+        format!("/etc/services.d/rootfsd.toml={}", rootfsd.display()),
+        format!("/etc/services.d/vfsd.toml={}", vfsd.display()),
+    ])
 }
 
 fn strip_to(program: &Path, destination: &Path) -> Result<()> {
@@ -737,21 +774,6 @@ fn strip_program(program: &Path, workdir: &Path) -> Result<PathBuf> {
     })
 }
 
-/// The FreeBSD base root skeleton the target `t_link` cases read.
-///
-/// `link_perm` links `/root` and `/root/.profile`, so the target guest root must carry both.
-/// `/root` is a directory synthesised by `initfsd`; `/root/.profile` is test input packed at
-/// mode 0644. The file is the single source for the runner and the `guest-root` qtest fixture.
-fn root_skeleton_specs(config: &QemuConfig) -> Vec<String> {
-    vec![format!(
-        "/root/.profile={}:0644",
-        config
-            .root
-            .join("tests/fixtures/guest-root/profile")
-            .display()
-    )]
-}
-
 fn guest_initfs_specs(
     config: &QemuConfig,
     guest: &Guest,
@@ -760,9 +782,9 @@ fn guest_initfs_specs(
     service: &Path,
     reader: Option<&Path>,
     svcd: &Path,
-) -> Vec<String> {
-    let mut specs = service_specs(config, guest);
-    specs.extend(root_skeleton_specs(config));
+    workdir: &Path,
+) -> Result<Vec<String>> {
+    let mut specs = service_specs(config, guest, workdir)?;
     specs.push(format!("/tests/program={}:0755", program.display()));
     specs.push(format!("/g1/manifest={}", manifest.display()));
     specs.push(format!("/etc/services.d/g1.toml={}", service.display()));
@@ -770,7 +792,7 @@ fn guest_initfs_specs(
         specs.push(format!("/etc/services.d/g1-read.toml={}", reader.display()));
     }
     specs.push(format!("/etc/svcd.conf={}", svcd.display()));
-    specs
+    Ok(specs)
 }
 
 fn mkinitfs_with(initfs: &Path, specs: &[String]) -> Vec<String> {

@@ -21,6 +21,7 @@ path = "src/main.rs"
 [dependencies]
 raven-abi = { path = "../../../../crates/raven-abi" }
 raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../../../crates/raven-proto-fs" }
 raven-proto-svc = { path = "../../../../crates/raven-proto-svc" }
 raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
 raven-scheme = { path = "../../../../crates/raven-scheme" }

@@ -19,8 +19,10 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_initfs::Initfs;
+use raven_proto_fs::{O_CREAT, O_TRUNC, O_WRONLY, S_IFDIR, S_IFMT};
 use raven_proto_svc::{State, Status};
 use raven_rt::entry;
 use raven_rt::spawn::{RtSys, SpawnOptions, spawn_image_with_fdmap};
@@ -34,6 +36,14 @@ const MANIFEST: &str = "/g1/manifest";
 const OPEN_READ: u32 = 1;
 /// Largest captured stream kept for the host.
 const CAPTURE_LIMIT: usize = 1024 * 1024;
+/// FreeBSD base root skeleton: `/root` is the 0700 root home; `.profile` is 0644.
+const ROOT_PATH: &str = "/root";
+const ROOT: &str = "file:/root";
+const PROFILE_PATH: &str = "file:/root/.profile";
+const PROFILE_ABSOLUTE: &str = "/root/.profile";
+const PROFILE: &[u8] = include_bytes!("../../../guest-root/profile");
+/// A second ramfs instance carries the donor `/root` mode; the default ramfs root is 0755.
+const ROOT_SCHEME: &str = "rootfs:";
 
 struct Manifest {
     mode: String,
@@ -80,20 +90,69 @@ impl Manifest {
     }
 }
 
+/// Reproduce the FreeBSD base `/root` skeleton before a donor test runs.
+///
+/// The target guest root is the read-only initfs, whose synthesized directories are 0755, while
+/// the FreeBSD base environment has `/root` at 0700. A second ramfs instance started by the guest
+/// service set supplies the donor mode; this process is root, so it mounts that instance at
+/// `/root` and writes the base `.profile`. The steps are idempotent: the donor assertions are
+/// the `link("/root", ...)` / `link("/root/.profile", ...)` pair in NetBSD `t_link.c`.
+fn ensure_root_skeleton() -> Result<(), String> {
+    match raven_rt::fs::stat(ROOT) {
+        Ok(stat) if stat.mode & S_IFMT == S_IFDIR => {}
+        Ok(_) => return Err(format!("{ROOT} exists but is not a directory")),
+        Err(Errno::ENOENT) => match raven_rt::fs::mount(ROOT_PATH, ROOT_SCHEME) {
+            Ok(()) | Err(Errno::EEXIST) => {}
+            Err(error) => return Err(format!("mount {ROOT}: {error:?}")),
+        },
+        Err(error) => return Err(format!("stat {ROOT}: {error:?}")),
+    }
+    let root = raven_rt::fs::stat(ROOT).map_err(|error| format!("stat {ROOT}: {error:?}"))?;
+    if root.mode & S_IFMT != S_IFDIR {
+        return Err(format!("{ROOT} is not a directory"));
+    }
+    if root.mode & 0o7777 != 0o700 {
+        raven_rt::fs::chmod(ROOT_PATH, 0o700)
+            .map_err(|error| format!("chmod {ROOT_PATH}: {error:?}"))?;
+    }
+    // The open protocol carries no creation mode; set the donor 0644 explicitly after writing.
+    let mut profile = raven_rt::fs::open(PROFILE_PATH, O_WRONLY | O_CREAT | O_TRUNC)
+        .map_err(|error| format!("open {PROFILE_PATH}: {error:?}"))?;
+    profile
+        .write(PROFILE)
+        .map_err(|error| format!("write {PROFILE_PATH}: {error:?}"))?;
+    profile
+        .close()
+        .map_err(|error| format!("close {PROFILE_PATH}: {error:?}"))?;
+    raven_rt::fs::chmod(PROFILE_ABSOLUTE, 0o644)
+        .map_err(|error| format!("chmod {PROFILE_ABSOLUTE}: {error:?}"))?;
+    Ok(())
+}
+
 fn main(args: raven_rt::Args) -> i32 {
     let mut read = false;
+    let mut root = false;
     let mut case = None;
     for index in 0..args.len() {
         if let Some(value) = args.get(index) {
             if value == "read" {
                 read = true;
             }
+            if value == "root" {
+                root = true;
+            }
             if let Ok(number) = value.parse::<usize>() {
                 case = Some(number);
             }
         }
     }
-    let result = if read { read_result(case) } else { run(case) };
+    let result = if root {
+        ensure_root_skeleton()
+    } else if read {
+        read_result(case)
+    } else {
+        run(case)
+    };
     match result {
         Ok(()) => 0,
         Err(error) => {
@@ -176,6 +235,9 @@ fn run(case: Option<usize>) -> Result<(), String> {
         .ok_or_else(|| format!("manifest missing: {path}"))?;
     let text = core::str::from_utf8(entry.data).map_err(|_| "manifest is not UTF-8".to_string())?;
     let manifest = Manifest::parse(text)?;
+    // The donor base environment has the `/root` skeleton; these guests have no login process,
+    // so the root wrapper materializes it before the test starts.
+    ensure_root_skeleton()?;
     if manifest.mode == "exec" {
         // The kernel's `PROC_EXEC` loader copies the file tail; `raven-spawn`'s userland
         // image path is strict, so an EXEC wrapper is the portable way to pass argv/env.
