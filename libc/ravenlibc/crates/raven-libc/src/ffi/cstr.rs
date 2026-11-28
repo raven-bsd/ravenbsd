@@ -6,6 +6,50 @@
 
 use core::ffi::c_char;
 
+#[cfg(all(any(target_os = "none", test), target_arch = "aarch64"))]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(all(any(target_os = "none", test), target_arch = "x86_64"))]
+use raven_abi::layout::x86_64::{USER_END, USER_MIN};
+#[cfg(any(target_os = "none", test))]
+use raven_libc_abi::errno::{EFAULT, ENAMETOOLONG, Errno};
+#[cfg(any(target_os = "none", test))]
+use raven_libc_abi::limits::PATH_MAX;
+
+/// A caller's NUL-terminated path, read under the kernel `copyinstr` limits.
+///
+/// The kernel rejects a path pointer outside the user window with `EFAULT` and a string with no
+/// NUL within `PATH_MAX` with `ENAMETOOLONG`. The shell reads paths in user mode and has no
+/// page-fault fixup, so it applies both predicates before it walks the bytes; an in-window path is
+/// read unchanged. A window-wide pointer that is not mapped is still the caller's contract, as for
+/// [`slice`].
+///
+/// # Safety
+/// `pointer` is NULL or points into the user address window.
+#[cfg(any(target_os = "none", test))]
+pub(crate) unsafe fn checked_path<'a>(pointer: *const c_char) -> Result<&'a [u8], Errno> {
+    if pointer.is_null() {
+        return Err(Errno::from_generated(EFAULT));
+    }
+    let start = pointer as usize as u64;
+    if !(USER_MIN..USER_END).contains(&start) {
+        return Err(Errno::from_generated(EFAULT));
+    }
+    let mut length = 0usize;
+    while length < PATH_MAX as usize {
+        let address = start.saturating_add(length as u64);
+        if address >= USER_END {
+            return Err(Errno::from_generated(EFAULT));
+        }
+        // SAFETY: `address` is inside the user window and the caller guarantees the mapping.
+        if unsafe { *pointer.cast::<u8>().add(length) } == 0 {
+            // SAFETY: `length` readable bytes precede the NUL the walk found.
+            return Ok(unsafe { core::slice::from_raw_parts(pointer.cast::<u8>(), length) });
+        }
+        length = length.saturating_add(1);
+    }
+    Err(Errno::from_generated(ENAMETOOLONG))
+}
+
 /// A NUL-terminated C string as a read-only slice.
 ///
 /// # Safety
