@@ -233,47 +233,6 @@ __attribute__((weak)) void *sbrk(intptr_t increment) {
     return previous;
 }
 
-static timer_t rl_alarm_timer;
-static int rl_alarm_created;
-static unsigned rl_alarm_seconds;
-static struct timespec rl_alarm_deadline;
-
-__attribute__((weak)) unsigned alarm(unsigned seconds) {
-    struct timespec now;
-    unsigned previous = 0;
-    if (rl_alarm_created && rl_alarm_seconds > 0
-        && clock_gettime(CLOCK_REALTIME, &now) == 0) {
-        time_t delta = rl_alarm_deadline.tv_sec - now.tv_sec;
-        if (delta > 0) {
-            previous = (unsigned)delta;
-        } else if (delta == 0 && rl_alarm_deadline.tv_nsec > now.tv_nsec) {
-            previous = 1;
-        }
-    }
-    if (!rl_alarm_created) {
-        struct sigevent event;
-        memset(&event, 0, sizeof(event));
-        event.sigev_notify = SIGEV_SIGNAL;
-        event.sigev_signo = SIGALRM;
-        if (timer_create(CLOCK_REALTIME, &event, &rl_alarm_timer) != 0) {
-            return 0;
-        }
-        rl_alarm_created = 1;
-    }
-    struct itimerspec timer;
-    memset(&timer, 0, sizeof(timer));
-    if (seconds > 0) {
-        timer.it_value.tv_sec = (time_t)seconds;
-        if (clock_gettime(CLOCK_REALTIME, &now) == 0) {
-            rl_alarm_deadline.tv_sec = now.tv_sec + (time_t)seconds;
-            rl_alarm_deadline.tv_nsec = now.tv_nsec;
-        }
-    }
-    (void)timer_settime(rl_alarm_timer, 0, &timer, NULL);
-    rl_alarm_seconds = seconds;
-    return previous;
-}
-
 __attribute__((weak)) int pause(void) {
     sigset_t mask;
     sigemptyset(&mask);

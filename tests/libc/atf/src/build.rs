@@ -20,7 +20,7 @@ use crate::{BuildStatus, Framework, Mode};
 /// Directory of ATF's own sources inside `vendor/atf`.
 const ATF_SOURCES: &[&str] = &["atf-c", "atf-c/detail"];
 /// Weak target diagnostics the C donor tests call but the current C ABI does not export.
-const TARGET_SHIM: &str = "tests/libc/atf/shim/rl_target_shim.c";
+const TARGET_SHIM: &str = "tests/libc/atf/shim/rl_target_shim.c.txt";
 
 /// Builds programs in one mode.
 #[derive(Clone, Debug)]
@@ -337,8 +337,13 @@ impl Builder {
         fs::create_dir_all(&directory)
             .with_context(|| format!("cannot create {}", directory.display()))?;
         let object = directory.join("rl_target_shim.o");
+        // The donor shim is tracked as test-only text; materialise the .c copy in the build
+        // directory so the product scaffold stays C-free.
         let source = self.root.join(TARGET_SHIM);
-        let args = target_shim_args(sysroot, &source, &object);
+        let materialized = directory.join("rl_target_shim.c");
+        fs::write(&materialized, fs::read(&source)?)
+            .with_context(|| format!("cannot materialise {}", materialized.display()))?;
+        let args = target_shim_args(sysroot, &materialized, &object);
         let output = run(self.target_compiler(), &args, self.root())?;
         if !output.success {
             let line = output

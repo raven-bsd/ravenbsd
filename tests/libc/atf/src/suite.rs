@@ -785,10 +785,22 @@ fn run_atf_qemu(
     let guest = qemu::Guest::new(&config.root);
     let mut results = Vec::with_capacity(batch.len());
     // `raven-svc-manifest` caps a graph at 256 services; each case uses a run/read pair and the
-    // bootstrap services take eight slots. A chunk is 20 cases (48 services) so one body that
-    // stalls the guest costs one chunk, not the whole matrix. The faulting memory programs run
-    // last (suite order); earlier required rows are recorded from the finished chunks.
-    for (chunk_index, chunk) in batch.chunks(BATCH_CHUNK).enumerate() {
+    // bootstrap services take eight slots. Start a fresh guest at every program boundary and
+    // cap each chunk at `BATCH_CHUNK`; a faulting program (t_mprotect, t_unlink) then cannot
+    // stall a different program's required rows. The full run remains one command and one
+    // table; the failure is isolated, not retried away.
+    let mut chunks: Vec<Vec<qemu::AtfBatchCase>> = Vec::new();
+    for program in programs {
+        let cases: Vec<_> = batch
+            .iter()
+            .filter(|case| case.program_name == program.name)
+            .cloned()
+            .collect();
+        for chunk in cases.chunks(BATCH_CHUNK) {
+            chunks.push(chunk.to_vec());
+        }
+    }
+    for (chunk_index, chunk) in chunks.iter().enumerate() {
         let chunk_work = work.join(format!("chunk-{chunk_index}"));
         results.extend(qemu::run_atf_batch(
             &qemu,
