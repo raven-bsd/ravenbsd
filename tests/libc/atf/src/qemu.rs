@@ -485,7 +485,7 @@ pub fn run_tap(config: &QemuConfig, guest: &Guest, job: &TapJob<'_>) -> Result<T
     fs::write(
         &wrap,
         format!(
-            "mode=spawn\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
+            "mode=exec\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
 arg=/tmp/pjdfstest\narg=/bin/sh\narg=-c\n\
 arg=cd /tmp/pjdfstest && exec /bin/sh /tests/pjdfstest/tests/{program}.t\n\
 env=PATH=/bin:/usr/bin\nenv=HOME=/tmp\nenv=TMPDIR=/tmp\nenv=TZ=UTC\n\
@@ -567,9 +567,11 @@ env=LANG=C.UTF-8\nenv=LC_ALL=C.UTF-8\n"
     let (_, timed_out) = boot(config, &image, &vars, &serial_path, &error_path)?;
     let serial = read_prefix(&serial_path);
     let text = String::from_utf8_lossy(&serial).into_owned();
+    // `mode=exec` replaces the wrapper image, so there is no G1-OUTPUT block; the program writes
+    // its TAP stream to the serial console. Use the marker block when present, else the serial.
     let output = marker_block(&text, "G1-OUTPUT-BEGIN", "G1-OUTPUT-END")
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
-        .unwrap_or_default();
+        .unwrap_or_else(|| text.clone());
     if !keep {
         for transient in [&initfs, &image, &vars] {
             let _ = fs::remove_file(transient);
