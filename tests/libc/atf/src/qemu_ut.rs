@@ -1,9 +1,23 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+use std::fs;
 use std::path::Path;
 
 use super::*;
+
+static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn temp(name: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "raven-atf-qemu-{name}-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&path);
+    fs::create_dir_all(&path).expect("temp");
+    path
+}
 
 #[test]
 fn the_last_init_exit_wins() {
@@ -170,7 +184,7 @@ fn the_guest_initfs_has_the_services_and_the_program() {
 
 #[test]
 fn the_batch_manifest_uses_the_indexed_image_and_result() {
-    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", None);
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", false, None);
     assert!(text.contains("mode=exec\n"));
     assert!(text.contains("program=/tests/t_foo\n"));
     assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
@@ -184,11 +198,62 @@ fn the_batch_manifest_carries_the_unprivileged_user() {
         "link_perm",
         "/tests/t_link",
         "/tmp/result-2",
+        false,
         Some("unprivileged"),
     );
     assert!(text.contains("user=65534\n"));
-    let root = batch_manifest("mkdir_err", "/tests/t_mkdir", "/tmp/result-3", Some("root"));
+    let root = batch_manifest(
+        "mkdir_err",
+        "/tests/t_mkdir",
+        "/tmp/result-3",
+        false,
+        Some("root"),
+    );
     assert!(!root.contains("user="));
+}
+
+#[test]
+fn the_batch_manifest_runs_through_the_workdir_wrapper() {
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", true, None);
+    assert!(text.contains("program=/tests/atf-wrapper\n"));
+    assert!(text.contains("arg=/tests/atf-wrapper\n"));
+    assert!(text.contains("arg=/tmp/atf-work\narg=/tests/t_foo\n"));
+    assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
+    assert!(text.contains("arg=-s\narg=/tests\narg=a_case\n"));
+}
+
+#[test]
+fn the_staged_image_ends_on_a_page_boundary() {
+    let workdir = temp("page");
+    let source = workdir.join("program");
+    let destination = workdir.join("staged");
+    fs::write(&source, vec![0u8; 4097]).expect("write");
+    strip_to(&source, &destination).expect("strip");
+    let length = fs::metadata(&destination).expect("stat").len();
+    assert_eq!(length % 4096, 0);
+    assert!(length >= 4097);
+}
+
+#[test]
+fn the_guest_credentials_stage_passwd_and_group() {
+    let workdir = temp("credentials");
+    let specs = guest_credentials(&workdir).expect("credentials");
+    let passwd = fs::read_to_string(workdir.join("etc/passwd")).expect("passwd");
+    let group = fs::read_to_string(workdir.join("etc/group")).expect("group");
+    assert!(passwd.contains("root:x:0:0:"));
+    assert!(passwd.contains("nobody:x:65534:"));
+    assert!(group.contains("wheel:*:0:root"));
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec
+                == &format!("/etc/passwd={}:0644", workdir.join("etc/passwd").display()))
+    );
+    assert!(
+        specs
+            .iter()
+            .any(|spec| spec == &format!("/etc/group={}:0644", workdir.join("etc/group").display()))
+    );
 }
 
 #[test]
@@ -267,6 +332,28 @@ fn the_target_environment_has_the_host_runner_values() {
     assert!(env.iter().any(|item| item == "TMPDIR=/tmp"));
     assert!(env.iter().any(|item| item == "TZ=UTC"));
     assert!(env.iter().any(|item| item == "LC_ALL=C.UTF-8"));
+}
+
+#[test]
+fn the_g1_mounts_make_dev_a_directory_and_dev_null_a_device_mount() {
+    let work = temp("mounts");
+    let specs = guest_mounts(&work).expect("mounts");
+    assert_eq!(specs.len(), 1);
+    let text = fs::read_to_string(work.join("etc/mounts")).expect("mounts file");
+    let lines: Vec<&str> = text.lines().collect();
+    let dev = lines
+        .iter()
+        .position(|line| *line == "/dev ramfs:")
+        .expect("/dev ramfs:");
+    let null = lines
+        .iter()
+        .position(|line| *line == "/dev/null null:")
+        .expect("/dev/null null:");
+    assert!(dev < null);
+    assert!(!lines.iter().any(|line| line.starts_with("/dev/null=")));
+    assert!(lines.contains(&"/ initfs:"));
+    assert!(lines.contains(&"/tmp ramfs:"));
+    let _ = fs::remove_dir_all(&work);
 }
 
 #[test]

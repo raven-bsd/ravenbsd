@@ -405,6 +405,7 @@ pub fn run_atf_batch(
     config: &QemuConfig,
     guest: &Guest,
     cases: &[AtfBatchCase],
+    wrapper: Option<&Path>,
     workdir: &Path,
     keep: bool,
 ) -> Result<Vec<AtfBatchResult>> {
@@ -458,6 +459,11 @@ pub fn run_atf_batch(
     }
 
     let mut specs = service_specs(config, guest, workdir)?;
+    if let Some(wrapper) = wrapper {
+        let destination = programs_dir.join("atf-wrapper");
+        strip_to(wrapper, &destination)?;
+        specs.push(format!("/tests/atf-wrapper={}:0755", destination.display()));
+    }
     for (index, case) in cases.iter().enumerate() {
         let image_path = image_paths
             .get(&case.program_path)
@@ -470,7 +476,13 @@ pub fn run_atf_batch(
         let manifest = workdir.join(format!("manifest-{index}"));
         fs::write(
             &manifest,
-            batch_manifest(&case.ident, image_path, &result, case.user.as_deref()),
+            batch_manifest(
+                &case.ident,
+                image_path,
+                &result,
+                wrapper.is_some(),
+                case.user.as_deref(),
+            ),
         )
         .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
@@ -536,7 +548,7 @@ readiness = \"exit\"\nrestart = \"never\"\nmax_restarts = 0\nrequired = false\n"
     make_image(config, &initfs, &image)?;
     copy_firmware_vars(&vars)?;
     let mut batch = config.clone();
-    batch.timeout_secs = batch.timeout_secs.max(1800);
+    batch.timeout_secs = batch.timeout_secs.max(180);
     let (_, timed_out) = boot(&batch, &image, &vars, &serial_path, &error_path)?;
     let serial = read_prefix(&serial_path);
     let text = String::from_utf8_lossy(&serial);
@@ -575,6 +587,8 @@ fn service_specs(config: &QemuConfig, guest: &Guest, workdir: &Path) -> Result<V
     }
     specs.push(format!("/sbin/vfsd={}", guest.path("vfsd").display()));
     specs.extend(guest_root_services(workdir)?);
+    specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
     Ok(specs)
 }
 
@@ -626,12 +640,41 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
         .arg("--strip-all")
         .arg(destination)
         .status();
+    // `raven-spawn` maps the image file tail and requires it to end on a page boundary; the
+    // kernel `PROC_EXEC` path does not. Pad the staged copy so a `posix_spawn` wrapper can start
+    // the same program from the initfs. Trailing zeros are outside every ELF segment.
+    let length = fs::metadata(destination)
+        .with_context(|| format!("cannot stat {}", destination.display()))?
+        .len();
+    let padded = length.saturating_add(4095) & !4095;
+    if padded > length {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(destination)
+            .with_context(|| format!("cannot open {}", destination.display()))?;
+        file.set_len(padded)
+            .with_context(|| format!("cannot pad {}", destination.display()))?;
+    }
     Ok(())
 }
 
-fn batch_manifest(ident: &str, image_path: &str, result: &str, user: Option<&str>) -> String {
+fn batch_manifest(
+    ident: &str,
+    image_path: &str,
+    result: &str,
+    wrapper: bool,
+    user: Option<&str>,
+) -> String {
+    let (program, prefix) = if wrapper {
+        (
+            "/tests/atf-wrapper",
+            format!("arg=/tmp/atf-work\narg={image_path}\n"),
+        )
+    } else {
+        (image_path, format!("arg={image_path}\n"))
+    };
     let mut text = format!(
-        "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
+        "mode=exec\nprogram={program}\narg={program}\n{prefix}arg=-r\narg={result}\n\
 arg=-s\narg=/tests\narg={ident}\n"
     );
     text.push_str(&user_manifest_line(user));
@@ -799,6 +842,63 @@ fn strip_program(program: &Path, workdir: &Path) -> Result<PathBuf> {
     })
 }
 
+/// Stage the account files a login session provides. Donor bodies such as `t_dup` open
+/// `/etc/passwd`; `initgroups(3)` in the wrapper reads `/etc/group`. The G1 initfs is a service
+/// image with no account database, so the runner supplies the same minimal files the S179
+/// credential image uses.
+fn guest_credentials(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let passwd = directory.join("passwd");
+    let group = directory.join("group");
+    fs::write(
+        &passwd,
+        "root:x:0:0:root:/root:/bin/sh\n\
+         nobody:x:65534:65534:nobody:/nonexistent:/nonexistent\n\
+         raven:x:1000:1000:raven:/home/raven:/bin/sh\n",
+    )
+    .with_context(|| format!("cannot write {}", passwd.display()))?;
+    fs::write(
+        &group,
+        "wheel:*:0:root\n\
+         nobody:*:65534:\n\
+         raven:*:1000:raven\n",
+    )
+    .with_context(|| format!("cannot write {}", group.display()))?;
+    Ok(vec![
+        format!("/etc/passwd={}:0644", passwd.display()),
+        format!("/etc/group={}:0644", group.display()),
+    ])
+}
+
+/// Stage the G1 mount table.
+///
+/// The product default mounts `/dev/null` on `null:`, but `vfsd` resolves the parent `/dev` in
+/// the read-only initfs before it looks up the final component. The initfs has no `/dev`, so the
+/// open fails with `ENOENT` before the null mount is reached. Mounting a ramfs at `/dev` makes
+/// the parent a real directory; `/dev/null` itself stays the `null:` device mount and is never a
+/// regular file. This is a test-only namespace file inside the ATF/G1 image, not a product mount
+/// edit.
+fn guest_mounts(workdir: &Path) -> Result<Vec<String>> {
+    let directory = workdir.join("etc");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("cannot create {}", directory.display()))?;
+    let mounts = directory.join("mounts");
+    fs::write(
+        &mounts,
+        "/ initfs:\n\
+         /tmp ramfs:\n\
+         /dev ramfs:\n\
+         /dev/null null:\n\
+         /dev/zero zero:\n\
+         /dev/random rand:\n\
+         /dev/urandom rand:\n",
+    )
+    .with_context(|| format!("cannot write {}", mounts.display()))?;
+    Ok(vec![format!("/etc/mounts={}:0644", mounts.display())])
+}
+
 fn guest_initfs_specs(
     config: &QemuConfig,
     guest: &Guest,
@@ -924,6 +1024,9 @@ fn make_image(config: &QemuConfig, initfs: &Path, image: &Path) -> Result<()> {
             config.kernel.display()
         );
     }
+    // Refuse a cached kernel from another commit, a dirty tree or the debug profile. The G1
+    // runner does not rebuild the artifact, so booting a stale one would test the wrong ABI.
+    crate::freshness::verify_kernel(&config.root, &config.kernel)?;
     let args = image_args(&config.kernel, initfs, image);
     run_tool(
         "cargo",

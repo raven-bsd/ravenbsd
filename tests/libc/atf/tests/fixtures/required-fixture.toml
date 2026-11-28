@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# CLI fixture for the fail-closed required matrix.
+
+schema = 1
+
+[[required]]
+id = "fixture-strchr"
+suite = "netbsd-libc"
+program = "string/t_strchr"
+case = "strchr_basic"
+donor = "tests/libc/atf/tests/fixtures/baseline-met.tsv"
+expect = "the fixture body passes"
+environment = "fixture"
+regression = "tests/libc/atf/tests/cli.rs"

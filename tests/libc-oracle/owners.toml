@@ -437,6 +437,11 @@ ticket = "C56"
 area = "FreeBSD stdio"
 
 [[owner]]
+prefix = "freebsd-libc-sys:"
+ticket = "S750"
+area = "FreeBSD kernel-facing libc sys tests"
+
+[[owner]]
 prefix = "freebsd-libc:stdlib/"
 ticket = "C41"
 area = "FreeBSD stdlib"
