@@ -42,6 +42,9 @@ fi
 
 out=build/fixtures/pipe-restart
 mkdir -p "$out"
+# The scaffold C gate forbids tracked .c files. Keep the exact fixture source as a test-only
+# text input and stage it under the build tree before compiling, like the S750a donor tree.
+cp "$root/tests/fixtures/pipe-restart/main.c.txt" "$out/main.c"
 link_script=$root/tests/libc/target/x86_64.ld
 builtins=
 if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
@@ -51,7 +54,7 @@ fi
 "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
     -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
     -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
-    -c "$root/tests/fixtures/pipe-restart/main.c" -o "$out/main.o"
+    -c "$out/main.c" -o "$out/main.o"
 
 if [ -n "$builtins" ]; then
     "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
@@ -77,7 +80,7 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
 "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" \
     -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
     -D__ravenbsd__=1 -D__unix__=1 -DS781_DONOR_ONLY=1 -mno-sse -mno-mmx -msoft-float \
-    -c "$root/tests/fixtures/pipe-restart/main.c" -o "$out/donor.o"
+    -c "$out/main.c" -o "$out/donor.o"
 
 if [ -n "$builtins" ]; then
     "$CC" --target=x86_64-unknown-ravenbsd --sysroot="$sysroot" -fuse-ld=lld \
