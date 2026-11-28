@@ -394,6 +394,67 @@ impl Builder {
         Ok(binary)
     }
 
+    /// Build the vendored pjdfstest helper for the target.
+    ///
+    /// The helper is the donor `pjdfstest.c` plus the minimal `config.h` beside it. It needs no
+    /// ATF shim and is not an ATF program: `open/00.t` invokes it once per expectation.
+    pub fn build_tap_helper(&self) -> Result<PathBuf> {
+        let sysroot = self.sysroot()?;
+        let directory = self.out.join("tap");
+        fs::create_dir_all(&directory)
+            .with_context(|| format!("cannot create {}", directory.display()))?;
+        let object = directory.join("pjdfstest.o");
+        let binary = directory.join("pjdfstest");
+        let source = self.vendor.join("vendor/pjdfstest/pjdfstest.c");
+        let include = self.vendor.join("vendor/pjdfstest");
+        if !source.is_file() {
+            bail!("vendored pjdfstest helper missing: {}", source.display());
+        }
+        let args = vec![
+            "--target=x86_64-unknown-ravenbsd".to_string(),
+            format!("--sysroot={}", sysroot.display()),
+            "-std=gnu11".to_string(),
+            "-O1".to_string(),
+            "-w".to_string(),
+            "-D_GNU_SOURCE".to_string(),
+            // ravenlibc declares __assert_fail but does not export it; the helper's two internal
+            // asserts are not on the open/create path.
+            "-DNDEBUG".to_string(),
+            format!("-I{}", include.display()),
+            "-c".to_string(),
+            source.display().to_string(),
+            "-o".to_string(),
+            object.display().to_string(),
+        ];
+        let output = run(self.target_compiler(), &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot compile the pjdfstest helper: {line}");
+        }
+        let args = target_link_args(
+            sysroot,
+            &binary,
+            &[object],
+            Framework::ExitStatus,
+            &self.out,
+            &[],
+        );
+        let output = run(self.linker()?, &args, self.root())?;
+        if !output.success {
+            let line = output
+                .text
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or("no output");
+            bail!("cannot link the pjdfstest helper: {line}");
+        }
+        Ok(binary)
+    }
+
     fn report(&self, output: CommandOutput, binary: Option<PathBuf>) -> BuildReport {
         let mut missing_headers = BTreeSet::new();
         let mut missing_symbols = BTreeSet::new();

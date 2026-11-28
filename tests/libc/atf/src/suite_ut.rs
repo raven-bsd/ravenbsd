@@ -228,6 +228,34 @@ fn defaults_are_sane() {
 }
 
 #[test]
+fn tap_all_ok_passes() {
+    let (verdict, reason) = parse_tap("1..2\nok 1\nok 2\n", Some(0));
+    assert_eq!(verdict, Verdict::Pass);
+    assert!(reason.is_empty());
+}
+
+#[test]
+fn tap_not_ok_fails_with_the_line() {
+    let (verdict, reason) = parse_tap("1..2\nok 1\nnot ok 2 - tried open\n", Some(0));
+    assert_eq!(verdict, Verdict::Fail);
+    assert!(reason.contains("not ok 2"));
+}
+
+#[test]
+fn tap_empty_stream_fails() {
+    let (verdict, reason) = parse_tap("", Some(0));
+    assert_eq!(verdict, Verdict::Fail);
+    assert!(reason.contains("no TAP results"));
+}
+
+#[test]
+fn tap_nonzero_exit_fails() {
+    let (verdict, reason) = parse_tap("1..1\nok 1\n", Some(1));
+    assert_eq!(verdict, Verdict::Fail);
+    assert!(reason.contains("exit:1"));
+}
+
+#[test]
 fn a_batch_case_carries_the_require_user_metadata() {
     let mut meta = BTreeMap::new();
     meta.insert("require.user".to_string(), "unprivileged".to_string());

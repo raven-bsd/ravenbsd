@@ -453,6 +453,9 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
         outcomes: Vec::new(),
         builds: BTreeMap::new(),
     };
+    let tap_target = config.mode == Mode::Target
+        && config.backend == RunBackend::Qemu
+        && suite.framework == Framework::Tap;
     let mut program_jobs = Vec::new();
     for program in &suite.programs {
         let manual = exclusions.matched(&suite.suite, &program.name, None);
@@ -483,7 +486,7 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
                 run.builds.insert(program.name.clone(), status);
                 continue;
             }
-            BuildStatus::Needs(token) if token.starts_with("needs-") => {
+            BuildStatus::Needs(token) if token.starts_with("needs-") && !tap_target => {
                 let case = Case::new(&suite.suite, &program.name, "unknown-bodies");
                 run.outcomes.push(Outcome::new(
                     case,
@@ -533,6 +536,15 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
 
     if config.mode == Mode::Target
         && config.backend == RunBackend::Qemu
+        && suite.framework == Framework::Tap
+        && incomplete.is_none()
+    {
+        run_tap_qemu(&builder, &suite, &program_jobs, config, &owners, &mut run)?;
+        run.sort();
+        return Ok(run);
+    }
+    if config.mode == Mode::Target
+        && config.backend == RunBackend::Qemu
         && suite.framework == Framework::Atf
         && incomplete.is_none()
     {
@@ -572,6 +584,97 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
 const BATCH_CHUNK: usize = 20;
 
 /// Target+qemu ATF: build every program, then run all eligible bodies in batched boots.
+/// Run the pjdfstest TAP programs in the guest and turn the TAP stream into one `run` body.
+fn run_tap_qemu(
+    builder: &Builder,
+    suite: &SuiteFile,
+    programs: &[Program],
+    config: &RunConfig,
+    owners: &Owners,
+    run: &mut SuiteRun,
+) -> Result<()> {
+    if programs.is_empty() {
+        return Ok(());
+    }
+    let helper = builder.build_tap_helper()?;
+    let wrapper = builder.build_target_wrapper()?;
+    let tree = config.root.join("tests/libc-oracle/vendor/pjdfstest/tests");
+    let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout.max(180));
+    let guest = qemu::Guest::new(&config.root);
+    for program in programs {
+        let work = config
+            .out
+            .join("work")
+            .join(&suite.suite)
+            .join(&program.name);
+        let script = tree.join(format!("{}.t", program.name));
+        let observation = qemu::run_tap(
+            &qemu,
+            &guest,
+            &qemu::TapJob {
+                script: &script,
+                program: &program.name,
+                tree: &tree,
+                helper: &helper,
+                wrapper: &wrapper,
+                workdir: &work,
+                keep: config.keep,
+            },
+        )?;
+        let (verdict, reason) = if observation.timed_out {
+            (
+                Verdict::Fail,
+                format!("timeout after {}s", config.max_timeout),
+            )
+        } else {
+            parse_tap(&observation.output, observation.exit)
+        };
+        run.outcomes.push(Outcome::new(
+            Case::new(&suite.suite, &program.name, "run"),
+            verdict,
+            reason,
+            owners.ticket(&suite.suite, &program.name),
+        ));
+        run.builds.insert(program.name.clone(), BuildStatus::Built);
+    }
+    Ok(())
+}
+
+/// Judge a TAP stream: every `ok` line passes, the first `not ok` fails, and an empty stream or a
+/// nonzero exit is a failure with the reason preserved.
+fn parse_tap(output: &str, exit: Option<i32>) -> (Verdict, String) {
+    let mut results = 0usize;
+    let mut first_failure = None;
+    for line in output.lines() {
+        let line = line.trim();
+        if line.starts_with("not ok") {
+            results += 1;
+            if first_failure.is_none() {
+                first_failure = Some(line.to_string());
+            }
+        } else if line.starts_with("ok ") || line == "ok" {
+            results += 1;
+        }
+    }
+    if let Some(line) = first_failure {
+        return (Verdict::Fail, format!("tap:{line}"));
+    }
+    if results == 0 {
+        return (
+            Verdict::Fail,
+            format!(
+                "no TAP results{}",
+                exit.map_or_else(String::new, |code| format!(" (exit {code})"))
+            ),
+        );
+    }
+    match exit {
+        Some(0) => (Verdict::Pass, String::new()),
+        Some(code) => (Verdict::Fail, format!("exit:{code}")),
+        None => (Verdict::Fail, "no G1-EXIT".to_string()),
+    }
+}
+
 fn run_atf_qemu(
     builder: &Builder,
     suite: &SuiteFile,

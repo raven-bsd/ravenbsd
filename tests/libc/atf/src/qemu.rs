@@ -398,6 +398,182 @@ pub fn run_atf_case(
     }
 }
 
+/// One pjdfstest TAP program run in the guest.
+pub struct TapJob<'a> {
+    /// Absolute path to the vendored `.t` script.
+    pub script: &'a Path,
+    /// Program name (`open/00`), used for the staged path.
+    pub program: &'a str,
+    /// Vendored `tests` tree holding `conf` and `misc.sh`.
+    pub tree: &'a Path,
+    /// The built pjdfstest helper.
+    pub helper: &'a Path,
+    /// The built target wrapper (sets the work directory).
+    pub wrapper: &'a Path,
+    /// Per-run host work directory.
+    pub workdir: &'a Path,
+    /// Keep the initfs and boot image.
+    pub keep: bool,
+}
+
+/// The guest observation of one TAP program.
+pub struct TapObservation {
+    /// The program's exit status from `G1-EXIT`.
+    pub exit: Option<i32>,
+    /// Captured stdout/stderr.
+    pub output: String,
+    /// Whether the boot hit the deadline.
+    pub timed_out: bool,
+}
+
+/// Tools the pjdfstest shell bodies call. Each entry is `(guest name, host path)`.
+fn tap_tools(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut tools = Vec::new();
+    for name in [
+        "basename", "cat", "chmod", "chown", "cp", "cut", "date", "df", "dirname", "echo", "env",
+        "false", "head", "id", "ln", "ls", "mkdir", "mv", "pwd", "rm", "rmdir", "sleep", "sort",
+        "stat", "tail", "touch", "tr", "true", "wc",
+    ] {
+        tools.push((
+            name.to_string(),
+            root.join("build/x86_64/uutils").join(name),
+        ));
+    }
+    for (name, package) in [
+        ("grep", "raven-grep"),
+        ("awk", "raven-awk"),
+        ("uname", "raven-uname"),
+    ] {
+        tools.push((
+            name.to_string(),
+            root.join("build/x86_64/user").join(package),
+        ));
+    }
+    tools
+}
+
+/// Run one pjdfstest TAP program through the guest shell and capture its TAP output.
+pub fn run_tap(config: &QemuConfig, guest: &Guest, job: &TapJob<'_>) -> Result<TapObservation> {
+    let TapJob {
+        script,
+        program,
+        tree,
+        helper,
+        wrapper,
+        workdir,
+        keep,
+    } = *job;
+    guest.require()?;
+    fs::create_dir_all(workdir).with_context(|| format!("cannot create {}", workdir.display()))?;
+    let initfs = workdir.join("initfs.img");
+    let image = workdir.join("boot.img");
+    let vars = workdir.join("OVMF_VARS.fd");
+    let serial_path = workdir.join("serial.log");
+    let error_path = workdir.join("qemu.err");
+    for stale in [&initfs, &image, &vars, &serial_path, &error_path] {
+        let _ = fs::remove_file(stale);
+    }
+
+    let stage = workdir.join("stage");
+    fs::create_dir_all(stage.join("tests")).with_context(|| "cannot create tap stage")?;
+    let staged_helper = stage.join("pjdfstest");
+    strip_to(helper, &staged_helper)?;
+    let staged_wrapper = stage.join("atf-wrapper");
+    strip_to(wrapper, &staged_wrapper)?;
+
+    let wrap = workdir.join("manifest");
+    fs::write(
+        &wrap,
+        format!(
+            "mode=exec\nprogram=/tests/atf-wrapper\narg=/tests/atf-wrapper\n\
+arg=/tmp/pjdfstest\narg=/bin/sh\narg=-c\n\
+arg=cd /tmp/pjdfstest && exec /bin/sh /tests/pjdfstest/tests/{program}.t\n\
+env=PATH=/bin:/usr/bin\nenv=HOME=/tmp\nenv=TMPDIR=/tmp\nenv=TZ=UTC\n\
+env=LANG=C.UTF-8\nenv=LC_ALL=C.UTF-8\n"
+        ),
+    )
+    .with_context(|| format!("cannot write {}", wrap.display()))?;
+    let service = workdir.join("g1.toml");
+    let svcd = workdir.join("svcd.conf");
+    let (service_text, _reader_text, svcd_text) = guest_service(GuestMode::Exec);
+    fs::write(&service, service_text)
+        .with_context(|| format!("cannot write {}", service.display()))?;
+    fs::write(&svcd, svcd_text).with_context(|| format!("cannot write {}", svcd.display()))?;
+
+    let mut specs = service_specs(config, guest, workdir)?;
+    specs.extend(guest_credentials(workdir)?);
+    specs.extend(guest_mounts(workdir)?);
+    specs.push(format!(
+        "/tests/atf-wrapper={}:0755",
+        staged_wrapper.display()
+    ));
+    specs.push(format!(
+        "/tests/pjdfstest/pjdfstest={}:0755",
+        staged_helper.display()
+    ));
+    specs.push(format!("/g1/manifest={}", wrap.display()));
+    specs.push(format!("/etc/services.d/g1.toml={}", service.display()));
+    specs.push(format!("/etc/svcd.conf={}", svcd.display()));
+    specs.push(format!(
+        "/bin/sh={}",
+        config.root.join("build/x86_64/brush").display()
+    ));
+    for (name, path) in tap_tools(&config.root) {
+        if !path.is_file() {
+            bail!(
+                "TAP tool missing: {} (build it with cargo xtask build user/uutils)",
+                path.display()
+            );
+        }
+        specs.push(format!("/bin/{name}={}", path.display()));
+    }
+    for name in ["conf", "misc.sh"] {
+        let source = tree.join(name);
+        let destination = stage.join("tests").join(name);
+        fs::copy(&source, &destination)
+            .with_context(|| format!("cannot stage {}", source.display()))?;
+        specs.push(format!(
+            "/tests/pjdfstest/tests/{name}={}",
+            destination.display()
+        ));
+    }
+    let destination = stage.join("tests").join(format!("{program}.t"));
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    fs::copy(script, &destination).with_context(|| format!("cannot stage {}", script.display()))?;
+    specs.push(format!(
+        "/tests/pjdfstest/tests/{program}.t={}",
+        destination.display()
+    ));
+
+    run_tool(
+        "cargo",
+        &mkinitfs_with(&initfs, &specs),
+        &config.root,
+        "cannot build the TAP guest initfs",
+    )?;
+    make_image(config, &initfs, &image)?;
+    copy_firmware_vars(&vars)?;
+    let (_, timed_out) = boot(config, &image, &vars, &serial_path, &error_path)?;
+    let serial = read_prefix(&serial_path);
+    let text = String::from_utf8_lossy(&serial).into_owned();
+    let output = marker_block(&text, "G1-OUTPUT-BEGIN", "G1-OUTPUT-END")
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+        .unwrap_or_default();
+    if !keep {
+        for transient in [&initfs, &image, &vars] {
+            let _ = fs::remove_file(transient);
+        }
+    }
+    Ok(TapObservation {
+        exit: marker_int(&text, "G1-EXIT "),
+        output,
+        timed_out,
+    })
+}
+
 /// Run a batch of ATF cases in one boot.
 ///
 /// Each case is a `g1-run-<i>` service that execs the test with `-r /tmp/result-<i>`, followed
