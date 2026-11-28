@@ -70,6 +70,17 @@ modified = false
 notes = "vendored TAP body, never linked into a shipped artifact"
 
 [[import]]
+path = "tests/libc-oracle/vendor/pjdfstest/tests/misc.raven.sh"
+upstream = "pjdfstest"
+upstream_path = "tests/misc.sh"
+upstream_rev = "85a8aea9e685999ef0540392fd80535f873d7ff7"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-28"
+modified = true
+notes = "Raven namegen only (shell pid/counter); every expect and assertion is the donor text"
+
+[[import]]
 path = "tests/libc-oracle/vendor/pjdfstest/pjdfstest.c"
 upstream = "pjdfstest"
 upstream_path = "pjdfstest.c"

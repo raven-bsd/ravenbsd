@@ -532,6 +532,8 @@ env=LANG=C.UTF-8\nenv=LC_ALL=C.UTF-8\n"
         // when it is present, but keep the upstream name the scripts source.
         let source = if name == "conf" && tree.join("conf.raven").is_file() {
             tree.join("conf.raven")
+        } else if name == "misc.sh" && tree.join("misc.raven.sh").is_file() {
+            tree.join("misc.raven.sh")
         } else {
             tree.join(name)
         };
