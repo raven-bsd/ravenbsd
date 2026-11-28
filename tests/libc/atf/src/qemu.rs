@@ -668,7 +668,7 @@ fn batch_manifest(
     let (program, prefix) = if wrapper {
         (
             "/tests/atf-wrapper",
-            format!("arg=/tmp/atf-work\narg={image_path}\n"),
+            format!("arg=/tmp/atf-root/atf-work\narg={image_path}\n"),
         )
     } else {
         (image_path, format!("arg={image_path}\n"))
