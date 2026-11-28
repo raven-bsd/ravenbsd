@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S779 plain signal(2) fault handler with the donor `mprotect_write` mapping flags:
+# `mmap(NULL, page, PROT_READ|PROT_WRITE, MAP_ANON, -1, 0)` (no private/shared type), then a
+# child installs `signal(SIGSEGV, sighandler)` (`SA_RESTART`, no `SA_SIGINFO`) and the handler
+# calls `_exit(SIGSEGV)`. The C19 frame must enter the plain handler and the child must report
+# status 11. The case also keeps the S776 SA_SIGINFO and default-disposition coverage.
+
+name = "signal-fault-plain"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+pre = ["sh tests/qtest/cases/signal-fault-plain-fixture/build.sh"]
+initfs = "build/fixtures/signal-fault-plain/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal-fault: page handler=1 code=2 addr=0x[0-9a-f]+ addr-match=1$'
+
+[[expect]]
+regex = '^signal-fault: page resumed=1$'
+
+[[expect]]
+regex = '^signal-fault: caught status=11$'
+
+[[expect]]
+regex = '^signal-fault: default status=-11$'
+
+[[expect]]
+regex = '^signal-fault: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
