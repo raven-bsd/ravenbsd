@@ -33,6 +33,8 @@ const CMDLINE: &str = "console=ttyS0 test-exit=1";
 const POLL: Duration = Duration::from_millis(50);
 /// Largest serial log kept; a batch of hundreds of ATF bodies can exceed a few megabytes.
 const SERIAL_LIMIT: usize = 32 * 1024 * 1024;
+/// The donor `nobody` uid/gid used for `require.user=unprivileged` ATF cases.
+const UNPRIVILEGED_UID: u32 = 65534;
 
 /// Where the target kernel and the QEMU tools come from.
 #[derive(Clone, Debug)]
@@ -132,6 +134,8 @@ pub struct AtfBatchCase {
     pub program_name: String,
     /// The ATF case ident.
     pub ident: String,
+    /// The ATF `require.user` metadata value, when the case requests an identity.
+    pub user: Option<String>,
 }
 
 /// One batched ATF result, in the input case order.
@@ -456,7 +460,7 @@ pub fn run_atf_batch(
             .expect("program image was registered");
         let result = format!("/tmp/result-{index}");
         let manifest = workdir.join(format!("manifest-{index}"));
-        fs::write(&manifest, batch_manifest(&case.ident, image_path, &result))
+        fs::write(&manifest, batch_manifest(&case.ident, image_path, &result, case.user.as_deref()))
             .with_context(|| format!("cannot write {}", manifest.display()))?;
         let run = workdir.join(format!("g1-run-{index}.toml"));
         let read = workdir.join(format!("g1-read-{index}.toml"));
@@ -613,11 +617,12 @@ fn strip_to(program: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn batch_manifest(ident: &str, image_path: &str, result: &str) -> String {
+fn batch_manifest(ident: &str, image_path: &str, result: &str, user: Option<&str>) -> String {
     let mut text = format!(
         "mode=exec\nprogram={image_path}\narg={image_path}\narg=-r\narg={result}\n\
 arg=-s\narg=/tests\narg={ident}\n"
     );
+    text.push_str(user_manifest_line(user));
     for item in target_env() {
         text.push_str("env=");
         text.push_str(&item);
@@ -627,6 +632,11 @@ arg=-s\narg=/tests\narg={ident}\n"
     text.push_str(result);
     text.push('\n');
     text
+}
+
+/// Render the guest credential request for an ATF case that asks for a non-root identity.
+fn user_manifest_line(_user: Option<&str>) -> &'static str {
+    ""
 }
 
 fn parse_batch(text: &str, count: usize) -> Vec<AtfBatchResult> {

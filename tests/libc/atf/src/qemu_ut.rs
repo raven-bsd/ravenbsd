@@ -170,12 +170,25 @@ fn the_guest_initfs_has_the_services_and_the_program() {
 
 #[test]
 fn the_batch_manifest_uses_the_indexed_image_and_result() {
-    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7");
+    let text = batch_manifest("a_case", "/tests/t_foo", "/tmp/result-7", None);
     assert!(text.contains("mode=exec\n"));
     assert!(text.contains("program=/tests/t_foo\n"));
     assert!(text.contains("arg=-r\narg=/tmp/result-7\n"));
     assert!(text.contains("arg=-s\narg=/tests\narg=a_case\n"));
     assert!(text.contains("result=/tmp/result-7\n"));
+}
+
+#[test]
+fn the_batch_manifest_carries_the_unprivileged_user() {
+    let text = batch_manifest(
+        "link_perm",
+        "/tests/t_link",
+        "/tmp/result-2",
+        Some("unprivileged"),
+    );
+    assert!(text.contains("user=65534\n"));
+    let root = batch_manifest("mkdir_err", "/tests/t_mkdir", "/tmp/result-3", Some("root"));
+    assert!(!root.contains("user="));
 }
 
 #[test]
