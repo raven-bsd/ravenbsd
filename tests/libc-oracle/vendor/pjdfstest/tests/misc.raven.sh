@@ -44,8 +44,12 @@ expect()
 {
 	e="${1}"
 	shift
-	r=`${fstest} $* 2>/dev/null | tail -1`
-	echo "${r}" | ${GREP} -Eq '^'${e}'$'
+	# The Raven guest's Rust tools abort when they read stdin; keep the donor tail-line and grep
+	# semantics but hand both tools a regular file.
+	${fstest} $* > /tmp/pjdfstest-out 2>/dev/null
+	r=`tail -1 /tmp/pjdfstest-out`
+	printf "%s\n" "${r}" > /tmp/pjdfstest-r
+	${GREP} -Eq '^'${e}'$' /tmp/pjdfstest-r
 	if [ $? -eq 0 ]; then
 		if [ -z "${todomsg}" ]; then
 			echo "ok ${ntest}"
