@@ -1534,6 +1534,25 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         })
     }
 
+    /// `link`: create `new` as a second name for `old`.
+    ///
+    /// Both names resolve against the cwd; the server decides whether the final component of
+    /// `old` is followed (FreeBSD `kern_linkat` passes `AT_SYMLINK_FOLLOW` for `link`).
+    pub fn link(&self, old: &[u8], new: &[u8]) -> Result<(), Errno> {
+        let old = self
+            .cwd
+            .resolve(old, false, &self.limits)
+            .map_err(crate::path::path_errno)?;
+        let new = self
+            .cwd
+            .resolve(new, false, &self.limits)
+            .map_err(crate::path::path_errno)?;
+        self.root_call(Call::Link {
+            path: &new.abs,
+            target: &old.abs,
+        })
+    }
+
     /// `symlink`.
     pub fn symlink(&self, target: &[u8], link: &[u8]) -> Result<(), Errno> {
         if target.is_empty() {
