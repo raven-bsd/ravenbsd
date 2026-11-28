@@ -38,6 +38,19 @@ fn anonymous_private_is_zero_filled() {
 }
 
 #[test]
+fn anonymous_without_a_type_is_private() {
+    let fake = FakeSys::new();
+    let platform = Platform::new(fake);
+    // NetBSD `uvm_mmap.c`: only `MAP_SHARED|MAP_PRIVATE` together is EINVAL; without a type
+    // the mapping is private.
+    let address = mmap(&platform, 0, PAGE, 3, mman::MAP_ANONYMOUS, -1, 0).expect("mmap");
+    assert_eq!(
+        platform.backend().mapped(address).expect("mapped"),
+        alloc::vec![0u8; PAGE]
+    );
+}
+
+#[test]
 fn anonymous_mapping_with_a_real_fd_is_einval() {
     let platform = Platform::new(FakeSys::new());
     assert_eq!(
