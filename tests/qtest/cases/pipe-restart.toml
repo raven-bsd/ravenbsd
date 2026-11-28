@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S781: a blocking pipe transfer interrupted by a caught signal must complete. The child blocks
+# on a pipe read and then on a signal; the parent fills the 2 MiB stream and blocks in write.
+# SIGALRM interrupts that write, the handler signals the child, and the write continues. A lost
+# wake or a dropped byte leaves a process blocked until the qtest timeout, which is the current
+# target failure of the FreeBSD/NetBSD `pipe_restart` row.
+
+name = "pipe-restart"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pipe-restart/build.sh"]
+initfs = "build/fixtures/pipe-restart/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipe-restart: child first=[0-9]+$'
+
+[[expect]]
+regex = '^pipe-restart: child signalled$'
+
+[[expect]]
+regex = '^pipe-restart: parent remaining=0$'
+
+[[expect]]
+regex = '^pipe-restart: child total=2097152$'
+
+[[expect]]
+regex = '^pipe-restart: child code=0$'
+
+[[expect]]
+regex = '^pipe-restart: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pipe-restart: fail'
