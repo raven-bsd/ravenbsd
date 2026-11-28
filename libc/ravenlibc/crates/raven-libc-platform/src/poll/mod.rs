@@ -5,9 +5,10 @@
 //!
 //! A regular file is always ready; that is what POSIX requires and it needs no kernel help. A
 //! tty, pipe or socket can report only `HUP` until PG-26/`POLL*` lands, so a blocking `poll` on
-//! one of those returns on hangup or timeout, not on data: an honest, documented gap. `ppoll`
-//! and `pselect` are not emulated with `sigprocmask; poll; sigprocmask`; they return `ENOSYS`
-//! until the atomic mask-and-wait operation exists.
+//! one of those returns on hangup or timeout, not on data: an honest, documented gap. `pselect`
+//! installs the caller's temporary mask, runs the existing wait and restores the mask on every
+//! return; the atomic masked wait remains PG-26/S173b. `ppoll` still accepts its mask without
+//! swapping it.
 
 pub mod epoll;
 #[allow(clippy::module_inception)]
@@ -16,7 +17,7 @@ pub mod select;
 
 pub use epoll::{EpollEvent, epoll_create1, epoll_ctl, epoll_pwait, epoll_pwait2, epoll_wait};
 pub use poll::{poll, ppoll, validate_user_range, wait_readable, wait_writable};
-pub use select::{pselect, select};
+pub use select::{KernelMasks, MaskOps, pselect, select};
 
 /// Maximum registrations in one event queue (`raven-evq-core MAX_REGISTRATIONS`).
 pub const MAX_POLL_FDS: usize = 4096;

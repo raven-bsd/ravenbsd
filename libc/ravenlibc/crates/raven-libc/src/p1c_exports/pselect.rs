@@ -36,5 +36,6 @@ pub unsafe extern "C" fn pselect(
         except,
         timeout,
         mask,
+        &mut raven_libc_platform::poll::KernelMasks,
     ))
 }
